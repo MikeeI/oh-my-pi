@@ -4,10 +4,11 @@ use tree_sitter::Node;
 
 use super::{
 	classify::{
-		ClassifierTables, LangClassifier, NamingMode, RecurseMode, RuleStyle, semantic_rule,
+		ClassifierTables, LangClassifier, NamingMode, RecurseMode, RuleStyle, WrapperSignature,
+		WrapperTransform, classify_with_defaults, first_wrapper_content_child,
+		promote_wrapper_candidate, semantic_rule,
 	},
 	common::*,
-	defaults::promote_assigned_expression,
 	kind::ChunkKind,
 };
 
@@ -41,7 +42,56 @@ static JSTS_TABLES: ClassifierTables = ClassifierTables {
 			RecurseMode::Auto(ChunkContext::FunctionBody),
 		),
 		semantic_rule(
+			"function",
+			ChunkKind::Function,
+			RuleStyle::Named,
+			NamingMode::AutoIdentifier,
+			RecurseMode::Auto(ChunkContext::FunctionBody),
+		),
+		semantic_rule(
+			"function_expression",
+			ChunkKind::Function,
+			RuleStyle::Named,
+			NamingMode::AutoIdentifier,
+			RecurseMode::Auto(ChunkContext::FunctionBody),
+		),
+		semantic_rule(
+			"arrow_function",
+			ChunkKind::Function,
+			RuleStyle::Named,
+			NamingMode::AutoIdentifier,
+			RecurseMode::Auto(ChunkContext::FunctionBody),
+		),
+		semantic_rule(
+			"generator_function",
+			ChunkKind::Function,
+			RuleStyle::Named,
+			NamingMode::AutoIdentifier,
+			RecurseMode::Auto(ChunkContext::FunctionBody),
+		),
+		semantic_rule(
+			"generator_function_declaration",
+			ChunkKind::Function,
+			RuleStyle::Named,
+			NamingMode::AutoIdentifier,
+			RecurseMode::Auto(ChunkContext::FunctionBody),
+		),
+		semantic_rule(
 			"class_declaration",
+			ChunkKind::Class,
+			RuleStyle::Named,
+			NamingMode::AutoIdentifier,
+			RecurseMode::Auto(ChunkContext::ClassBody),
+		),
+		semantic_rule(
+			"class",
+			ChunkKind::Class,
+			RuleStyle::Named,
+			NamingMode::AutoIdentifier,
+			RecurseMode::Auto(ChunkContext::ClassBody),
+		),
+		semantic_rule(
+			"class_expression",
 			ChunkKind::Class,
 			RuleStyle::Named,
 			NamingMode::AutoIdentifier,
@@ -101,6 +151,22 @@ impl LangClassifier for JsTsClassifier {
 		&JSTS_TABLES
 	}
 
+	fn is_trivia(&self, kind: &str) -> bool {
+		// Whitespace/text runs between JSX elements carry no structure and
+		// should be absorbed as leading trivia of the next element (matching
+		// the existing comment-absorption semantics).
+		kind == "jsx_text"
+	}
+
+	fn should_skip_child(&self, kind: &str) -> bool {
+		// JSX opening and closing elements are part of the enclosing
+		// `jsx_element` chunk's framing, not children in their own right.
+		// Skip them entirely when enumerating children so they don't pollute
+		// the chunk tree with noisy 1‑line entries and, crucially, so they
+		// don't get absorbed backward into the next real child.
+		matches!(kind, "jsx_opening_element" | "jsx_closing_element")
+	}
+
 	fn classify_override<'t>(
 		&self,
 		context: ChunkContext,
@@ -118,8 +184,15 @@ impl LangClassifier for JsTsClassifier {
 fn classify_root_custom<'t>(node: Node<'t>, source: &str) -> Option<RawChunkCandidate<'t>> {
 	match node.kind() {
 		// ── Exports / decorators ──
-		"export_statement" => Some(classify_export_statement(node, source)),
-		"decorated_definition" => Some(classify_decorated(node, source)),
+		"export_statement" => Some(classify_export_statement(ChunkContext::Root, node, source)),
+		"decorated_definition" => promote_wrapper_candidate(
+			&JsTsClassifier,
+			ChunkContext::Root,
+			node,
+			source,
+			WrapperTransform { signature: WrapperSignature::Wrapper, ..WrapperTransform::default() },
+		)
+		.or_else(|| Some(positional_candidate(node, ChunkKind::Block, source))),
 
 		// ── Variables ──
 		"lexical_declaration" | "variable_declaration" => Some(classify_var_decl_js(node, source)),
@@ -154,8 +227,15 @@ fn classify_root_custom<'t>(node: Node<'t>, source: &str) -> Option<RawChunkCand
 fn classify_class_custom<'t>(node: Node<'t>, source: &str) -> Option<RawChunkCandidate<'t>> {
 	match node.kind() {
 		// ── Exports / decorators (re-exported members) ──
-		"export_statement" => Some(classify_export_statement(node, source)),
-		"decorated_definition" => Some(classify_decorated(node, source)),
+		"export_statement" => Some(classify_export_statement(ChunkContext::ClassBody, node, source)),
+		"decorated_definition" => promote_wrapper_candidate(
+			&JsTsClassifier,
+			ChunkContext::ClassBody,
+			node,
+			source,
+			WrapperTransform { signature: WrapperSignature::Wrapper, ..WrapperTransform::default() },
+		)
+		.or_else(|| Some(positional_candidate(node, ChunkKind::Block, source))),
 
 		// ── Variables ──
 		"lexical_declaration" | "variable_declaration" => Some(classify_var_decl_js(node, source)),
@@ -249,9 +329,148 @@ fn classify_function_js<'t>(node: Node<'t>, source: &str) -> RawChunkCandidate<'
 			}
 		},
 
+		// ── Return statements ──
+		// A bare `return <Link>…</Link>` or `return (<Link>…</Link>)` creates a
+		// huge monolithic leaf chunk in React components. Recurse into the JSX
+		// so each child element inside the returned tree stays individually
+		// addressable. Callback-with-trailing-block patterns such as
+		// `return items.map(item => { … })` are handled by the shared
+		// call-with-callback promotion in `classify_with_defaults` via the
+		// `return_statement` arm below.
+		"return_statement" => classify_return_statement_js(node, source),
+
+		// ── JSX elements ──
+		// Inside function bodies, JSX elements become container chunks with
+		// their tag name so React component trees are navigable instead of
+		// opaque walls of markup.
+		"jsx_element" => classify_jsx_element(node, source),
+		"jsx_self_closing_element" => classify_jsx_self_closing_element(node, source),
+		"jsx_fragment" => make_candidate(
+			node,
+			ChunkKind::Tag,
+			Some("fragment".to_string()),
+			NameStyle::Named,
+			signature_for_node(node, source),
+			Some(recurse_self(node, ChunkContext::FunctionBody)),
+			source,
+		),
+
 		// ── Fallback ──
 		_ => group_from_sanitized(node, source),
 	}
+}
+
+/// Classify a `jsx_element` as a container chunk named after its tag.
+///
+/// The chunk recurses into itself so that nested JSX children are emitted as
+/// sub-chunks. Structural JSX nodes (opening/closing elements, text,
+/// attributes) are filtered out as trivia by the classifier's `is_trivia`
+/// override, so only meaningful children (child elements, expression
+/// containers) become chunks.
+fn classify_jsx_element<'t>(node: Node<'t>, source: &str) -> RawChunkCandidate<'t> {
+	let tag_name = extract_jsx_tag_name(node, source);
+	let mut candidate = make_candidate(
+		node,
+		ChunkKind::Tag,
+		tag_name,
+		NameStyle::Named,
+		signature_for_node(node, source),
+		Some(recurse_self(node, ChunkContext::FunctionBody)),
+		source,
+	);
+	// Force recursion for jsx_elements that span more than a single
+	// source line. Without this, a `<div>` wrapping a single
+	// near-equal-sized child fails `recursion_narrows_scope` and the
+	// whole subtree collapses into one opaque chunk. One-line elements
+	// keep natural collapse behavior so short inline JSX stays a leaf.
+	if candidate
+		.range_end_line
+		.saturating_sub(candidate.range_start_line)
+		> 0
+	{
+		candidate.force_recurse = true;
+	}
+	candidate
+}
+
+/// Classify a `return_statement`.
+///
+/// Two patterns matter:
+///
+/// 1. `return <Link>…</Link>` / `return (<Link>…</Link>)` — unwrap any
+///    parentheses and recurse directly into the JSX tree so each nested JSX
+///    element is individually addressable.
+/// 2. `return items.map(item => { … })` — the shared call-with-trailing-
+///    callback promoter turns this into a named expression container that
+///    recurses into the callback body. We invoke it explicitly here because the
+///    shared promotion in `classify_with_defaults` only runs on groupable
+///    leaves, and `Return` is not groupable.
+fn classify_return_statement_js<'t>(node: Node<'t>, source: &str) -> RawChunkCandidate<'t> {
+	if let Some(expr) = named_children(node).into_iter().next() {
+		let target = unwrap_parenthesized(expr);
+		if matches!(target.kind(), "jsx_element" | "jsx_fragment" | "jsx_self_closing_element") {
+			let mut candidate = make_candidate(
+				node,
+				ChunkKind::Return,
+				None::<String>,
+				NameStyle::Named,
+				signature_for_node(node, source),
+				Some(RecurseSpec { node: target, context: ChunkContext::FunctionBody }),
+				source,
+			);
+			// The JSX tree may span nearly the entire return statement, which
+			// would fail the `recursion_narrows_scope` check. Force recursion
+			// so the JSX children are always individually addressable.
+			candidate.force_recurse = true;
+			return candidate;
+		}
+	}
+	if let Some(mut promoted) = try_promote_call_with_callback(node, source) {
+		// The callback body is the sole child of the return value, so it
+		// spans nearly the entire return statement. Force recursion to
+		// guarantee the callback internals are addressable.
+		promoted.force_recurse = true;
+		return promoted;
+	}
+	group_from_sanitized(node, source)
+}
+
+/// Classify a `jsx_self_closing_element` as a leaf chunk named after its tag.
+fn classify_jsx_self_closing_element<'t>(node: Node<'t>, source: &str) -> RawChunkCandidate<'t> {
+	let tag_name = extract_jsx_tag_name(node, source);
+	make_kind_chunk(node, ChunkKind::Tag, tag_name, source, None)
+}
+
+/// Unwrap nested `parenthesized_expression` wrappers to reach the meaningful
+/// inner expression.
+fn unwrap_parenthesized(mut node: Node<'_>) -> Node<'_> {
+	while node.kind() == "parenthesized_expression" {
+		let Some(inner) = named_children(node).into_iter().next() else {
+			break;
+		};
+		node = inner;
+	}
+	node
+}
+
+/// Extract the tag name from a `jsx_element` or `jsx_self_closing_element`.
+///
+/// The tag may be an identifier (`div`, `Link`), a member expression
+/// (`Foo.Bar`), or a nested identifier. We sanitize the full text so path
+/// segments remain valid identifiers.
+fn extract_jsx_tag_name(node: Node<'_>, source: &str) -> Option<String> {
+	let name_holder = match node.kind() {
+		"jsx_element" => child_by_kind(node, &["jsx_opening_element"])?,
+		"jsx_self_closing_element" => node,
+		_ => return None,
+	};
+	let name_node = named_children(name_holder).into_iter().find(|child| {
+		matches!(
+			child.kind(),
+			"identifier" | "member_expression" | "nested_identifier" | "jsx_namespace_name"
+		)
+	})?;
+	sanitize_identifier(node_text(source, name_node.start_byte(), name_node.end_byte()))
 }
 
 /// Classify `const`/`let`/`var` declarations, promoting arrow functions
@@ -300,19 +519,28 @@ fn group_from_sanitized<'t>(node: Node<'t>, source: &str) -> RawChunkCandidate<'
 
 /// Unwrap `export` / `export default` to classify the inner declaration.
 ///
-/// Named exports delegate to the appropriate container/named-chunk builder;
-/// `export default …` always maps to `default_export`.  Re-exports and
-/// bare expression exports fall through to the `stmts` group.
-fn classify_export_statement<'t>(node: Node<'t>, source: &str) -> RawChunkCandidate<'t> {
+/// Wrapper promotion handles declaration-like exports automatically.
+/// `export default …` remaps the promoted child to `default_export`, while
+/// re-exports and bare expression exports still fall through to `stmts`.
+fn classify_export_statement<'t>(
+	context: ChunkContext,
+	node: Node<'t>,
+	source: &str,
+) -> RawChunkCandidate<'t> {
 	let header = normalized_header(source, node.start_byte(), node.end_byte());
 	let is_default = header.starts_with("export default");
 
-	let inner = named_children(node)
-		.into_iter()
-		.find(|child| !is_trivia(child.kind()) && !child.is_error() && child.kind() != "comment");
+	if let Some(candidate) =
+		promote_wrapper_candidate(&JsTsClassifier, context, node, source, WrapperTransform {
+			kind: is_default.then_some(ChunkKind::DefaultExport),
+			name_style: is_default.then_some(NameStyle::Named),
+			clear_identifier: is_default,
+			..WrapperTransform::default()
+		}) {
+		return candidate;
+	}
 
-	let Some(child) = inner else {
-		// `export { foo } from "bar"` with no inner declaration node.
+	let Some(child) = first_wrapper_content_child(&JsTsClassifier, node) else {
 		return if is_default {
 			make_kind_chunk(node, ChunkKind::DefaultExport, None, source, None)
 		} else {
@@ -320,149 +548,14 @@ fn classify_export_statement<'t>(node: Node<'t>, source: &str) -> RawChunkCandid
 		};
 	};
 
-	match child.kind() {
-		"class_declaration" => {
-			let recurse = recurse_class(child);
-			if is_default {
-				make_container_chunk_from(node, child, ChunkKind::DefaultExport, None, source, recurse)
-			} else {
-				make_container_chunk_from(
-					node,
-					child,
-					ChunkKind::Class,
-					extract_identifier(child, source),
-					source,
-					recurse,
-				)
-			}
-		},
-		"function_declaration"
-		| "function"
-		| "function_expression"
-		| "arrow_function"
-		| "generator_function"
-		| "generator_function_declaration" => {
-			let recurse = recurse_body(child, ChunkContext::FunctionBody);
-			if is_default {
-				make_kind_chunk_from(node, child, ChunkKind::DefaultExport, None, source, recurse)
-			} else {
-				make_kind_chunk_from(
-					node,
-					child,
-					ChunkKind::Function,
-					extract_identifier(child, source),
-					source,
-					recurse,
-				)
-			}
-		},
-		"interface_declaration" => {
-			let recurse = recurse_interface(child);
-			if is_default {
-				make_container_chunk_from(node, child, ChunkKind::DefaultExport, None, source, recurse)
-			} else {
-				make_container_chunk_from(
-					node,
-					child,
-					ChunkKind::Interface,
-					extract_identifier(child, source),
-					source,
-					recurse,
-				)
-			}
-		},
-		"type_alias_declaration" => {
-			if is_default {
-				make_kind_chunk_from(node, child, ChunkKind::DefaultExport, None, source, None)
-			} else {
-				make_kind_chunk_from(
-					node,
-					child,
-					ChunkKind::Type,
-					extract_identifier(child, source),
-					source,
-					None,
-				)
-			}
-		},
-		"enum_declaration" => {
-			let recurse = recurse_enum(child);
-			if is_default {
-				make_container_chunk_from(node, child, ChunkKind::DefaultExport, None, source, recurse)
-			} else {
-				make_container_chunk_from(
-					node,
-					child,
-					ChunkKind::Enum,
-					extract_identifier(child, source),
-					source,
-					recurse,
-				)
-			}
-		},
-		"internal_module" => {
-			let recurse = recurse_internal_module(child);
-			if is_default {
-				make_container_chunk_from(node, child, ChunkKind::DefaultExport, None, source, recurse)
-			} else {
-				make_container_chunk_from(
-					node,
-					child,
-					ChunkKind::Module,
-					extract_identifier(child, source),
-					source,
-					recurse,
-				)
-			}
-		},
-		"lexical_declaration" | "variable_declaration" => {
-			if is_default {
-				make_kind_chunk_from(node, child, ChunkKind::DefaultExport, None, source, None)
-			} else {
-				promote_assigned_expression(node, child, source)
-					.unwrap_or_else(|| super::defaults::classify_var_decl(child, source))
-			}
-		},
-		_ => {
-			// expression_statement, re-exports, or anything else.
-			if is_default {
-				make_kind_chunk_from(node, child, ChunkKind::DefaultExport, None, source, None)
-			} else {
-				group_candidate(child, ChunkKind::Statements, source)
-			}
-		},
+	if is_default {
+		return make_kind_chunk(node, ChunkKind::DefaultExport, None, source, None);
 	}
-}
 
-/// Unwrap `@decorator` wrappers (TS/Python `decorated_definition`) to find
-/// the inner class or function definition.
-fn classify_decorated<'t>(node: Node<'t>, source: &str) -> RawChunkCandidate<'t> {
-	let inner = named_children(node).into_iter().find(|c| {
-		matches!(
-			c.kind(),
-			"class_declaration" | "class_definition" | "function_declaration" | "function_definition"
-		)
-	});
-
-	match inner {
-		Some(child) if child.kind() == "class_declaration" || child.kind() == "class_definition" => {
-			let recurse = recurse_class(child);
-			make_container_chunk(
-				node,
-				ChunkKind::Class,
-				extract_identifier(child, source),
-				source,
-				recurse,
-			)
+	match child.kind() {
+		"lexical_declaration" | "variable_declaration" => {
+			classify_with_defaults(&JsTsClassifier, context, child, source)
 		},
-		Some(child) => {
-			// function_declaration | function_definition
-			let name = extract_identifier(child, source).unwrap_or_else(|| "anonymous".to_string());
-			make_kind_chunk(node, ChunkKind::Function, Some(name), source, {
-				let context = ChunkContext::FunctionBody;
-				recurse_into(child, context, &["body"], &["block"])
-			})
-		},
-		None => positional_candidate(node, ChunkKind::Block, source),
+		_ => group_candidate(child, ChunkKind::Statements, source),
 	}
 }

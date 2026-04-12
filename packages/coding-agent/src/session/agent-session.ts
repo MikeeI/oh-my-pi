@@ -56,6 +56,7 @@ import type { Rule } from "../capability/rule";
 import { MODEL_ROLE_IDS, type ModelRegistry } from "../config/model-registry";
 import {
 	extractExplicitThinkingSelector,
+	formatModelSelectorValue,
 	formatModelString,
 	parseModelString,
 	type ResolvedModelRoleValue,
@@ -996,6 +997,16 @@ export class AgentSession {
 			const msg = this.#lastAssistantMessage ?? fallbackAssistant;
 			this.#lastAssistantMessage = undefined;
 			if (!msg) return;
+
+			// Invalidate GitHub Copilot credentials on auth failure so stale tokens
+			// aren't reused on the next request
+			if (
+				msg.stopReason === "error" &&
+				msg.provider === "github-copilot" &&
+				msg.errorMessage?.includes("GitHub Copilot authentication failed")
+			) {
+				await this.#modelRegistry.authStorage.remove("github-copilot");
+			}
 
 			if (this.#skipPostTurnMaintenanceAssistantTimestamp === msg.timestamp) {
 				this.#skipPostTurnMaintenanceAssistantTimestamp = undefined;
@@ -3380,7 +3391,11 @@ export class AgentSession {
 	 * Validates API key, saves to session and settings.
 	 * @throws Error if no API key available for the model
 	 */
-	async setModel(model: Model, role: string = "default"): Promise<void> {
+	async setModel(
+		model: Model,
+		role: string = "default",
+		options?: { selector?: string; thinkingLevel?: ThinkingLevel },
+	): Promise<void> {
 		const apiKey = await this.#modelRegistry.getApiKey(model, this.sessionId);
 		if (!apiKey) {
 			throw new Error(`No API key for ${model.provider}/${model.id}`);
@@ -3389,7 +3404,10 @@ export class AgentSession {
 		this.#clearActiveRetryFallback();
 		this.#setModelWithProviderSessionReset(model);
 		this.sessionManager.appendModelChange(`${model.provider}/${model.id}`, role);
-		this.settings.setModelRole(role, this.#formatRoleModelValue(role, model));
+		this.settings.setModelRole(
+			role,
+			this.#formatRoleModelValue(role, model, options?.selector, options?.thinkingLevel),
+		);
 		this.settings.getStorage()?.recordModelUsage(`${model.provider}/${model.id}`);
 
 		// Re-apply the current thinking level for the newly selected model
@@ -3462,6 +3480,7 @@ export class AgentSession {
 			const resolved = resolveModelRoleValue(roleModelStr, availableModels, {
 				settings: this.settings,
 				matchPreferences,
+				modelRegistry: this.#modelRegistry,
 			});
 			if (!resolved.model) continue;
 
@@ -4226,6 +4245,14 @@ export class AgentSession {
 			return undefined;
 		}
 
+		// Only inject on the first user message of the conversation. Subsequent user
+		// turns must not receive the eager todo reminder — they often correct, clarify,
+		// or redirect the prior task, and forcing a brand-new todo list there is wrong.
+		const hasPriorUserMessage = this.agent.state.messages.some(m => m.role === "user");
+		if (hasPriorUserMessage) {
+			return undefined;
+		}
+
 		const trimmedPromptText = promptText.trimEnd();
 		if (trimmedPromptText.endsWith("?") || trimmedPromptText.endsWith("!")) {
 			return undefined;
@@ -4578,14 +4605,21 @@ export class AgentSession {
 		return `${model.provider}/${model.id}`;
 	}
 
-	#formatRoleModelValue(role: string, model: Model): string {
-		const modelKey = `${model.provider}/${model.id}`;
+	#formatRoleModelValue(
+		role: string,
+		model: Model,
+		selectorOverride?: string,
+		thinkingLevelOverride?: ThinkingLevel,
+	): string {
+		const modelKey = selectorOverride ?? `${model.provider}/${model.id}`;
+		if (thinkingLevelOverride !== undefined) {
+			return formatModelSelectorValue(modelKey, thinkingLevelOverride);
+		}
 		const existingRoleValue = this.settings.getModelRole(role);
 		if (!existingRoleValue) return modelKey;
 
 		const thinkingLevel = extractExplicitThinkingSelector(existingRoleValue, this.settings);
-		if (thinkingLevel === undefined) return modelKey;
-		return `${modelKey}:${thinkingLevel}`;
+		return formatModelSelectorValue(modelKey, thinkingLevel);
 	}
 	#resolveContextPromotionConfiguredTarget(currentModel: Model, availableModels: Model[]): Model | undefined {
 		const configuredTarget = currentModel.contextPromotionTarget?.trim();
@@ -4618,6 +4652,7 @@ export class AgentSession {
 		return resolveModelRoleValue(roleModelStr, availableModels, {
 			settings: this.settings,
 			matchPreferences: { usageOrder: this.settings.getStorage()?.getModelUsageOrder() },
+			modelRegistry: this.#modelRegistry,
 		});
 	}
 
