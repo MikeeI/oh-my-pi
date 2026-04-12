@@ -214,7 +214,7 @@ export function createCompactionSummaryMessage(
 	};
 }
 
-export function sanitizeRehydratedOpenAIResponsesAssistantMessage(message: AssistantMessage): AssistantMessage {
+export function sanitizeStoredOpenAIResponsesAssistantMessage(message: AssistantMessage): AssistantMessage {
 	if (message.providerPayload?.type !== "openaiResponsesHistory") {
 		return message;
 	}
@@ -229,10 +229,9 @@ export function sanitizeRehydratedOpenAIResponsesAssistantMessage(message: Assis
 		return { ...block, thinkingSignature: undefined };
 	});
 
-	// Strip the assistant-side native replay payload entirely.
-	// After rehydration it belongs to a previous live provider connection and
-	// replaying it on a warmed session causes 401 rejections from GitHub Copilot.
-	// User/developer payloads are preserved separately by the caller.
+	// Strip the assistant-side native replay payload before persisting session state.
+	// Live provider state owns replay metadata while a request is active; session
+	// storage should keep only the normalized transcript content.
 	return {
 		...message,
 		...(didSanitizeContent ? { content: sanitizedContent } : {}),

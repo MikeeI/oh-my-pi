@@ -2741,6 +2741,7 @@ dependencies = [
  "image",
  "inferno",
  "libc",
+ "log",
  "memmap2",
  "mimalloc",
  "napi",

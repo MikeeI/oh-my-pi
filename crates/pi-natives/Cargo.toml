@@ -32,6 +32,7 @@ fff-grep = "0.4"
 fff = { package = "fff-search", version = "0.4.2", default-features = false, features = [
    "zlob",
 ] }
+log = "0.4"
 # Force fff-search's transitive blake3 build off AVX-512 so shipped x64 addons stay <= x86-64-v3.
 blake3 = { version = "1.8.4", default-features = false, features = ["std", "pure"] }
 grep-matcher = "0.1"

@@ -3,6 +3,7 @@ import * as os from "node:os";
 import * as path from "node:path";
 import type { AgentMessage } from "@oh-my-pi/pi-agent-core";
 import type {
+	AssistantMessage,
 	ImageContent,
 	Message,
 	MessageAttribution,
@@ -46,7 +47,7 @@ import {
 	type FileMentionMessage,
 	type HookMessage,
 	type PythonExecutionMessage,
-	sanitizeRehydratedOpenAIResponsesAssistantMessage,
+	sanitizeStoredOpenAIResponsesAssistantMessage,
 } from "./messages";
 import type { SessionStorage, SessionStorageWriter } from "./session-storage";
 import { FileSessionStorage, MemorySessionStorage } from "./session-storage";
@@ -2046,12 +2047,16 @@ export class SessionManager {
 			| PythonExecutionMessage
 			| FileMentionMessage,
 	): string {
+		const persistedMessage =
+			message.role === "assistant"
+				? sanitizeStoredOpenAIResponsesAssistantMessage(message as AssistantMessage)
+				: message;
 		const entry: SessionMessageEntry = {
 			type: "message",
 			id: generateId(this.#byId),
 			parentId: this.#leafId,
 			timestamp: new Date().toISOString(),
-			message,
+			message: persistedMessage,
 		};
 		this.#appendEntry(entry);
 		return entry.id;
@@ -2364,7 +2369,7 @@ export class SessionManager {
 		return buildSessionContext(this.getEntries(), this.#leafId, this.#byId);
 	}
 
-	/** Strip stale OpenAI Responses assistant replay metadata from loaded in-memory entries. */
+	/** Normalize persisted assistant replay metadata in loaded in-memory entries. */
 	sanitizeLoadedOpenAIResponsesReplayMetadata(): boolean {
 		let didSanitize = false;
 		for (const entry of this.#fileEntries) {
@@ -2372,7 +2377,7 @@ export class SessionManager {
 				continue;
 			}
 
-			const sanitizedMessage = sanitizeRehydratedOpenAIResponsesAssistantMessage(entry.message);
+			const sanitizedMessage = sanitizeStoredOpenAIResponsesAssistantMessage(entry.message);
 			if (sanitizedMessage === entry.message) {
 				continue;
 			}
