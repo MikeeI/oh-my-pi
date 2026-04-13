@@ -1478,6 +1478,28 @@ describe("edit tool CRLF handling", () => {
 		).rejects.toThrow(/Found 2 occurrences/);
 	});
 
+	it("should describe batching same-file edits in hashline mode", () => {
+		const originalEditVariant = Bun.env.PI_EDIT_VARIANT;
+		Bun.env.PI_EDIT_VARIANT = "hashline";
+
+		const hashDir = path.join(os.tmpdir(), `coding-agent-hashline-description-${Snowflake.next()}`);
+		fs.mkdirSync(hashDir, { recursive: true });
+
+		try {
+			const session = createTestToolSession(hashDir);
+			const hashlineEditTool = new EditTool(session);
+
+			expect(hashlineEditTool.description).toContain("In one `edit` call, batch all edits for one file.");
+			expect(hashlineEditTool.description).toContain(
+				"do not spend a second same-file edit fixing a brace, delimiter, or adjacent line you could have included in the first consumed range",
+			);
+		} finally {
+			fs.rmSync(hashDir, { recursive: true, force: true });
+			if (originalEditVariant === undefined) delete Bun.env.PI_EDIT_VARIANT;
+			else Bun.env.PI_EDIT_VARIANT = originalEditVariant;
+		}
+	});
+
 	it("should delete file in hashline mode with delete:true", async () => {
 		const originalEditVariant = Bun.env.PI_EDIT_VARIANT;
 		Bun.env.PI_EDIT_VARIANT = "hashline";

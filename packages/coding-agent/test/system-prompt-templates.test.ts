@@ -3,6 +3,7 @@ import * as fs from "node:fs/promises";
 import * as os from "node:os";
 import * as path from "node:path";
 import { buildSystemPrompt } from "@oh-my-pi/pi-coding-agent/system-prompt";
+import "@oh-my-pi/pi-coding-agent/config/prompt-templates";
 import { prompt } from "@oh-my-pi/pi-utils";
 import Handlebars from "handlebars";
 
@@ -162,6 +163,17 @@ describe("system Handlebars prompt templates", () => {
 			tools: baseTools.filter((tool: string) => tool !== "inspect_image"),
 		});
 		expect(withoutInspectImage).not.toContain("### Image inspection");
+	});
+
+	test("system-prompt tells agents to batch same-file edits", async () => {
+		const templatePath = path.join(systemPromptsDir, "system-prompt.md");
+		const template = await Bun.file(templatePath).text();
+
+		const rendered = prompt.render(template, baseRenderContext);
+
+		expect(rendered).toContain(
+			"When multiple changes in one file are already known, batch them into one `edit` call instead of drip-feeding same-file follow-ups.",
+		);
 	});
 
 	test("system-prompt renders MCP discovery hint when enabled", async () => {

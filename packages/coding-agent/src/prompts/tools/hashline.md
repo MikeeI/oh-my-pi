@@ -1,6 +1,6 @@
 Applies precise file edits using `LINE#ID` anchors from `read` output.
 
-Read the file first. Copy anchors exactly from the latest `read` output. In one `edit` call, batch all edits for one file. After any successful edit, re-read before editing that file again.
+Read the file first. Copy anchors exactly from the latest `read` output. In one `edit` call, batch all edits for one file. Plan the full change before calling `edit` — do not spend a second same-file edit fixing a brace, delimiter, or adjacent line you could have included in the first consumed range. After any successful edit, re-read before editing that file again.
 
 <operations>
 **Top level**
