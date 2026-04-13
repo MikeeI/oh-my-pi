@@ -16,6 +16,10 @@ import * as os from "node:os";
 import * as path from "node:path";
 import { engines, version } from "../package.json" with { type: "json" };
 
+declare const PI_VERSION_OVERRIDE: string | undefined;
+
+const versionOverride = typeof PI_VERSION_OVERRIDE === "string" && PI_VERSION_OVERRIDE.length > 0 ? PI_VERSION_OVERRIDE : undefined;
+
 /** App name (e.g. "omp") */
 export const APP_NAME: string = "omp";
 
@@ -23,7 +27,7 @@ export const APP_NAME: string = "omp";
 export const CONFIG_DIR_NAME: string = ".omp";
 
 /** Version (e.g. "1.0.0") */
-export const VERSION: string = version;
+export const VERSION: string = versionOverride ?? version;
 
 /** Minimum Bun version */
 export const MIN_BUN_VERSION: string = engines.bun.replace(/[^0-9.]/g, "");

@@ -6,6 +6,8 @@ This repo contains multiple packages, but **`packages/coding-agent/`** is the pr
 
 **Terminology**: When the user says "agent" or asks "why is agent doing X", they mean the **coding-agent package implementation**, not you (the assistant). The coding-agent is a CLI tool that uses Claude—questions about its behavior refer to the code in `packages/coding-agent/`, not your current session.
 
+**Local OMP install**: If you need to inspect how `omp` is installed or overridden on this machine, check the dotfiles repo at `/root/projects/dotfiles`. The relevant script is `/root/projects/dotfiles/scripts/script_install_local_omp_override.sh`, which builds from this repo and installs the preferred local override to `/root/.local/bin/omp` ahead of `/root/.bun/bin/omp`.
+
 ### Package Structure
 
 | Package                 | Description                                          |

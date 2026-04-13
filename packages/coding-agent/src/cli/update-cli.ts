@@ -11,6 +11,7 @@ import { $which, APP_NAME, isEnoent, VERSION } from "@oh-my-pi/pi-utils";
 import { $ } from "bun";
 import chalk from "chalk";
 import { theme } from "../modes/theme/theme";
+import { compareNumericVersionStrings, parseCliVersionOutput } from "../utils/version";
 
 const REPO = "can1357/oh-my-pi";
 const PACKAGE = "@oh-my-pi/pi-coding-agent";
@@ -106,21 +107,13 @@ async function getLatestRelease(): Promise<ReleaseInfo> {
 }
 
 /**
- * Compare semver versions. Returns:
+ * Compare dotted numeric versions. Returns:
  * - negative if a < b
  * - 0 if a == b
  * - positive if a > b
  */
 function compareVersions(a: string, b: string): number {
-	const pa = a.split(".").map(Number);
-	const pb = b.split(".").map(Number);
-
-	for (let i = 0; i < Math.max(pa.length, pb.length); i++) {
-		const na = pa[i] || 0;
-		const nb = pb[i] || 0;
-		if (na !== nb) return na - nb;
-	}
-	return 0;
+	return compareNumericVersionStrings(a, b);
 }
 
 /**
@@ -182,9 +175,8 @@ async function verifyInstalledVersion(
 		const result = await $`${ompPath} --version`.quiet().nothrow();
 		if (result.exitCode !== 0) return { ok: false, path: ompPath };
 		const output = result.text().trim();
-		// Output format: "omp/X.Y.Z"
-		const match = output.match(/\/(\d+\.\d+\.\d+)/);
-		const actual = match?.[1];
+		// Output format: "omp/X.Y.Z" or "omp/X.Y.Z.W"
+		const actual = parseCliVersionOutput(output);
 		return { ok: actual === expectedVersion, actual, path: ompPath };
 	} catch {
 		return { ok: false, path: ompPath };

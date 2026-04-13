@@ -49,6 +49,7 @@ import { resolveResumableSession, type SessionInfo, SessionManager } from "./ses
 import { resolvePromptInput } from "./system-prompt";
 import type { LspStartupServerInfo } from "./tools";
 import { getChangelogPath, getNewEntries, parseChangelog } from "./utils/changelog";
+import { compareNumericVersionStrings } from "./utils/version";
 import type { EventBus } from "./utils/event-bus";
 
 async function checkForNewVersion(currentVersion: string): Promise<string | undefined> {
@@ -62,7 +63,7 @@ async function checkForNewVersion(currentVersion: string): Promise<string | unde
 		const data = (await response.json()) as { version?: string };
 		const latestVersion = data.version;
 
-		if (latestVersion && Bun.semver.order(latestVersion, currentVersion) > 0) {
+		if (latestVersion && compareNumericVersionStrings(latestVersion, currentVersion) > 0) {
 			return latestVersion;
 		}
 
