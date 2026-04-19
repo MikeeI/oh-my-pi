@@ -275,7 +275,7 @@ export function mapEffortToAnthropicAdaptiveEffort<TApi extends Api>(
 	}
 }
 
-function anthropicModelHasRealXHighEffort<TApi extends Api>(model: ApiModel<TApi>): boolean {
+export function anthropicModelHasRealXHighEffort<TApi extends Api>(model: ApiModel<TApi>): boolean {
 	if (model.api !== "anthropic-messages") return false;
 	const parsedModel = parseKnownModel(model.id);
 	if (parsedModel.family !== "anthropic" || parsedModel.kind !== "opus") return false;
