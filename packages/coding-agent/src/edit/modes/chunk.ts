@@ -25,6 +25,7 @@ import { invalidateFsScanAfterWrite } from "../../tools/fs-cache-invalidation";
 import { outputMeta } from "../../tools/output-meta";
 import { enforcePlanModeWrite, resolvePlanPath } from "../../tools/plan-mode-guard";
 import { generateUnifiedDiffString } from "../diff";
+import { HASHLINE_NIBBLE_ALPHABET } from "../line-hash";
 import { detectLineEnding, normalizeToLF, restoreLineEndings, stripBom } from "../normalize";
 import type { EditToolDetails, LspBatchRequest } from "../renderer";
 
@@ -300,7 +301,7 @@ export async function describeChunkedGrepMatch(params: {
 	};
 }
 
-const CHUNK_CHECKSUM_ALPHABET = "ZPMQVRWSNKTXJBYH";
+const CHUNK_CHECKSUM_ALPHABET = HASHLINE_NIBBLE_ALPHABET;
 type NativeChunkRegion = "head" | "body";
 
 function isChunkChecksumToken(value: string): boolean {

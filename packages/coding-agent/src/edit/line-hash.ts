@@ -6,6 +6,12 @@
 /** 16-char nibble alphabet (no digits); shared with chunk checksum suffixes. */
 export const HASHLINE_NIBBLE_ALPHABET = "ZPMQVRWSNKTXJBYH";
 
+/** Regex character class (without brackets) matching a single nibble character. */
+export const HASHLINE_NIBBLE_CHAR_CLASS = HASHLINE_NIBBLE_ALPHABET;
+
+/** Regex fragment matching the full 2-nibble hash, e.g. `ZP`. */
+export const HASHLINE_HASH_PATTERN = `[${HASHLINE_NIBBLE_CHAR_CLASS}]{2}`;
+
 const NIBBLE_STR = HASHLINE_NIBBLE_ALPHABET;
 
 const DICT = Array.from({ length: 256 }, (_, i) => {
@@ -17,12 +23,14 @@ const DICT = Array.from({ length: 256 }, (_, i) => {
 const RE_SIGNIFICANT = /[\p{L}\p{N}]/u;
 
 /**
- * Compute a short hexadecimal hash of a single line.
+ * Compute a short 2-character hash of a single line.
  *
- * Uses xxHash32 on a trailing-whitespace-trimmed, CR-stripped line, truncated to 2 chars from
- * {@link NIBBLE_STR}. For lines containing no alphanumeric characters (only
- * punctuation/symbols/whitespace), the line number is mixed in to reduce hash collisions.
- * The line input should not include a trailing newline.
+ * Uses xxHash32 on a trailing-whitespace-trimmed, CR-stripped line, reduced to 8 bits and
+ * encoded as two characters from {@link HASHLINE_NIBBLE_ALPHABET} (not hex — the alphabet
+ * contains only consonants to avoid collisions with digits and common language tokens).
+ * For lines containing no alphanumeric characters (only punctuation/symbols/whitespace),
+ * the line number is mixed in to reduce hash collisions. The line input should not include
+ * a trailing newline.
  */
 export function computeLineHash(idx: number, line: string): string {
 	line = line.replace(/\r/g, "").trimEnd();

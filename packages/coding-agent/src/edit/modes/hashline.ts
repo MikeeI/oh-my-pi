@@ -2,14 +2,14 @@
  * Hashline edit mode — a line-addressable edit format using text hashes.
  *
  * Each line in a file is identified by its 1-indexed line number and a short
- * hexadecimal hash derived from the normalized line text (xxHash32, truncated to 2
- * hex chars).
+ * 2-character hash derived from the normalized line text (xxHash32 reduced to 8 bits,
+ * encoded via {@link HASHLINE_NIBBLE_ALPHABET} — consonant-only, not hex).
  * The combined `LINE#ID` reference acts as both an address and a staleness check:
  * if the file has changed since the caller last read it, hash mismatches are caught
  * before any mutation occurs.
  *
  * Displayed format: `LINENUM#HASH:TEXT`
- * Reference format: `"LINENUM#HASH"` (e.g. `"5#aa"`)
+ * Reference format: `"LINENUM#HASH"` (e.g. `"5#ZP"`)
  */
 
 import * as fs from "node:fs/promises";
@@ -30,7 +30,7 @@ import { outputMeta } from "../../tools/output-meta";
 import { resolveToCwd } from "../../tools/path-utils";
 import { enforcePlanModeWrite, resolvePlanPath } from "../../tools/plan-mode-guard";
 import { generateDiffString } from "../diff";
-import { computeLineHash, formatLineHash } from "../line-hash";
+import { computeLineHash, formatLineHash, HASHLINE_HASH_PATTERN } from "../line-hash";
 import { detectLineEnding, normalizeToLF, restoreLineEndings, stripBom } from "../normalize";
 import type { EditToolDetails, LspBatchRequest } from "../renderer";
 
@@ -49,9 +49,14 @@ export type HashlineEdit =
 	| { op: "append_file"; lines: string[] }
 	| { op: "prepend_file"; lines: string[] };
 
-const HASHLINE_PREFIX_RE = /^\s*(?:>>>|>>)?\s*(?:\+?\s*(?:\d+\s*#\s*|#\s*)|\+)\s*[ZPMQVRWSNKTXJBYH]{2}:/;
-const HASHLINE_PREFIX_PLUS_RE = /^\s*(?:>>>|>>)?\s*\+\s*(?:\d+\s*#\s*|#\s*)?[ZPMQVRWSNKTXJBYH]{2}:/;
+const HASHLINE_PREFIX_RE = new RegExp(
+	String.raw`^\s*(?:>>>|>>)?\s*(?:\+?\s*(?:\d+\s*#\s*|#\s*)|\+)\s*${HASHLINE_HASH_PATTERN}:`,
+);
+const HASHLINE_PREFIX_PLUS_RE = new RegExp(
+	String.raw`^\s*(?:>>>|>>)?\s*\+\s*(?:\d+\s*#\s*|#\s*)?${HASHLINE_HASH_PATTERN}:`,
+);
 const DIFF_PLUS_RE = /^[+](?![+])/;
+const PARSE_TAG_RE = new RegExp(String.raw`^\s*[>+-]*\s*(\d+)\s*#\s*(${HASHLINE_HASH_PATTERN})`);
 
 type LinePrefixStats = {
 	nonEmpty: number;
@@ -459,20 +464,21 @@ export async function* streamHashLinesFromLines(
 }
 
 /**
- * Parse a line reference string like `"5#abcd"` into structured form.
+ * Parse a line reference string like `"5#ZP"` into structured form.
  *
- * @throws Error if the format is invalid (not `NUMBER#HEXHASH`)
+ * @throws Error if the format is invalid (not `LINE#HASH` where HASH is 2 chars from
+ *   {@link HASHLINE_NIBBLE_ALPHABET})
  */
 export function parseTag(ref: string): { line: number; hash: string } {
 	// This regex captures:
 	//  1. optional leading ">+" and whitespace
 	//  2. line number (1+ digits)
 	//  3. "#" with optional surrounding spaces
-	//  4. hash (2 hex chars)
+	//  4. hash (2 chars from HASHLINE_NIBBLE_ALPHABET)
 	//  5. optional trailing display suffix (":..." or "  ...")
-	const match = ref.match(/^\s*[>+-]*\s*(\d+)\s*#\s*([ZPMQVRWSNKTXJBYH]{2})/);
+	const match = ref.match(PARSE_TAG_RE);
 	if (!match) {
-		throw new Error(`Invalid line reference "${ref}". Expected format "LINE#ID" (e.g. "5#aa").`);
+		throw new Error(`Invalid line reference "${ref}". Expected format "LINE#ID" (e.g. "5#ZP").`);
 	}
 	const line = Number.parseInt(match[1], 10);
 	if (line < 1) {
