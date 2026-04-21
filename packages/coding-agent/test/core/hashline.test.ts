@@ -515,6 +515,7 @@ describe("applyHashlineEdits — prepend", () => {
 // ═══════════════════════════════════════════════════════════════════════════
 
 describe("applyHashlineEdits — heuristics", () => {
+	describe("parsing and normalization", () => {
 	it("accepts polluted src that starts with LINE#ID but includes trailing content", () => {
 		const content = "aaa\nbbb\nccc";
 		const srcHash = computeLineHash(2, "bbb");
@@ -557,6 +558,9 @@ describe("applyHashlineEdits — heuristics", () => {
 		expect(result.lines).toBe("aaa\nBBB\nccc");
 	});
 
+	});
+
+	describe("boundary duplication across languages", () => {
 	it("auto-strips exact trailing structural boundary echoes and warns", () => {
 		const content = "if (ok) {\n  run();\n}\nafter();";
 		const edits: HashlineEdit[] = [
@@ -677,6 +681,572 @@ describe("applyHashlineEdits — heuristics", () => {
 		expect(result.warnings?.[0]).toContain("Auto-stripped exact trailing boundary echo");
 	});
 
+	it("auto-strips exact Markdown separator echoes", () => {
+		const content = "# Title\nold\n---\nafter";
+		const edits: HashlineEdit[] = [
+			{
+				op: "replace_range",
+				pos: makeTag(1, "# Title"),
+				end: makeTag(2, "old"),
+				lines: ["# Title", "new", "---"],
+			},
+		];
+
+		const result = applyHashlineEdits(content, edits);
+		expect(result.lines).toBe("# Title\nnew\n---\nafter");
+		expect(result.warnings).toHaveLength(1);
+		expect(result.warnings?.[0]).toContain("Auto-stripped exact trailing boundary echo");
+	});
+
+	it("auto-strips exact Markdown code-fence echoes", () => {
+		const content = "```ts\nold()\n```\nafter";
+		const edits: HashlineEdit[] = [
+			{
+				op: "replace_range",
+				pos: makeTag(1, "```ts"),
+				end: makeTag(2, "old()"),
+				lines: ["```ts", "new()", "```"],
+			},
+		];
+
+		const result = applyHashlineEdits(content, edits);
+		expect(result.lines).toBe("```ts\nnew()\n```\nafter");
+		expect(result.warnings).toHaveLength(1);
+		expect(result.warnings?.[0]).toContain("Auto-stripped exact trailing boundary echo");
+	});
+
+	it("auto-strips exact Go block closers", () => {
+		const content = "func main() {\n\tfmt.Println(\"old\")\n}\nafter()";
+		const edits: HashlineEdit[] = [
+			{
+				op: "replace_range",
+				pos: makeTag(1, "func main() {"),
+				end: makeTag(2, "\tfmt.Println(\"old\")"),
+				lines: ["func main() {", "\tfmt.Println(\"new\")", "}"],
+			},
+		];
+
+		const result = applyHashlineEdits(content, edits);
+		expect(result.lines).toBe("func main() {\n\tfmt.Println(\"new\")\n}\nafter()");
+		expect(result.warnings).toHaveLength(1);
+		expect(result.warnings?.[0]).toContain("Auto-stripped exact trailing boundary echo");
+	});
+
+	it("auto-strips exact JSON array closers", () => {
+		const content = "[\n  1,\n]\nrest";
+		const edits: HashlineEdit[] = [
+			{
+				op: "replace_range",
+				pos: makeTag(1, "["),
+				end: makeTag(2, "  1,"),
+				lines: ["[", "  2,", "]"],
+			},
+		];
+
+		const result = applyHashlineEdits(content, edits);
+		expect(result.lines).toBe("[\n  2,\n]\nrest");
+		expect(result.warnings).toHaveLength(1);
+		expect(result.warnings?.[0]).toContain("Auto-stripped exact trailing boundary echo");
+	});
+
+	it("keeps Python boundary echoes with identifiers as warnings only", () => {
+		const content = "def outer():\n    old_body()\n    return 1";
+		const edits: HashlineEdit[] = [
+			{
+				op: "replace_range",
+				pos: makeTag(2, "    old_body()"),
+				end: makeTag(3, "    return 1"),
+				lines: ["def outer():", "    new_body()", "    return 1"],
+			},
+		];
+
+		const result = applyHashlineEdits(content, edits);
+		expect(result.lines).toBe("def outer():\ndef outer():\n    new_body()\n    return 1");
+		expect(result.warnings).toHaveLength(1);
+		expect(result.warnings?.[0]).toContain("Possible boundary duplication");
+		expect(result.warnings?.[0]).toContain("def outer():");
+	});
+
+	it("keeps shell heredoc terminators with letters as warnings only", () => {
+		const content = "cat <<'EOF'\nold\nEOF\nafter";
+		const edits: HashlineEdit[] = [
+			{
+				op: "replace_range",
+				pos: makeTag(1, "cat <<'EOF'"),
+				end: makeTag(2, "old"),
+				lines: ["cat <<'EOF'", "new", "EOF"],
+			},
+		];
+
+		const result = applyHashlineEdits(content, edits);
+		expect(result.lines).toBe("cat <<'EOF'\nnew\nEOF\nEOF\nafter");
+		expect(result.warnings).toHaveLength(1);
+		expect(result.warnings?.[0]).toContain("Possible boundary duplication");
+		expect(result.warnings?.[0]).toContain("EOF");
+	});
+
+
+
+	it("auto-strips exact Rust block closers", () => {
+		const content = "fn main() {\n    old();\n}\nafter();";
+		const edits: HashlineEdit[] = [
+			{
+				op: "replace_range",
+				pos: makeTag(1, "fn main() {"),
+				end: makeTag(2, "    old();"),
+				lines: ["fn main() {", "    new();", "}"],
+			},
+		];
+
+		const result = applyHashlineEdits(content, edits);
+		expect(result.lines).toBe("fn main() {\n    new();\n}\nafter();");
+		expect(result.warnings).toHaveLength(1);
+		expect(result.warnings?.[0]).toContain("Auto-stripped exact trailing boundary echo");
+	});
+
+	it("auto-strips exact CSS block closers", () => {
+		const content = ".card {\n  color: red;\n}\nafter";
+		const edits: HashlineEdit[] = [
+			{
+				op: "replace_range",
+				pos: makeTag(1, ".card {"),
+				end: makeTag(2, "  color: red;"),
+				lines: [".card {", "  color: blue;", "}"],
+			},
+		];
+
+		const result = applyHashlineEdits(content, edits);
+		expect(result.lines).toBe(".card {\n  color: blue;\n}\nafter");
+		expect(result.warnings).toHaveLength(1);
+		expect(result.warnings?.[0]).toContain("Auto-stripped exact trailing boundary echo");
+	});
+
+	it("auto-strips exact TOML array closers", () => {
+		const content = "hosts = [\n  \"old\",\n]\nafter = true";
+		const edits: HashlineEdit[] = [
+			{
+				op: "replace_range",
+				pos: makeTag(1, "hosts = ["),
+				end: makeTag(2, '  "old",'),
+				lines: ["hosts = [", '  "new",', "]"],
+			},
+		];
+
+		const result = applyHashlineEdits(content, edits);
+		expect(result.lines).toBe("hosts = [\n  \"new\",\n]\nafter = true");
+		expect(result.warnings).toHaveLength(1);
+		expect(result.warnings?.[0]).toContain("Auto-stripped exact trailing boundary echo");
+	});
+
+	it("auto-strips exact YAML document end markers", () => {
+		const content = "key: old\n...\nafter: true";
+		const edits: HashlineEdit[] = [
+			{
+				op: "replace_line",
+				pos: makeTag(1, "key: old"),
+				lines: ["key: new", "..."],
+			},
+		];
+
+		const result = applyHashlineEdits(content, edits);
+		expect(result.lines).toBe("key: new\n...\nafter: true");
+		expect(result.warnings).toHaveLength(1);
+		expect(result.warnings?.[0]).toContain("Auto-stripped exact trailing boundary echo");
+	});
+
+	it("keeps XML closing tags as warnings only", () => {
+		const content = "<root>\n  old\n</root>\nafter";
+		const edits: HashlineEdit[] = [
+			{
+				op: "replace_range",
+				pos: makeTag(1, "<root>"),
+				end: makeTag(2, "  old"),
+				lines: ["<root>", "  new", "</root>"],
+			},
+		];
+
+		const result = applyHashlineEdits(content, edits);
+		expect(result.lines).toBe("<root>\n  new\n</root>\n</root>\nafter");
+		expect(result.warnings).toHaveLength(1);
+		expect(result.warnings?.[0]).toContain("Possible boundary duplication");
+		expect(result.warnings?.[0]).toContain("</root>");
+	});
+
+	it("keeps Lua end markers as warnings only", () => {
+		const content = "if ready then\n  old()\nend\nafter()";
+		const edits: HashlineEdit[] = [
+			{
+				op: "replace_range",
+				pos: makeTag(1, "if ready then"),
+				end: makeTag(2, "  old()"),
+				lines: ["if ready then", "  new()", "end"],
+			},
+		];
+
+		const result = applyHashlineEdits(content, edits);
+		expect(result.lines).toBe("if ready then\n  new()\nend\nend\nafter()");
+		expect(result.warnings).toHaveLength(1);
+		expect(result.warnings?.[0]).toContain("Possible boundary duplication");
+		expect(result.warnings?.[0]).toContain("end");
+	});
+
+	it("keeps Ruby end markers as warnings only", () => {
+		const content = "class Box\n  old\nend\nafter";
+		const edits: HashlineEdit[] = [
+			{
+				op: "replace_range",
+				pos: makeTag(1, "class Box"),
+				end: makeTag(2, "  old"),
+				lines: ["class Box", "  new", "end"],
+			},
+		];
+
+		const result = applyHashlineEdits(content, edits);
+		expect(result.lines).toBe("class Box\n  new\nend\nend\nafter");
+		expect(result.warnings).toHaveLength(1);
+		expect(result.warnings?.[0]).toContain("Possible boundary duplication");
+		expect(result.warnings?.[0]).toContain("end");
+	});
+
+	it("keeps shell fi markers as warnings only", () => {
+		const content = "if true; then\n  old\nfi\nafter";
+		const edits: HashlineEdit[] = [
+			{
+				op: "replace_range",
+				pos: makeTag(1, "if true; then"),
+				end: makeTag(2, "  old"),
+				lines: ["if true; then", "  new", "fi"],
+			},
+		];
+
+		const result = applyHashlineEdits(content, edits);
+		expect(result.lines).toBe("if true; then\n  new\nfi\nfi\nafter");
+		expect(result.warnings).toHaveLength(1);
+		expect(result.warnings?.[0]).toContain("Possible boundary duplication");
+		expect(result.warnings?.[0]).toContain("fi");
+	});
+
+	it("auto-strips exact SQL dollar-quote delimiters", () => {
+		const content = "CREATE FUNCTION f() RETURNS text AS $$\nSELECT 'old';\n$$\nLANGUAGE sql;\nafter";
+		const edits: HashlineEdit[] = [
+			{
+				op: "replace_range",
+				pos: makeTag(1, "CREATE FUNCTION f() RETURNS text AS $$"),
+				end: makeTag(2, "SELECT 'old';"),
+				lines: ["CREATE FUNCTION f() RETURNS text AS $$", "SELECT 'new';", "$$"],
+			},
+		];
+
+		const result = applyHashlineEdits(content, edits);
+		expect(result.lines).toBe("CREATE FUNCTION f() RETURNS text AS $$\nSELECT 'new';\n$$\nLANGUAGE sql;\nafter");
+		expect(result.warnings).toHaveLength(1);
+		expect(result.warnings?.[0]).toContain("Auto-stripped exact trailing boundary echo");
+	});
+
+
+	it("keeps HTML closing tags as warnings only", () => {
+		const content = "<section>\n  old\n</section>\nafter";
+		const edits: HashlineEdit[] = [
+			{
+				op: "replace_range",
+				pos: makeTag(1, "<section>"),
+				end: makeTag(2, "  old"),
+				lines: ["<section>", "  new", "</section>"],
+			},
+		];
+
+		const result = applyHashlineEdits(content, edits);
+		expect(result.lines).toBe("<section>\n  new\n</section>\n</section>\nafter");
+		expect(result.warnings).toHaveLength(1);
+		expect(result.warnings?.[0]).toContain("Possible boundary duplication");
+		expect(result.warnings?.[0]).toContain("</section>");
+	});
+
+	it("keeps JSX closing tags as warnings only", () => {
+		const content = "<Panel>\n  old\n</Panel>\nafter";
+		const edits: HashlineEdit[] = [
+			{
+				op: "replace_range",
+				pos: makeTag(1, "<Panel>"),
+				end: makeTag(2, "  old"),
+				lines: ["<Panel>", "  new", "</Panel>"],
+			},
+		];
+
+		const result = applyHashlineEdits(content, edits);
+		expect(result.lines).toBe("<Panel>\n  new\n</Panel>\n</Panel>\nafter");
+		expect(result.warnings).toHaveLength(1);
+		expect(result.warnings?.[0]).toContain("Possible boundary duplication");
+		expect(result.warnings?.[0]).toContain("</Panel>");
+	});
+
+	it("keeps Vue closing tags as warnings only", () => {
+		const content = "<template>\n  old\n</template>\nafter";
+		const edits: HashlineEdit[] = [
+			{
+				op: "replace_range",
+				pos: makeTag(1, "<template>"),
+				end: makeTag(2, "  old"),
+				lines: ["<template>", "  new", "</template>"],
+			},
+		];
+
+		const result = applyHashlineEdits(content, edits);
+		expect(result.lines).toBe("<template>\n  new\n</template>\n</template>\nafter");
+		expect(result.warnings).toHaveLength(1);
+		expect(result.warnings?.[0]).toContain("Possible boundary duplication");
+		expect(result.warnings?.[0]).toContain("</template>");
+	});
+
+	it("keeps Svelte block closers as warnings only", () => {
+		const content = "{#if ready}\n  old\n{/if}\nafter";
+		const edits: HashlineEdit[] = [
+			{
+				op: "replace_range",
+				pos: makeTag(1, "{#if ready}"),
+				end: makeTag(2, "  old"),
+				lines: ["{#if ready}", "  new", "{/if}"],
+			},
+		];
+
+		const result = applyHashlineEdits(content, edits);
+		expect(result.lines).toBe("{#if ready}\n  new\n{/if}\n{/if}\nafter");
+		expect(result.warnings).toHaveLength(1);
+		expect(result.warnings?.[0]).toContain("Possible boundary duplication");
+		expect(result.warnings?.[0]).toContain("{/if}");
+	});
+
+	it("keeps LaTeX end markers as warnings only", () => {
+		const content = "\\begin{itemize}\n\\item old\n\\end{itemize}\nafter";
+		const edits: HashlineEdit[] = [
+			{
+				op: "replace_range",
+				pos: makeTag(1, "\\begin{itemize}"),
+				end: makeTag(2, "\\item old"),
+				lines: ["\\begin{itemize}", "\\item new", "\\end{itemize}"],
+			},
+		];
+
+		const result = applyHashlineEdits(content, edits);
+		expect(result.lines).toBe("\\begin{itemize}\n\\item new\n\\end{itemize}\n\\end{itemize}\nafter");
+		expect(result.warnings).toHaveLength(1);
+		expect(result.warnings?.[0]).toContain("Possible boundary duplication");
+		expect(result.warnings?.[0]).toContain("\\end{itemize}");
+	});
+
+	it("auto-strips exact symbol-only boundaries across deterministic fuzz cases", () => {
+		const boundaries = ["}", "]", ")", "});", "*/", "---", "```", "$$", "..."];
+		let seed = 0x5eed1234;
+		const nextIndex = () => {
+			seed = (seed * 1664525 + 1013904223) >>> 0;
+			return seed % boundaries.length;
+		};
+
+		for (let i = 0; i < 24; i++) {
+			const boundary = boundaries[nextIndex()];
+			const content = `head\nold-${i}\n${boundary}\nafter-${i}`;
+			const edits: HashlineEdit[] = [
+				{
+					op: "replace_range",
+					pos: makeTag(1, "head"),
+					end: makeTag(2, `old-${i}`),
+					lines: ["head", `new-${i}`, boundary],
+				},
+			];
+			const result = applyHashlineEdits(content, edits);
+			expect(result.lines).toBe(`head\nnew-${i}\n${boundary}\nafter-${i}`);
+			expect(result.warnings).toHaveLength(1);
+			expect(result.warnings?.[0]).toContain("Auto-stripped exact trailing boundary echo");
+		}
+	});
+
+	it("keeps alphanumeric boundaries as warnings across deterministic fuzz cases", () => {
+		const boundaries = ["EOF", "end", "fi", "</div>", "</Panel>", "</template>", "{/if}", "\\end{itemize}"];
+		let seed = 0x1234abcd;
+		const nextIndex = () => {
+			seed = (seed * 1103515245 + 12345) >>> 0;
+			return seed % boundaries.length;
+		};
+
+		for (let i = 0; i < 24; i++) {
+			const boundary = boundaries[nextIndex()];
+			const content = `head\nold-${i}\n${boundary}\nafter-${i}`;
+			const edits: HashlineEdit[] = [
+				{
+					op: "replace_range",
+					pos: makeTag(1, "head"),
+					end: makeTag(2, `old-${i}`),
+					lines: ["head", `new-${i}`, boundary],
+				},
+			];
+			const result = applyHashlineEdits(content, edits);
+			expect(result.lines).toBe(`head\nnew-${i}\n${boundary}\n${boundary}\nafter-${i}`);
+			expect(result.warnings).toHaveLength(1);
+			expect(result.warnings?.[0]).toContain("Possible boundary duplication");
+			expect(result.warnings?.[0]).toContain(boundary);
+		}
+	});
+
+
+	it("auto-strips exact C block closers", () => {
+		const content = "int main() {\n    old();\n}\nafter();";
+		const edits: HashlineEdit[] = [
+			{
+				op: "replace_range",
+				pos: makeTag(1, "int main() {"),
+				end: makeTag(2, "    old();"),
+				lines: ["int main() {", "    new();", "}"],
+			},
+		];
+
+		const result = applyHashlineEdits(content, edits);
+		expect(result.lines).toBe("int main() {\n    new();\n}\nafter();");
+		expect(result.warnings).toHaveLength(1);
+		expect(result.warnings?.[0]).toContain("Auto-stripped exact trailing boundary echo");
+	});
+
+	it("auto-strips exact C++ class terminators", () => {
+		const content = "class Box {\npublic:\n    void old();\n};\nafter();";
+		const edits: HashlineEdit[] = [
+			{
+				op: "replace_range",
+				pos: makeTag(2, "public:"),
+				end: makeTag(3, "    void old();"),
+				lines: ["public:", "    void now();", "};"],
+			},
+		];
+
+		const result = applyHashlineEdits(content, edits);
+		expect(result.lines).toBe("class Box {\npublic:\n    void now();\n};\nafter();");
+		expect(result.warnings).toHaveLength(1);
+		expect(result.warnings?.[0]).toContain("Auto-stripped exact trailing boundary echo");
+	});
+
+	it("auto-strips exact Java block closers", () => {
+		const content = "class Box {\n    void old() {}\n}\nafter();";
+		const edits: HashlineEdit[] = [
+			{
+				op: "replace_range",
+				pos: makeTag(1, "class Box {"),
+				end: makeTag(2, "    void old() {}"),
+				lines: ["class Box {", "    void now() {}", "}"],
+			},
+		];
+
+		const result = applyHashlineEdits(content, edits);
+		expect(result.lines).toBe("class Box {\n    void now() {}\n}\nafter();");
+		expect(result.warnings).toHaveLength(1);
+		expect(result.warnings?.[0]).toContain("Auto-stripped exact trailing boundary echo");
+	});
+
+	it("auto-strips exact Kotlin block closers", () => {
+		const content = "fun main() {\n    old()\n}\nafter()";
+		const edits: HashlineEdit[] = [
+			{
+				op: "replace_range",
+				pos: makeTag(1, "fun main() {"),
+				end: makeTag(2, "    old()"),
+				lines: ["fun main() {", "    now()", "}"],
+			},
+		];
+
+		const result = applyHashlineEdits(content, edits);
+		expect(result.lines).toBe("fun main() {\n    now()\n}\nafter()");
+		expect(result.warnings).toHaveLength(1);
+		expect(result.warnings?.[0]).toContain("Auto-stripped exact trailing boundary echo");
+	});
+
+	it("auto-strips exact C# block closers", () => {
+		const content = "class Box {\n    void Old() {}\n}\nafter();";
+		const edits: HashlineEdit[] = [
+			{
+				op: "replace_range",
+				pos: makeTag(1, "class Box {"),
+				end: makeTag(2, "    void Old() {}"),
+				lines: ["class Box {", "    void New() {}", "}"],
+			},
+		];
+
+		const result = applyHashlineEdits(content, edits);
+		expect(result.lines).toBe("class Box {\n    void New() {}\n}\nafter();");
+		expect(result.warnings).toHaveLength(1);
+		expect(result.warnings?.[0]).toContain("Auto-stripped exact trailing boundary echo");
+	});
+
+
+	it("keeps Markdown table separators as warnings only", () => {
+		const content = "| col |\n| old |\n| --- |\nafter";
+		const edits: HashlineEdit[] = [
+			{
+				op: "replace_range",
+				pos: makeTag(1, "| col |"),
+				end: makeTag(2, "| old |"),
+				lines: ["| col |", "| new |", "| --- |"],
+			},
+		];
+
+		const result = applyHashlineEdits(content, edits);
+		expect(result.lines).toBe("| col |\n| new |\n| --- |\nafter");
+		expect(result.warnings).toHaveLength(1);
+		expect(result.warnings?.[0]).toContain("Auto-stripped exact trailing boundary echo");
+		expect(result.warnings?.[0]).toContain("| --- |");
+	});
+
+	it("keeps INI section headers as warnings only", () => {
+		const content = "[service]\nold=value\n[service]\nafter=true";
+		const edits: HashlineEdit[] = [
+			{
+				op: "replace_range",
+				pos: makeTag(1, "[service]"),
+				end: makeTag(2, "old=value"),
+				lines: ["[service]", "new=value", "[service]"],
+			},
+		];
+
+		const result = applyHashlineEdits(content, edits);
+		expect(result.lines).toBe("[service]\nnew=value\n[service]\n[service]\nafter=true");
+		expect(result.warnings).toHaveLength(1);
+		expect(result.warnings?.[0]).toContain("Possible boundary duplication");
+		expect(result.warnings?.[0]).toContain("[service]");
+	});
+
+	it("keeps Dockerfile heredoc terminators as warnings only", () => {
+		const content = "RUN <<EOF\nold\nEOF\nafter";
+		const edits: HashlineEdit[] = [
+			{
+				op: "replace_range",
+				pos: makeTag(1, "RUN <<EOF"),
+				end: makeTag(2, "old"),
+				lines: ["RUN <<EOF", "new", "EOF"],
+			},
+		];
+
+		const result = applyHashlineEdits(content, edits);
+		expect(result.lines).toBe("RUN <<EOF\nnew\nEOF\nEOF\nafter");
+		expect(result.warnings).toHaveLength(1);
+		expect(result.warnings?.[0]).toContain("Possible boundary duplication");
+		expect(result.warnings?.[0]).toContain("EOF");
+	});
+
+	it("keeps Nginx block headers as warnings only", () => {
+		const content = "location / {\n  proxy_pass http://old;\nlocation / {\n}";
+		const edits: HashlineEdit[] = [
+			{
+				op: "replace_range",
+				pos: makeTag(1, "location / {"),
+				end: makeTag(2, "  proxy_pass http://old;"),
+				lines: ["location / {", "  proxy_pass http://new;", "location / {"],
+			},
+		];
+
+		const result = applyHashlineEdits(content, edits);
+		expect(result.lines).toBe("location / {\n  proxy_pass http://new;\nlocation / {\nlocation / {\n}");
+		expect(result.warnings).toHaveLength(1);
+		expect(result.warnings?.[0]).toContain("Possible boundary duplication");
+		expect(result.warnings?.[0]).toContain("location / {");
+	});
+
+
 	it("allows nested structural closers when indentation differs", () => {
 		const content = "if (outer) {\n  if (inner) {\n    old();\n  }\n}\nafter();";
 		const edits: HashlineEdit[] = [
@@ -692,6 +1262,9 @@ describe("applyHashlineEdits — heuristics", () => {
 		expect(result.warnings).toBeUndefined();
 	});
 
+	});
+
+	describe("sanitizer heuristics", () => {
 	it("auto-corrects leading escaped tab indentation by default", () => {
 		const previous = Bun.env.PI_HASHLINE_AUTOCORRECT_ESCAPED_TABS;
 		delete Bun.env.PI_HASHLINE_AUTOCORRECT_ESCAPED_TABS;
@@ -755,6 +1328,7 @@ describe("applyHashlineEdits — heuristics", () => {
 		expect(result.lines).toBe("aaa\n\\uDDDD\nccc");
 		expect(result.warnings).toHaveLength(1);
 		expect(result.warnings?.[0]).toContain("Detected literal \\uDDDD");
+	});
 	});
 });
 
@@ -823,6 +1397,41 @@ describe("applyHashlineEdits — multiple edits", () => {
 		expect(result.lines).toBe("aaa\n\ninserted\n\nccc");
 		expect(result.firstChangedLine).toBe(2);
 	});
+
+	it("tracks final changed span across disjoint edits that shift each other", () => {
+		const content = Array.from({ length: 12 }, (_, index) => `line-${index + 1}`).join("\n");
+		const edits: HashlineEdit[] = [
+			{ op: "prepend_at", pos: makeTag(4, "line-4"), lines: ["pre-1", "pre-2", "pre-3", "pre-4"] },
+			{ op: "append_at", pos: makeTag(10, "line-10"), lines: ["post-1", "post-2"] },
+		];
+
+		const result = applyHashlineEdits(content, edits);
+		expect(result.lines).toBe(
+			[
+				"line-1",
+				"line-2",
+				"line-3",
+				"pre-1",
+				"pre-2",
+				"pre-3",
+				"pre-4",
+				"line-4",
+				"line-5",
+				"line-6",
+				"line-7",
+				"line-8",
+				"line-9",
+				"line-10",
+				"post-1",
+				"post-2",
+				"line-11",
+				"line-12",
+			].join("\n"),
+		);
+		expect(result.firstChangedLine).toBe(4);
+		expect(result.lastChangedLine).toBe(16);
+	});
+
 
 	it("empty edits array is a no-op", () => {
 		const content = "aaa\nbbb";
@@ -935,6 +1544,51 @@ describe("applyHashlineEdits — errors", () => {
 		const prependEdits: HashlineEdit[] = [{ op: "prepend_at", pos: makeTag(1, "aaa"), lines: [] }];
 		expect(applyHashlineEdits(content, prependEdits).lines).toBe("\naaa\nbbb");
 	});
+	it("rejects deterministic stale multi-edit batches across shifted regions", () => {
+		let seed = 0x51a7e;
+		const nextIndex = (mod: number) => {
+			seed = (seed * 214013 + 2531011) >>> 0;
+			return seed % mod;
+		};
+
+		for (let caseIndex = 0; caseIndex < 24; caseIndex++) {
+			const lines = Array.from({ length: 8 }, (_, index) => `line-${caseIndex}-${index + 1}`);
+			const content = lines.join("\n");
+			const firstLine = 1 + nextIndex(3);
+			const secondLine = 5 + nextIndex(3);
+			const edits: HashlineEdit[] = [
+				{ op: "append_at", pos: { line: firstLine, hash: "ZZ" }, lines: [`insert-${caseIndex}`] },
+				{ op: "replace_line", pos: { line: secondLine, hash: "ZZ" }, lines: [`replace-${caseIndex}`] },
+			];
+			expect(() => applyHashlineEdits(content, edits)).toThrow(HashlineMismatchError);
+		}
+	});
+
+	it("rejects deterministic stale range edits after earlier inserts", () => {
+		let seed = 0x9e3779b9;
+		const nextIndex = (mod: number) => {
+			seed = (seed * 1664525 + 1013904223) >>> 0;
+			return seed % mod;
+		};
+
+		for (let caseIndex = 0; caseIndex < 24; caseIndex++) {
+			const lines = Array.from({ length: 9 }, (_, index) => `row-${caseIndex}-${index + 1}`);
+			const content = lines.join("\n");
+			const staleStartLine = 2 + nextIndex(2);
+			const staleEndLine = staleStartLine + 1 + nextIndex(2);
+			const edits: HashlineEdit[] = [
+				{ op: "prepend_at", pos: { line: 1, hash: "ZZ" }, lines: [`header-${caseIndex}`] },
+				{
+					op: "replace_range",
+					pos: { line: staleStartLine, hash: "ZZ" },
+					end: { line: staleEndLine, hash: "ZZ" },
+					lines: [`block-${caseIndex}`],
+				},
+			];
+			expect(() => applyHashlineEdits(content, edits)).toThrow(HashlineMismatchError);
+		}
+	});
+
 });
 
 describe("executeHashlineSingle", () => {
@@ -966,6 +1620,139 @@ describe("executeHashlineSingle", () => {
 		expect(result.details?.updatedAnchors).toEqual({ start: 1, end: 4, text: updatedAnchorText });
 		expect(await Bun.file(filePath).text()).toBe("# Title\nALPHA\nbeta\ngamma");
 	});
+
+	it("returns updated anchors spanning batched edits that shift later regions", async () => {
+		using tempDir = TempDir.createSync("@omp-hashline-");
+		_resetSettingsForTest();
+		await Settings.init({ inMemory: true, cwd: tempDir.path() });
+		const originalLines = Array.from({ length: 12 }, (_, index) => `line-${index + 1}`);
+		const filePath = path.join(tempDir.path(), "batch.txt");
+		await Bun.write(filePath, originalLines.join("\n"));
+		const line4 = makeTag(4, originalLines[3]);
+		const line10 = makeTag(10, originalLines[9]);
+		const result = await executeHashlineSingle({
+			session: createToolSession(tempDir.path()),
+			path: "batch.txt",
+			edits: [
+				{ path: "batch.txt", loc: { prepend: `${line4.line}#${line4.hash}` }, content: ["pre-1", "pre-2", "pre-3", "pre-4"] },
+				{ path: "batch.txt", loc: { append: `${line10.line}#${line10.hash}` }, content: ["post-1", "post-2"] },
+			],
+			writethrough: writethroughNoop,
+			beginDeferredDiagnosticsForPath: () => createDeferredHandle(),
+		});
+		const finalLines = [
+			"line-1",
+			"line-2",
+			"line-3",
+			"pre-1",
+			"pre-2",
+			"pre-3",
+			"pre-4",
+			"line-4",
+			"line-5",
+			"line-6",
+			"line-7",
+			"line-8",
+			"line-9",
+			"line-10",
+			"post-1",
+			"post-2",
+			"line-11",
+			"line-12",
+		];
+		const updatedAnchorText = formatHashLines(finalLines.slice(1).join("\n"), 2);
+		expect(getText(result)).toContain(
+			"--- Updated anchors (lines 2-18; use these for subsequent edits in this region) ---",
+		);
+		expect(result.details?.updatedAnchors).toEqual({ start: 2, end: 18, text: updatedAnchorText });
+		expect(await Bun.file(filePath).text()).toBe(finalLines.join("\n"));
+	});
+
+
+	it("returns consistent updated anchors across deterministic small-span cases", async () => {
+		using tempDir = TempDir.createSync("@omp-hashline-");
+		_resetSettingsForTest();
+		await Settings.init({ inMemory: true, cwd: tempDir.path() });
+		const session = createToolSession(tempDir.path());
+		let seed = 0x13579bdf;
+		const nextIndex = (mod: number) => {
+			seed = (seed * 1664525 + 1013904223) >>> 0;
+			return seed % mod;
+		};
+
+		for (let caseIndex = 0; caseIndex < 12; caseIndex++) {
+			const lines = Array.from({ length: 6 }, (_, index) => `line-${caseIndex}-${index + 1}`);
+			const targetLine = 2 + nextIndex(3);
+			const fileName = `small-${caseIndex}.txt`;
+			const filePath = path.join(tempDir.path(), fileName);
+			await Bun.write(filePath, lines.join("\n"));
+			const anchor = makeTag(targetLine, lines[targetLine - 1]);
+			const replacement = `updated-${caseIndex}`;
+			const result = await executeHashlineSingle({
+				session,
+				path: fileName,
+				edits: [
+					{
+						path: fileName,
+						loc: { range: { pos: `${anchor.line}#${anchor.hash}`, end: `${anchor.line}#${anchor.hash}` } },
+						content: [replacement],
+					},
+				],
+				writethrough: writethroughNoop,
+				beginDeferredDiagnosticsForPath: () => createDeferredHandle(),
+			});
+			const finalLines = [...lines];
+			finalLines[targetLine - 1] = replacement;
+			const expectedStart = Math.max(1, targetLine - 2);
+			const expectedEnd = Math.min(finalLines.length, targetLine + 2);
+			const expectedText = formatHashLines(finalLines.slice(expectedStart - 1, expectedEnd).join("\n"), expectedStart);
+			expect(result.details?.updatedAnchors).toEqual({ start: expectedStart, end: expectedEnd, text: expectedText });
+			expect(getText(result)).toContain(
+				`--- Updated anchors (lines ${expectedStart}-${expectedEnd}; use these for subsequent edits in this region) ---`,
+			);
+			expect(await Bun.file(filePath).text()).toBe(finalLines.join("\n"));
+		}
+	});
+
+	it("omits updated anchors across deterministic over-budget spans", async () => {
+		using tempDir = TempDir.createSync("@omp-hashline-");
+		_resetSettingsForTest();
+		await Settings.init({ inMemory: true, cwd: tempDir.path() });
+		const session = createToolSession(tempDir.path());
+		let seed = 0x2468ace0;
+		const nextIndex = (mod: number) => {
+			seed = (seed * 1103515245 + 12345) >>> 0;
+			return seed % mod;
+		};
+
+		for (let caseIndex = 0; caseIndex < 10; caseIndex++) {
+			const lines = Array.from({ length: 30 }, (_, index) => `row-${caseIndex}-${index + 1}`);
+			const startLine = 4 + nextIndex(3);
+			const endLine = startLine + 16;
+			const fileName = `large-${caseIndex}.txt`;
+			const filePath = path.join(tempDir.path(), fileName);
+			await Bun.write(filePath, lines.join("\n"));
+			const start = makeTag(startLine, lines[startLine - 1]);
+			const end = makeTag(endLine, lines[endLine - 1]);
+			const replacement = Array.from({ length: 17 }, (_, index) => `changed-${caseIndex}-${index + 1}`);
+			const result = await executeHashlineSingle({
+				session,
+				path: fileName,
+				edits: [
+					{
+						path: fileName,
+						loc: { range: { pos: `${start.line}#${start.hash}`, end: `${end.line}#${end.hash}` } },
+						content: replacement,
+					},
+				],
+				writethrough: writethroughNoop,
+				beginDeferredDiagnosticsForPath: () => createDeferredHandle(),
+			});
+			expect(result.details?.updatedAnchors).toBeUndefined();
+			expect(getText(result)).not.toContain("--- Updated anchors");
+		}
+	});
+
 
 	it("omits updated anchors when the changed span exceeds the budget", async () => {
 		using tempDir = TempDir.createSync("@omp-hashline-");

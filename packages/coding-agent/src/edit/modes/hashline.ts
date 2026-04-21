@@ -813,14 +813,20 @@ function getHashlineEditSortKey(edit: HashlineEdit, fileLineCount: number): { so
 	}
 }
 
+type HashlineAppliedChange = {
+	startLine: number;
+	endLine: number;
+	shiftThreshold: number;
+	delta: number;
+};
+
 function applyHashlineEditToLines(
 	edit: HashlineEdit,
 	fileLines: string[],
 	originalFileLines: string[],
 	editIndex: number,
 	noopEdits: Array<{ editIndex: number; loc: string; current: string }>,
-	trackChangedSpan: (startLine: number, endLine: number) => void,
-): void {
+): HashlineAppliedChange | undefined {
 	switch (edit.op) {
 		case "replace_line": {
 			const origLines = originalFileLines.slice(edit.pos.line - 1, edit.pos.line);
@@ -831,17 +837,25 @@ function applyHashlineEditToLines(
 					loc: `${edit.pos.line}#${edit.pos.hash}`,
 					current: origLines.join("\n"),
 				});
-				break;
+				return undefined;
 			}
 			fileLines.splice(edit.pos.line - 1, 1, ...newLines);
-			trackChangedSpan(edit.pos.line, edit.pos.line + Math.max(newLines.length, 1) - 1);
-			break;
+			return {
+				startLine: edit.pos.line,
+				endLine: edit.pos.line + Math.max(newLines.length, 1) - 1,
+				shiftThreshold: edit.pos.line + 1,
+				delta: newLines.length - 1,
+			};
 		}
 		case "replace_range": {
 			const count = edit.end.line - edit.pos.line + 1;
 			fileLines.splice(edit.pos.line - 1, count, ...edit.lines);
-			trackChangedSpan(edit.pos.line, edit.pos.line + Math.max(edit.lines.length, 1) - 1);
-			break;
+			return {
+				startLine: edit.pos.line,
+				endLine: edit.pos.line + Math.max(edit.lines.length, 1) - 1,
+				shiftThreshold: edit.end.line + 1,
+				delta: edit.lines.length - count,
+			};
 		}
 		case "append_at": {
 			const inserted = edit.lines;
@@ -851,12 +865,16 @@ function applyHashlineEditToLines(
 					loc: `${edit.pos.line}#${edit.pos.hash}`,
 					current: originalFileLines[edit.pos.line - 1],
 				});
-				break;
+				return undefined;
 			}
 			const startLine = edit.pos.line + 1;
 			fileLines.splice(edit.pos.line, 0, ...inserted);
-			trackChangedSpan(startLine, startLine + inserted.length - 1);
-			break;
+			return {
+				startLine,
+				endLine: startLine + inserted.length - 1,
+				shiftThreshold: startLine,
+				delta: inserted.length,
+			};
 		}
 		case "prepend_at": {
 			const inserted = edit.lines;
@@ -866,17 +884,21 @@ function applyHashlineEditToLines(
 					loc: `${edit.pos.line}#${edit.pos.hash}`,
 					current: originalFileLines[edit.pos.line - 1],
 				});
-				break;
+				return undefined;
 			}
 			fileLines.splice(edit.pos.line - 1, 0, ...inserted);
-			trackChangedSpan(edit.pos.line, edit.pos.line + inserted.length - 1);
-			break;
+			return {
+				startLine: edit.pos.line,
+				endLine: edit.pos.line + inserted.length - 1,
+				shiftThreshold: edit.pos.line,
+				delta: inserted.length,
+			};
 		}
 		case "append_file": {
 			const inserted = edit.lines;
 			if (inserted.length === 0) {
 				noopEdits.push({ editIndex, loc: "EOF", current: "" });
-				break;
+				return undefined;
 			}
 			const insertingIntoEmptyFile = fileLines.length === 0 || (fileLines.length === 1 && fileLines[0] === "");
 			const startLine = insertingIntoEmptyFile ? 1 : fileLines.length + 1;
@@ -885,14 +907,18 @@ function applyHashlineEditToLines(
 			} else {
 				fileLines.splice(fileLines.length, 0, ...inserted);
 			}
-			trackChangedSpan(startLine, startLine + inserted.length - 1);
-			break;
+			return {
+				startLine,
+				endLine: startLine + inserted.length - 1,
+				shiftThreshold: Number.POSITIVE_INFINITY,
+				delta: inserted.length,
+			};
 		}
 		case "prepend_file": {
 			const inserted = edit.lines;
 			if (inserted.length === 0) {
 				noopEdits.push({ editIndex, loc: "BOF", current: "" });
-				break;
+				return undefined;
 			}
 			const insertingIntoEmptyFile = fileLines.length === 0 || (fileLines.length === 1 && fileLines[0] === "");
 			if (insertingIntoEmptyFile) {
@@ -900,8 +926,12 @@ function applyHashlineEditToLines(
 			} else {
 				fileLines.splice(0, 0, ...inserted);
 			}
-			trackChangedSpan(1, inserted.length);
-			break;
+			return {
+				startLine: 1,
+				endLine: inserted.length,
+				shiftThreshold: 1,
+				delta: inserted.length,
+			};
 		}
 	}
 }
@@ -999,8 +1029,7 @@ export function applyHashlineEdits(
 
 	const fileLines = text.split("\n");
 	const originalFileLines = [...fileLines];
-	let firstChangedLine: number | undefined;
-	let lastChangedLine: number | undefined;
+	const changedSpans: Array<{ start: number; end: number }> = [];
 	const noopEdits: Array<{ editIndex: number; loc: string; current: string }> = [];
 	const warnings: string[] = [];
 
@@ -1022,19 +1051,26 @@ export function applyHashlineEdits(
 		.sort((a, b) => b.sortLine - a.sortLine || a.precedence - b.precedence || a.idx - b.idx);
 
 	for (const { edit, idx } of annotated) {
-		applyHashlineEditToLines(edit, fileLines, originalFileLines, idx, noopEdits, trackChangedSpan);
+		const appliedChange = applyHashlineEditToLines(edit, fileLines, originalFileLines, idx, noopEdits);
+		if (!appliedChange) continue;
+		if (appliedChange.delta !== 0) {
+			for (const span of changedSpans) {
+				if (span.start >= appliedChange.shiftThreshold) {
+					span.start += appliedChange.delta;
+					span.end += appliedChange.delta;
+				}
+			}
+		}
+		changedSpans.push({ start: appliedChange.startLine, end: appliedChange.endLine });
 	}
 
-	return buildHashlineEditResult({ fileLines, firstChangedLine, lastChangedLine, warnings, noopEdits });
-
-	function trackChangedSpan(startLine: number, endLine: number): void {
-		if (firstChangedLine === undefined || startLine < firstChangedLine) {
-			firstChangedLine = startLine;
-		}
-		if (lastChangedLine === undefined || endLine > lastChangedLine) {
-			lastChangedLine = endLine;
-		}
-	}
+	return buildHashlineEditResult({
+		fileLines,
+		firstChangedLine: changedSpans.length > 0 ? Math.min(...changedSpans.map(span => span.start)) : undefined,
+		lastChangedLine: changedSpans.length > 0 ? Math.max(...changedSpans.map(span => span.end)) : undefined,
+		warnings,
+		noopEdits,
+	});
 }
 
 function computeUpdatedAnchorRange(
