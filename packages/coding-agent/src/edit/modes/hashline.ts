@@ -58,6 +58,18 @@ const HASHLINE_PREFIX_PLUS_RE = new RegExp(
 const DIFF_PLUS_RE = /^[+](?![+])/;
 const PARSE_TAG_RE = new RegExp(String.raw`^\s*[>+-]*\s*(\d+)\s*#\s*(${HASHLINE_HASH_PATTERN})`);
 
+// A line is a "structural close" if after trimming it consists only of closing
+// delimiters, separators, and optional block-comment terminator. Covers }, ),
+// ], }), });, ]}, )}, ]});, */, and whitespace combinations across Go, TS, JS,
+// Rust, C, Java, Swift. When such a line is duplicated at an edit boundary,
+// the edit almost certainly has a wrong `pos` or `end` — producing syntactically
+// broken code. We treat these cases as hard errors rather than warnings.
+const STRUCTURAL_CLOSE_RE = /^[}\])\s,;]*(?:\*\/)?[}\])\s,;]*$/;
+
+function isStructuralCloseLine(trimmed: string): boolean {
+	return trimmed.length > 0 && STRUCTURAL_CLOSE_RE.test(trimmed);
+}
+
 type LinePrefixStats = {
 	nonEmpty: number;
 	hashPrefixCount: number;
@@ -562,6 +574,30 @@ export class HashlineMismatchError extends Error {
 	}
 }
 
+// ═══════════════════════════════════════════════════════════════════════════
+// Boundary Duplication Error
+// ═══════════════════════════════════════════════════════════════════════════
+
+/**
+ * Error thrown when an edit would duplicate a structural closer line at its
+ * boundary — e.g. the replacement content ends with `}` and the line immediately
+ * following `end` is also `}`, which would produce two closing braces and break
+ * syntax. The message names the offending edit, the duplicated line, and the
+ * concrete anchor the caller should extend to.
+ */
+export class HashlineBoundaryError extends Error {
+	constructor(
+		public readonly editIndex: number,
+		public readonly loc: string,
+		public readonly duplicatedLine: string,
+		public readonly side: "leading" | "trailing",
+		message: string,
+	) {
+		super(message);
+		this.name = "HashlineBoundaryError";
+	}
+}
+
 /**
  * Validate that a line reference points to an existing line with a matching hash.
  *
@@ -635,32 +671,103 @@ function ensureHashlineEditHasContent(edit: HashlineEdit): void {
 	}
 }
 
-function collectBoundaryDuplicationWarning(edit: HashlineEdit, originalFileLines: string[], warnings: string[]): void {
-	let endLine: number;
+function enforceBoundaryDuplicationIntegrity(
+	edit: HashlineEdit,
+	editIndex: number,
+	originalFileLines: string[],
+	warnings: string[],
+): void {
+	if (edit.lines.length === 0) return;
+
+	let prevSurvivingIdx: number;
+	let nextSurvivingIdx: number;
 	switch (edit.op) {
 		case "replace_line":
-			endLine = edit.pos.line;
+			prevSurvivingIdx = edit.pos.line - 2;
+			nextSurvivingIdx = edit.pos.line;
 			break;
 		case "replace_range":
-			endLine = edit.end.line;
+			prevSurvivingIdx = edit.pos.line - 2;
+			nextSurvivingIdx = edit.end.line;
+			break;
+		case "append_at":
+			prevSurvivingIdx = edit.pos.line - 1;
+			nextSurvivingIdx = edit.pos.line;
+			break;
+		case "prepend_at":
+			prevSurvivingIdx = edit.pos.line - 2;
+			nextSurvivingIdx = edit.pos.line - 1;
 			break;
 		default:
 			return;
 	}
 
-	if (edit.lines.length === 0) return;
-	const nextSurvivingIdx = endLine;
-	if (nextSurvivingIdx >= originalFileLines.length) return;
-	const nextSurvivingLine = originalFileLines[nextSurvivingIdx];
-	const lastInsertedLine = edit.lines[edit.lines.length - 1];
-	const trimmedNext = nextSurvivingLine.trim();
-	const trimmedLast = lastInsertedLine.trim();
-	if (trimmedLast.length > 0 && trimmedLast === trimmedNext) {
-		const tag = formatLineHash(endLine + 1, nextSurvivingLine);
-		warnings.push(
-			`Possible boundary duplication: your last replacement line \`${trimmedLast}\` is identical to the next surviving line ${tag}. ` +
-				`If you meant to replace the entire block, set \`end\` to ${tag} instead.`,
+	checkBoundaryDuplication(
+		edit,
+		editIndex,
+		"trailing",
+		nextSurvivingIdx,
+		edit.lines[edit.lines.length - 1],
+		originalFileLines,
+		warnings,
+	);
+	checkBoundaryDuplication(edit, editIndex, "leading", prevSurvivingIdx, edit.lines[0], originalFileLines, warnings);
+}
+
+function checkBoundaryDuplication(
+	edit: HashlineEdit,
+	editIndex: number,
+	side: "leading" | "trailing",
+	neighborIdx: number,
+	insertedLine: string,
+	originalFileLines: string[],
+	warnings: string[],
+): void {
+	if (neighborIdx < 0 || neighborIdx >= originalFileLines.length) return;
+
+	const neighborLine = originalFileLines[neighborIdx];
+	const trimmedInserted = insertedLine.trim();
+	const trimmedNeighbor = neighborLine.trim();
+	if (trimmedInserted.length === 0 || trimmedInserted !== trimmedNeighbor) return;
+
+	const neighborTag = formatLineHash(neighborIdx + 1, neighborLine);
+	const verb = side === "leading" ? "first" : "last";
+	const direction = side === "leading" ? "previous" : "next";
+	const anchorName = side === "leading" ? "pos" : "end";
+
+	const fixHint =
+		edit.op === "replace_line" || edit.op === "replace_range"
+			? `If you meant to replace the entire block, set \`${anchorName}\` to ${neighborTag} instead.`
+			: `Remove the duplicate from your content, or use \`range\` with ${anchorName} ${neighborTag} to cover both lines.`;
+
+	const kind = edit.op === "append_at" || edit.op === "prepend_at" ? "inserted" : "replacement";
+	const message =
+		`Possible boundary duplication: your ${verb} ${kind} line \`${trimmedInserted}\` ` +
+		`is identical to the ${direction} surviving line ${neighborTag}. ${fixHint}`;
+
+	if (isStructuralCloseLine(trimmedInserted)) {
+		throw new HashlineBoundaryError(
+			editIndex,
+			formatEditLocation(edit),
+			trimmedInserted,
+			side,
+			`Edit aborted — ${message}`,
 		);
+	}
+
+	warnings.push(message);
+}
+
+function formatEditLocation(edit: HashlineEdit): string {
+	switch (edit.op) {
+		case "replace_line":
+		case "append_at":
+		case "prepend_at":
+			return `${edit.pos.line}#${edit.pos.hash}`;
+		case "replace_range":
+			return `${edit.pos.line}#${edit.pos.hash}..${edit.end.line}#${edit.end.hash}`;
+		default:
+			return "";
 	}
 }
 
@@ -908,8 +1015,8 @@ export function applyHashlineEdits(
 		throw new HashlineMismatchError(mismatches, fileLines);
 	}
 	runHashlinePreflightSanitizers(edits, warnings);
-	for (const edit of edits) {
-		collectBoundaryDuplicationWarning(edit, originalFileLines, warnings);
+	for (let idx = 0; idx < edits.length; idx++) {
+		enforceBoundaryDuplicationIntegrity(edits[idx], idx, originalFileLines, warnings);
 	}
 	dedupeHashlineEdits(edits);
 

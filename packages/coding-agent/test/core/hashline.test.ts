@@ -4,6 +4,7 @@ import {
 	buildCompactHashlineDiffPreview,
 	computeLineHash,
 	formatHashLines,
+	HashlineBoundaryError,
 	HashlineMismatchError,
 	hashlineParseText,
 	parseTag,
@@ -526,7 +527,7 @@ describe("applyHashlineEdits — heuristics", () => {
 		expect(result.lines).toBe("aaa\nBBB\nccc");
 	});
 
-	it("preserves duplicated trailing closer lines exactly as provided", () => {
+	it("throws on trailing structural delimiter duplication", () => {
 		const content = "if (ok) {\n  run();\n}\nafter();";
 		const edits: HashlineEdit[] = [
 			{
@@ -536,11 +537,18 @@ describe("applyHashlineEdits — heuristics", () => {
 				lines: ["if (ok) {", "  runSafe();", "}"],
 			},
 		];
-		const result = applyHashlineEdits(content, edits);
-		expect(result.lines).toBe("if (ok) {\n  runSafe();\n}\n}\nafter();");
-		expect(result.warnings).toHaveLength(1);
-		expect(result.warnings?.[0]).toContain("Possible boundary duplication");
-		expect(result.warnings?.[0]).toContain("set `end` to 3#RZ");
+		let err: unknown;
+		try {
+			applyHashlineEdits(content, edits);
+		} catch (caught) {
+			err = caught;
+		}
+		expect(err).toBeInstanceOf(HashlineBoundaryError);
+		const boundaryErr = err as HashlineBoundaryError;
+		expect(boundaryErr.side).toBe("trailing");
+		expect(boundaryErr.duplicatedLine).toBe("}");
+		expect(boundaryErr.message).toContain("Edit aborted");
+		expect(boundaryErr.message).toContain("set `end` to 3#RZ");
 	});
 
 	it("preserves duplicated trailing content when replacement re-emits the next line", () => {
@@ -560,7 +568,7 @@ describe("applyHashlineEdits — heuristics", () => {
 		expect(result.warnings?.[0]).toContain("set `end` to 3#HR");
 	});
 
-	it("preserves duplicated leading content when replacement re-emits the previous line", () => {
+	it("warns on duplicated leading content when replacement re-emits the previous line", () => {
 		const content = "if (x) {\n  oldBody();\n}\nafter();";
 		const edits: HashlineEdit[] = [
 			{
@@ -572,7 +580,93 @@ describe("applyHashlineEdits — heuristics", () => {
 		];
 		const result = applyHashlineEdits(content, edits);
 		expect(result.lines).toBe("if (x) {\nif (x) {\n  newBody();\n}\nafter();");
-		expect(result.warnings).toBeUndefined();
+		expect(result.warnings).toHaveLength(1);
+		expect(result.warnings?.[0]).toContain("Possible boundary duplication");
+		expect(result.warnings?.[0]).toContain("first replacement line `if (x) {`");
+		expect(result.warnings?.[0]).toContain("set `pos` to 1#");
+	});
+
+	it("throws on append_at with duplicated trailing closer", () => {
+		const content = "func() {\n  body();\n}\nafter();";
+		const edits: HashlineEdit[] = [
+			{
+				op: "append_at",
+				pos: makeTag(2, "  body();"),
+				lines: ["  extra();", "}"],
+			},
+		];
+		let err: unknown;
+		try {
+			applyHashlineEdits(content, edits);
+		} catch (caught) {
+			err = caught;
+		}
+		expect(err).toBeInstanceOf(HashlineBoundaryError);
+		const boundaryErr = err as HashlineBoundaryError;
+		expect(boundaryErr.side).toBe("trailing");
+		expect(boundaryErr.duplicatedLine).toBe("}");
+	});
+
+	it("throws on leading structural delimiter duplication", () => {
+		const content = "}\nfoo\nbar";
+		const edits: HashlineEdit[] = [
+			{
+				op: "replace_range",
+				pos: makeTag(2, "foo"),
+				end: makeTag(3, "bar"),
+				lines: ["}", "new"],
+			},
+		];
+		let err: unknown;
+		try {
+			applyHashlineEdits(content, edits);
+		} catch (caught) {
+			err = caught;
+		}
+		expect(err).toBeInstanceOf(HashlineBoundaryError);
+		const boundaryErr = err as HashlineBoundaryError;
+		expect(boundaryErr.side).toBe("leading");
+		expect(boundaryErr.duplicatedLine).toBe("}");
+	});
+
+	it("throws on duplicated comment-close delimiter `*/`", () => {
+		const content = "/*\n comment\n*/\ncode;";
+		const edits: HashlineEdit[] = [
+			{
+				op: "replace_range",
+				pos: makeTag(1, "/*"),
+				end: makeTag(2, " comment"),
+				lines: ["/*", " updated comment", "*/"],
+			},
+		];
+		let err: unknown;
+		try {
+			applyHashlineEdits(content, edits);
+		} catch (caught) {
+			err = caught;
+		}
+		expect(err).toBeInstanceOf(HashlineBoundaryError);
+		expect((err as HashlineBoundaryError).duplicatedLine).toBe("*/");
+	});
+
+	it("throws on combined delimiter `});` duplication", () => {
+		const content = "call(() => {\n  body();\n});\nafter();";
+		const edits: HashlineEdit[] = [
+			{
+				op: "replace_range",
+				pos: makeTag(1, "call(() => {"),
+				end: makeTag(2, "  body();"),
+				lines: ["call(() => {", "  bodyV2();", "});"],
+			},
+		];
+		let err: unknown;
+		try {
+			applyHashlineEdits(content, edits);
+		} catch (caught) {
+			err = caught;
+		}
+		expect(err).toBeInstanceOf(HashlineBoundaryError);
+		expect((err as HashlineBoundaryError).duplicatedLine).toBe("});");
 	});
 
 	it("auto-corrects leading escaped tab indentation by default", () => {
