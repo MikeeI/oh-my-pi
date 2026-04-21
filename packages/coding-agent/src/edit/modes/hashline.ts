@@ -30,7 +30,7 @@ import { outputMeta } from "../../tools/output-meta";
 import { resolveToCwd } from "../../tools/path-utils";
 import { enforcePlanModeWrite, resolvePlanPath } from "../../tools/plan-mode-guard";
 import { generateDiffString } from "../diff";
-import { computeLineHash, formatLineHash, HASHLINE_HASH_PATTERN } from "../line-hash";
+import { computeLineHash, formatHashLines, formatLineHash, HASHLINE_HASH_PATTERN } from "../line-hash";
 import { detectLineEnding, normalizeToLF, restoreLineEndings, stripBom } from "../normalize";
 import type { EditToolDetails, LspBatchRequest } from "../renderer";
 
@@ -57,17 +57,12 @@ const HASHLINE_PREFIX_PLUS_RE = new RegExp(
 );
 const DIFF_PLUS_RE = /^[+](?![+])/;
 const PARSE_TAG_RE = new RegExp(String.raw`^\s*[>+-]*\s*(\d+)\s*#\s*(${HASHLINE_HASH_PATTERN})`);
+const SYMBOL_ONLY_BOUNDARY_RE = /^(?:[^\p{L}\p{N}\s]+(?:\s+[^\p{L}\p{N}\s]+)*)$/u;
+const UPDATED_ANCHOR_CONTEXT_LINES = 2;
+const UPDATED_ANCHOR_MAX_LINES = 20;
 
-// A line is a "structural close" if after trimming it consists only of closing
-// delimiters, separators, and optional block-comment terminator. Covers }, ),
-// ], }), });, ]}, )}, ]});, */, and whitespace combinations across Go, TS, JS,
-// Rust, C, Java, Swift. When such a line is duplicated at an edit boundary,
-// the edit almost certainly has a wrong `pos` or `end` — producing syntactically
-// broken code. We treat these cases as hard errors rather than warnings.
-const STRUCTURAL_CLOSE_RE = /^[}\])\s,;]*(?:\*\/)?[}\])\s,;]*$/;
-
-function isStructuralCloseLine(trimmed: string): boolean {
-	return trimmed.length > 0 && STRUCTURAL_CLOSE_RE.test(trimmed);
+function isSymbolOnlyBoundaryLine(trimmed: string): boolean {
+	return trimmed.length > 0 && SYMBOL_ONLY_BOUNDARY_RE.test(trimmed);
 }
 
 type LinePrefixStats = {
@@ -673,7 +668,6 @@ function ensureHashlineEditHasContent(edit: HashlineEdit): void {
 
 function enforceBoundaryDuplicationIntegrity(
 	edit: HashlineEdit,
-	editIndex: number,
 	originalFileLines: string[],
 	warnings: string[],
 ): void {
@@ -704,19 +698,22 @@ function enforceBoundaryDuplicationIntegrity(
 
 	checkBoundaryDuplication(
 		edit,
-		editIndex,
 		"trailing",
 		nextSurvivingIdx,
 		edit.lines[edit.lines.length - 1],
 		originalFileLines,
 		warnings,
 	);
-	checkBoundaryDuplication(edit, editIndex, "leading", prevSurvivingIdx, edit.lines[0], originalFileLines, warnings);
+	if (edit.lines.length === 0) return;
+	checkBoundaryDuplication(edit, "leading", prevSurvivingIdx, edit.lines[0], originalFileLines, warnings);
+}
+
+function stripBoundaryEchoLine(edit: HashlineEdit, side: "leading" | "trailing"): void {
+	edit.lines = side === "leading" ? edit.lines.slice(1) : edit.lines.slice(0, -1);
 }
 
 function checkBoundaryDuplication(
 	edit: HashlineEdit,
-	editIndex: number,
 	side: "leading" | "trailing",
 	neighborIdx: number,
 	insertedLine: string,
@@ -726,9 +723,14 @@ function checkBoundaryDuplication(
 	if (neighborIdx < 0 || neighborIdx >= originalFileLines.length) return;
 
 	const neighborLine = originalFileLines[neighborIdx];
+	const exactMatch = insertedLine === neighborLine;
 	const trimmedInserted = insertedLine.trim();
 	const trimmedNeighbor = neighborLine.trim();
 	if (trimmedInserted.length === 0 || trimmedInserted !== trimmedNeighbor) return;
+
+	// Exact text still matters for symbol-only boundaries: `\t}` before `}` is usually a
+	// nested-block boundary, not a duplicated line that should be auto-stripped.
+	if (isSymbolOnlyBoundaryLine(trimmedInserted) && !exactMatch) return;
 
 	const neighborTag = formatLineHash(neighborIdx + 1, neighborLine);
 	const verb = side === "leading" ? "first" : "last";
@@ -745,31 +747,15 @@ function checkBoundaryDuplication(
 		`Possible boundary duplication: your ${verb} ${kind} line \`${trimmedInserted}\` ` +
 		`is identical to the ${direction} surviving line ${neighborTag}. ${fixHint}`;
 
-	if (isStructuralCloseLine(trimmedInserted)) {
-		throw new HashlineBoundaryError(
-			editIndex,
-			formatEditLocation(edit),
-			trimmedInserted,
-			side,
-			`Edit aborted — ${message}`,
-		);
+	if (exactMatch && isSymbolOnlyBoundaryLine(trimmedInserted)) {
+		stripBoundaryEchoLine(edit, side);
+		warnings.push(`Auto-stripped exact ${side} boundary echo: ${message}`);
+		return;
 	}
 
 	warnings.push(message);
 }
 
-function formatEditLocation(edit: HashlineEdit): string {
-	switch (edit.op) {
-		case "replace_line":
-		case "append_at":
-		case "prepend_at":
-			return `${edit.pos.line}#${edit.pos.hash}`;
-		case "replace_range":
-			return `${edit.pos.line}#${edit.pos.hash}..${edit.end.line}#${edit.end.hash}`;
-		default:
-			return "";
-	}
-}
 
 function dedupeHashlineEdits(edits: HashlineEdit[]): void {
 	const seenEditKeys = new Map<string, number>();
@@ -833,7 +819,7 @@ function applyHashlineEditToLines(
 	originalFileLines: string[],
 	editIndex: number,
 	noopEdits: Array<{ editIndex: number; loc: string; current: string }>,
-	trackFirstChanged: (line: number) => void,
+	trackChangedSpan: (startLine: number, endLine: number) => void,
 ): void {
 	switch (edit.op) {
 		case "replace_line": {
@@ -848,13 +834,13 @@ function applyHashlineEditToLines(
 				break;
 			}
 			fileLines.splice(edit.pos.line - 1, 1, ...newLines);
-			trackFirstChanged(edit.pos.line);
+			trackChangedSpan(edit.pos.line, edit.pos.line + Math.max(newLines.length, 1) - 1);
 			break;
 		}
 		case "replace_range": {
 			const count = edit.end.line - edit.pos.line + 1;
 			fileLines.splice(edit.pos.line - 1, count, ...edit.lines);
-			trackFirstChanged(edit.pos.line);
+			trackChangedSpan(edit.pos.line, edit.pos.line + Math.max(edit.lines.length, 1) - 1);
 			break;
 		}
 		case "append_at": {
@@ -867,8 +853,9 @@ function applyHashlineEditToLines(
 				});
 				break;
 			}
+			const startLine = edit.pos.line + 1;
 			fileLines.splice(edit.pos.line, 0, ...inserted);
-			trackFirstChanged(edit.pos.line + 1);
+			trackChangedSpan(startLine, startLine + inserted.length - 1);
 			break;
 		}
 		case "prepend_at": {
@@ -882,7 +869,7 @@ function applyHashlineEditToLines(
 				break;
 			}
 			fileLines.splice(edit.pos.line - 1, 0, ...inserted);
-			trackFirstChanged(edit.pos.line);
+			trackChangedSpan(edit.pos.line, edit.pos.line + inserted.length - 1);
 			break;
 		}
 		case "append_file": {
@@ -891,13 +878,14 @@ function applyHashlineEditToLines(
 				noopEdits.push({ editIndex, loc: "EOF", current: "" });
 				break;
 			}
-			if (fileLines.length === 1 && fileLines[0] === "") {
-				fileLines.splice(0, 1, ...inserted);
-				trackFirstChanged(1);
+			const insertingIntoEmptyFile = fileLines.length === 0 || (fileLines.length === 1 && fileLines[0] === "");
+			const startLine = insertingIntoEmptyFile ? 1 : fileLines.length + 1;
+			if (insertingIntoEmptyFile) {
+				fileLines.splice(0, Math.min(fileLines.length, 1), ...inserted);
 			} else {
 				fileLines.splice(fileLines.length, 0, ...inserted);
-				trackFirstChanged(fileLines.length - inserted.length + 1);
 			}
+			trackChangedSpan(startLine, startLine + inserted.length - 1);
 			break;
 		}
 		case "prepend_file": {
@@ -906,12 +894,13 @@ function applyHashlineEditToLines(
 				noopEdits.push({ editIndex, loc: "BOF", current: "" });
 				break;
 			}
-			if (fileLines.length === 1 && fileLines[0] === "") {
-				fileLines.splice(0, 1, ...inserted);
+			const insertingIntoEmptyFile = fileLines.length === 0 || (fileLines.length === 1 && fileLines[0] === "");
+			if (insertingIntoEmptyFile) {
+				fileLines.splice(0, Math.min(fileLines.length, 1), ...inserted);
 			} else {
 				fileLines.splice(0, 0, ...inserted);
 			}
-			trackFirstChanged(1);
+			trackChangedSpan(1, inserted.length);
 			break;
 		}
 	}
@@ -920,18 +909,21 @@ function applyHashlineEditToLines(
 function buildHashlineEditResult(params: {
 	fileLines: string[];
 	firstChangedLine: number | undefined;
+	lastChangedLine: number | undefined;
 	warnings: string[];
 	noopEdits: Array<{ editIndex: number; loc: string; current: string }>;
 }): {
 	lines: string;
 	firstChangedLine: number | undefined;
+	lastChangedLine: number | undefined;
 	warnings?: string[];
 	noopEdits?: Array<{ editIndex: number; loc: string; current: string }>;
 } {
-	const { fileLines, firstChangedLine, warnings, noopEdits } = params;
+	const { fileLines, firstChangedLine, lastChangedLine, warnings, noopEdits } = params;
 	return {
 		lines: fileLines.join("\n"),
 		firstChangedLine,
+		lastChangedLine,
 		...(warnings.length > 0 ? { warnings } : {}),
 		...(noopEdits.length > 0 ? { noopEdits } : {}),
 	};
@@ -989,7 +981,7 @@ function validateHashlineEditRefs(edits: HashlineEdit[], fileLines: string[]): H
  * Edits are sorted bottom-up (highest effective line first) so earlier
  * splices don't invalidate later line numbers.
  *
- * @returns The modified content and the 1-indexed first changed line number
+ * @returns The modified content and the 1-indexed changed span in the new file
  */
 export function applyHashlineEdits(
 	text: string,
@@ -997,16 +989,18 @@ export function applyHashlineEdits(
 ): {
 	lines: string;
 	firstChangedLine: number | undefined;
+	lastChangedLine: number | undefined;
 	warnings?: string[];
 	noopEdits?: Array<{ editIndex: number; loc: string; current: string }>;
 } {
 	if (edits.length === 0) {
-		return { lines: text, firstChangedLine: undefined };
+		return { lines: text, firstChangedLine: undefined, lastChangedLine: undefined };
 	}
 
 	const fileLines = text.split("\n");
 	const originalFileLines = [...fileLines];
 	let firstChangedLine: number | undefined;
+	let lastChangedLine: number | undefined;
 	const noopEdits: Array<{ editIndex: number; loc: string; current: string }> = [];
 	const warnings: string[] = [];
 
@@ -1015,8 +1009,8 @@ export function applyHashlineEdits(
 		throw new HashlineMismatchError(mismatches, fileLines);
 	}
 	runHashlinePreflightSanitizers(edits, warnings);
-	for (let idx = 0; idx < edits.length; idx++) {
-		enforceBoundaryDuplicationIntegrity(edits[idx], idx, originalFileLines, warnings);
+	for (const edit of edits) {
+		enforceBoundaryDuplicationIntegrity(edit, originalFileLines, warnings);
 	}
 	dedupeHashlineEdits(edits);
 
@@ -1028,16 +1022,51 @@ export function applyHashlineEdits(
 		.sort((a, b) => b.sortLine - a.sortLine || a.precedence - b.precedence || a.idx - b.idx);
 
 	for (const { edit, idx } of annotated) {
-		applyHashlineEditToLines(edit, fileLines, originalFileLines, idx, noopEdits, trackFirstChanged);
+		applyHashlineEditToLines(edit, fileLines, originalFileLines, idx, noopEdits, trackChangedSpan);
 	}
 
-	return buildHashlineEditResult({ fileLines, firstChangedLine, warnings, noopEdits });
+	return buildHashlineEditResult({ fileLines, firstChangedLine, lastChangedLine, warnings, noopEdits });
 
-	function trackFirstChanged(line: number): void {
-		if (firstChangedLine === undefined || line < firstChangedLine) {
-			firstChangedLine = line;
+	function trackChangedSpan(startLine: number, endLine: number): void {
+		if (firstChangedLine === undefined || startLine < firstChangedLine) {
+			firstChangedLine = startLine;
+		}
+		if (lastChangedLine === undefined || endLine > lastChangedLine) {
+			lastChangedLine = endLine;
 		}
 	}
+}
+
+function computeUpdatedAnchorRange(
+	firstChangedLine: number | undefined,
+	lastChangedLine: number | undefined,
+	totalLines: number,
+): { start: number; end: number } | null {
+	if (firstChangedLine === undefined || lastChangedLine === undefined || totalLines < 1) {
+		return null;
+	}
+	const boundedFirst = Math.min(Math.max(firstChangedLine, 1), totalLines);
+	const boundedLast = Math.min(Math.max(lastChangedLine, 1), totalLines);
+	const start = Math.max(1, Math.min(boundedFirst, boundedLast) - UPDATED_ANCHOR_CONTEXT_LINES);
+	const end = Math.min(totalLines, Math.max(boundedFirst, boundedLast) + UPDATED_ANCHOR_CONTEXT_LINES);
+	if (end < start || end - start + 1 > UPDATED_ANCHOR_MAX_LINES) {
+		return null;
+	}
+	return { start, end };
+}
+
+function buildUpdatedAnchorBlock(
+	text: string,
+	firstChangedLine: number | undefined,
+	lastChangedLine: number | undefined,
+): { start: number; end: number; text: string } | undefined {
+	const lines = text.split("\n");
+	const range = computeUpdatedAnchorRange(firstChangedLine, lastChangedLine, Math.max(lines.length, 1));
+	if (!range) return undefined;
+	return {
+		...range,
+		text: formatHashLines(lines.slice(range.start - 1, range.end).join("\n"), range.start),
+	};
 }
 
 export interface CompactHashlineDiffPreview {
@@ -1264,6 +1293,7 @@ export async function computeHashlineDiff(
 	| {
 			diff: string;
 			firstChangedLine: number | undefined;
+			lastChangedLine: number | undefined;
 	  }
 	| {
 			error: string;
@@ -1282,7 +1312,7 @@ export async function computeHashlineDiff(
 			return { error: "move path is the same as source path" };
 		}
 		if (isMoveOnly) {
-			return { diff: "", firstChangedLine: undefined };
+			return { diff: "", firstChangedLine: undefined, lastChangedLine: undefined };
 		}
 
 		const rawContent = await readHashlineFileText(file, path);
@@ -1414,6 +1444,7 @@ export async function executeHashlineSingle(
 	const result = {
 		text: normalizedText,
 		firstChangedLine: anchorResult.firstChangedLine,
+		lastChangedLine: anchorResult.lastChangedLine,
 		warnings: anchorResult.warnings,
 		noopEdits: anchorResult.noopEdits,
 	};
@@ -1450,6 +1481,7 @@ export async function executeHashlineSingle(
 	}
 
 	const diffResult = generateDiffString(originalNormalized, result.text);
+	const updatedAnchors = buildUpdatedAnchorBlock(result.text, result.firstChangedLine, result.lastChangedLine);
 	const meta = outputMeta()
 		.diagnostics(diagnostics?.summary ?? "", diagnostics?.messages ?? [])
 		.get();
@@ -1457,14 +1489,17 @@ export async function executeHashlineSingle(
 	const resultText = move ? `Moved ${path} to ${move}` : `Updated ${path}`;
 	const preview = buildCompactHashlineDiffPreview(diffResult.diff);
 	const summaryLine = `Changes: +${preview.addedLines} -${preview.removedLines}${preview.preview ? "" : " (no textual diff preview)"}`;
-	const warningsBlock = result.warnings?.length ? `\n\nWarnings:\n${result.warnings.join("\n")}` : "";
 	const previewBlock = preview.preview ? `\n\nDiff preview:\n${preview.preview}` : "";
+	const updatedAnchorsBlock = updatedAnchors
+		? `\n\n--- Updated anchors (lines ${updatedAnchors.start}-${updatedAnchors.end}; use these for subsequent edits in this region) ---\n${updatedAnchors.text}`
+		: "";
+	const warningsBlock = result.warnings?.length ? `\n\nWarnings:\n${result.warnings.join("\n")}` : "";
 
 	return {
 		content: [
 			{
 				type: "text",
-				text: `${resultText}\n${summaryLine}${previewBlock}${warningsBlock}`,
+				text: `${resultText}\n${summaryLine}${previewBlock}${updatedAnchorsBlock}${warningsBlock}`
 			},
 		],
 		details: {
@@ -1474,6 +1509,7 @@ export async function executeHashlineSingle(
 			op: "update",
 			move,
 			meta,
+			updatedAnchors,
 		},
 	};
 }

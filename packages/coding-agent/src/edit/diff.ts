@@ -13,6 +13,7 @@ import { adjustIndentation, normalizeToLF, stripBom } from "./normalize";
 export interface DiffResult {
 	diff: string;
 	firstChangedLine: number | undefined;
+	lastChangedLine: number | undefined;
 }
 
 export interface DiffError {
@@ -78,6 +79,7 @@ export function generateDiffString(oldContent: string, newContent: string, conte
 	let newLineNum = 1;
 	let lastWasChange = false;
 	let firstChangedLine: number | undefined;
+	let lastChangedLine: number | undefined;
 
 	for (let i = 0; i < parts.length; i++) {
 		const part = parts[i];
@@ -87,15 +89,19 @@ export function generateDiffString(oldContent: string, newContent: string, conte
 		}
 
 		if (part.added || part.removed) {
-			// Capture the first changed line (in the new file)
+			// Capture the changed span in the new file.
 			if (firstChangedLine === undefined) {
 				firstChangedLine = newLineNum;
+			}
+			if (part.removed) {
+				lastChangedLine = newLineNum;
 			}
 
 			// Show the change
 			for (const line of raw) {
 				if (part.added) {
 					output.push(formatNumberedDiffLine("+", newLineNum, lineNumWidth, line));
+					lastChangedLine = newLineNum;
 					newLineNum++;
 				} else {
 					output.push(formatNumberedDiffLine("-", oldLineNum, lineNumWidth, line));
@@ -153,7 +159,7 @@ export function generateDiffString(oldContent: string, newContent: string, conte
 		}
 	}
 
-	return { diff: output.join("\n"), firstChangedLine };
+	return { diff: output.join("\n"), firstChangedLine, lastChangedLine };
 }
 
 // ═══════════════════════════════════════════════════════════════════════════
@@ -184,6 +190,7 @@ export function generateUnifiedDiffString(oldContent: string, newContent: string
 	const patch = Diff.structuredPatch("", "", oldContent, newContent, "", "", { context: contextLines });
 	const output: string[] = [];
 	let firstChangedLine: number | undefined;
+	let lastChangedLine: number | undefined;
 	const maxLineNum = Math.max(countContentLines(oldContent), countContentLines(newContent));
 	const lineNumWidth = String(maxLineNum).length;
 	for (const hunk of patch.hunks) {
@@ -193,12 +200,14 @@ export function generateUnifiedDiffString(oldContent: string, newContent: string
 		for (const line of hunk.lines) {
 			if (line.startsWith("-")) {
 				if (firstChangedLine === undefined) firstChangedLine = newLine;
+				lastChangedLine = newLine;
 				output.push(formatNumberedDiffLine("-", oldLine, lineNumWidth, line.slice(1)));
 				oldLine++;
 				continue;
 			}
 			if (line.startsWith("+")) {
 				if (firstChangedLine === undefined) firstChangedLine = newLine;
+				lastChangedLine = newLine;
 				output.push(formatNumberedDiffLine("+", newLine, lineNumWidth, line.slice(1)));
 				newLine++;
 				continue;
@@ -213,7 +222,7 @@ export function generateUnifiedDiffString(oldContent: string, newContent: string
 		}
 	}
 
-	return { diff: output.join("\n"), firstChangedLine };
+	return { diff: output.join("\n"), firstChangedLine, lastChangedLine };
 }
 
 const EOF_MARKER = "*** End of File";
