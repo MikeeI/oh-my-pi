@@ -2,6 +2,10 @@
 
 ## [Unreleased]
 
+### Changed
+
+- Added `gpt-5.5` to the top of the `slow` model priority list
+
 ## [14.1.5] - 2026-04-21
 
 ### Fixed

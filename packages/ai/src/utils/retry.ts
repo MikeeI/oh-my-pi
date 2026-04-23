@@ -98,7 +98,7 @@ function extractStatusFromMessage(message: string): number | undefined {
 
 /**
  * GitHub Copilot intermittently rejects preview models (gpt-5.3-codex,
- * gpt-5.4, gpt-5.4-mini, ...) with HTTP 400 `model_not_supported`, even
+ * gpt-5.4, gpt-5.4-mini, gpt-5.5, ...) with HTTP 400 `model_not_supported`, even
  * though the model is listed as enabled on the user's account via `/models`.
  *
  * Root cause: Copilot's request-routing backend is rolled out per OAuth

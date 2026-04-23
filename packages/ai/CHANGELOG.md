@@ -8,6 +8,7 @@
 
 ### Changed
 
+- Updated default model from `gpt-5.4` to `gpt-5.5` for openai, openai-codex, nanogpt, and openrouter provider descriptors
 - Renamed `rewriteCopilotAuthError` to `rewriteCopilotError` and extended it to rewrite `HTTP 400 model_not_supported` after retries are exhausted with guidance about Copilot's OAuth-client-specific rollout gap (see opencode#13313).
 
 ## [14.1.3] - 2026-04-17
