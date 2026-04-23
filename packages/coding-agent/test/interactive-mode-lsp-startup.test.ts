@@ -4,6 +4,7 @@ import { Agent } from "@oh-my-pi/pi-agent-core";
 import { _resetSettingsForTest, Settings } from "@oh-my-pi/pi-coding-agent/config/settings";
 import { initTheme, theme } from "@oh-my-pi/pi-coding-agent/modes/theme/theme";
 import { TempDir } from "@oh-my-pi/pi-utils";
+import { YAML } from "bun";
 import { ModelRegistry } from "../src/config/model-registry";
 import { LSP_STARTUP_EVENT_CHANNEL, type LspStartupEvent } from "../src/lsp/startup-events";
 import { InteractiveMode } from "../src/modes/interactive-mode";
@@ -21,6 +22,7 @@ describe("InteractiveMode LSP startup welcome banner", () => {
 	let session: AgentSession;
 	let tempDir: TempDir;
 
+	let sessionSettings: Settings;
 	beforeAll(() => {
 		initTheme();
 	});
@@ -39,7 +41,7 @@ describe("InteractiveMode LSP startup welcome banner", () => {
 
 		_resetSettingsForTest();
 		tempDir = TempDir.createSync("@pi-interactive-mode-lsp-startup-");
-		await Settings.init({ inMemory: true, cwd: tempDir.path() });
+		sessionSettings = await Settings.init({ cwd: tempDir.path(), agentDir: tempDir.path() });
 		authStorage = await AuthStorage.create(path.join(tempDir.path(), "testauth.db"));
 		const modelRegistry = new ModelRegistry(authStorage);
 		const model = modelRegistry.find("anthropic", "claude-sonnet-4-5");
@@ -57,7 +59,7 @@ describe("InteractiveMode LSP startup welcome banner", () => {
 				},
 			}),
 			sessionManager: SessionManager.create(tempDir.path(), tempDir.path()),
-			settings: Settings.isolated(),
+			settings: sessionSettings,
 			modelRegistry,
 		});
 		eventBus = new EventBus();
@@ -113,5 +115,14 @@ describe("InteractiveMode LSP startup welcome banner", () => {
 		expect(showStatusSpy).not.toHaveBeenCalled();
 		expect(findServerLine()).toContain(theme.status.success);
 		expect(findServerLine()).not.toContain(theme.status.pending);
+	});
+
+	it("flushes pending settings changes on shutdown", async () => {
+		sessionSettings.setModelRole("default", "openai/gpt-5.5");
+		await mode.shutdown();
+
+		const configText = await Bun.file(path.join(tempDir.path(), "config.yml")).text();
+		const config = YAML.parse(configText) as { modelRoles?: { default?: string } } | null;
+		expect(config?.modelRoles?.default).toBe("openai/gpt-5.5");
 	});
 });
