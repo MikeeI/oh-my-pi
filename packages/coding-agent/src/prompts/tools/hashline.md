@@ -122,9 +122,6 @@ When adding a sibling declaration, prefer `prepend` on the next declaration.
 <critical>
 - Make the minimum exact edit. Do not rewrite nearby code unless the consumed range requires it.
 - Use anchors exactly as `N#ID` from the latest `read` output.
-- Prefer one `edit` call per file. If you already know multiple changes in the same file, send them together in one `edits` array; separate calls usually stale the anchors.
-- After a successful edit, prefer any returned `Updated anchors` block for follow-up edits in that same region.
-- Re-read only when you need anchors for a different region, or after a stale-anchor failure.
 - `range` requires both `pos` and `end`.
 - When your replacement `content` ends with a closing delimiter (`}`, `*/`, `)`, `]`), verify `end` includes the original line carrying that delimiter. If `end` stops one line too early, the original delimiter survives and your content adds a second copy.
 - **Self-check**: compare the last line of `content` with the line immediately after `end` in the file. If they match (e.g., both are `}`), extend `end` to include that line.

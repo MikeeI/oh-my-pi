@@ -29,6 +29,8 @@ export const BASH_DEFAULT_PREVIEW_LINES = 10;
 
 const BASH_ENV_NAME_PATTERN = /^[A-Za-z_][A-Za-z0-9_]*$/;
 const DEFAULT_AUTO_BACKGROUND_THRESHOLD_MS = 60_000;
+const MIN_AUTO_BACKGROUND_WAIT_MS = 125;
+const AUTO_BACKGROUND_SETTLE_MS = 25;
 
 const bashSchemaBase = Type.Object({
 	command: Type.String({ description: "Command to execute" }),
@@ -437,10 +439,26 @@ export class BashTool implements AgentTool<BashToolSchema, BashToolDetails> {
 		}
 	}
 
+	async #settleManagedBashJob(
+		job: ManagedBashJobHandle,
+		signal?: AbortSignal,
+	): Promise<ManagedBashJobCompletion | { kind: "running" } | { kind: "aborted" }> {
+		return await this.#waitForManagedBashJob(job, AUTO_BACKGROUND_SETTLE_MS, signal);
+	}
+
 	#resolveAutoBackgroundWaitMs(timeoutMs: number): number {
 		if (this.#autoBackgroundThresholdMs <= 0) return 0;
 		const timeoutBufferMs = 1_000;
-		return Math.max(0, Math.min(this.#autoBackgroundThresholdMs, timeoutMs - timeoutBufferMs));
+		const waitMs = Math.max(this.#autoBackgroundThresholdMs, MIN_AUTO_BACKGROUND_WAIT_MS);
+		return Math.max(0, Math.min(waitMs, timeoutMs - timeoutBufferMs));
+	}
+
+	#shouldPreferInlineExecution(command: string): boolean {
+		const trimmed = command.trim();
+		if (trimmed.length === 0 || trimmed.length > 80) return false;
+		if (/[\n;&|><()]/.test(trimmed)) return false;
+		const words = trimmed.split(/\s+/);
+		return words.length <= 4;
 	}
 
 	async execute(
@@ -552,7 +570,12 @@ export class BashTool implements AgentTool<BashToolSchema, BashToolDetails> {
 			return this.#buildBackgroundStartResult(job.jobId, job.label, "", timeoutSec);
 		}
 
-		if (this.#autoBackgroundEnabled && !pty && this.session.asyncJobManager) {
+		if (
+			this.#autoBackgroundEnabled &&
+			!pty &&
+			this.session.asyncJobManager &&
+			!this.#shouldPreferInlineExecution(command)
+		) {
 			const autoBackgroundWaitMs = this.#resolveAutoBackgroundWaitMs(timeoutMs);
 			const startBackgrounded = autoBackgroundWaitMs === 0;
 			const job = this.#startManagedBashJob({
@@ -579,6 +602,20 @@ export class BashTool implements AgentTool<BashToolSchema, BashToolDetails> {
 				throw waitResult.error;
 			}
 			if (waitResult.kind === "aborted") {
+				this.session.asyncJobManager.cancel(job.jobId);
+				this.session.asyncJobManager.acknowledgeDeliveries([job.jobId]);
+				throw new ToolAbortError(job.getLatestText() || "Command aborted");
+			}
+			const settleResult = await this.#settleManagedBashJob(job, signal);
+			if (settleResult.kind === "completed") {
+				this.session.asyncJobManager.acknowledgeDeliveries([job.jobId]);
+				return settleResult.result;
+			}
+			if (settleResult.kind === "failed") {
+				this.session.asyncJobManager.acknowledgeDeliveries([job.jobId]);
+				throw settleResult.error;
+			}
+			if (settleResult.kind === "aborted") {
 				this.session.asyncJobManager.cancel(job.jobId);
 				this.session.asyncJobManager.acknowledgeDeliveries([job.jobId]);
 				throw new ToolAbortError(job.getLatestText() || "Command aborted");

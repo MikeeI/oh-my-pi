@@ -68,7 +68,6 @@ export interface EditToolPerFileResult {
 	isError?: boolean;
 	errorText?: string;
 	meta?: OutputMeta;
-	updatedAnchors?: { start: number; end: number; text: string };
 }
 
 export interface EditToolDetails {
@@ -84,8 +83,6 @@ export interface EditToolDetails {
 	move?: string;
 	/** Structured output metadata */
 	meta?: OutputMeta;
-	/** Fresh anchors for immediate follow-up edits in the same region */
-	updatedAnchors?: { start: number; end: number; text: string };
 	/** Per-file results (multi-file edits) */
 	perFileResults?: EditToolPerFileResult[];
 }

@@ -186,7 +186,6 @@ async function executePerFile(
 				op: details?.op,
 				move: details?.move,
 				meta: details?.meta,
-				updatedAnchors: details?.updatedAnchors,
 			});
 			const text = result.content?.find(c => c.type === "text")?.text ?? "";
 			if (text) contentTexts.push(text);
@@ -206,7 +205,6 @@ async function executePerFile(
 						.filter(Boolean)
 						.join("\n"),
 					firstChangedLine: perFileResults.find(r => r.firstChangedLine)?.firstChangedLine,
-					updatedAnchors: perFileResults.find(r => r.updatedAnchors)?.updatedAnchors,
 					perFileResults: [...perFileResults],
 				},
 			});
@@ -221,7 +219,6 @@ async function executePerFile(
 				.filter(Boolean)
 				.join("\n"),
 			firstChangedLine: perFileResults.find(r => r.firstChangedLine)?.firstChangedLine,
-			updatedAnchors: perFileResults.find(r => r.updatedAnchors)?.updatedAnchors,
 			perFileResults,
 		},
 	};

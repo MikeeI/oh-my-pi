@@ -158,8 +158,8 @@ async function patchGeneratedIndexLoader(): Promise<void> {
 		content = content.replace(
 			'__filename.includes("%7EBUN");',
 			'__filename.includes("%7EBUN") ||\n' +
-			'	(typeof Bun !== "undefined" && typeof Bun.main === "string" &&\n' +
-			'		(Bun.main.includes("$bunfs") || Bun.main.includes("~BUN") || Bun.main.includes("%7EBUN")));',
+				'	(typeof Bun !== "undefined" && typeof Bun.main === "string" &&\n' +
+				'		(Bun.main.includes("$bunfs") || Bun.main.includes("~BUN") || Bun.main.includes("%7EBUN")));',
 		);
 	}
 	await Bun.write(indexPath, content);

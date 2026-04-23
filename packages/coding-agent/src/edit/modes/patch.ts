@@ -29,7 +29,9 @@ import { resolveToCwd } from "../../tools/path-utils";
 import { enforcePlanModeWrite, resolvePlanPath } from "../../tools/plan-mode-guard";
 import {
 	ApplyPatchError,
+	type DiffError,
 	type DiffHunk,
+	type DiffResult,
 	generateUnifiedDiffString,
 	normalizeCreateContent,
 	parseDiffHunks,
@@ -1548,15 +1550,7 @@ export async function computePatchDiff(
 	input: PatchInput,
 	cwd: string,
 	options?: { fuzzyThreshold?: number; allowFuzzy?: boolean },
-): Promise<
-	| {
-			diff: string;
-			firstChangedLine: number | undefined;
-	  }
-	| {
-			error: string;
-	  }
-> {
+): Promise<DiffResult | DiffError> {
 	try {
 		const result = await previewPatch(input, {
 			cwd,
@@ -1568,7 +1562,7 @@ export async function computePatchDiff(
 		const normalizedOld = normalizeToLF(stripBom(oldContent).text);
 		const normalizedNew = normalizeToLF(stripBom(newContent).text);
 		if (!normalizedOld && !normalizedNew) {
-			return { diff: "", firstChangedLine: undefined };
+			return { diff: "", firstChangedLine: undefined, lastChangedLine: undefined };
 		}
 		return generateUnifiedDiffString(normalizedOld, normalizedNew);
 	} catch (err) {
