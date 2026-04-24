@@ -7,6 +7,10 @@
 - Added `gpt-5.5` to the top of the `slow` model priority list
 - Replaced `CHUNK_CHECKSUM_ALPHABET` literal in `edit/modes/chunk.ts` with an import of `HASHLINE_NIBBLE_ALPHABET` from `edit/line-hash.ts` (the two were already documented as sharing the same alphabet)
 
+### Fixed
+
+- Fixed Mermaid fenced markdown rendering in assistant messages on terminals without image protocol support ([#650](https://github.com/can1357/oh-my-pi/issues/650))
+
 ## [14.2.0] - 2026-04-23
 
 ### Added
