@@ -5,23 +5,33 @@
 ### Changed
 
 - Added `gpt-5.5` to the top of the `slow` model priority list
+- Replaced `CHUNK_CHECKSUM_ALPHABET` literal in `edit/modes/chunk.ts` with an import of `HASHLINE_NIBBLE_ALPHABET` from `edit/line-hash.ts` (the two were already documented as sharing the same alphabet)
 
-## [14.1.5] - 2026-04-21
+## [14.2.0] - 2026-04-23
+
+### Added
+
+- Added an `apply_patch` edit mode that accepts Codex `*** Begin Patch` envelopes, shares patch-mode execution and diagnostics, and renders streaming per-file diffs in the TUI.
+
+### Changed
+
+- Changed Spark models to default to `apply_patch` edit mode instead of `replace`.
+- Tightened the contract for `SearchParams.recency` in `web/search/providers/base.ts`: providers MUST interpret recency as a pure time filter and MUST NOT use it as an implicit signal to change topic scope, content domain, or ranking strategy.
+- Inline read tool previews are now optional via `read.toolResultPreview` and default to off
 
 ### Fixed
 
+- Fixed `apply_patch` streaming previews to avoid showing the missing `*** End Patch` parse error while the patch body is still arriving.
+- Fixed diagnostics rendering to replace tabs before TUI output, preventing compiler messages from breaking tree alignment.
+- Fixed compiled `omp` binaries to ignore project-local `bunfig.toml` and `.env` autoloading at startup, preventing unrelated project config from crashing or preloading code into the CLI
+- Fixed edit tool diff and replace operations to report missing-file failures as `File not found: <path>` errors instead of raw filesystem ENOENT errors
 - Fixed `local://` URL path leak on Linux where `//` collapsing to `/` produced `local:/path` forms that bypassed the internal protocol handler and leaked as filesystem paths, breaking plan mode file resolution
+- Fixed Darwin compiled binaries failing to start under Bun 1.3.12 by ad-hoc signing local and release binary builds after applying Bun's no-codesign workaround ([#754](https://github.com/can1357/oh-my-pi/issues/754))
 - Fixed Tavily web search silently returning off-topic news articles when `--recency` was set. The provider was unconditionally coupling `topic: "news"` to recency, which scoped Tavily's index to news publications and excluded documentation, release notes, GitHub, and all non-news technical content. Technical queries with `--recency` now return the correct corpus.
 - Fixed status-line sanitization to strip OSC, DCS, PM, APC, and 8-bit CSI escape sequences instead of leaving payload fragments in the UI
 - Fixed inline read tool previews to avoid rendering duplicate summary rows above the same code cell
 - Fixed hashline edit tool to hard-abort edits that would produce a duplicated structural delimiter at a boundary (e.g. replacement content ending with `}` while the next surviving line is also `}`). Previously these edits produced syntactically broken output with only a warning, forcing cleanup edits in Go and other brace-delimited languages. The new `HashlineBoundaryError` covers all four insert ops (`replace_line`, `replace_range`, `append_at`, `prepend_at`) and both leading and trailing boundaries, with an actionable error message naming the anchor the caller should extend to. Non-delimiter duplications (repeated statements, function calls) continue to emit warnings without aborting.
 - Fixed hashline `line-hash` module where the JSDoc described the 2-character line identifier as "hexadecimal" despite using a 16-character consonant alphabet (`ZPMQVRWSNKTXJBYH`). The prefix regexes in `hashline.ts` are now derived from the exported `HASHLINE_HASH_PATTERN` constant rather than hardcoded, preventing silent drift if the alphabet is ever extended. Example references in docs updated from `5#aa` to `5#ZP`.
-
-### Changed
-
-- Tightened the contract for `SearchParams.recency` in `web/search/providers/base.ts`: providers MUST interpret recency as a pure time filter and MUST NOT use it as an implicit signal to change topic scope, content domain, or ranking strategy.
-- Inline read tool previews are now optional via `read.toolResultPreview` and default to off
-- Replaced `CHUNK_CHECKSUM_ALPHABET` literal in `edit/modes/chunk.ts` with an import of `HASHLINE_NIBBLE_ALPHABET` from `edit/line-hash.ts` (the two were already documented as sharing the same alphabet)
 
 ## [14.1.3] - 2026-04-17
 

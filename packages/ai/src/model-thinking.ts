@@ -48,6 +48,14 @@ const CODEX_GPT_5_4_PRIORITY_BY_VARIANT: Partial<Record<OpenAIVariant, number>> 
 	nano: 2,
 };
 
+const COPILOT_GENERATED_LIMITS: Record<string, { contextWindow: number; maxTokens: number }> = {
+	"claude-opus-4.6": { contextWindow: 168000, maxTokens: 32000 },
+	"gpt-5.2": { contextWindow: 272000, maxTokens: 128000 },
+	"gpt-5.4": { contextWindow: 272000, maxTokens: 128000 },
+	"gpt-5.4-mini": { contextWindow: 272000, maxTokens: 128000 },
+	"grok-code-fast-1": { contextWindow: 192000, maxTokens: 64000 },
+};
+
 interface GeminiModel {
 	family: "gemini";
 	kind: GeminiKind;
@@ -283,7 +291,19 @@ export function anthropicModelHasRealXHighEffort<TApi extends Api>(model: ApiMod
 }
 
 function applyGeneratedModelPolicy(model: ApiModel<Api>): void {
+	const copilotLimits = model.provider === "github-copilot" ? COPILOT_GENERATED_LIMITS[model.id] : undefined;
+	if (copilotLimits) {
+		model.contextWindow = copilotLimits.contextWindow;
+		model.maxTokens = copilotLimits.maxTokens;
+	}
+
 	const parsedModel = parseKnownModel(model.id);
+	const applyPatchToolType = inferGeneratedApplyPatchToolType(model, parsedModel);
+	if (applyPatchToolType) {
+		model.applyPatchToolType = applyPatchToolType;
+	} else {
+		delete model.applyPatchToolType;
+	}
 	if (parsedModel.family === "anthropic") {
 		applyAnthropicCatalogPolicy(model, parsedModel);
 	}
@@ -306,6 +326,22 @@ function applyAnthropicCatalogPolicy(model: ApiModel<Api>, parsedModel: Anthropi
 		model.contextWindow = 1000000;
 		model.maxTokens = 128000;
 	}
+}
+
+function inferGeneratedApplyPatchToolType(
+	model: ApiModel<Api>,
+	parsedModel: ParsedModel,
+): ApiModel<Api>["applyPatchToolType"] {
+	if (parsedModel.family !== "openai" || parsedModel.version.major !== 5) {
+		return undefined;
+	}
+	if (model.provider === "openai" && model.api === "openai-responses") {
+		return "freeform";
+	}
+	if (model.provider === "openai-codex" && model.api === "openai-codex-responses") {
+		return "freeform";
+	}
+	return undefined;
 }
 
 function applyOpenAICatalogPolicy(model: ApiModel<Api>, parsedModel: OpenAIModel): void {

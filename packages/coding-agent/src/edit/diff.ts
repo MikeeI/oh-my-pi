@@ -4,11 +4,11 @@
  * Provides diff string generation and the replace-mode edit logic
  * used when not in patch mode.
  */
-import { isEnoent } from "@oh-my-pi/pi-utils";
 import * as Diff from "diff";
 import { resolveToCwd } from "../tools/path-utils";
 import { DEFAULT_FUZZY_THRESHOLD, EditMatchError, findMatch } from "./modes/replace";
 import { adjustIndentation, normalizeToLF, stripBom } from "./normalize";
+import { readEditFileText } from "./read-file";
 
 export interface DiffResult {
 	diff: string;
@@ -282,17 +282,6 @@ function formatOccurrenceMatchError(
 		occurrences > MAX_OCCURRENCE_PREVIEWS ? ` (showing first ${MAX_OCCURRENCE_PREVIEWS} of ${occurrences})` : "";
 	const pathSuffix = path ? ` in ${path}` : "";
 	return `Found ${occurrences} occurrences${pathSuffix}${moreMsg}:\n\n${previews}\n\nAdd more context lines to disambiguate.`;
-}
-
-async function readFileTextForDiff(path: string, absolutePath: string): Promise<string> {
-	try {
-		return await Bun.file(absolutePath).text();
-	} catch (error) {
-		if (isEnoent(error)) {
-			throw new Error(`File not found: ${path}`);
-		}
-		throw error;
-	}
 }
 
 export function normalizeDiff(diff: string): string {
@@ -775,7 +764,7 @@ export async function computeEditDiff(
 		const absolutePath = resolveToCwd(path, cwd);
 		let rawContent: string;
 		try {
-			rawContent = await readFileTextForDiff(path, absolutePath);
+			rawContent = await readEditFileText(absolutePath, path);
 		} catch (error) {
 			const message = error instanceof Error ? error.message : String(error);
 			return { error: message || `Unable to read ${path}` };

@@ -886,6 +886,8 @@ export const SETTINGS_SCHEMA = {
 
 	"memories.rolloutPayloadPercent": { type: "number", default: 0.7 },
 
+	"memories.phase1InputTokenLimit": { type: "number", default: 4000 },
+
 	"memories.fallbackTokenLimit": { type: "number", default: 16000 },
 
 	"memories.summaryInjectionTokenLimit": { type: "number", default: 5000 },
@@ -953,12 +955,12 @@ export const SETTINGS_SCHEMA = {
 	// Edit tool
 	"edit.mode": {
 		type: "enum",
-		values: ["replace", "patch", "hashline", "chunk", "vim"] as const,
+		values: ["replace", "patch", "hashline", "chunk", "vim", "apply_patch"] as const,
 		default: "hashline",
 		ui: {
 			tab: "editing",
 			label: "Edit Mode",
-			description: "Select the edit tool variant (replace, patch, hashline, chunk, or vim)",
+			description: "Select the edit tool variant (replace, patch, hashline, chunk, vim, or apply_patch)",
 		},
 	},
 

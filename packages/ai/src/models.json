@@ -16200,6 +16200,31 @@
 				"maxLevel": "xhigh"
 			}
 		},
+		"claude-opus-4-7": {
+			"id": "claude-opus-4-7",
+			"name": "Claude Opus 4.7",
+			"api": "openai-completions",
+			"provider": "litellm",
+			"baseUrl": "http://localhost:4000/v1",
+			"reasoning": true,
+			"input": [
+				"text",
+				"image"
+			],
+			"cost": {
+				"input": 0,
+				"output": 0,
+				"cacheRead": 0,
+				"cacheWrite": 0
+			},
+			"contextWindow": 222222,
+			"maxTokens": 8888,
+			"thinking": {
+				"mode": "effort",
+				"minLevel": "minimal",
+				"maxLevel": "xhigh"
+			}
+		},
 		"claude-sonnet-4": {
 			"id": "claude-sonnet-4",
 			"name": "Claude Sonnet 4",
@@ -16962,6 +16987,50 @@
 				"minLevel": "low",
 				"maxLevel": "xhigh"
 			}
+		},
+		"gpt-5.5": {
+			"id": "gpt-5.5",
+			"name": "GPT-5.5",
+			"api": "openai-completions",
+			"provider": "litellm",
+			"baseUrl": "http://localhost:4000/v1",
+			"reasoning": true,
+			"input": [
+				"text",
+				"image"
+			],
+			"cost": {
+				"input": 0,
+				"output": 0,
+				"cacheRead": 0,
+				"cacheWrite": 0
+			},
+			"contextWindow": 222222,
+			"maxTokens": 8888,
+			"thinking": {
+				"mode": "effort",
+				"minLevel": "low",
+				"maxLevel": "xhigh"
+			}
+		},
+		"gpt-image-2": {
+			"id": "gpt-image-2",
+			"name": "gpt-image-2",
+			"api": "openai-completions",
+			"provider": "litellm",
+			"baseUrl": "http://localhost:4000/v1",
+			"reasoning": false,
+			"input": [
+				"text"
+			],
+			"cost": {
+				"input": 0,
+				"output": 0,
+				"cacheRead": 0,
+				"cacheWrite": 0
+			},
+			"contextWindow": 222222,
+			"maxTokens": 8888
 		},
 		"grok-4-1-fast-non-reasoning": {
 			"id": "grok-4-1-fast-non-reasoning",
@@ -18709,6 +18778,44 @@
 			"contextWindow": 222222,
 			"maxTokens": 8888
 		},
+		"alibaba/qwen3.6-27b": {
+			"id": "alibaba/qwen3.6-27b",
+			"name": "alibaba/qwen3.6-27b",
+			"api": "openai-completions",
+			"provider": "nanogpt",
+			"baseUrl": "https://nano-gpt.com/api/v1",
+			"reasoning": false,
+			"input": [
+				"text"
+			],
+			"cost": {
+				"input": 0,
+				"output": 0,
+				"cacheRead": 0,
+				"cacheWrite": 0
+			},
+			"contextWindow": 222222,
+			"maxTokens": 8888
+		},
+		"alibaba/qwen3.6-flash": {
+			"id": "alibaba/qwen3.6-flash",
+			"name": "alibaba/qwen3.6-flash",
+			"api": "openai-completions",
+			"provider": "nanogpt",
+			"baseUrl": "https://nano-gpt.com/api/v1",
+			"reasoning": false,
+			"input": [
+				"text"
+			],
+			"cost": {
+				"input": 0,
+				"output": 0,
+				"cacheRead": 0,
+				"cacheWrite": 0
+			},
+			"contextWindow": 222222,
+			"maxTokens": 8888
+		},
 		"allenai/molmo-2-8b": {
 			"id": "allenai/molmo-2-8b",
 			"name": "allenai/molmo-2-8b",
@@ -19066,6 +19173,25 @@
 			},
 			"contextWindow": 222222,
 			"maxTokens": 8888
+		},
+		"arcee-ai/trinity-large-preview": {
+			"id": "arcee-ai/trinity-large-preview",
+			"name": "Trinity Large Preview",
+			"api": "openai-completions",
+			"baseUrl": "https://nano-gpt.com/api/v1",
+			"provider": "nanogpt",
+			"reasoning": false,
+			"input": [
+				"text"
+			],
+			"cost": {
+				"input": 0.25,
+				"output": 1,
+				"cacheRead": 0,
+				"cacheWrite": 0
+			},
+			"contextWindow": 131000,
+			"maxTokens": 131000
 		},
 		"arcee-ai/trinity-large-thinking": {
 			"id": "arcee-ai/trinity-large-thinking",
@@ -22999,6 +23125,44 @@
 			"contextWindow": 222222,
 			"maxTokens": 8888
 		},
+		"inclusionai/ling-2.6-1t": {
+			"id": "inclusionai/ling-2.6-1t",
+			"name": "inclusionai/ling-2.6-1t",
+			"api": "openai-completions",
+			"provider": "nanogpt",
+			"baseUrl": "https://nano-gpt.com/api/v1",
+			"reasoning": false,
+			"input": [
+				"text"
+			],
+			"cost": {
+				"input": 0,
+				"output": 0,
+				"cacheRead": 0,
+				"cacheWrite": 0
+			},
+			"contextWindow": 222222,
+			"maxTokens": 8888
+		},
+		"inclusionai/ling-2.6-flash": {
+			"id": "inclusionai/ling-2.6-flash",
+			"name": "inclusionai/ling-2.6-flash",
+			"api": "openai-completions",
+			"provider": "nanogpt",
+			"baseUrl": "https://nano-gpt.com/api/v1",
+			"reasoning": false,
+			"input": [
+				"text"
+			],
+			"cost": {
+				"input": 0,
+				"output": 0,
+				"cacheRead": 0,
+				"cacheWrite": 0
+			},
+			"contextWindow": 222222,
+			"maxTokens": 8888
+		},
 		"Infermatic/MN-12B-Inferor-v0.0": {
 			"id": "Infermatic/MN-12B-Inferor-v0.0",
 			"name": "Infermatic/MN-12B-Inferor-v0.0",
@@ -25315,6 +25479,31 @@
 				"maxLevel": "xhigh"
 			}
 		},
+		"moonshotai/kimi-k2.6": {
+			"id": "moonshotai/kimi-k2.6",
+			"name": "Kimi K2.6",
+			"api": "openai-completions",
+			"provider": "nanogpt",
+			"baseUrl": "https://nano-gpt.com/api/v1",
+			"reasoning": true,
+			"input": [
+				"text",
+				"image"
+			],
+			"cost": {
+				"input": 0,
+				"output": 0,
+				"cacheRead": 0,
+				"cacheWrite": 0
+			},
+			"contextWindow": 222222,
+			"maxTokens": 8888,
+			"thinking": {
+				"mode": "effort",
+				"minLevel": "minimal",
+				"maxLevel": "xhigh"
+			}
+		},
 		"NeverSleep/Llama-3-Lumimaid-70B-v0.1": {
 			"id": "NeverSleep/Llama-3-Lumimaid-70B-v0.1",
 			"name": "NeverSleep/Llama-3-Lumimaid-70B-v0.1",
@@ -27444,6 +27633,30 @@
 			"contextWindow": 222222,
 			"maxTokens": 8888
 		},
+		"Qwen/Qwen3.6-35B-A3B": {
+			"id": "Qwen/Qwen3.6-35B-A3B",
+			"name": "Qwen/Qwen3.6-35B-A3B",
+			"api": "openai-completions",
+			"provider": "nanogpt",
+			"baseUrl": "https://nano-gpt.com/api/v1",
+			"reasoning": true,
+			"input": [
+				"text"
+			],
+			"cost": {
+				"input": 0,
+				"output": 0,
+				"cacheRead": 0,
+				"cacheWrite": 0
+			},
+			"contextWindow": 222222,
+			"maxTokens": 8888,
+			"thinking": {
+				"mode": "effort",
+				"minLevel": "minimal",
+				"maxLevel": "high"
+			}
+		},
 		"qwen/qwq-32b-preview": {
 			"id": "qwen/qwq-32b-preview",
 			"name": "qwen/qwq-32b-preview",
@@ -27961,6 +28174,25 @@
 		"qwen3.5-omni-plus": {
 			"id": "qwen3.5-omni-plus",
 			"name": "qwen3.5-omni-plus",
+			"api": "openai-completions",
+			"provider": "nanogpt",
+			"baseUrl": "https://nano-gpt.com/api/v1",
+			"reasoning": false,
+			"input": [
+				"text"
+			],
+			"cost": {
+				"input": 0,
+				"output": 0,
+				"cacheRead": 0,
+				"cacheWrite": 0
+			},
+			"contextWindow": 222222,
+			"maxTokens": 8888
+		},
+		"qwen3.6-max-preview": {
+			"id": "qwen3.6-max-preview",
+			"name": "qwen3.6-max-preview",
 			"api": "openai-completions",
 			"provider": "nanogpt",
 			"baseUrl": "https://nano-gpt.com/api/v1",
@@ -28818,6 +29050,44 @@
 			"contextWindow": 222222,
 			"maxTokens": 8888
 		},
+		"TEE/glm-5.1": {
+			"id": "TEE/glm-5.1",
+			"name": "TEE/glm-5.1",
+			"api": "openai-completions",
+			"provider": "nanogpt",
+			"baseUrl": "https://nano-gpt.com/api/v1",
+			"reasoning": false,
+			"input": [
+				"text"
+			],
+			"cost": {
+				"input": 0,
+				"output": 0,
+				"cacheRead": 0,
+				"cacheWrite": 0
+			},
+			"contextWindow": 222222,
+			"maxTokens": 8888
+		},
+		"TEE/glm-5.1-thinking": {
+			"id": "TEE/glm-5.1-thinking",
+			"name": "TEE/glm-5.1-thinking",
+			"api": "openai-completions",
+			"provider": "nanogpt",
+			"baseUrl": "https://nano-gpt.com/api/v1",
+			"reasoning": false,
+			"input": [
+				"text"
+			],
+			"cost": {
+				"input": 0,
+				"output": 0,
+				"cacheRead": 0,
+				"cacheWrite": 0
+			},
+			"contextWindow": 222222,
+			"maxTokens": 8888
+		},
 		"TEE/gpt-oss-120b": {
 			"id": "TEE/gpt-oss-120b",
 			"name": "TEE/gpt-oss-120b",
@@ -28913,6 +29183,25 @@
 			"contextWindow": 222222,
 			"maxTokens": 8888
 		},
+		"TEE/kimi-k2.6": {
+			"id": "TEE/kimi-k2.6",
+			"name": "TEE/kimi-k2.6",
+			"api": "openai-completions",
+			"provider": "nanogpt",
+			"baseUrl": "https://nano-gpt.com/api/v1",
+			"reasoning": false,
+			"input": [
+				"text"
+			],
+			"cost": {
+				"input": 0,
+				"output": 0,
+				"cacheRead": 0,
+				"cacheWrite": 0
+			},
+			"contextWindow": 222222,
+			"maxTokens": 8888
+		},
 		"TEE/llama3-3-70b": {
 			"id": "TEE/llama3-3-70b",
 			"name": "TEE/llama3-3-70b",
@@ -28932,9 +29221,47 @@
 			"contextWindow": 222222,
 			"maxTokens": 8888
 		},
+		"TEE/mimo-v2-flash": {
+			"id": "TEE/mimo-v2-flash",
+			"name": "TEE/mimo-v2-flash",
+			"api": "openai-completions",
+			"provider": "nanogpt",
+			"baseUrl": "https://nano-gpt.com/api/v1",
+			"reasoning": false,
+			"input": [
+				"text"
+			],
+			"cost": {
+				"input": 0,
+				"output": 0,
+				"cacheRead": 0,
+				"cacheWrite": 0
+			},
+			"contextWindow": 222222,
+			"maxTokens": 8888
+		},
 		"TEE/minimax-m2.1": {
 			"id": "TEE/minimax-m2.1",
 			"name": "TEE/minimax-m2.1",
+			"api": "openai-completions",
+			"provider": "nanogpt",
+			"baseUrl": "https://nano-gpt.com/api/v1",
+			"reasoning": false,
+			"input": [
+				"text"
+			],
+			"cost": {
+				"input": 0,
+				"output": 0,
+				"cacheRead": 0,
+				"cacheWrite": 0
+			},
+			"contextWindow": 222222,
+			"maxTokens": 8888
+		},
+		"TEE/minimax-m2.5": {
+			"id": "TEE/minimax-m2.5",
+			"name": "TEE/minimax-m2.5",
 			"api": "openai-completions",
 			"provider": "nanogpt",
 			"baseUrl": "https://nano-gpt.com/api/v1",
@@ -29008,6 +29335,25 @@
 			"contextWindow": 222222,
 			"maxTokens": 8888
 		},
+		"TEE/qwen3-coder-next": {
+			"id": "TEE/qwen3-coder-next",
+			"name": "TEE/qwen3-coder-next",
+			"api": "openai-completions",
+			"provider": "nanogpt",
+			"baseUrl": "https://nano-gpt.com/api/v1",
+			"reasoning": false,
+			"input": [
+				"text"
+			],
+			"cost": {
+				"input": 0,
+				"output": 0,
+				"cacheRead": 0,
+				"cacheWrite": 0
+			},
+			"contextWindow": 222222,
+			"maxTokens": 8888
+		},
 		"TEE/qwen3.5-27b": {
 			"id": "TEE/qwen3.5-27b",
 			"name": "TEE/qwen3.5-27b",
@@ -29049,6 +29395,25 @@
 		"tencent/Hunyuan-MT-7B": {
 			"id": "tencent/Hunyuan-MT-7B",
 			"name": "tencent/Hunyuan-MT-7B",
+			"api": "openai-completions",
+			"provider": "nanogpt",
+			"baseUrl": "https://nano-gpt.com/api/v1",
+			"reasoning": false,
+			"input": [
+				"text"
+			],
+			"cost": {
+				"input": 0,
+				"output": 0,
+				"cacheRead": 0,
+				"cacheWrite": 0
+			},
+			"contextWindow": 222222,
+			"maxTokens": 8888
+		},
+		"tencent/hy3-preview": {
+			"id": "tencent/hy3-preview",
+			"name": "tencent/hy3-preview",
 			"api": "openai-completions",
 			"provider": "nanogpt",
 			"baseUrl": "https://nano-gpt.com/api/v1",
@@ -30019,6 +30384,44 @@
 				"minLevel": "minimal",
 				"maxLevel": "xhigh"
 			}
+		},
+		"xiaomi/mimo-v2.5": {
+			"id": "xiaomi/mimo-v2.5",
+			"name": "xiaomi/mimo-v2.5",
+			"api": "openai-completions",
+			"provider": "nanogpt",
+			"baseUrl": "https://nano-gpt.com/api/v1",
+			"reasoning": false,
+			"input": [
+				"text"
+			],
+			"cost": {
+				"input": 0,
+				"output": 0,
+				"cacheRead": 0,
+				"cacheWrite": 0
+			},
+			"contextWindow": 222222,
+			"maxTokens": 8888
+		},
+		"xiaomi/mimo-v2.5-pro": {
+			"id": "xiaomi/mimo-v2.5-pro",
+			"name": "xiaomi/mimo-v2.5-pro",
+			"api": "openai-completions",
+			"provider": "nanogpt",
+			"baseUrl": "https://nano-gpt.com/api/v1",
+			"reasoning": false,
+			"input": [
+				"text"
+			],
+			"cost": {
+				"input": 0,
+				"output": 0,
+				"cacheRead": 0,
+				"cacheWrite": 0
+			},
+			"contextWindow": 222222,
+			"maxTokens": 8888
 		},
 		"yi-large": {
 			"id": "yi-large",
@@ -32101,7 +32504,8 @@
 				"mode": "effort",
 				"minLevel": "minimal",
 				"maxLevel": "high"
-			}
+			},
+			"applyPatchToolType": "freeform"
 		},
 		"gpt-5-chat-latest": {
 			"id": "gpt-5-chat-latest",
@@ -32121,7 +32525,8 @@
 				"cacheWrite": 0
 			},
 			"contextWindow": 128000,
-			"maxTokens": 16384
+			"maxTokens": 16384,
+			"applyPatchToolType": "freeform"
 		},
 		"gpt-5-codex": {
 			"id": "gpt-5-codex",
@@ -32146,7 +32551,8 @@
 				"mode": "effort",
 				"minLevel": "minimal",
 				"maxLevel": "high"
-			}
+			},
+			"applyPatchToolType": "freeform"
 		},
 		"gpt-5-mini": {
 			"id": "gpt-5-mini",
@@ -32171,7 +32577,8 @@
 				"mode": "effort",
 				"minLevel": "minimal",
 				"maxLevel": "high"
-			}
+			},
+			"applyPatchToolType": "freeform"
 		},
 		"gpt-5-nano": {
 			"id": "gpt-5-nano",
@@ -32196,7 +32603,8 @@
 				"mode": "effort",
 				"minLevel": "minimal",
 				"maxLevel": "high"
-			}
+			},
+			"applyPatchToolType": "freeform"
 		},
 		"gpt-5-pro": {
 			"id": "gpt-5-pro",
@@ -32221,7 +32629,8 @@
 				"mode": "effort",
 				"minLevel": "minimal",
 				"maxLevel": "high"
-			}
+			},
+			"applyPatchToolType": "freeform"
 		},
 		"gpt-5.1": {
 			"id": "gpt-5.1",
@@ -32246,7 +32655,8 @@
 				"mode": "effort",
 				"minLevel": "minimal",
 				"maxLevel": "high"
-			}
+			},
+			"applyPatchToolType": "freeform"
 		},
 		"gpt-5.1-chat-latest": {
 			"id": "gpt-5.1-chat-latest",
@@ -32271,7 +32681,8 @@
 				"mode": "effort",
 				"minLevel": "minimal",
 				"maxLevel": "high"
-			}
+			},
+			"applyPatchToolType": "freeform"
 		},
 		"gpt-5.1-codex": {
 			"id": "gpt-5.1-codex",
@@ -32296,7 +32707,8 @@
 				"mode": "effort",
 				"minLevel": "minimal",
 				"maxLevel": "high"
-			}
+			},
+			"applyPatchToolType": "freeform"
 		},
 		"gpt-5.1-codex-max": {
 			"id": "gpt-5.1-codex-max",
@@ -32321,7 +32733,8 @@
 				"mode": "effort",
 				"minLevel": "minimal",
 				"maxLevel": "high"
-			}
+			},
+			"applyPatchToolType": "freeform"
 		},
 		"gpt-5.1-codex-mini": {
 			"id": "gpt-5.1-codex-mini",
@@ -32346,7 +32759,8 @@
 				"mode": "effort",
 				"minLevel": "medium",
 				"maxLevel": "high"
-			}
+			},
+			"applyPatchToolType": "freeform"
 		},
 		"gpt-5.2": {
 			"id": "gpt-5.2",
@@ -32371,7 +32785,8 @@
 				"mode": "effort",
 				"minLevel": "low",
 				"maxLevel": "xhigh"
-			}
+			},
+			"applyPatchToolType": "freeform"
 		},
 		"gpt-5.2-chat-latest": {
 			"id": "gpt-5.2-chat-latest",
@@ -32396,7 +32811,8 @@
 				"mode": "effort",
 				"minLevel": "low",
 				"maxLevel": "xhigh"
-			}
+			},
+			"applyPatchToolType": "freeform"
 		},
 		"gpt-5.2-codex": {
 			"id": "gpt-5.2-codex",
@@ -32421,7 +32837,8 @@
 				"mode": "effort",
 				"minLevel": "low",
 				"maxLevel": "xhigh"
-			}
+			},
+			"applyPatchToolType": "freeform"
 		},
 		"gpt-5.2-pro": {
 			"id": "gpt-5.2-pro",
@@ -32446,7 +32863,8 @@
 				"mode": "effort",
 				"minLevel": "low",
 				"maxLevel": "xhigh"
-			}
+			},
+			"applyPatchToolType": "freeform"
 		},
 		"gpt-5.3-chat-latest": {
 			"id": "gpt-5.3-chat-latest",
@@ -32466,7 +32884,8 @@
 				"cacheWrite": 0
 			},
 			"contextWindow": 128000,
-			"maxTokens": 16384
+			"maxTokens": 16384,
+			"applyPatchToolType": "freeform"
 		},
 		"gpt-5.3-codex": {
 			"id": "gpt-5.3-codex",
@@ -32491,7 +32910,8 @@
 				"mode": "effort",
 				"minLevel": "low",
 				"maxLevel": "xhigh"
-			}
+			},
+			"applyPatchToolType": "freeform"
 		},
 		"gpt-5.3-codex-spark": {
 			"id": "gpt-5.3-codex-spark",
@@ -32517,6 +32937,7 @@
 				"minLevel": "low",
 				"maxLevel": "xhigh"
 			},
+			"applyPatchToolType": "freeform",
 			"contextPromotionTarget": "openai/gpt-5.3-codex"
 		},
 		"gpt-5.4": {
@@ -32542,7 +32963,8 @@
 				"mode": "effort",
 				"minLevel": "low",
 				"maxLevel": "xhigh"
-			}
+			},
+			"applyPatchToolType": "freeform"
 		},
 		"gpt-5.4-mini": {
 			"id": "gpt-5.4-mini",
@@ -32567,7 +32989,8 @@
 				"mode": "effort",
 				"minLevel": "low",
 				"maxLevel": "xhigh"
-			}
+			},
+			"applyPatchToolType": "freeform"
 		},
 		"gpt-5.4-nano": {
 			"id": "gpt-5.4-nano",
@@ -32592,7 +33015,8 @@
 				"mode": "effort",
 				"minLevel": "low",
 				"maxLevel": "xhigh"
-			}
+			},
+			"applyPatchToolType": "freeform"
 		},
 		"gpt-5.4-pro": {
 			"id": "gpt-5.4-pro",
@@ -32617,7 +33041,34 @@
 				"mode": "effort",
 				"minLevel": "low",
 				"maxLevel": "xhigh"
-			}
+			},
+			"applyPatchToolType": "freeform"
+		},
+		"gpt-5.5": {
+			"id": "gpt-5.5",
+			"name": "GPT-5.5",
+			"api": "openai-responses",
+			"provider": "openai",
+			"baseUrl": "https://api.openai.com/v1",
+			"reasoning": true,
+			"input": [
+				"text",
+				"image"
+			],
+			"cost": {
+				"input": 5,
+				"output": 30,
+				"cacheRead": 0.5,
+				"cacheWrite": 0
+			},
+			"contextWindow": 1050000,
+			"maxTokens": 130000,
+			"thinking": {
+				"mode": "effort",
+				"minLevel": "low",
+				"maxLevel": "xhigh"
+			},
+			"applyPatchToolType": "freeform"
 		},
 		"gpt-5.5": {
 			"id": "gpt-5.5",
@@ -32897,7 +33348,8 @@
 				"mode": "effort",
 				"minLevel": "minimal",
 				"maxLevel": "high"
-			}
+			},
+			"applyPatchToolType": "freeform"
 		},
 		"gpt-5-codex": {
 			"id": "gpt-5-codex",
@@ -32924,7 +33376,8 @@
 				"mode": "effort",
 				"minLevel": "minimal",
 				"maxLevel": "high"
-			}
+			},
+			"applyPatchToolType": "freeform"
 		},
 		"gpt-5-codex-mini": {
 			"id": "gpt-5-codex-mini",
@@ -32951,7 +33404,8 @@
 				"mode": "effort",
 				"minLevel": "minimal",
 				"maxLevel": "high"
-			}
+			},
+			"applyPatchToolType": "freeform"
 		},
 		"gpt-5.1": {
 			"id": "gpt-5.1",
@@ -32978,7 +33432,8 @@
 				"mode": "effort",
 				"minLevel": "minimal",
 				"maxLevel": "high"
-			}
+			},
+			"applyPatchToolType": "freeform"
 		},
 		"gpt-5.1-codex": {
 			"id": "gpt-5.1-codex",
@@ -33005,7 +33460,8 @@
 				"mode": "effort",
 				"minLevel": "minimal",
 				"maxLevel": "high"
-			}
+			},
+			"applyPatchToolType": "freeform"
 		},
 		"gpt-5.1-codex-max": {
 			"id": "gpt-5.1-codex-max",
@@ -33032,7 +33488,8 @@
 				"mode": "effort",
 				"minLevel": "minimal",
 				"maxLevel": "high"
-			}
+			},
+			"applyPatchToolType": "freeform"
 		},
 		"gpt-5.1-codex-mini": {
 			"id": "gpt-5.1-codex-mini",
@@ -33059,7 +33516,8 @@
 				"mode": "effort",
 				"minLevel": "medium",
 				"maxLevel": "high"
-			}
+			},
+			"applyPatchToolType": "freeform"
 		},
 		"gpt-5.2": {
 			"id": "gpt-5.2",
@@ -33086,7 +33544,8 @@
 				"mode": "effort",
 				"minLevel": "low",
 				"maxLevel": "xhigh"
-			}
+			},
+			"applyPatchToolType": "freeform"
 		},
 		"gpt-5.2-codex": {
 			"id": "gpt-5.2-codex",
@@ -33113,7 +33572,8 @@
 				"mode": "effort",
 				"minLevel": "low",
 				"maxLevel": "xhigh"
-			}
+			},
+			"applyPatchToolType": "freeform"
 		},
 		"gpt-5.3-codex": {
 			"id": "gpt-5.3-codex",
@@ -33140,7 +33600,8 @@
 				"mode": "effort",
 				"minLevel": "low",
 				"maxLevel": "xhigh"
-			}
+			},
+			"applyPatchToolType": "freeform"
 		},
 		"gpt-5.3-codex-spark": {
 			"id": "gpt-5.3-codex-spark",
@@ -33166,7 +33627,8 @@
 				"mode": "effort",
 				"minLevel": "low",
 				"maxLevel": "xhigh"
-			}
+			},
+			"applyPatchToolType": "freeform"
 		},
 		"gpt-5.4": {
 			"id": "gpt-5.4",
@@ -33193,7 +33655,8 @@
 				"mode": "effort",
 				"minLevel": "low",
 				"maxLevel": "xhigh"
-			}
+			},
+			"applyPatchToolType": "freeform"
 		},
 		"gpt-5.4-mini": {
 			"id": "gpt-5.4-mini",
@@ -33220,7 +33683,8 @@
 				"mode": "effort",
 				"minLevel": "low",
 				"maxLevel": "xhigh"
-			}
+			},
+			"applyPatchToolType": "freeform"
 		},
 		"gpt-5.4-nano": {
 			"id": "gpt-5.4-nano",
@@ -33247,7 +33711,8 @@
 				"mode": "effort",
 				"minLevel": "low",
 				"maxLevel": "xhigh"
-			}
+			},
+			"applyPatchToolType": "freeform"
 		},
 		"gpt-5.5": {
 			"id": "gpt-5.5",
@@ -33274,7 +33739,8 @@
 				"mode": "effort",
 				"minLevel": "low",
 				"maxLevel": "xhigh"
-			}
+			},
+			"applyPatchToolType": "freeform"
 		}
 	},
 	"opencode": {
@@ -36919,7 +37385,7 @@
 				"cacheWrite": 0
 			},
 			"contextWindow": 196608,
-			"maxTokens": 65536,
+			"maxTokens": 8888,
 			"thinking": {
 				"mode": "effort",
 				"minLevel": "minimal",
@@ -48798,6 +49264,25 @@
 			"contextWindow": 128000,
 			"maxTokens": 64000
 		},
+		"inclusionai/ling-2.6-flash": {
+			"id": "inclusionai/ling-2.6-flash",
+			"name": "inclusionAI: Ling-2.6-flash",
+			"api": "openai-completions",
+			"provider": "zenmux",
+			"baseUrl": "https://zenmux.ai/api/v1",
+			"reasoning": false,
+			"input": [
+				"text"
+			],
+			"cost": {
+				"input": 0.1,
+				"output": 0.3,
+				"cacheRead": 0.02,
+				"cacheWrite": 0
+			},
+			"contextWindow": 262144,
+			"maxTokens": 8888
+		},
 		"inclusionai/ling-flash-2.0": {
 			"id": "inclusionai/ling-flash-2.0",
 			"name": "inclusionAI: Ling-flash-2.0",
@@ -50360,6 +50845,30 @@
 				"maxLevel": "xhigh"
 			}
 		},
+		"tencent/hy3-preview": {
+			"id": "tencent/hy3-preview",
+			"name": "Tencent: Hy3 preview",
+			"api": "openai-completions",
+			"provider": "zenmux",
+			"baseUrl": "https://zenmux.ai/api/v1",
+			"reasoning": true,
+			"input": [
+				"text"
+			],
+			"cost": {
+				"input": 0.172,
+				"output": 0.572,
+				"cacheRead": 0.058,
+				"cacheWrite": 0
+			},
+			"contextWindow": 262144,
+			"maxTokens": 8888,
+			"thinking": {
+				"mode": "effort",
+				"minLevel": "minimal",
+				"maxLevel": "xhigh"
+			}
+		},
 		"volcengine/doubao-seed-1-6-vision": {
 			"id": "volcengine/doubao-seed-1-6-vision",
 			"name": "VolcanoEngine: Doubao-Seed-1.6-vision",
@@ -50800,6 +51309,55 @@
 			},
 			"contextWindow": 1000000,
 			"maxTokens": 256000,
+			"thinking": {
+				"mode": "effort",
+				"minLevel": "minimal",
+				"maxLevel": "xhigh"
+			}
+		},
+		"xiaomi/mimo-v2.5": {
+			"id": "xiaomi/mimo-v2.5",
+			"name": "Xiaomi: MiMo-V2.5",
+			"api": "openai-completions",
+			"provider": "zenmux",
+			"baseUrl": "https://zenmux.ai/api/v1",
+			"reasoning": true,
+			"input": [
+				"text",
+				"image"
+			],
+			"cost": {
+				"input": 0.4,
+				"output": 2,
+				"cacheRead": 0.08,
+				"cacheWrite": 0
+			},
+			"contextWindow": 1048576,
+			"maxTokens": 8888,
+			"thinking": {
+				"mode": "effort",
+				"minLevel": "minimal",
+				"maxLevel": "xhigh"
+			}
+		},
+		"xiaomi/mimo-v2.5-pro": {
+			"id": "xiaomi/mimo-v2.5-pro",
+			"name": "Xiaomi: MiMo-V2.5-Pro",
+			"api": "openai-completions",
+			"provider": "zenmux",
+			"baseUrl": "https://zenmux.ai/api/v1",
+			"reasoning": true,
+			"input": [
+				"text"
+			],
+			"cost": {
+				"input": 1,
+				"output": 3,
+				"cacheRead": 0.2,
+				"cacheWrite": 0
+			},
+			"contextWindow": 1048576,
+			"maxTokens": 8888,
 			"thinking": {
 				"mode": "effort",
 				"minLevel": "minimal",

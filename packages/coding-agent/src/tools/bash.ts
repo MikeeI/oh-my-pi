@@ -9,7 +9,7 @@ import type { RenderResultOptions } from "../extensibility/custom-tools/types";
 import { truncateToVisualLines } from "../modes/components/visual-truncate";
 import type { Theme } from "../modes/theme/theme";
 import bashDescription from "../prompts/tools/bash.md" with { type: "text" };
-import { DEFAULT_MAX_BYTES, TailBuffer } from "../session/streaming-output";
+import { DEFAULT_MAX_BYTES, streamTailUpdates, TailBuffer } from "../session/streaming-output";
 import { renderStatusLine } from "../tui";
 import { CachedOutputBlock } from "../tui/output-block";
 import { getSixelLineMask } from "../utils/sixel";
@@ -40,7 +40,7 @@ const bashSchemaBase = Type.Object({
 				"Additional environment variables passed to the command and rendered inline as shell assignments; prefer this for multiline or quote-heavy content",
 		}),
 	),
-	timeout: Type.Optional(Type.Number({ description: "Timeout in seconds (default: 300)" })),
+	timeout: Type.Optional(Type.Number({ description: "Timeout in seconds", default: 300 })),
 	cwd: Type.Optional(Type.String({ description: "Working directory (default: cwd)" })),
 	head: Type.Optional(Type.Number({ description: "Return only first N lines of output" })),
 	tail: Type.Optional(Type.Number({ description: "Return only last N lines of output" })),
@@ -649,15 +649,7 @@ export class BashTool implements AgentTool<BashToolSchema, BashToolDetails> {
 					env: resolvedEnv,
 					artifactPath,
 					artifactId,
-					onChunk: chunk => {
-						tailBuffer.append(chunk);
-						if (onUpdate) {
-							onUpdate({
-								content: [{ type: "text", text: tailBuffer.text() }],
-								details: {},
-							});
-						}
-					},
+					onChunk: streamTailUpdates(tailBuffer, onUpdate),
 				});
 		if (result.cancelled) {
 			if (signal?.aborted) {
