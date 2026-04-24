@@ -8,8 +8,9 @@ use crate::chunk::{
 	},
 	kind::ChunkKind,
 	resolve::{
-		ParsedSelector, chunk_region_range, resolve_chunk_selector, resolve_chunk_with_crc,
-		sanitize_chunk_selector, sanitize_crc, split_selector_crc_and_region,
+		ParsedSelector, chunk_region_range, resolve_chunk_selector,
+		resolve_chunk_selector_with_crc_filter, resolve_chunk_with_crc, sanitize_crc,
+		split_selector_crc_and_region, verify_any_ancestor_crc_match,
 	},
 	state::{ChunkState, ChunkStateInner, ConflictMeta},
 	types::{
@@ -23,8 +24,30 @@ struct ScheduledEditOperation {
 	operation:          EditOperation,
 	original_index:     usize,
 	requested_selector: Option<String>,
+	supplied_checksum:  Option<String>,
 	initial_chunk:      Option<ChunkNode>,
+	checksum_validated: bool,
 }
+
+#[derive(Clone, Debug, Eq, Hash, PartialEq)]
+struct BatchTargetKey {
+	path:     String,
+	checksum: String,
+}
+
+#[derive(Clone)]
+enum CurrentBatchTarget {
+	Path(String),
+	Missing,
+}
+
+#[derive(Clone)]
+struct AppliedEditTarget {
+	before:             ChunkNode,
+	full_chunk_removed: bool,
+}
+
+type CurrentBatchTargets = HashMap<BatchTargetKey, CurrentBatchTarget>;
 
 #[derive(Clone, Copy, PartialEq, Eq)]
 enum InsertPosition {
@@ -55,6 +78,101 @@ struct ResolvedEditTarget {
 const NORMALIZED_TAB_REPLACEMENT: &str = "    ";
 const PRESERVED_TAB_REPLACEMENT: &str = "\t";
 
+const fn operation_requires_checksum(op: ChunkEditOp) -> bool {
+	matches!(op, ChunkEditOp::Put | ChunkEditOp::Replace | ChunkEditOp::Delete)
+}
+
+fn resolve_initial_edit_chunk<'a>(
+	state: &'a ChunkStateInner,
+	cleaned_selector: Option<&str>,
+	cleaned_crc: Option<&str>,
+	lenient_multi_crc: bool,
+	warnings: &mut Vec<String>,
+) -> Result<(&'a ChunkNode, Option<String>), String> {
+	if lenient_multi_crc {
+		let chunk = resolve_chunk_selector(state, cleaned_selector, warnings)?;
+		return Ok((chunk, cleaned_crc.map(str::to_owned)));
+	}
+
+	let mut selector_warnings = Vec::new();
+	match resolve_chunk_selector_with_crc_filter(
+		state,
+		cleaned_selector,
+		cleaned_crc,
+		&mut selector_warnings,
+	) {
+		Ok(chunk) => {
+			warnings.extend(selector_warnings);
+			Ok((chunk, cleaned_crc.map(str::to_owned)))
+		},
+		Err(selector_error) => {
+			let Some(cleaned_crc) = cleaned_crc else {
+				warnings.extend(selector_warnings);
+				return Err(selector_error);
+			};
+			if let Ok(resolved) =
+				resolve_chunk_with_crc(state, cleaned_selector, Some(cleaned_crc), warnings)
+			{
+				Ok((resolved.chunk, resolved.crc))
+			} else {
+				warnings.extend(selector_warnings);
+				Err(selector_error)
+			}
+		},
+	}
+}
+
+fn schedule_edit_operation(
+	state: &ChunkStateInner,
+	operation: EditOperation,
+	original_index: usize,
+	default_selector: Option<&str>,
+	default_crc: Option<&str>,
+	warnings: &mut Vec<String>,
+) -> Result<ScheduledEditOperation, String> {
+	let normalized_operation = normalize_operation_literals(&operation);
+	let selector = normalized_operation.sel.as_deref().or(default_selector);
+	let crc = normalized_operation.crc.as_deref().or_else(|| {
+		if normalized_operation.sel.is_none() {
+			default_crc
+		} else {
+			None
+		}
+	});
+	let ParsedSelector {
+		selector: cleaned_selector,
+		crc: cleaned_crc,
+		all_crcs: parsed_crcs,
+		has_trailing_crc,
+		..
+	} = split_selector_crc_and_region(selector, crc, normalized_operation.region)?;
+	let lenient_multi_crc = parsed_crcs.len() >= 2 || (!parsed_crcs.is_empty() && !has_trailing_crc);
+	let (resolved_chunk, resolved_crc) = resolve_initial_edit_chunk(
+		state,
+		cleaned_selector.as_deref(),
+		cleaned_crc.as_deref(),
+		lenient_multi_crc,
+		warnings,
+	)?;
+	let requires_checksum = operation_requires_checksum(normalized_operation.op);
+	let checksum_validated = if lenient_multi_crc {
+		verify_any_ancestor_crc_match(state, resolved_chunk, &parsed_crcs)?;
+		!parsed_crcs.is_empty()
+	} else {
+		validate_batch_crc(resolved_chunk, resolved_crc.as_deref(), requires_checksum)?;
+		resolved_crc.is_some()
+	};
+
+	Ok(ScheduledEditOperation {
+		operation,
+		original_index,
+		requested_selector: cleaned_selector,
+		supplied_checksum: cleaned_crc,
+		initial_chunk: Some(resolved_chunk.clone()),
+		checksum_validated,
+	})
+}
+
 pub fn apply_edits(state: &ChunkState, params: &EditParams) -> Result<EditResult, String> {
 	let original_text = normalize_chunk_source(state.inner().source());
 	let initial_notebook_ctx = state.inner().notebook.clone();
@@ -65,6 +183,7 @@ pub fn apply_edits(state: &ChunkState, params: &EditParams) -> Result<EditResult
 		initial_notebook_ctx.clone(),
 		initial_conflict_meta.clone(),
 	)?;
+	let original_state = state.clone();
 	let file_indent_step = detect_file_indent_step(&state.source, &state.tree) as usize;
 	let file_indent_char = detect_file_indent_char(&state.source, &state.tree);
 	let initial_parse_errors = state.tree.parse_errors;
@@ -91,25 +210,42 @@ pub fn apply_edits(state: &ChunkState, params: &EditParams) -> Result<EditResult
 
 	let mut scheduled_ops = Vec::with_capacity(params.operations.len());
 	for (original_index, operation) in params.operations.iter().cloned().enumerate() {
-		let selector = operation
-			.sel
-			.as_deref()
-			.or(initial_default_selector.as_deref());
-		let requested_selector = sanitize_chunk_selector(selector);
-		let initial_chunk = resolve_chunk_selector(&state, selector, &mut warnings)
-			.ok()
-			.cloned();
-		scheduled_ops.push(ScheduledEditOperation {
+		match schedule_edit_operation(
+			&state,
 			operation,
 			original_index,
-			requested_selector,
-			initial_chunk,
-		});
+			initial_default_selector.as_deref(),
+			initial_default_crc.as_deref(),
+			&mut warnings,
+		) {
+			Ok(scheduled) => scheduled_ops.push(scheduled),
+			Err(err) => {
+				let display_path = display_path_for_file(&params.file_path, &params.cwd);
+				let context = render_error_context(
+					&state,
+					params.operations[original_index]
+						.sel
+						.as_deref()
+						.or(initial_default_selector.as_deref()),
+					&display_path,
+					params.anchor_style,
+					normalize_indent,
+				);
+				return Err(format!(
+					"Edit operation {}/{} failed during initial checksum validation: {}\nNo changes \
+					 were saved. Fix the failing operation and retry the entire batch.{context}",
+					original_index + 1,
+					params.operations.len(),
+					err,
+				));
+			},
+		}
 	}
 
 	let execution_ops = scheduled_ops;
 	let current_default_selector = initial_default_selector.as_deref();
 	let mut current_default_crc = initial_default_crc;
+	let mut current_batch_targets = CurrentBatchTargets::new();
 	let total_ops = params.operations.len();
 
 	for scheduled in execution_ops {
@@ -126,6 +262,7 @@ pub fn apply_edits(state: &ChunkState, params: &EditParams) -> Result<EditResult
 				file_indent_char,
 				normalize_indent,
 				&mut touched_paths,
+				&current_batch_targets,
 				&mut warnings,
 			),
 			ChunkEditOp::Replace => apply_find_replace(
@@ -136,6 +273,7 @@ pub fn apply_edits(state: &ChunkState, params: &EditParams) -> Result<EditResult
 				current_default_crc.as_deref(),
 				normalize_indent,
 				&mut touched_paths,
+				&current_batch_targets,
 				&mut warnings,
 			),
 			ChunkEditOp::Delete => apply_delete(
@@ -145,6 +283,7 @@ pub fn apply_edits(state: &ChunkState, params: &EditParams) -> Result<EditResult
 				current_default_selector,
 				current_default_crc.as_deref(),
 				&mut touched_paths,
+				&current_batch_targets,
 				&mut warnings,
 			),
 			ChunkEditOp::Before | ChunkEditOp::After | ChunkEditOp::Prepend | ChunkEditOp::Append => {
@@ -158,25 +297,34 @@ pub fn apply_edits(state: &ChunkState, params: &EditParams) -> Result<EditResult
 					file_indent_char,
 					normalize_indent,
 					&mut touched_paths,
+					&current_batch_targets,
 					&mut warnings,
 				)
 			},
 		};
 
-		if let Err(err) = result {
-			let display_path = display_path_for_file(&params.file_path, &params.cwd);
-			let sel = operation.sel.as_deref().or(current_default_selector);
-			let context =
-				render_error_context(&state, sel, &display_path, params.anchor_style, normalize_indent);
-			return Err(format!(
-				"Edit operation {}/{} failed ({}): {}\nNo changes were saved. Fix the failing \
-				 operation and retry the entire batch.{context}",
-				scheduled.original_index + 1,
-				total_ops,
-				describe_scheduled_operation(&scheduled),
-				err,
-			));
-		}
+		let applied_target = match result {
+			Ok(applied_target) => applied_target,
+			Err(err) => {
+				let display_path = display_path_for_file(&params.file_path, &params.cwd);
+				let sel = operation.sel.as_deref().or(current_default_selector);
+				let context = render_error_context(
+					&original_state,
+					sel,
+					&display_path,
+					params.anchor_style,
+					normalize_indent,
+				);
+				return Err(format!(
+					"Edit operation {}/{} failed ({}): {}\nNo changes were saved. Fix the failing \
+					 operation and retry the entire batch.{context}",
+					scheduled.original_index + 1,
+					total_ops,
+					describe_scheduled_operation(&scheduled),
+					err,
+				));
+			},
+		};
 
 		state = rebuild_chunk_state(
 			state.source.clone(),
@@ -184,6 +332,7 @@ pub fn apply_edits(state: &ChunkState, params: &EditParams) -> Result<EditResult
 			state.notebook.clone(),
 			state.conflict_meta.clone(),
 		)?;
+		update_current_batch_target(&mut current_batch_targets, &state, &scheduled, &applied_target);
 		if operation.sel.is_none() {
 			current_default_crc = None;
 		}
@@ -328,14 +477,114 @@ pub fn apply_edits(state: &ChunkState, params: &EditParams) -> Result<EditResult
 	})
 }
 
+fn unique_current_chunk_by_initial_checksum<'a>(
+	state: &'a ChunkStateInner,
+	scheduled: &ScheduledEditOperation,
+) -> Option<&'a ChunkNode> {
+	if !scheduled.checksum_validated {
+		return None;
+	}
+	let initial_chunk = scheduled.initial_chunk.as_ref()?;
+	if initial_chunk.path.is_empty() {
+		return state
+			.chunk("")
+			.filter(|chunk| chunk.checksum == initial_chunk.checksum);
+	}
+
+	let scoped_matches = match initial_chunk.parent_path.as_deref() {
+		Some(parent_path) => state.chunk(parent_path).map(|parent| {
+			parent
+				.children
+				.iter()
+				.filter_map(|child_path| state.chunk(child_path))
+				.filter(|chunk| chunk.checksum == initial_chunk.checksum)
+				.collect::<Vec<_>>()
+		}),
+		None => Some(
+			state
+				.tree
+				.root_children
+				.iter()
+				.filter_map(|child_path| state.chunk(child_path))
+				.filter(|chunk| chunk.checksum == initial_chunk.checksum)
+				.collect::<Vec<_>>(),
+		),
+	};
+	if let Some(matches) = scoped_matches
+		&& matches.len() == 1
+	{
+		return Some(matches[0]);
+	}
+
+	let all_matches = state
+		.tree
+		.chunks
+		.iter()
+		.filter(|chunk| chunk.checksum == initial_chunk.checksum)
+		.collect::<Vec<_>>();
+	if all_matches.len() == 1 {
+		Some(all_matches[0])
+	} else {
+		None
+	}
+}
+
+fn batch_target_key(chunk: &ChunkNode) -> BatchTargetKey {
+	BatchTargetKey { path: chunk.path.clone(), checksum: chunk.checksum.clone() }
+}
+
+fn format_batch_target_key(key: &BatchTargetKey) -> String {
+	if key.path.is_empty() {
+		format!("<root>#{}", key.checksum)
+	} else {
+		format!("{}#{}", key.path, key.checksum)
+	}
+}
+
+fn resolve_current_batch_chunk<'a>(
+	state: &'a ChunkStateInner,
+	cleaned_selector: Option<&str>,
+	scheduled: &ScheduledEditOperation,
+	current_batch_targets: &CurrentBatchTargets,
+	warnings: &mut Vec<String>,
+) -> Result<&'a ChunkNode, String> {
+	if let Some(initial_chunk) = scheduled.initial_chunk.as_ref() {
+		let key = batch_target_key(initial_chunk);
+		if let Some(current_target) = current_batch_targets.get(&key) {
+			return match current_target {
+				CurrentBatchTarget::Path(path) => state.chunk(path.as_str()).ok_or_else(|| {
+					format!(
+						"Batch target {} was remapped to \"{}\" by an earlier operation, but that chunk \
+						 no longer exists after later edits.",
+						format_batch_target_key(&key),
+						if path.is_empty() {
+							"<root>"
+						} else {
+							path.as_str()
+						}
+					)
+				}),
+				CurrentBatchTarget::Missing => Err(format!(
+					"Batch target {} was removed or could not be remapped after an earlier operation.",
+					format_batch_target_key(&key)
+				)),
+			};
+		}
+	}
+	if let Some(chunk) = unique_current_chunk_by_initial_checksum(state, scheduled) {
+		return Ok(chunk);
+	}
+	let resolved = resolve_chunk_with_crc(state, cleaned_selector, None, warnings)?;
+	Ok(resolved.chunk)
+}
+
 fn resolve_edit_target(
 	state: &ChunkStateInner,
 	operation: &EditOperation,
 	scheduled: &ScheduledEditOperation,
 	default_selector: Option<&str>,
 	default_crc: Option<&str>,
-	requires_checksum: bool,
-	touched_paths: &[String],
+	current_batch_targets: &CurrentBatchTargets,
 	warnings: &mut Vec<String>,
 ) -> Result<ResolvedEditTarget, String> {
 	let selector = operation.sel.as_deref().or(default_selector);
@@ -346,22 +595,17 @@ fn resolve_edit_target(
 			None
 		}
 	});
-	let ParsedSelector { selector: cleaned_selector, crc: cleaned_crc, region: parsed_region } =
+	let ParsedSelector { selector: cleaned_selector, region: parsed_region, .. } =
 		split_selector_crc_and_region(selector, crc, operation.region)?;
-	let batch_auto_accepted =
-		ensure_batch_operation_target_current(scheduled, cleaned_crc.as_deref(), touched_paths);
-	let resolve_crc = if batch_auto_accepted {
-		None
-	} else {
-		cleaned_crc.as_deref()
-	};
-	let resolved =
-		resolve_chunk_with_crc(state, cleaned_selector.as_deref(), resolve_crc, warnings)?;
 	let mut region = operation.region.or(parsed_region);
-	if !batch_auto_accepted {
-		validate_batch_crc(resolved.chunk, resolved.crc.as_deref(), requires_checksum)?;
-	}
-	let chunk = resolved.chunk.clone();
+	let chunk = resolve_current_batch_chunk(
+		state,
+		cleaned_selector.as_deref(),
+		scheduled,
+		current_batch_targets,
+		warnings,
+	)?
+	.clone();
 	let python_leaf_control_flow = state.language == "python"
 		&& chunk.leaf
 		&& matches!(
@@ -383,6 +627,63 @@ fn resolve_edit_target(
 	}
 
 	Ok(ResolvedEditTarget { chunk, region })
+}
+
+fn find_current_batch_target_after_edit<'a>(
+	state: &'a ChunkStateInner,
+	before: &ChunkNode,
+) -> Option<&'a ChunkNode> {
+	if let Some(chunk) = state.chunk(before.path.as_str()) {
+		return Some(chunk);
+	}
+	if before.path.is_empty() {
+		return state.chunk("");
+	}
+
+	let same_start_same_kind = state
+		.tree
+		.chunks
+		.iter()
+		.filter(|chunk| {
+			!chunk.path.is_empty()
+				&& chunk.start_line == before.start_line
+				&& chunk.kind == before.kind
+		})
+		.collect::<Vec<_>>();
+	if same_start_same_kind.len() == 1 {
+		return Some(same_start_same_kind[0]);
+	}
+
+	let same_start = state
+		.tree
+		.chunks
+		.iter()
+		.filter(|chunk| !chunk.path.is_empty() && chunk.start_line == before.start_line)
+		.collect::<Vec<_>>();
+	if same_start.len() == 1 {
+		return Some(same_start[0]);
+	}
+
+	None
+}
+
+fn update_current_batch_target(
+	current_batch_targets: &mut CurrentBatchTargets,
+	state: &ChunkStateInner,
+	scheduled: &ScheduledEditOperation,
+	applied_target: &AppliedEditTarget,
+) {
+	let Some(initial_chunk) = scheduled.initial_chunk.as_ref() else {
+		return;
+	};
+	let key = batch_target_key(initial_chunk);
+	let current_target = if applied_target.full_chunk_removed {
+		CurrentBatchTarget::Missing
+	} else {
+		find_current_batch_target_after_edit(state, &applied_target.before)
+			.map_or(CurrentBatchTarget::Missing, |chunk| CurrentBatchTarget::Path(chunk.path.clone()))
+	};
+	current_batch_targets.insert(key, current_target);
 }
 
 /// Re-indent replacement content to match the original matched source's
@@ -465,19 +766,20 @@ fn apply_find_replace(
 	default_crc: Option<&str>,
 	normalize_indent: bool,
 	touched_paths: &mut Vec<String>,
+	current_batch_targets: &CurrentBatchTargets,
 	warnings: &mut Vec<String>,
-) -> Result<(), String> {
+) -> Result<AppliedEditTarget, String> {
 	let target = resolve_edit_target(
 		state,
 		operation,
 		scheduled,
 		default_selector,
 		default_crc,
-		true,
-		touched_paths.as_slice(),
+		current_batch_targets,
 		warnings,
 	)?;
 	let anchor = target.chunk;
+	let target_before = anchor.clone();
 
 	let (region_start, region_end) = match target.region {
 		None => (anchor.start_byte as usize, anchor.end_byte as usize),
@@ -539,7 +841,7 @@ fn apply_find_replace(
 	new_source.push_str(&state.source[abs_end..]);
 	replace_source_and_adjust_conflicts(state, new_source, warnings);
 	touched_paths.push(anchor.path);
-	Ok(())
+	Ok(AppliedEditTarget { before: target_before, full_chunk_removed: false })
 }
 
 fn apply_put(
@@ -552,19 +854,20 @@ fn apply_put(
 	file_indent_char: char,
 	normalize_indent: bool,
 	touched_paths: &mut Vec<String>,
+	current_batch_targets: &CurrentBatchTargets,
 	warnings: &mut Vec<String>,
-) -> Result<(), String> {
+) -> Result<AppliedEditTarget, String> {
 	let target = resolve_edit_target(
 		state,
 		operation,
 		scheduled,
 		default_selector,
 		default_crc,
-		true,
-		touched_paths.as_slice(),
+		current_batch_targets,
 		warnings,
 	)?;
 	let anchor = target.chunk;
+	let target_before = anchor.clone();
 	if anchor.kind == ChunkKind::Theirs {
 		return Err(
 			"Virtual conflict branches cannot be replaced directly. Delete conflict.theirs to accept \
@@ -589,6 +892,7 @@ fn apply_put(
 	);
 
 	let effective_region = target.region;
+	let full_chunk_removed = effective_region.is_none() && replacement.is_empty();
 	if should_preserve_head_for_fallback_body_replace(
 		state,
 		&anchor,
@@ -679,7 +983,7 @@ fn apply_put(
 		replace_source_and_adjust_conflicts(state, new_source, warnings);
 	}
 	touched_paths.push(anchor.path);
-	Ok(())
+	Ok(AppliedEditTarget { before: target_before, full_chunk_removed })
 }
 
 fn requested_region_for_operation(
@@ -822,19 +1126,20 @@ fn apply_delete(
 	default_selector: Option<&str>,
 	default_crc: Option<&str>,
 	touched_paths: &mut Vec<String>,
+	current_batch_targets: &CurrentBatchTargets,
 	warnings: &mut Vec<String>,
-) -> Result<(), String> {
+) -> Result<AppliedEditTarget, String> {
 	let target = resolve_edit_target(
 		state,
 		operation,
 		scheduled,
 		default_selector,
 		default_crc,
-		true,
-		touched_paths.as_slice(),
+		current_batch_targets,
 		warnings,
 	)?;
 	let anchor = target.chunk;
+	let target_before = anchor.clone();
 	if target.region.is_none() {
 		match anchor.kind {
 			ChunkKind::Ours => {
@@ -852,7 +1157,10 @@ fn apply_delete(
 				);
 				replace_source_and_adjust_conflicts(state, new_source, warnings);
 				touched_paths.push(conflict_path.to_owned());
-				return Ok(());
+				return Ok(AppliedEditTarget {
+					before:             target_before,
+					full_chunk_removed: true,
+				});
 			},
 			ChunkKind::Theirs => {
 				let Some(conflict_path) = anchor.parent_path.as_deref() else {
@@ -860,7 +1168,10 @@ fn apply_delete(
 				};
 				state.conflict_meta.remove(conflict_path);
 				touched_paths.push(conflict_path.to_owned());
-				return Ok(());
+				return Ok(AppliedEditTarget {
+					before:             target_before,
+					full_chunk_removed: true,
+				});
 			},
 			ChunkKind::Conflict => {
 				state.conflict_meta.remove(anchor.path.as_str());
@@ -894,7 +1205,10 @@ fn apply_delete(
 		replace_source_and_adjust_conflicts(state, new_source, warnings);
 	}
 	touched_paths.push(anchor.path);
-	Ok(())
+	Ok(AppliedEditTarget {
+		before:             target_before,
+		full_chunk_removed: target.region.is_none(),
+	})
 }
 
 fn apply_insert(
@@ -907,19 +1221,20 @@ fn apply_insert(
 	file_indent_char: char,
 	normalize_indent: bool,
 	touched_paths: &mut Vec<String>,
+	current_batch_targets: &CurrentBatchTargets,
 	warnings: &mut Vec<String>,
-) -> Result<(), String> {
+) -> Result<AppliedEditTarget, String> {
 	let target = resolve_edit_target(
 		state,
 		operation,
 		scheduled,
 		default_selector,
 		default_crc,
-		false,
-		touched_paths.as_slice(),
+		current_batch_targets,
 		warnings,
 	)?;
 	let anchor = target.chunk;
+	let target_before = anchor.clone();
 	if anchor.kind == ChunkKind::Theirs {
 		return Err(
 			"Virtual conflict branches cannot be edited in place. Delete conflict.theirs to accept \
@@ -983,7 +1298,7 @@ fn apply_insert(
 		warnings,
 	);
 	touched_paths.push(anchor.path);
-	Ok(())
+	Ok(AppliedEditTarget { before: target_before, full_chunk_removed: false })
 }
 
 fn normalize_operation_literals(operation: &EditOperation) -> EditOperation {
@@ -1032,7 +1347,7 @@ fn rebuild_chunk_state(
 }
 
 fn validate_batch_crc(chunk: &ChunkNode, crc: Option<&str>, required: bool) -> Result<(), String> {
-	if !required {
+	if !required && crc.is_none() {
 		return Ok(());
 	}
 	validate_crc(chunk, crc)
@@ -1073,45 +1388,13 @@ const fn chunk_path_opt(chunk: &ChunkNode) -> &str {
 	}
 }
 
-fn touches_chunk_path(touched_paths: &[String], selector: &str) -> bool {
-	touched_paths.iter().any(|touched| {
-		touched == selector
-			|| touched.starts_with(&format!("{selector}."))
-			|| selector.starts_with(&format!("{touched}."))
-	})
-}
-
-/// Returns `true` when the CRC was auto-accepted (chunk was touched by an
-/// earlier batch op and the model supplied the pre-batch CRC). The caller
-/// should skip CRC validation in that case.
-fn ensure_batch_operation_target_current(
-	scheduled: &ScheduledEditOperation,
-	crc: Option<&str>,
-	touched_paths: &[String],
-) -> bool {
-	let Some(selector) = scheduled.requested_selector.as_deref() else {
-		return false;
-	};
-	let Some(initial_chunk) = scheduled.initial_chunk.as_ref() else {
-		return false;
-	};
-	let Some(cleaned_crc) = sanitize_crc(crc) else {
-		return false;
-	};
-	if !touches_chunk_path(touched_paths, selector) || cleaned_crc != initial_chunk.checksum {
-		return false;
-	}
-	// The chunk was touched by an earlier operation in this batch, and the model
-	// supplied the pre-batch CRC (which is all it could know). Auto-accept.
-	true
-}
-
 fn describe_scheduled_operation(scheduled: &ScheduledEditOperation) -> String {
 	let op = scheduled.operation.op.as_str();
-	if let Some(selector) = scheduled.requested_selector.as_deref() {
-		format!("{op} on \"{selector}\"")
-	} else {
-		op.to_owned()
+	match (scheduled.requested_selector.as_deref(), scheduled.supplied_checksum.as_deref()) {
+		(Some(selector), Some(checksum)) => format!("{op} on \"{selector}#{checksum}\""),
+		(Some(selector), None) => format!("{op} on \"{selector}\""),
+		(None, Some(checksum)) => format!("{op} on \"#{checksum}\""),
+		(None, None) => op.to_owned(),
 	}
 }
 
@@ -2364,6 +2647,18 @@ mod tests {
 		.expect("edit should apply")
 	}
 
+	fn edit_params(operations: Vec<EditOperation>) -> EditParams {
+		EditParams {
+			operations,
+			default_selector: None,
+			default_crc: None,
+			anchor_style: None,
+			cwd: ".".to_owned(),
+			file_path: "test.ts".to_owned(),
+			normalize_indent: None,
+		}
+	}
+
 	#[test]
 	fn root_level_replace_preserves_space_indentation() {
 		let source = "fn main() {\n    println!(\"old\");\n}\n";
@@ -2517,6 +2812,362 @@ mod tests {
 			"expected auto-resolution warning, got {:?}",
 			result.warnings
 		);
+	}
+
+	#[test]
+	fn edit_batch_uses_initial_checksum_identity_after_same_file_renumbering() {
+		let source = "\
+const transportAlpha = 1;
+
+const transportBeta = 2;
+
+const transportGamma = 3;
+";
+		let state = state_for(source, "typescript");
+		let first = state.inner().chunk("var_tra_1").expect("var_tra_1").clone();
+		let second = state.inner().chunk("var_tra_2").expect("var_tra_2").clone();
+
+		let result = apply_edits(
+			&state,
+			&edit_params(vec![
+				EditOperation {
+					op:      ChunkEditOp::Delete,
+					sel:     Some("var_tra_1".to_owned()),
+					crc:     Some(first.checksum),
+					region:  None,
+					content: None,
+					find:    None,
+				},
+				EditOperation {
+					op:      ChunkEditOp::Put,
+					sel:     Some("var_tra_2".to_owned()),
+					crc:     Some(second.checksum),
+					region:  None,
+					content: Some("const transportBeta = 20;".to_owned()),
+					find:    None,
+				},
+			]),
+		)
+		.expect("same-file batch should keep the original logical target");
+
+		assert!(
+			!result.diff_after.contains("transportAlpha"),
+			"first sibling should be deleted:\n{}",
+			result.diff_after
+		);
+		assert!(
+			result.diff_after.contains("const transportBeta = 20;"),
+			"renumbered second sibling should be updated:\n{}",
+			result.diff_after
+		);
+		assert!(
+			result.diff_after.contains("const transportGamma = 3;"),
+			"third sibling should not receive the second operation:\n{}",
+			result.diff_after
+		);
+		assert!(
+			result
+				.warnings
+				.iter()
+				.all(|warning| !warning.contains("Auto-resolved stale selector")),
+			"same-batch renumbering should not emit stale-selector warnings: {:?}",
+			result.warnings
+		);
+	}
+
+	#[test]
+	fn edit_batch_rejects_bad_initial_checksum_before_applying_operations() {
+		let source = "\
+const transportAlpha = 1;
+
+const transportBeta = 2;
+";
+		let state = state_for(source, "typescript");
+		let first = state.inner().chunk("var_tra_1").expect("var_tra_1").clone();
+
+		let err = apply_edits(
+			&state,
+			&edit_params(vec![
+				EditOperation {
+					op:      ChunkEditOp::Delete,
+					sel:     Some("var_tra_1".to_owned()),
+					crc:     Some(first.checksum),
+					region:  None,
+					content: None,
+					find:    None,
+				},
+				EditOperation {
+					op:      ChunkEditOp::Put,
+					sel:     Some("var_tra_2".to_owned()),
+					crc:     Some("0000".to_owned()),
+					region:  None,
+					content: Some("const transportBeta = 20;".to_owned()),
+					find:    None,
+				},
+			]),
+		)
+		.err()
+		.expect("bad initial checksum should reject the batch");
+
+		assert!(
+			err.contains("Edit operation 2/2 failed during initial checksum validation"),
+			"error should identify initial validation failure: {err}"
+		);
+		assert!(
+			err.contains("Checksum mismatch for var_tra_2"),
+			"error should report the stale checksum target: {err}"
+		);
+		assert_eq!(state.source(), source, "original state should remain unchanged");
+	}
+
+	#[test]
+	fn edit_batch_failure_after_recompute_is_atomic_for_original_state() {
+		let source = "\
+const transportAlpha = 1;
+
+const transportBeta = 2;
+";
+		let state = state_for(source, "typescript");
+		let first = state.inner().chunk("var_tra_1").expect("var_tra_1").clone();
+		let second = state.inner().chunk("var_tra_2").expect("var_tra_2").clone();
+
+		let err = apply_edits(
+			&state,
+			&edit_params(vec![
+				EditOperation {
+					op:      ChunkEditOp::Delete,
+					sel:     Some("var_tra_1".to_owned()),
+					crc:     Some(first.checksum),
+					region:  None,
+					content: None,
+					find:    None,
+				},
+				EditOperation {
+					op:      ChunkEditOp::Replace,
+					sel:     Some("var_tra_2".to_owned()),
+					crc:     Some(second.checksum),
+					region:  None,
+					content: Some("const transportBeta = 20;".to_owned()),
+					find:    Some("not in current chunk".to_owned()),
+				},
+			]),
+		)
+		.err()
+		.expect("second operation should fail after recompute");
+
+		assert!(
+			err.contains("Edit operation 2/2 failed"),
+			"error should identify the failing operation: {err}"
+		);
+		assert!(
+			err.contains("'find' text not found inside chunk"),
+			"error should preserve the real operation failure: {err}"
+		);
+		assert_eq!(state.source(), source, "original state should remain unchanged");
+	}
+
+	#[test]
+	fn edit_batch_failure_context_uses_original_snapshot_after_partial_apply() {
+		let source = "\
+const alphaValue = 1;
+
+const betaValue = 2;
+";
+		let state = state_for(source, "typescript");
+		let first = state
+			.inner()
+			.tree()
+			.root_children
+			.first()
+			.and_then(|path| state.inner().chunk(path))
+			.expect("first top-level chunk")
+			.clone();
+		let first_path = first.path.clone();
+		let first_checksum = first.checksum;
+
+		let err = apply_edits(
+			&state,
+			&edit_params(vec![
+				EditOperation {
+					op:      ChunkEditOp::Put,
+					sel:     Some(first_path.clone()),
+					crc:     Some(first_checksum.clone()),
+					region:  None,
+					content: Some("const alphaValue = 10;".to_owned()),
+					find:    None,
+				},
+				EditOperation {
+					op:      ChunkEditOp::Replace,
+					sel:     Some(first_path),
+					crc:     Some(first_checksum),
+					region:  None,
+					content: Some("replacement".to_owned()),
+					find:    Some("not in current file".to_owned()),
+				},
+			]),
+		)
+		.err()
+		.expect("second operation should fail after the first mutates in-memory state");
+
+		assert!(
+			err.contains("No changes were saved"),
+			"error should preserve the transactional message: {err}"
+		);
+		assert!(
+			err.contains("const alphaValue = 1;"),
+			"fresh content should show the original saved snapshot: {err}"
+		);
+		assert!(
+			!err.contains("const alphaValue = 10;"),
+			"fresh content must not show partial in-memory edits: {err}"
+		);
+	}
+
+	#[test]
+	fn edit_batch_maps_reused_checksum_after_target_changes() {
+		let source = "\
+function target(): void {
+\tconsole.log(\"old\");
+}
+
+function helper(): void {
+\tconsole.log(\"helper\");
+}
+";
+		let state = state_for(source, "typescript");
+		let target = state.inner().chunk("fn_tar").expect("fn_tar").clone();
+
+		let result = apply_edits(
+			&state,
+			&edit_params(vec![
+				EditOperation {
+					op:      ChunkEditOp::Put,
+					sel:     Some(format!("#{}", target.checksum)),
+					crc:     None,
+					region:  None,
+					content: Some("function target(): void {\n\tconsole.log(\"middle\");\n}".to_owned()),
+					find:    None,
+				},
+				EditOperation {
+					op:      ChunkEditOp::Put,
+					sel:     Some(format!("#{}", target.checksum)),
+					crc:     None,
+					region:  None,
+					content: Some("function target(): void {\n\tconsole.log(\"final\");\n}".to_owned()),
+					find:    None,
+				},
+			]),
+		)
+		.expect("same-batch reused checksum should follow the changed target");
+
+		assert!(
+			result.diff_after.contains("console.log(\"final\")"),
+			"second edit should apply to the original target:\n{}",
+			result.diff_after
+		);
+		assert!(
+			!result.diff_after.contains("console.log(\"middle\")"),
+			"second edit should replace the first edit on the same target:\n{}",
+			result.diff_after
+		);
+		assert!(
+			result.diff_after.contains("function helper(): void"),
+			"reused checksum must not fall back to root replacement:\n{}",
+			result.diff_after
+		);
+	}
+
+	#[test]
+	fn edit_accepts_multi_crc_inline_segments() {
+		let source = "class Worker {\n\trun(): void {\n\t\tconsole.log(this.name);\n\t}\n}\n";
+		let state = state_for(source, "typescript");
+		let class_chunk = state.inner().chunk("cls_Wor").expect("cls_Wor").clone();
+		let method_chunk = state
+			.inner()
+			.chunk("cls_Wor.fn_run")
+			.expect("fn_run")
+			.clone();
+
+		// Both CRCs present and valid – selector carries `#CRC` on every segment.
+		let sel = format!(
+			"cls_Wor#{parent}.fn_run#{leaf}",
+			parent = class_chunk.checksum,
+			leaf = method_chunk.checksum,
+		);
+		let result = apply_edits(&state, &EditParams {
+			operations:       vec![EditOperation {
+				op:      ChunkEditOp::Put,
+				sel:     Some(sel),
+				crc:     None,
+				region:  None,
+				content: Some("run(): void {\n\tconsole.log(\"multi-crc\");\n}".to_owned()),
+				find:    None,
+			}],
+			default_selector: None,
+			default_crc:      None,
+			anchor_style:     None,
+			cwd:              ".".to_owned(),
+			file_path:        "test.ts".to_owned(),
+			normalize_indent: None,
+		})
+		.expect("multi-crc selector with all fresh CRCs should edit successfully");
+		assert!(result.diff_after.contains("console.log(\"multi-crc\");"), "{}", result.diff_after);
+	}
+
+	#[test]
+	fn edit_accepts_multi_crc_selector_when_only_ancestor_crc_matches() {
+		let source = "class Worker {\n\trun(): void {\n\t\tconsole.log(this.name);\n\t}\n}\n";
+		let state = state_for(source, "typescript");
+		let class_chunk = state.inner().chunk("cls_Wor").expect("cls_Wor").clone();
+
+		// Stale leaf CRC but fresh ancestor CRC. Under the new lenient rule,
+		// at least one provided CRC matches the ancestor chain, so the edit
+		// proceeds.
+		let sel = format!("cls_Wor#{parent}.fn_run#ZZZZ", parent = class_chunk.checksum);
+		let result = apply_edits(&state, &EditParams {
+			operations:       vec![EditOperation {
+				op:      ChunkEditOp::Put,
+				sel:     Some(sel),
+				crc:     None,
+				region:  None,
+				content: Some("run(): void {\n\tconsole.log(\"any-match\");\n}".to_owned()),
+				find:    None,
+			}],
+			default_selector: None,
+			default_crc:      None,
+			anchor_style:     None,
+			cwd:              ".".to_owned(),
+			file_path:        "test.ts".to_owned(),
+			normalize_indent: None,
+		})
+		.expect("edit should accept a multi-crc path when any crc matches an ancestor");
+		assert!(result.diff_after.contains("console.log(\"any-match\");"), "{}", result.diff_after);
+	}
+
+	#[test]
+	fn edit_rejects_multi_crc_selector_when_all_crcs_stale() {
+		let source = "class Worker {\n\trun(): void {\n\t\tconsole.log(this.name);\n\t}\n}\n";
+		let state = state_for(source, "typescript");
+
+		let err = apply_edits(&state, &EditParams {
+			operations:       vec![EditOperation {
+				op:      ChunkEditOp::Put,
+				sel:     Some("cls_Wor#XXXX.fn_run#ZZZZ".to_owned()),
+				crc:     None,
+				region:  None,
+				content: Some("run(): void {\n\tconsole.log(\"should-not-apply\");\n}".to_owned()),
+				find:    None,
+			}],
+			default_selector: None,
+			default_crc:      None,
+			anchor_style:     None,
+			cwd:              ".".to_owned(),
+			file_path:        "test.ts".to_owned(),
+			normalize_indent: None,
+		})
+		.err()
+		.expect("all-stale multi-crc selector should fail");
+		assert!(err.contains("None of the provided checksums"), "{err}");
 	}
 
 	#[test]

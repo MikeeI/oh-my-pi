@@ -8,7 +8,11 @@ import type {
 	MessageParam,
 } from "@anthropic-ai/sdk/resources/messages";
 import { $env, abortableSleep, isEnoent } from "@oh-my-pi/pi-utils";
-import { anthropicModelHasRealXHighEffort, mapEffortToAnthropicAdaptiveEffort } from "../model-thinking";
+import {
+  anthropicModelHasRealXHighEffort,
+  hasOpus47ApiRestrictions,
+  mapEffortToAnthropicAdaptiveEffort,
+} from "../model-thinking";
 import { calculateCost } from "../models";
 import { getEnvApiKey, OUTPUT_FALLBACK_BUFFER } from "../stream";
 import type {
@@ -1422,6 +1426,13 @@ function buildParams(
 		if (options?.topK !== undefined) {
 			params.top_k = options.topK;
 		}
+	}
+
+	// Opus 4.7+ rejects non-default sampling parameters with 400 error.
+	if (hasOpus47ApiRestrictions(model.id)) {
+		delete params.temperature;
+		delete (params as AnthropicSamplingParams).top_p;
+		delete (params as AnthropicSamplingParams).top_k;
 	}
 
 	if (context.tools) {
