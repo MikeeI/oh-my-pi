@@ -24,7 +24,7 @@ import { assertEditableFileContent } from "../../tools/auto-generated-guard";
 import { invalidateFsScanAfterWrite } from "../../tools/fs-cache-invalidation";
 import { outputMeta } from "../../tools/output-meta";
 import { enforcePlanModeWrite, resolvePlanPath } from "../../tools/plan-mode-guard";
-import { generateUnifiedDiffString } from "../diff";
+import { type DiffError, type DiffResult, generateUnifiedDiffString } from "../diff";
 import { HASHLINE_NIBBLE_ALPHABET } from "../line-hash";
 import { detectLineEnding, normalizeToLF, restoreLineEndings, stripBom } from "../normalize";
 import type { EditToolDetails, LspBatchRequest } from "../renderer";
@@ -187,7 +187,7 @@ export async function computeChunkDiff(
 	input: { path: string; edits: ChunkToolEdit[] },
 	cwd: string,
 	options?: { anchorStyle?: ChunkAnchorStyle; signal?: AbortSignal },
-): Promise<{ diff: string; firstChangedLine: number | undefined } | { error: string }> {
+): Promise<DiffResult | DiffError> {
 	try {
 		options?.signal?.throwIfAborted?.();
 		const { filePath } = parseChunkEditPath(input.path);
@@ -205,7 +205,7 @@ export async function computeChunkDiff(
 		});
 		options?.signal?.throwIfAborted?.();
 		if (!result.changed) {
-			return { diff: "", firstChangedLine: undefined };
+			return { diff: "", firstChangedLine: undefined, lastChangedLine: undefined };
 		}
 		return generateUnifiedDiffString(result.diffSourceBefore, result.diffSourceAfter);
 	} catch (err) {
