@@ -15,7 +15,7 @@
 - Changed shell execution in both interactive and non-interactive modes to route command output through the configured shell output minimizer
 - Changed default behavior so shell output minimization can now be toggled from settings without code changes
 - Changed shell output minimization to leave compound and piped commands unchanged; only a single eligible whole command is captured and minimized after it exits
-- Added `gpt-5.5` to the top of the `slow` model priority list
+- Changed the `slow` model priority list to put `gpt-5.5` first
 - Replaced `CHUNK_CHECKSUM_ALPHABET` literal in `edit/modes/chunk.ts` with an import of `HASHLINE_NIBBLE_ALPHABET` from `edit/line-hash.ts` (the two were already documented as sharing the same alphabet)
 
 ### Fixed
