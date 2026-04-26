@@ -219,6 +219,41 @@ Test the contract the system exposes — not the easiest internal detail to asse
 - Don't add tests for tiny low-risk changes unless they protect a real contract or fix a regression-prone edge case.
 - Prefer focused package-local verification for the changed area.
 
+## Git Workflow (Fork)
+- `main` mirrors `upstream/main`. Keep it reset to upstream and force-pushed to `origin/main`; do not carry local patches on `main`.
+- Fork sync: merge upstream into `dev/local` using `merge -s ours` + `git read-tree -m -u main` + `commit --amend` to keep full local history while resetting the tree to upstream.
+- Local-only patches (e.g. deploy script) go as cherry-picks on top of the sync commit.
+- Standard sequence: `git checkout main && git fetch upstream && git reset --hard upstream/main && git push --force-with-lease origin main && git checkout dev/local && git merge main -s ours --no-edit -m "sync: reset to upstream vX.Y.Z (keep history)" && git read-tree -m -u main && git commit --amend --no-edit`.
+- After sync, cherry-pick local patches and force-push: `git push --force-with-lease origin dev/local`.
+
+## GitHub Issues
+
+When reading issues:
+
+- Always read all comments on the issue
+
+When creating issues:
+
+- Use standard GitHub labels (bug, enhancement, documentation, etc.)
+- If an issue affects a specific package, mention it in the issue title or description
+
+When closing issues via commit:
+
+- Include `fixes #<number>` or `closes #<number>` in the commit message
+- This automatically closes the issue when the commit is merged
+
+## Tools
+
+- GitHub CLI for issues/PRs
+- TUI interaction: use tmux
+
+## Style
+
+- Keep answers short and concise
+- No emojis in commits, issues, PR comments, or code
+- No fluff or cheerful filler text
+- Technical prose only, be kind but direct (e.g., "Thanks @user" not "Thanks so much @user!")
+
 ## Changelog
 
 Location: `packages/*/CHANGELOG.md` (per package).
