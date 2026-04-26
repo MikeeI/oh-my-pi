@@ -1,7 +1,7 @@
 {
 	"type": "module",
 	"name": "@oh-my-pi/pi-coding-agent",
-	"version": "14.3.0",
+	"version": "14.5.2",
 	"description": "Coding agent CLI with read, bash, edit, write tools and session management",
 	"homepage": "https://github.com/can1357/oh-my-pi",
 	"author": "Can Boluk",
@@ -32,7 +32,6 @@
 	},
 	"scripts": {
 		"build": "bun scripts/build-binary.ts",
-		"deploy": "bun scripts/deploy-local-override.ts",
 		"check": "biome check . && bun run check:types",
 		"check:types": "tsgo -p tsconfig.json --noEmit",
 		"lint": "biome lint .",
@@ -53,6 +52,7 @@
 		"@oh-my-pi/pi-natives": "catalog:",
 		"@oh-my-pi/pi-tui": "catalog:",
 		"@oh-my-pi/pi-utils": "catalog:",
+		"@puppeteer/browsers": "catalog:",
 		"@sinclair/typebox": "catalog:",
 		"@xterm/headless": "catalog:",
 		"ajv": "catalog:",
@@ -63,7 +63,7 @@
 		"linkedom": "catalog:",
 		"lru-cache": "catalog:",
 		"markit-ai": "catalog:",
-		"puppeteer": "catalog:",
+		"puppeteer-core": "catalog:",
 		"turndown": "catalog:",
 		"turndown-plugin-gfm": "catalog:",
 		"zod": "catalog:"

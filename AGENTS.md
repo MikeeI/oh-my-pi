@@ -464,12 +464,6 @@ When adding or changing tests, test the contract the system exposes — not the 
 - Do not add tests for tiny, low-risk changes unless the change affects a real contract, fixes a regression-prone edge case, or would otherwise be easy to break silently.
 - When trimming or adding tests, prefer focused package-local verification for the changed area so the surviving suite proves the contract it claims to protect.
 
-## Git Workflow (Fork)
-- Fork sync: merge upstream into `dev/local` using `merge -s ours` + `git read-tree -m -u main` + `commit --amend` to keep full local history while resetting the tree to upstream.
-- Local-only patches (e.g. deploy script) go as cherry-picks on top of the sync commit.
-- Standard sequence: `git checkout main && git fetch upstream && git reset --hard upstream/main && git checkout dev/local && git merge main -s ours --no-edit -m "sync: reset to upstream vX.Y.Z (keep history)" && git read-tree -m -u main && git commit --amend --no-edit`.
-- After sync, cherry-pick local patches and force-push: `git push --force origin dev/local main`.
-
 ## GitHub Issues
 
 When reading issues:
