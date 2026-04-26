@@ -187,7 +187,7 @@ You **MUST NOT** use Python or Bash when a specialized tool exists.
 {{/ifAny}}
 
 {{#ifAny (includes tools "read") (includes tools "write") (includes tools "grep") (includes tools "find") (includes tools "edit")}}
-{{#has tools "read"}}- Use `read`, not `cat` or `open`.{{/has}}
+{{#has tools "read"}}- Use `read`, not `cat`.{{/has}}
 {{#has tools "write"}}- Use `write`, not shell redirection.{{/has}}
 {{#has tools "grep"}}- Use `grep`, not shell regex search.{{/has}}
 {{#has tools "find"}}- Use `find`, not shell file globbing.{{/has}}

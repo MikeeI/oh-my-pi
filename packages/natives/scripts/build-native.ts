@@ -151,17 +151,6 @@ async function patchGeneratedIndexLoader(): Promise<void> {
 			`$1\n${lazyLoadPatch}`,
 		);
 	}
-
-	// Patch isCompiledBinary to also check Bun.main — CJS __filename in compiled Bun binaries
-	// retains the original build path instead of containing $bunfs
-	if (!content.includes("Bun.main")) {
-		content = content.replace(
-			'__filename.includes("%7EBUN");',
-			'__filename.includes("%7EBUN") ||\n' +
-				'	(typeof Bun !== "undefined" && typeof Bun.main === "string" &&\n' +
-				'		(Bun.main.includes("$bunfs") || Bun.main.includes("~BUN") || Bun.main.includes("%7EBUN")));',
-		);
-	}
 	await Bun.write(indexPath, content);
 }
 

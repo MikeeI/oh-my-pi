@@ -10,6 +10,8 @@ import {
 	DEFAULT_FUZZY_THRESHOLD,
 	findMatch,
 	loadChunkSource,
+	parseChunkEditPath,
+	parseChunkReadPath,
 } from "@oh-my-pi/pi-coding-agent/edit";
 
 describe("findMatch", () => {
@@ -192,6 +194,54 @@ describe("computeChunkDiff", () => {
 		expect("error" in result).toBe(true);
 	});
 
+	test("rejects write:null instead of previewing a delete", async () => {
+		const file = path.join(tmpDir, "null-delete.ts");
+		await fs.writeFile(file, "export const x = 1;\n");
+		const result = await computeChunkDiff(
+			{
+				path: "null-delete.ts",
+				edits: [{ path: "null-delete.ts", write: null }],
+			},
+			tmpDir,
+		);
+		expect("error" in result).toBe(true);
+		if ("error" in result) {
+			expect(result.error).toContain("write:null no longer deletes chunks");
+		}
+	});
+
+	test("rejects bare chunk edit entries instead of treating them as deletes", async () => {
+		const file = path.join(tmpDir, "bare.ts");
+		await fs.writeFile(file, "export const x = 1;\n");
+		const result = await computeChunkDiff(
+			{
+				path: "bare.ts",
+				edits: [{ path: "bare.ts" }],
+			},
+			tmpDir,
+		);
+		expect("error" in result).toBe(true);
+		if ("error" in result) {
+			expect(result.error).toContain("no operation specified");
+		}
+	});
+
+	test("rejects write empty string instead of previewing a destructive empty replacement", async () => {
+		const file = path.join(tmpDir, "empty-write.ts");
+		await fs.writeFile(file, "export const x = 1;\n");
+		const result = await computeChunkDiff(
+			{
+				path: "empty-write.ts",
+				edits: [{ path: "empty-write.ts", write: "" }],
+			},
+			tmpDir,
+		);
+		expect("error" in result).toBe(true);
+		if ("error" in result) {
+			expect(result.error).toContain('write:"" is a destructive empty replacement');
+		}
+	});
+
 	test("aborts when signal fires before compute completes", async () => {
 		const controller = new AbortController();
 		controller.abort();
@@ -214,6 +264,23 @@ describe("computeChunkDiff", () => {
 		const loaded = await loadChunkSource({ cwd: tmpDir, path: "e.ts" });
 		expect(loaded.exists).toBe(true);
 		expect(loaded.rawContent).toContain("export const x");
+	});
+});
+
+describe("chunk path parsing", () => {
+	test("splits local plan URLs with chunk selectors after the URL path", () => {
+		expect(parseChunkEditPath("local://PLAN.md:sct_0_T#SRJJ")).toEqual({
+			filePath: "local://PLAN.md",
+			selector: "sct_0_T#SRJJ",
+		});
+		expect(parseChunkReadPath("local://PLAN.md:sct_6_R.sct_6_u#MZKS")).toEqual({
+			filePath: "local://PLAN.md",
+			selector: "sct_6_R.sct_6_u#MZKS",
+		});
+	});
+
+	test("does not treat the local URL scheme colon as a chunk selector separator", () => {
+		expect(parseChunkEditPath("local://PLAN.md")).toEqual({ filePath: "local://PLAN.md" });
 	});
 });
 

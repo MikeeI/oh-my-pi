@@ -32,9 +32,7 @@ const isCompiledBinary =
 	process.env.PI_COMPILED ||
 	__filename.includes("$bunfs") ||
 	__filename.includes("~BUN") ||
-	__filename.includes("%7EBUN") ||
-	(typeof Bun !== "undefined" && typeof Bun.main === "string" &&
-		(Bun.main.includes("$bunfs") || Bun.main.includes("~BUN") || Bun.main.includes("%7EBUN")));
+	__filename.includes("%7EBUN");
 
 if (isCompiledBinary) {
 	try {

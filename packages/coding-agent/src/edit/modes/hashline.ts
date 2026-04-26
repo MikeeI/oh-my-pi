@@ -29,7 +29,7 @@ import {
 import { outputMeta } from "../../tools/output-meta";
 import { resolveToCwd } from "../../tools/path-utils";
 import { enforcePlanModeWrite, resolvePlanPath } from "../../tools/plan-mode-guard";
-import { type DiffError, type DiffResult, generateDiffString } from "../diff";
+import { generateDiffString } from "../diff";
 import { computeLineHash, formatLineHash } from "../line-hash";
 import { detectLineEnding, normalizeToLF, restoreLineEndings, stripBom } from "../normalize";
 import type { EditToolDetails, LspBatchRequest } from "../renderer";
@@ -1172,7 +1172,15 @@ export function buildCompactHashlineDiffPreview(
 export async function computeHashlineDiff(
 	input: { path: string; edits: HashlineEditInput[]; move?: string },
 	cwd: string,
-): Promise<DiffResult | DiffError> {
+): Promise<
+	| {
+			diff: string;
+			firstChangedLine: number | undefined;
+	  }
+	| {
+			error: string;
+	  }
+> {
 	const { path, edits, move } = input;
 
 	try {
@@ -1186,7 +1194,7 @@ export async function computeHashlineDiff(
 			return { error: "move path is the same as source path" };
 		}
 		if (isMoveOnly) {
-			return { diff: "", firstChangedLine: undefined, lastChangedLine: undefined };
+			return { diff: "", firstChangedLine: undefined };
 		}
 
 		const rawContent = await readHashlineFileText(file, path);

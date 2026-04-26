@@ -2,15 +2,13 @@
 
 ## [Unreleased]
 
+## [14.3.0] - 2026-04-25
+
 ### Added
 
 - Added support for Claude Opus 4.7 (`claude-opus-4-7`) model ([#726](https://github.com/can1357/oh-my-pi/issues/726))
   - Suppresses sampling parameters (temperature/top_p/top_k) that Opus 4.7 rejects
   - Enables `display: "summarized"` for adaptive thinking to restore visible thinking content
-
-### Changed
-
-- Updated default model from `gpt-5.4` to `gpt-5.5` for openai, openai-codex, nanogpt, and openrouter provider descriptors
 
 ### Fixed
 

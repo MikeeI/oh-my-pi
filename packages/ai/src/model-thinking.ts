@@ -154,19 +154,27 @@ export function applyGeneratedModelPolicies(models: ApiModel<Api>[]): void {
 }
 
 /**
- * Link `-spark` model variants to their base models for context promotion.
+ * Link OpenAI model variants to their context promotion targets.
  *
- * When a spark model's context is exhausted, the agent can promote to the
- * corresponding full model. This sets `contextPromotionTarget` on each
- * spark variant that has a matching base model.
+ * When a model's context is exhausted, the agent can promote to a sibling
+ * model with a larger context window on the same provider:
+ * - `-spark` variants promote to `gpt-5.5`.
+ * - `gpt-5.5` (270K input) promotes to `gpt-5.4` (1M input).
  */
-export function linkSparkPromotionTargets(models: ApiModel<Api>[]): void {
+export function linkOpenAIPromotionTargets(models: ApiModel<Api>[]): void {
 	for (const candidate of models) {
 		const parsedCandidate = parseKnownModel(candidate.id);
-		if (parsedCandidate.family !== "openai" || parsedCandidate.variant !== "codex-spark") continue;
-		const baseId = candidate.id.slice(0, -"-spark".length);
+		if (parsedCandidate.family !== "openai") continue;
+		let targetId: string | undefined;
+		if (parsedCandidate.variant === "codex-spark") {
+			targetId = "gpt-5.5";
+		} else if (parsedCandidate.variant === "base" && semverEqual(parsedCandidate.version, "5.5")) {
+			targetId = "gpt-5.4";
+		} else {
+			continue;
+		}
 		const fallback = models.find(
-			model => model.provider === candidate.provider && model.api === candidate.api && model.id === baseId,
+			model => model.provider === candidate.provider && model.api === candidate.api && model.id === targetId,
 		);
 		if (!fallback) continue;
 		candidate.contextPromotionTarget = `${fallback.provider}/${fallback.id}`;
@@ -294,7 +302,7 @@ export function hasOpus47ApiRestrictions(modelId: string): boolean {
 	return semverGte(parsed.version, "4.7") && parsed.kind === "opus";
 }
 
-export function anthropicModelHasRealXHighEffort<TApi extends Api>(model: ApiModel<TApi>): boolean {
+function anthropicModelHasRealXHighEffort<TApi extends Api>(model: ApiModel<TApi>): boolean {
 	if (model.api !== "anthropic-messages") return false;
 	const parsedModel = parseKnownModel(model.id);
 	if (parsedModel.family !== "anthropic" || parsedModel.kind !== "opus") return false;

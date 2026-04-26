@@ -8,11 +8,7 @@ import type {
 	MessageParam,
 } from "@anthropic-ai/sdk/resources/messages";
 import { $env, abortableSleep, isEnoent } from "@oh-my-pi/pi-utils";
-import {
-	anthropicModelHasRealXHighEffort,
-	hasOpus47ApiRestrictions,
-	mapEffortToAnthropicAdaptiveEffort,
-} from "../model-thinking";
+import { hasOpus47ApiRestrictions, mapEffortToAnthropicAdaptiveEffort } from "../model-thinking";
 import { calculateCost } from "../models";
 import { getEnvApiKey, OUTPUT_FALLBACK_BUFFER } from "../stream";
 import type {
@@ -1415,17 +1411,14 @@ function buildParams(
 		stream: true,
 	};
 
-	// Opus 4.7+ rejects sampling params (temperature/top_p/top_k) with HTTP 400.
-	if (!anthropicModelHasRealXHighEffort(model)) {
-		if (options?.temperature !== undefined) {
-			params.temperature = options.temperature;
-		}
-		if (options?.topP !== undefined) {
-			params.top_p = options.topP;
-		}
-		if (options?.topK !== undefined) {
-			params.top_k = options.topK;
-		}
+	if (options?.temperature !== undefined) {
+		params.temperature = options.temperature;
+	}
+	if (options?.topP !== undefined) {
+		params.top_p = options.topP;
+	}
+	if (options?.topK !== undefined) {
+		params.top_k = options.topK;
 	}
 
 	// Opus 4.7+ rejects non-default sampling parameters with 400 error.

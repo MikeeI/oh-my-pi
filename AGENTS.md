@@ -464,13 +464,6 @@ When adding or changing tests, test the contract the system exposes — not the 
 - Do not add tests for tiny, low-risk changes unless the change affects a real contract, fixes a regression-prone edge case, or would otherwise be easy to break silently.
 - When trimming or adding tests, prefer focused package-local verification for the changed area so the surviving suite proves the contract it claims to protect.
 
-## Git Workflow
-
-- Fork sync default: align local `main` to `upstream/main`, then merge `main` into `dev/local`.
-- Never hard reset `dev/local` or drop local work to make sync easier.
-- If local changes block sync: preserve them first with a commit or `git stash push -u`, complete the sync, then restore and resolve conflicts.
-- Standard sequence: `git checkout main && git fetch upstream && git reset --hard upstream/main && git checkout dev/local && git merge main`.
-
 ## GitHub Issues
 
 When reading issues:

@@ -298,12 +298,8 @@ export class InteractiveMode implements InteractiveModeContext {
 		logger.time("InteractiveMode.init:keybindings");
 		this.keybindings = KeybindingsManager.create();
 
-		// Register cleanup flush for signal handlers (SIGINT, SIGTERM, SIGHUP) so
-		// model and settings changes survive immediate restarts.
-		this.#cleanupUnsubscribe = postmortem.register("interactive-state-flush", async () => {
-			await this.settings.flush();
-			await this.sessionManager.flush();
-		});
+		// Register session manager flush for signal handlers (SIGINT, SIGTERM, SIGHUP)
+		this.#cleanupUnsubscribe = postmortem.register("session-manager-flush", () => this.sessionManager.flush());
 
 		await logger.time(
 			"InteractiveMode.init:slashCommands",
@@ -1042,9 +1038,7 @@ export class InteractiveMode implements InteractiveModeContext {
 		if (this.#isShuttingDown) return;
 		this.#isShuttingDown = true;
 
-		// Flush pending settings and session writes before shutdown so persisted
-		// model selections survive immediate restarts.
-		await this.settings.flush();
+		// Flush pending session writes before shutdown
 		await this.sessionManager.flush();
 		this.#btwController.dispose();
 
