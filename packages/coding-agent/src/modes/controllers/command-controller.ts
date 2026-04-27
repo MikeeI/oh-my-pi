@@ -35,7 +35,7 @@ import { replaceTabs } from "../../tools/render-utils";
 import { getChangelogPath, parseChangelog } from "../../utils/changelog";
 import { copyToClipboard } from "../../utils/clipboard";
 import { openPath } from "../../utils/open";
-import { setSessionTerminalTitle } from "../../utils/title-generator";
+import { regenerateSessionTitle, setSessionTerminalTitle } from "../../utils/title-generator";
 
 function showMarkdownPanel(ctx: InteractiveModeContext, title: string, markdown: string): void {
 	ctx.chatContainer.addChild(new Spacer(1));
@@ -702,9 +702,80 @@ export class CommandController {
 		}
 	}
 
-	async handleRenameCommand(title: string): Promise<void> {
+	async handleRenameCommand(title?: string): Promise<void> {
+		const wasManual = title !== undefined;
 		try {
-			const stored = await this.ctx.sessionManager.setSessionName(title, "user");
+			if (!title) {
+				// Auto-generate title from recent messages
+				const messages = this.ctx.session.messages;
+				const userTexts: string[] = [];
+				for (const msg of messages) {
+					if (msg.role !== "user") continue;
+					const text =
+						typeof msg.content === "string"
+							? msg.content
+							: msg.content
+									.filter(c => c.type === "text")
+									.map(c => (c as { text: string }).text)
+									.join("");
+					if (text.trim()) userTexts.push(text);
+				}
+
+				if (userTexts.length === 0) {
+					this.ctx.showError("No messages yet \u2014 provide a title manually.");
+					return;
+				}
+
+				// Include compaction shortSummary as additional context for the LLM (not as the title)
+				const entries = this.ctx.sessionManager.getEntries();
+				const compactionEntry = entries.findLast(
+					e => e.type === "compaction" && typeof (e as { shortSummary?: string }).shortSummary === "string",
+				);
+				const shortSummary = compactionEntry
+					? (compactionEntry as { shortSummary: string }).shortSummary
+					: undefined;
+				if (shortSummary) userTexts.push(shortSummary);
+
+				const projectName = path.basename(this.ctx.sessionManager.getCwd());
+				const loader = new Loader(
+					this.ctx.ui,
+					s => theme.fg("accent", s),
+					t => theme.fg("muted", t),
+					"Generating title...",
+				);
+				this.ctx.statusContainer.addChild(loader);
+				this.ctx.ui.requestRender();
+				try {
+					title =
+						(await regenerateSessionTitle(
+							userTexts,
+							this.ctx.sessionManager.getSessionName(),
+							this.ctx.session.modelRegistry,
+							this.ctx.settings,
+							this.ctx.session.sessionId,
+							this.ctx.session.model,
+							projectName,
+						)) ?? undefined;
+				} finally {
+					loader.stop();
+					this.ctx.statusContainer.clear();
+				}
+
+				if (!title) {
+					this.ctx.showError("Could not generate a title. Try /rename <title> instead.");
+					return;
+				}
+			}
+
+			// Same-title guard: if auto-generated title matches current, skip the update
+			const currentName = this.ctx.sessionManager.getSessionName();
+			if (!wasManual && currentName && title.toLowerCase() === currentName.toLowerCase()) {
+				this.ctx.showStatus("Title unchanged.");
+				return;
+			}
+
+			const source = wasManual ? "user" : "auto";
+			const stored = await this.ctx.sessionManager.setSessionName(title, source);
 			if (!stored) {
 				this.ctx.showError("Session name cannot be empty.");
 				return;
@@ -713,7 +784,8 @@ export class CommandController {
 			setSessionTerminalTitle(name, this.ctx.sessionManager.getCwd(), this.ctx.sessionManager.titleSource);
 			this.ctx.statusLine.invalidate();
 			this.ctx.updateEditorBorderColor();
-			this.ctx.showStatus(`Session renamed to "${name}".`);
+			const verb = source === "auto" ? "Title generated" : "Session renamed to";
+			this.ctx.showStatus(`${verb} "${name}".`);
 		} catch (err) {
 			this.ctx.showError(`Rename failed: ${err instanceof Error ? err.message : String(err)}`);
 		}
