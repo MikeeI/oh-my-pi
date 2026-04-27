@@ -2,6 +2,9 @@
 
 ## [Unreleased]
 
+### Added
+
+- `/rename` without argument auto-generates a session title using the smol model based on recent conversation context
 ## [14.5.3] - 2026-04-27
 
 ### Added

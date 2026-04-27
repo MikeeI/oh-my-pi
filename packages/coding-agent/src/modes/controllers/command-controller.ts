@@ -35,7 +35,16 @@ import { replaceTabs } from "../../tools/render-utils";
 import { getChangelogPath, parseChangelog } from "../../utils/changelog";
 import { copyToClipboard } from "../../utils/clipboard";
 import { openPath } from "../../utils/open";
-import { setSessionTerminalTitle } from "../../utils/title-generator";
+import { regenerateSessionTitle, setSessionTerminalTitle } from "../../utils/title-generator";
+
+/** Extract text content from any message type. */
+function extractMessageText(msg: { content: string | { type: string; text?: string }[] }): string {
+	if (typeof msg.content === "string") return msg.content;
+	return msg.content
+		.filter(c => c.type === "text" && c.text)
+		.map(c => c.text!)
+		.join("");
+}
 
 function showMarkdownPanel(ctx: InteractiveModeContext, title: string, markdown: string): void {
 	ctx.chatContainer.addChild(new Spacer(1));
@@ -702,9 +711,117 @@ export class CommandController {
 		}
 	}
 
-	async handleRenameCommand(title: string): Promise<void> {
+	async handleRenameCommand(title?: string): Promise<void> {
+		const wasManual = title !== undefined;
 		try {
-			const stored = await this.ctx.sessionManager.setSessionName(title, "user");
+			if (!title) {
+				// Build compact context summary from recent conversation
+				const messages = this.ctx.session.messages;
+				if (!messages.some(m => m.role === "user")) {
+					this.ctx.showError("No messages yet \u2014 provide a title manually.");
+					return;
+				}
+				const MAX_PAIRS = 5;
+				const lines: string[] = [];
+				const toolNames = new Set<string>();
+
+				// Walk messages: for each user message, grab the next assistant first-line
+				const pairs: { user: string; assistant?: string }[] = [];
+				for (let i = 0; i < messages.length; i++) {
+					const msg = messages[i];
+					if (msg.role === "toolResult") {
+						const toolMsg = msg as { toolName?: string };
+						if (toolMsg.toolName) toolNames.add(toolMsg.toolName);
+						continue;
+					}
+					if (msg.role !== "user") continue;
+					const userText = extractMessageText(msg).trim();
+					if (!userText) continue;
+
+					// Find the next assistant message after this user message
+					let assistantLine: string | undefined;
+					for (let j = i + 1; j < messages.length; j++) {
+						const next = messages[j];
+						if (next.role === "user") break;
+						if (next.role === "toolResult") {
+							const toolMsg = next as { toolName?: string };
+							if (toolMsg.toolName) toolNames.add(toolMsg.toolName);
+							continue;
+						}
+						if (next.role === "assistant") {
+							const fullText = extractMessageText(next).trim();
+							if (fullText) {
+								// First meaningful non-heading line
+								assistantLine = fullText.split("\n").find(l => l.trim() && !l.startsWith("#")) ?? "";
+							}
+							break;
+						}
+					}
+
+					pairs.push({ user: userText, assistant: assistantLine });
+				}
+
+				// Last N pairs for recency
+				const selected = pairs.slice(-MAX_PAIRS);
+				for (const pair of selected) {
+					lines.push(`user: ${pair.user}`);
+					if (pair.assistant) lines.push(`assistant: ${pair.assistant}`);
+				}
+
+				if (toolNames.size > 0) {
+					lines.push(`Tools used: ${[...toolNames].slice(-15).join(", ")}`);
+				}
+
+				// Add compaction summary as context
+				const entries = this.ctx.sessionManager.getEntries();
+				const compactionEntry = entries.findLast(
+					e => e.type === "compaction" && typeof (e as { shortSummary?: string }).shortSummary === "string",
+				);
+				if (compactionEntry) {
+					lines.push(`Summary: ${(compactionEntry as { shortSummary: string }).shortSummary}`);
+				}
+
+				const contextSummary = lines.join("\n");
+				const projectName = path.basename(this.ctx.sessionManager.getCwd());
+				const loader = new Loader(
+					this.ctx.ui,
+					s => theme.fg("accent", s),
+					t => theme.fg("muted", t),
+					"Generating title...",
+				);
+				this.ctx.statusContainer.addChild(loader);
+				this.ctx.ui.requestRender();
+				try {
+					title =
+						(await regenerateSessionTitle(
+							contextSummary,
+							this.ctx.sessionManager.getSessionName(),
+							this.ctx.session.modelRegistry,
+							this.ctx.settings,
+							this.ctx.session.sessionId,
+							this.ctx.session.model,
+							projectName,
+						)) ?? undefined;
+				} finally {
+					loader.stop();
+					this.ctx.statusContainer.clear();
+				}
+
+				if (!title) {
+					this.ctx.showError("Could not generate a title. Try /rename <title> instead.");
+					return;
+				}
+			}
+
+			// Same-title guard: if auto-generated title matches current, skip the update
+			const currentName = this.ctx.sessionManager.getSessionName();
+			if (!wasManual && currentName && title.toLowerCase() === currentName.toLowerCase()) {
+				this.ctx.showStatus("Title unchanged.");
+				return;
+			}
+
+			const source = wasManual ? "user" : "auto";
+			const stored = await this.ctx.sessionManager.setSessionName(title, source);
 			if (!stored) {
 				this.ctx.showError("Session name cannot be empty.");
 				return;
@@ -713,7 +830,8 @@ export class CommandController {
 			setSessionTerminalTitle(name, this.ctx.sessionManager.getCwd(), this.ctx.sessionManager.titleSource);
 			this.ctx.statusLine.invalidate();
 			this.ctx.updateEditorBorderColor();
-			this.ctx.showStatus(`Session renamed to "${name}".`);
+			const verb = source === "auto" ? "Title generated" : "Session renamed to";
+			this.ctx.showStatus(`${verb} "${name}".`);
 		} catch (err) {
 			this.ctx.showError(`Rename failed: ${err instanceof Error ? err.message : String(err)}`);
 		}
