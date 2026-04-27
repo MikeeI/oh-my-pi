@@ -12,10 +12,9 @@ import type { Settings } from "../config/settings";
 import titleSystemPrompt from "../prompts/system/title-system.md" with { type: "text" };
 import { toReasoningEffort } from "../thinking";
 
-const MAX_RECENT_MESSAGES = 3;
-const MAX_CHARS_PER_MESSAGE = 600;
+const TITLE_SYSTEM_PROMPT = prompt.render(titleSystemPrompt);
 
-const DEFAULT_TERMINAL_TITLE = "\u03C0";
+const DEFAULT_TERMINAL_TITLE = "π";
 const TERMINAL_TITLE_CONTROL_CHARS = /[\u0000-\u001f\u007f-\u009f]/g;
 
 const MAX_INPUT_CHARS = 2000;
@@ -40,21 +39,16 @@ function getTitleModel(
 	return undefined;
 }
 
-/** Clean up model-generated title text. */
-function cleanTitle(raw: string): string | null {
-	let title = raw.trim();
-	if (!title) return null;
-	title = title.replace(/^["']|["']$/g, "").replace(/[.!?]$/, "");
-	return title || null;
-}
-
 /**
- * Shared LLM call for title generation.
- * Resolves model, API key, calls completeSimple, and cleans the result.
+ * Generate a title for a session based on the first user message.
+ *
+ * @param firstMessage The first user message
+ * @param registry Model registry
+ * @param settings Settings used to resolve the smol role, including per-role thinking
+ * @param sessionId Optional session id for sticky API key selection
  */
-async function callTitleModel(
-	userMessage: string,
-	template: { currentTitle?: string; projectName?: string },
+export async function generateSessionTitle(
+	firstMessage: string,
 	registry: ModelRegistry,
 	settings: Settings,
 	sessionId?: string,
@@ -66,25 +60,36 @@ async function callTitleModel(
 		return null;
 	}
 
+	// Truncate message if too long
+	const truncatedMessage =
+		firstMessage.length > MAX_INPUT_CHARS ? `${firstMessage.slice(0, MAX_INPUT_CHARS)}…` : firstMessage;
+	const userMessage = `<user-message>
+${truncatedMessage}
+</user-message>`;
+
 	const apiKey = await registry.getApiKey(candidate.model, sessionId);
 	if (!apiKey) {
-		logger.debug("title-generator: no API key", {
+		logger.debug("title-generator: no API key for smol model", {
 			provider: candidate.model.provider,
 			id: candidate.model.id,
 		});
 		return null;
 	}
 
-	const systemPrompt = prompt.render(titleSystemPrompt, template);
-	const model = `${candidate.model.provider}/${candidate.model.id}`;
-	logger.debug("title-generator: request", { model, userMessage });
+	const request = {
+		model: `${candidate.model.provider}/${candidate.model.id}`,
+		systemPrompt: TITLE_SYSTEM_PROMPT,
+		userMessage,
+		maxTokens: 30,
+	};
+	logger.debug("title-generator: request", request);
 
 	try {
 		const response = await completeSimple(
 			candidate.model,
 			{
-				systemPrompt,
-				messages: [{ role: "user", content: userMessage, timestamp: Date.now() }],
+				systemPrompt: request.systemPrompt,
+				messages: [{ role: "user", content: request.userMessage, timestamp: Date.now() }],
 			},
 			{
 				apiKey,
@@ -94,78 +99,41 @@ async function callTitleModel(
 		);
 
 		if (response.stopReason === "error") {
-			logger.debug("title-generator: response error", { model, errorMessage: response.errorMessage });
+			logger.debug("title-generator: response error", {
+				model: request.model,
+				stopReason: response.stopReason,
+				errorMessage: response.errorMessage,
+			});
 			return null;
 		}
 
 		let title = "";
 		for (const content of response.content) {
-			if (content.type === "text") title += content.text;
+			if (content.type === "text") {
+				title += content.text;
+			}
 		}
+		title = title.trim();
 
 		logger.debug("title-generator: response", {
-			model,
+			model: request.model,
 			title,
 			usage: response.usage,
 			stopReason: response.stopReason,
 		});
-		return cleanTitle(title);
+
+		if (!title) {
+			return null;
+		}
+
+		return title.replace(/^["']|["']$/g, "").replace(/[.!?]$/, "");
 	} catch (err) {
-		logger.debug("title-generator: error", { model, error: err instanceof Error ? err.message : String(err) });
+		logger.debug("title-generator: error", {
+			model: request.model,
+			error: err instanceof Error ? err.message : String(err),
+		});
 		return null;
 	}
-}
-
-/**
- * Generate a title for a session based on the first user message.
- */
-export async function generateSessionTitle(
-	firstMessage: string,
-	registry: ModelRegistry,
-	settings: Settings,
-	sessionId?: string,
-	currentModel?: Model<Api>,
-): Promise<string | null> {
-	const truncated =
-		firstMessage.length > MAX_INPUT_CHARS ? `${firstMessage.slice(0, MAX_INPUT_CHARS)}\u2026` : firstMessage;
-	return callTitleModel(
-		`<user-message>\n${truncated}\n</user-message>`,
-		{},
-		registry,
-		settings,
-		sessionId,
-		currentModel,
-	);
-}
-
-/**
- * Re-generate a session title from recent conversation messages.
- * Uses the same prompt but passes currentTitle and projectName as template context
- * so the model can decide whether the title still fits.
- */
-export async function regenerateSessionTitle(
-	recentUserMessages: string[],
-	currentTitle: string | undefined,
-	registry: ModelRegistry,
-	settings: Settings,
-	sessionId?: string,
-	currentModel?: Model<Api>,
-	projectName?: string,
-): Promise<string | null> {
-	const truncated = recentUserMessages
-		.slice(-MAX_RECENT_MESSAGES)
-		.map(m => (m.length > MAX_CHARS_PER_MESSAGE ? `${m.slice(0, MAX_CHARS_PER_MESSAGE)}\u2026` : m));
-	const combined = truncated.join("\n---\n");
-	if (!combined.trim()) return null;
-
-	return callTitleModel(
-		`<recent-messages>\n${combined}\n</recent-messages>`,
-		{ currentTitle, projectName },
-		registry,
-		settings,
-		sessionId,
-		currentModel,
-	);
 }
 
 /**
