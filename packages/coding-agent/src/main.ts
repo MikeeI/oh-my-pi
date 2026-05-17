@@ -547,12 +547,11 @@ async function buildSessionOptions(
 	// (handled by caller before createAgentSession)
 
 	// System prompt
-	if (resolvedSystemPrompt && resolvedAppendPrompt) {
-		options.systemPrompt = defaultPrompt => [resolvedSystemPrompt, resolvedAppendPrompt, ...defaultPrompt.slice(1)];
-	} else if (resolvedSystemPrompt) {
-		options.systemPrompt = defaultPrompt => [resolvedSystemPrompt, ...defaultPrompt.slice(1)];
-	} else if (resolvedAppendPrompt) {
-		options.systemPrompt = defaultPrompt => [...defaultPrompt, resolvedAppendPrompt];
+	if (resolvedSystemPrompt) {
+		options.systemPromptTemplate = resolvedSystemPrompt;
+	}
+	if (resolvedAppendPrompt) {
+		options.appendSystemPromptTemplate = resolvedAppendPrompt;
 	}
 
 	// Tools

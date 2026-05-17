@@ -232,6 +232,79 @@ describe("system Handlebars prompt templates", () => {
 			expect(systemPrompt[1].indexOf("</workspace-tree>")).toBeLessThan(systemPrompt[1].indexOf("Today is "));
 		});
 	});
+
+	test("custom SYSTEM.md copy of native template renders identically to default", async () => {
+		await withTempDir(async dir => {
+			const nativeTemplate = await Bun.file(path.join(systemPromptsDir, "system-prompt.md")).text();
+			const options = {
+				cwd: dir,
+				contextFiles: [],
+				skills: [
+					{
+						name: "skill-template-review",
+						description: "Reviews prompt templates for rendered dynamic data",
+						filePath: "/tmp/skill-template-review/SKILL.md",
+						baseDir: "/tmp/skill-template-review",
+						source: "native:user",
+					},
+				],
+				rules: [
+					{
+						name: "paperless-docs",
+						description: "Use Paperless for documents",
+						path: "/tmp/rule.md",
+						globs: ["**/*.md"],
+					},
+				],
+				toolNames: ["read", "search"],
+				tools: new Map([
+					["read", { label: "Read", description: "Reads files" }],
+					["search", { label: "Search", description: "Searches files" }],
+				]),
+				workspaceTree: {
+					rootPath: dir,
+					rendered: ".\n  - src/        1m",
+					truncated: false,
+					totalLines: 2,
+					agentsMdFiles: [],
+				},
+			};
+
+			const nativePrompt = await buildSystemPrompt(options);
+			const copiedPrompt = await buildSystemPrompt({ ...options, customPrompt: nativeTemplate });
+
+			expect(copiedPrompt.systemPrompt).toEqual(nativePrompt.systemPrompt);
+		});
+	});
+
+	test("custom SYSTEM.md renders with the native prompt data model", async () => {
+		const { systemPrompt } = await buildSystemPrompt({
+			cwd: os.tmpdir(),
+			contextFiles: [],
+			skills: [
+				{
+					name: "skill-template-review",
+					description: "Reviews prompt templates for rendered dynamic data",
+					filePath: "/tmp/skill-template-review/SKILL.md",
+					baseDir: "/tmp/skill-template-review",
+					source: "native:user",
+				},
+			],
+			rules: [],
+			toolNames: ["read"],
+			tools: new Map([["read", { label: "Read", description: "Reads files" }]]),
+			customPrompt: [
+				"{{#if skills.length}}",
+				"{{#each skills}}",
+				"- {{name}}: {{description}}",
+				"{{/each}}",
+				"{{/if}}",
+			].join("\n"),
+		});
+
+		expect(systemPrompt[0]).toContain("- skill-template-review: Reviews prompt templates for rendered dynamic data");
+		expect(systemPrompt[0]).not.toContain("{{#if skills.length}}");
+	});
 	test("buildSystemPrompt renders workspace tree after directory context in project prompt", async () => {
 		await withTempDir(async dir => {
 			const { systemPrompt } = await buildSystemPrompt({

@@ -11,9 +11,9 @@ import { systemPromptCapability } from "./capability/system-prompt";
 import type { SkillsSettings } from "./config/settings";
 import { type ContextFile, loadCapability, type SystemPrompt as SystemPromptFile } from "./discovery";
 import { loadSkills, type Skill } from "./extensibility/skills";
-import customSystemPromptTemplate from "./prompts/system/custom-system-prompt.md" with { type: "text" };
 import projectPromptTemplate from "./prompts/system/project-prompt.md" with { type: "text" };
 import systemPromptTemplate from "./prompts/system/system-prompt.md" with { type: "text" };
+import systemPromptSupplementTemplate from "./prompts/system/system-prompt-supplement.md" with { type: "text" };
 import { shortenPath } from "./tools/render-utils";
 import { AGENTS_MD_LIMIT, buildWorkspaceTree, type WorkspaceTree } from "./workspace-tree";
 
@@ -73,6 +73,14 @@ function firstNonEmpty(...values: (string | undefined | null)[]): string | null 
 		if (trimmed) return trimmed;
 	}
 	return null;
+}
+
+function promptIncludesSkill(source: string, skill: Skill): boolean {
+	return source.includes(skill.name) && (!skill.description || source.includes(skill.description));
+}
+
+function promptIncludesRule(source: string, rule: { name: string; description?: string; globs?: string[] }): boolean {
+	return source.includes(rule.name) && (!rule.description || source.includes(rule.description));
 }
 
 function parseWmicTable(output: string, header: string): string | null {
@@ -547,7 +555,7 @@ export async function buildSystemPrompt(options: BuildSystemPromptOptions = {}):
 	const data = {
 		systemPromptCustomization: effectiveSystemPromptCustomization,
 		customPrompt: resolvedCustomPrompt,
-		appendPrompt: resolvedAppendPrompt ?? "",
+		appendPrompt: "",
 		tools: toolNames,
 		toolInfo,
 		repeatToolDescriptions,
@@ -570,9 +578,32 @@ export async function buildSystemPrompt(options: BuildSystemPromptOptions = {}):
 		eagerTasks,
 		secretsEnabled,
 	};
-	const rendered = prompt.render(resolvedCustomPrompt ? customSystemPromptTemplate : systemPromptTemplate, data);
+	const renderedAppendPrompt = resolvedAppendPrompt ? prompt.render(resolvedAppendPrompt, data) : "";
+	const renderData = { ...data, appendPrompt: renderedAppendPrompt };
+	const systemTemplate = resolvedCustomPrompt ?? systemPromptTemplate;
+	const renderedBaseSystemPrompt = prompt.render(systemTemplate, renderData);
+	const renderedSystemPromptCustomization = effectiveSystemPromptCustomization
+		? prompt.render(effectiveSystemPromptCustomization, renderData)
+		: "";
+	const renderedBaseWithCustomization =
+		renderedSystemPromptCustomization && !renderedBaseSystemPrompt.includes(renderedSystemPromptCustomization)
+			? `${renderedSystemPromptCustomization}\n\n${renderedBaseSystemPrompt}`
+			: renderedBaseSystemPrompt;
+	const supplementData = {
+		...renderData,
+		skills: filteredSkills.filter(skill => !promptIncludesSkill(renderedBaseWithCustomization, skill)),
+		rules: (rules ?? []).filter(rule => !promptIncludesRule(renderedBaseWithCustomization, rule)),
+		alwaysApplyRules: injectedAlwaysApplyRules.filter(
+			rule => !promptSourceContainsRule(renderedBaseWithCustomization, rule.content),
+		),
+		secretsEnabled: secretsEnabled && !renderedBaseWithCustomization.includes("<redacted-content>"),
+	};
+	const renderedSupplement = prompt.render(systemPromptSupplementTemplate, supplementData).trim();
+	const rendered = renderedSupplement
+		? `${renderedBaseWithCustomization}\n\n${renderedSupplement}`
+		: renderedBaseWithCustomization;
 	const systemPrompt = [rendered];
-	const projectPrompt = resolvedCustomPrompt ? "" : prompt.render(projectPromptTemplate, data).trim();
+	const projectPrompt = prompt.render(projectPromptTemplate, renderData).trim();
 	if (projectPrompt) {
 		systemPrompt.push(projectPrompt);
 	}

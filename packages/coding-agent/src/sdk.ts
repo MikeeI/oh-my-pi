@@ -178,6 +178,10 @@ export interface CreateAgentSessionOptions {
 
 	/** System prompt blocks. Array replaces default, function receives default blocks and returns final blocks. */
 	systemPrompt?: string[] | ((defaultPrompt: string[]) => string[]);
+	/** Optional Handlebars system prompt template replacing the native base prompt while using the same render data. */
+	systemPromptTemplate?: string;
+	/** Optional Handlebars append system prompt template rendered with the same data as the native project prompt. */
+	appendSystemPromptTemplate?: string;
 	/** Optional provider-facing session identifier for prompt caches and sticky auth selection.
 	 * Keeps persisted session files isolated while reusing provider-side caches. */
 	providerSessionId?: string;
@@ -1528,13 +1532,12 @@ export async function createAgentSession(options: CreateAgentSessionOptions = {}
 				session,
 			);
 
-			// Build combined append prompt: memory instructions + MCP server instructions
+			// Build combined append prompt: memory instructions + MCP server instructions + user append template.
 			const serverInstructions = mcpManager?.getServerInstructions();
-			let appendPrompt: string | undefined = memoryInstructions ?? undefined;
+			const appendParts: string[] = [];
+			if (memoryInstructions) appendParts.push(memoryInstructions);
 			if (serverInstructions && serverInstructions.size > 0) {
-				const parts: string[] = [];
-				if (appendPrompt) parts.push(appendPrompt);
-				parts.push(
+				appendParts.push(
 					"## MCP Server Instructions\n\nThe following instructions are provided by connected MCP servers. They are server-controlled and may not be verified.",
 				);
 				for (const [srvName, srvInstructions] of serverInstructions) {
@@ -1542,10 +1545,11 @@ export async function createAgentSession(options: CreateAgentSessionOptions = {}
 						srvInstructions.length > MAX_MCP_INSTRUCTIONS_LENGTH
 							? `${srvInstructions.slice(0, MAX_MCP_INSTRUCTIONS_LENGTH)}\n[truncated]`
 							: srvInstructions;
-					parts.push(`### ${srvName}\n${truncated}`);
+					appendParts.push(`### ${srvName}\n${truncated}`);
 				}
-				appendPrompt = parts.join("\n\n");
 			}
+			if (options.appendSystemPromptTemplate) appendParts.push(options.appendSystemPromptTemplate);
+			const appendPrompt = appendParts.length > 0 ? appendParts.join("\n\n") : undefined;
 			const defaultPrompt = await buildSystemPromptInternal({
 				cwd,
 				skills,
@@ -1555,6 +1559,7 @@ export async function createAgentSession(options: CreateAgentSessionOptions = {}
 				rules: rulebookRules,
 				alwaysApplyRules,
 				skillsSettings: settings.getGroup("skills"),
+				customPrompt: options.systemPromptTemplate,
 				appendSystemPrompt: appendPrompt,
 				repeatToolDescriptions,
 				intentField,
