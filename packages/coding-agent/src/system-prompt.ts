@@ -13,7 +13,6 @@ import { type ContextFile, loadCapability, type SystemPrompt as SystemPromptFile
 import { loadSkills, type Skill } from "./extensibility/skills";
 import projectPromptTemplate from "./prompts/system/project-prompt.md" with { type: "text" };
 import systemPromptTemplate from "./prompts/system/system-prompt.md" with { type: "text" };
-import systemPromptSupplementTemplate from "./prompts/system/system-prompt-supplement.md" with { type: "text" };
 import { shortenPath } from "./tools/render-utils";
 import { AGENTS_MD_LIMIT, buildWorkspaceTree, type WorkspaceTree } from "./workspace-tree";
 
@@ -73,14 +72,6 @@ function firstNonEmpty(...values: (string | undefined | null)[]): string | null 
 		if (trimmed) return trimmed;
 	}
 	return null;
-}
-
-function promptIncludesSkill(source: string, skill: Skill): boolean {
-	return source.includes(skill.name) && (!skill.description || source.includes(skill.description));
-}
-
-function promptIncludesRule(source: string, rule: { name: string; description?: string; globs?: string[] }): boolean {
-	return source.includes(rule.name) && (!rule.description || source.includes(rule.description));
 }
 
 function parseWmicTable(output: string, header: string): string | null {
@@ -342,6 +333,8 @@ export interface BuildSystemPromptOptions {
 	toolNames?: string[];
 	/** Text to append to system prompt. */
 	appendSystemPrompt?: string;
+	/** Handlebars template appended after internal raw append text. */
+	appendSystemPromptTemplate?: string;
 	/** Repeat full tool descriptions in system prompt. Default: false */
 	repeatToolDescriptions?: boolean;
 	/** Skills settings for discovery. */
@@ -386,6 +379,7 @@ export async function buildSystemPrompt(options: BuildSystemPromptOptions = {}):
 		customPrompt,
 		tools,
 		appendSystemPrompt,
+		appendSystemPromptTemplate,
 		repeatToolDescriptions = false,
 		skillsSettings,
 		toolNames: providedToolNames,
@@ -406,6 +400,7 @@ export async function buildSystemPrompt(options: BuildSystemPromptOptions = {}):
 	const prepDefaults = {
 		resolvedCustomPrompt: undefined as string | undefined,
 		resolvedAppendPrompt: undefined as string | undefined,
+		resolvedAppendPromptTemplate: undefined as string | undefined,
 		systemPromptCustomization: null as string | null,
 		contextFiles: dedupeExactContextFiles(providedContextFiles ?? []),
 		skills: providedSkills ?? ([] as Skill[]),
@@ -465,29 +460,37 @@ export async function buildSystemPrompt(options: BuildSystemPromptOptions = {}):
 				? loadSkills({ ...skillsSettings, cwd: resolvedCwd }).then(result => result.skills)
 				: Promise.resolve([]);
 
-	const [resolvedCustomPrompt, resolvedAppendPrompt, systemPromptCustomization, contextFiles, skills, workspaceTree] =
-		await Promise.all([
-			withDeadline(
-				"customPrompt",
-				resolvePromptInput(customPrompt, "system prompt"),
-				prepDefaults.resolvedCustomPrompt,
-			),
-			withDeadline(
-				"appendSystemPrompt",
-				resolvePromptInput(appendSystemPrompt, "append system prompt"),
-				prepDefaults.resolvedAppendPrompt,
-			),
-			withDeadline(
-				"loadSystemPromptFiles",
-				systemPromptCustomizationPromise,
-				prepDefaults.systemPromptCustomization,
-			),
-			withDeadline("loadProjectContextFiles", contextFilesPromise, prepDefaults.contextFiles).then(
-				dedupeExactContextFiles,
-			),
-			withDeadline("loadSkills", skillsPromise, prepDefaults.skills),
-			withDeadline("buildWorkspaceTree", workspaceTreePromise, prepDefaults.workspaceTree),
-		]);
+	const [
+		resolvedCustomPrompt,
+		resolvedAppendPrompt,
+		resolvedAppendPromptTemplate,
+		systemPromptCustomization,
+		contextFiles,
+		skills,
+		workspaceTree,
+	] = await Promise.all([
+		withDeadline(
+			"customPrompt",
+			resolvePromptInput(customPrompt, "system prompt"),
+			prepDefaults.resolvedCustomPrompt,
+		),
+		withDeadline(
+			"appendSystemPrompt",
+			resolvePromptInput(appendSystemPrompt, "append system prompt"),
+			prepDefaults.resolvedAppendPrompt,
+		),
+		withDeadline(
+			"appendSystemPromptTemplate",
+			resolvePromptInput(appendSystemPromptTemplate, "append system prompt template"),
+			prepDefaults.resolvedAppendPromptTemplate,
+		),
+		withDeadline("loadSystemPromptFiles", systemPromptCustomizationPromise, prepDefaults.systemPromptCustomization),
+		withDeadline("loadProjectContextFiles", contextFilesPromise, prepDefaults.contextFiles).then(
+			dedupeExactContextFiles,
+		),
+		withDeadline("loadSkills", skillsPromise, prepDefaults.skills),
+		withDeadline("buildWorkspaceTree", workspaceTreePromise, prepDefaults.workspaceTree),
+	]);
 	const agentsMdFiles = Array.from(new Set(workspaceTree.agentsMdFiles)).sort().slice(0, AGENTS_MD_LIMIT);
 
 	if (timedOut.length > 0) {
@@ -547,8 +550,14 @@ export async function buildSystemPrompt(options: BuildSystemPromptOptions = {}):
 	const effectiveSystemPromptCustomization = dedupePromptSource(systemPromptCustomization, [
 		resolvedCustomPrompt,
 		resolvedAppendPrompt,
+		resolvedAppendPromptTemplate,
 	]);
-	const promptSources = [effectiveSystemPromptCustomization, resolvedCustomPrompt, resolvedAppendPrompt];
+	const promptSources = [
+		effectiveSystemPromptCustomization,
+		resolvedCustomPrompt,
+		resolvedAppendPrompt,
+		resolvedAppendPromptTemplate,
+	];
 	const injectedAlwaysApplyRules = dedupeAlwaysApplyRules(alwaysApplyRules, promptSources);
 
 	const environment = await logger.time("getEnvironmentInfo", getEnvironmentInfo);
@@ -578,30 +587,20 @@ export async function buildSystemPrompt(options: BuildSystemPromptOptions = {}):
 		eagerTasks,
 		secretsEnabled,
 	};
-	const renderedAppendPrompt = resolvedAppendPrompt ? prompt.render(resolvedAppendPrompt, data) : "";
-	const renderData = { ...data, appendPrompt: renderedAppendPrompt };
+	const renderedAppendPromptTemplate = resolvedAppendPromptTemplate
+		? prompt.render(resolvedAppendPromptTemplate, data)
+		: "";
+	const appendPrompt = [resolvedAppendPrompt, renderedAppendPromptTemplate].filter(Boolean).join("\n\n");
+	const renderData = { ...data, appendPrompt };
 	const systemTemplate = resolvedCustomPrompt ?? systemPromptTemplate;
 	const renderedBaseSystemPrompt = prompt.render(systemTemplate, renderData);
 	const renderedSystemPromptCustomization = effectiveSystemPromptCustomization
 		? prompt.render(effectiveSystemPromptCustomization, renderData)
 		: "";
-	const renderedBaseWithCustomization =
+	const rendered =
 		renderedSystemPromptCustomization && !renderedBaseSystemPrompt.includes(renderedSystemPromptCustomization)
 			? `${renderedSystemPromptCustomization}\n\n${renderedBaseSystemPrompt}`
 			: renderedBaseSystemPrompt;
-	const supplementData = {
-		...renderData,
-		skills: filteredSkills.filter(skill => !promptIncludesSkill(renderedBaseWithCustomization, skill)),
-		rules: (rules ?? []).filter(rule => !promptIncludesRule(renderedBaseWithCustomization, rule)),
-		alwaysApplyRules: injectedAlwaysApplyRules.filter(
-			rule => !promptSourceContainsRule(renderedBaseWithCustomization, rule.content),
-		),
-		secretsEnabled: secretsEnabled && !renderedBaseWithCustomization.includes("<redacted-content>"),
-	};
-	const renderedSupplement = prompt.render(systemPromptSupplementTemplate, supplementData).trim();
-	const rendered = renderedSupplement
-		? `${renderedBaseWithCustomization}\n\n${renderedSupplement}`
-		: renderedBaseWithCustomization;
 	const systemPrompt = [rendered];
 	const projectPrompt = prompt.render(projectPromptTemplate, renderData).trim();
 	if (projectPrompt) {

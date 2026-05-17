@@ -35,6 +35,7 @@
 
 ### Fixed
 
+- Fixed custom `SYSTEM.md` and `APPEND_SYSTEM.md` prompt files to render with the same Handlebars data model as the native system prompt, while keeping internal memory/MCP append instructions raw.
 - Fixed streaming API requests to recover from provider auth errors by invalidating stale credentials and retrying with a fresh key
 - Fixed `auth-broker` migration, `auth-gateway` startup, and `discoverAuthStorage` to fail fast with a clear error when the broker snapshot endpoint returns a non-200 response
 - Fixed `omp auth-broker migrate` to skip local placeholder `<authenticated>` API credentials (not real keys) when exporting to a remote broker

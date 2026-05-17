@@ -331,40 +331,26 @@ describe("system Handlebars prompt templates", () => {
 		});
 	});
 
-	test("buildSystemPrompt deduplicates always-apply rules already present in SYSTEM.md", async () => {
-		const duplicateRule = ["Use static imports.", "", "Do not use dynamic loading."].join("\n");
-		const distinctRule = "Validate inputs at boundaries.";
+	test("custom SYSTEM.md does not auto-backfill always-apply rules omitted by the template", async () => {
+		const omittedRule = "Surface failures explicitly to callers.";
 
-		await withTempDir(async dir => {
-			const configDir = path.join(dir, ".agent");
-			await fs.mkdir(configDir, { recursive: true });
-			await fs.writeFile(
-				path.join(configDir, "SYSTEM.md"),
-				["Project instructions", "", duplicateRule, "", "Trailing note"].join("\n"),
-			);
-
-			const { systemPrompt } = await buildSystemPrompt({
-				cwd: dir,
-				contextFiles: [],
-				skills: [],
-				rules: [],
-				toolNames: ["read"],
-				customPrompt: "Custom prompt body",
-				alwaysApplyRules: [
-					{ name: "no-dynamic-loading", content: duplicateRule, path: "/tmp/no-dynamic-loading.md" },
-					{ name: "validate-boundaries", content: distinctRule, path: "/tmp/validate-boundaries.md" },
-				],
-			});
-
-			const prompt = systemPrompt.join("\n\n");
-
-			expect(countOccurrences(prompt, "Use static imports.")).toBe(1);
-			expect(countOccurrences(prompt, "Do not use dynamic loading.")).toBe(1);
-			expect(countOccurrences(prompt, distinctRule)).toBe(1);
+		const { systemPrompt } = await buildSystemPrompt({
+			cwd: os.tmpdir(),
+			contextFiles: [],
+			skills: [],
+			rules: [],
+			toolNames: ["read"],
+			customPrompt: "Custom guidance without rule placeholders.",
+			alwaysApplyRules: [{ name: "truthful-failures", content: omittedRule, path: "/tmp/truthful-failures.md" }],
 		});
+
+		const prompt = systemPrompt.join("\n\n");
+
+		expect(prompt).toContain("Custom guidance without rule placeholders.");
+		expect(prompt).not.toContain(omittedRule);
 	});
 
-	test("buildSystemPrompt deduplicates always-apply rules already present in customPrompt", async () => {
+	test("custom SYSTEM.md renders deduped always-apply rules through the native data model", async () => {
 		const duplicateRule = ["Keep functions small.", "", "Extract shared helpers on the second use."].join("\n");
 		const distinctRule = "Surface failures explicitly to callers.";
 
@@ -374,7 +360,15 @@ describe("system Handlebars prompt templates", () => {
 			skills: [],
 			rules: [],
 			toolNames: ["read"],
-			customPrompt: ["Custom guidance", "", duplicateRule, "", "More custom guidance"].join("\n"),
+			customPrompt: [
+				"Custom guidance",
+				"",
+				duplicateRule,
+				"",
+				"{{#each alwaysApplyRules}}",
+				"{{content}}",
+				"{{/each}}",
+			].join("\n"),
 			alwaysApplyRules: [
 				{ name: "small-functions", content: duplicateRule, path: "/tmp/small-functions.md" },
 				{ name: "truthful-failures", content: distinctRule, path: "/tmp/truthful-failures.md" },
@@ -386,6 +380,25 @@ describe("system Handlebars prompt templates", () => {
 		expect(countOccurrences(prompt, "Keep functions small.")).toBe(1);
 		expect(countOccurrences(prompt, "Extract shared helpers on the second use.")).toBe(1);
 		expect(countOccurrences(prompt, distinctRule)).toBe(1);
+	});
+
+	test("append system prompt template renders separately from raw append prompt", async () => {
+		const { systemPrompt } = await buildSystemPrompt({
+			cwd: os.tmpdir(),
+			contextFiles: [],
+			skills: [],
+			rules: [],
+			toolNames: ["read"],
+			appendSystemPrompt: "Raw append keeps literal {{date}}.",
+			appendSystemPromptTemplate: "Rendered append uses {{date}} in {{cwd}}.",
+		});
+
+		const projectPrompt = systemPrompt[1] ?? "";
+
+		expect(projectPrompt).toContain("Raw append keeps literal {{date}}.");
+		expect(projectPrompt).toContain("Rendered append uses ");
+		expect(projectPrompt).not.toContain("Rendered append uses {{date}}");
+		expect(projectPrompt).toContain(" in ");
 	});
 
 	test("buildSystemPromptToolMetadata captures custom wire names", () => {

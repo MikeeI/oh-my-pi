@@ -1532,7 +1532,8 @@ export async function createAgentSession(options: CreateAgentSessionOptions = {}
 				session,
 			);
 
-			// Build combined append prompt: memory instructions + MCP server instructions + user append template.
+			// Build combined raw append prompt from trusted internal instructions. User append templates
+			// render separately in system-prompt.ts so MCP/server text is never interpreted as Handlebars.
 			const serverInstructions = mcpManager?.getServerInstructions();
 			const appendParts: string[] = [];
 			if (memoryInstructions) appendParts.push(memoryInstructions);
@@ -1548,7 +1549,6 @@ export async function createAgentSession(options: CreateAgentSessionOptions = {}
 					appendParts.push(`### ${srvName}\n${truncated}`);
 				}
 			}
-			if (options.appendSystemPromptTemplate) appendParts.push(options.appendSystemPromptTemplate);
 			const appendPrompt = appendParts.length > 0 ? appendParts.join("\n\n") : undefined;
 			const defaultPrompt = await buildSystemPromptInternal({
 				cwd,
@@ -1561,6 +1561,7 @@ export async function createAgentSession(options: CreateAgentSessionOptions = {}
 				skillsSettings: settings.getGroup("skills"),
 				customPrompt: options.systemPromptTemplate,
 				appendSystemPrompt: appendPrompt,
+				appendSystemPromptTemplate: options.appendSystemPromptTemplate,
 				repeatToolDescriptions,
 				intentField,
 				mcpDiscoveryMode: hasDiscoverableTools,
