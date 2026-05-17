@@ -1,6 +1,7 @@
 import type { AgentMessage } from "@oh-my-pi/pi-agent-core";
+import type { CompactionOutcome } from "@oh-my-pi/pi-agent-core/compaction";
 import type { AssistantMessage, ImageContent, Message, UsageReport } from "@oh-my-pi/pi-ai";
-import type { Component, Container, Loader, Spacer, Text, TUI } from "@oh-my-pi/pi-tui";
+import type { Component, Container, EditorTheme, Loader, Spacer, Text, TUI } from "@oh-my-pi/pi-tui";
 import type { KeybindingsManager } from "../config/keybindings";
 import type { Settings } from "../config/settings";
 import type {
@@ -11,19 +12,21 @@ import type {
 } from "../extensibility/extensions";
 import type { CompactOptions } from "../extensibility/extensions/types";
 import type { MCPManager } from "../mcp";
+import type { PlanApprovalDetails } from "../plan-mode/approved-plan";
 import type { AgentSession, AgentSessionEvent } from "../session/agent-session";
 import type { HistoryStorage } from "../session/history-storage";
 import type { SessionContext, SessionManager } from "../session/session-manager";
-import type { ExitPlanModeDetails, LspStartupServerInfo } from "../tools";
+import type { LspStartupServerInfo } from "../tools";
 import type { AssistantMessageComponent } from "./components/assistant-message";
 import type { BashExecutionComponent } from "./components/bash-execution";
 import type { CustomEditor } from "./components/custom-editor";
+import type { EvalExecutionComponent } from "./components/eval-execution";
 import type { HookEditorComponent } from "./components/hook-editor";
 import type { HookInputComponent } from "./components/hook-input";
 import type { HookSelectorComponent } from "./components/hook-selector";
-import type { PythonExecutionComponent } from "./components/python-execution";
 import type { StatusLineComponent } from "./components/status-line";
 import type { ToolExecutionHandle } from "./components/tool-execution";
+import type { LoopLimitRuntime } from "./loop-limit";
 import type { OAuthManualInputManager } from "./oauth-manual-input";
 import type { Theme } from "./theme/theme";
 
@@ -35,6 +38,8 @@ export type CompactionQueuedMessage = {
 export type SubmittedUserInput = {
 	text: string;
 	images?: ImageContent[];
+	customType?: string;
+	display?: boolean;
 	cancelled: boolean;
 	started: boolean;
 };
@@ -42,7 +47,6 @@ export type SubmittedUserInput = {
 export type TodoStatus = "pending" | "in_progress" | "completed" | "abandoned";
 
 export type TodoItem = {
-	id: string;
 	content: string;
 	status: TodoStatus;
 	details?: string;
@@ -50,7 +54,6 @@ export type TodoItem = {
 };
 
 export type TodoPhase = {
-	id: string;
 	name: string;
 	tasks: TodoItem[];
 };
@@ -86,6 +89,11 @@ export interface InteractiveModeContext {
 	toolOutputExpanded: boolean;
 	todoExpanded: boolean;
 	planModeEnabled: boolean;
+	goalModeEnabled: boolean;
+	goalModePaused: boolean;
+	loopModeEnabled: boolean;
+	loopPrompt?: string;
+	loopLimit?: LoopLimitRuntime;
 	planModePlanFilePath?: string;
 	hideThinkingBlock: boolean;
 	pendingImages: ImageContent[];
@@ -93,8 +101,8 @@ export interface InteractiveModeContext {
 	pendingTools: Map<string, ToolExecutionHandle>;
 	pendingBashComponents: BashExecutionComponent[];
 	bashComponent: BashExecutionComponent | undefined;
-	pendingPythonComponents: PythonExecutionComponent[];
-	pythonComponent: PythonExecutionComponent | undefined;
+	pendingPythonComponents: EvalExecutionComponent[];
+	pythonComponent: EvalExecutionComponent | undefined;
 	isPythonMode: boolean;
 	streamingComponent: AssistantMessageComponent | undefined;
 	streamingMessage: AssistantMessage | undefined;
@@ -106,6 +114,7 @@ export interface InteractiveModeContext {
 	unsubscribe?: () => void;
 	onInputCallback?: (input: SubmittedUserInput) => void;
 	optimisticUserMessageSignature: string | undefined;
+	locallySubmittedUserSignatures: Set<string>;
 	lastSigintTime: number;
 	lastEscapeTime: number;
 	shutdownRequested: boolean;
@@ -128,6 +137,9 @@ export interface InteractiveModeContext {
 	setToolUIContext(uiContext: ExtensionUIContext, hasUI: boolean): void;
 	initializeHookRunner(uiContext: ExtensionUIContext, hasUI: boolean): void;
 	createBackgroundUiContext(): ExtensionUIContext;
+	setEditorComponent(
+		factory: ((tui: TUI, theme: EditorTheme, keybindings: KeybindingsManager) => CustomEditor) | undefined,
+	): void;
 
 	// Event handling
 	handleBackgroundEvent(event: AgentSessionEvent): Promise<void>;
@@ -146,17 +158,35 @@ export interface InteractiveModeContext {
 	setWorkingMessage(message?: string): void;
 	applyPendingWorkingMessage(): void;
 	ensureLoadingAnimation(): void;
-	startPendingSubmission(input: { text: string; images?: ImageContent[] }): SubmittedUserInput;
+	startPendingSubmission(input: {
+		text: string;
+		images?: ImageContent[];
+		customType?: string;
+		display?: boolean;
+	}): SubmittedUserInput;
 	cancelPendingSubmission(): boolean;
 	markPendingSubmissionStarted(input: SubmittedUserInput): boolean;
 	finishPendingSubmission(input: SubmittedUserInput): void;
+	/**
+	 * Marks a locally-initiated user submission so the eventual `message_start`
+	 * event for that user message does not clobber the editor draft (see #783).
+	 * Returns a dispose function that removes the signature; call it on
+	 * delivery failure so a retry can be re-marked cleanly.
+	 */
+	recordLocalSubmission(text: string, imageCount?: number): () => void;
+	/**
+	 * Wraps `fn` in a `recordLocalSubmission` marker that is automatically
+	 * removed if `fn` rejects. Use this for the common case where a thrown
+	 * delivery error should leave the signature set untouched.
+	 */
+	withLocalSubmission<T>(text: string, fn: () => Promise<T>, options?: { imageCount?: number }): Promise<T>;
 	isKnownSlashCommand(text: string): boolean;
-	addMessageToChat(message: AgentMessage, options?: { populateHistory?: boolean }): void;
+	addMessageToChat(message: AgentMessage, options?: { populateHistory?: boolean }): Component[];
 	renderSessionContext(
 		sessionContext: SessionContext,
 		options?: { updateFooter?: boolean; populateHistory?: boolean },
 	): void;
-	renderInitialMessages(): void;
+	renderInitialMessages(prebuiltContext?: SessionContext): void;
 	getUserMessageText(message: Message): string;
 	findLastAssistantMessage(): AssistantMessage | undefined;
 	extractAssistantText(message: AssistantMessage): string;
@@ -178,6 +208,7 @@ export interface InteractiveModeContext {
 	handleChangelogCommand(showFull?: boolean): Promise<void>;
 	handleHotkeysCommand(): void;
 	handleToolsCommand(): void;
+	handleContextCommand(): void;
 	handleDumpCommand(): void;
 	handleDebugTranscriptCommand(): Promise<void>;
 	handleClearCommand(): Promise<void>;
@@ -187,13 +218,16 @@ export interface InteractiveModeContext {
 	handlePythonCommand(code: string, excludeFromContext?: boolean): Promise<void>;
 	handleMCPCommand(text: string): Promise<void>;
 	handleSSHCommand(text: string): Promise<void>;
-	handleCompactCommand(customInstructions?: string): Promise<void>;
+	handleCompactCommand(customInstructions?: string): Promise<CompactionOutcome>;
 	handleHandoffCommand(customInstructions?: string): Promise<void>;
 	handleMoveCommand(targetPath: string): Promise<void>;
-	handleRenameCommand(title?: string): Promise<void>;
+	handleRenameCommand(title: string): Promise<void>;
 	handleMemoryCommand(text: string): Promise<void>;
 	handleSTTToggle(): Promise<void>;
-	executeCompaction(customInstructionsOrOptions?: string | CompactOptions, isAuto?: boolean): Promise<void>;
+	executeCompaction(
+		customInstructionsOrOptions?: string | CompactOptions,
+		isAuto?: boolean,
+	): Promise<CompactionOutcome>;
 	openInBrowser(urlOrPath: string): void;
 	refreshSlashCommandState(cwd?: string): Promise<void>;
 
@@ -233,7 +267,11 @@ export interface InteractiveModeContext {
 	openExternalEditor(): void;
 	registerExtensionShortcuts(): void;
 	handlePlanModeCommand(initialPrompt?: string): Promise<void>;
-	handleExitPlanModeTool(details: ExitPlanModeDetails): Promise<void>;
+	handleGoalModeCommand(rest?: string): Promise<void>;
+	handleLoopCommand(args?: string): Promise<void>;
+	disableLoopMode(): void;
+	pauseLoop(): void;
+	handlePlanApproval(details: PlanApprovalDetails): Promise<void>;
 
 	// Hook UI methods
 	initHooksAndCustomTools(): Promise<void>;

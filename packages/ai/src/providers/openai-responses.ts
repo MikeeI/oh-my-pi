@@ -6,25 +6,26 @@ import type {
 	ResponseInput,
 } from "openai/resources/responses/responses";
 import { getEnvApiKey } from "../stream";
-import {
-	type Api,
-	type AssistantMessage,
-	type CacheRetention,
-	type Context,
-	type MessageAttribution,
-	type Model,
-	type ProviderSessionState,
-	type ServiceTier,
-	type StreamFunction,
-	type StreamOptions,
-	shouldSendServiceTier,
-	type Tool,
-	type ToolChoice,
+import type {
+	AssistantMessage,
+	CacheRetention,
+	Context,
+	FetchImpl,
+	MessageAttribution,
+	Model,
+	OpenAICompat,
+	ProviderSessionState,
+	ServiceTier,
+	StreamFunction,
+	StreamOptions,
+	Tool,
+	ToolChoice,
 } from "../types";
 import {
 	createOpenAIResponsesHistoryPayload,
 	getOpenAIResponsesHistoryItems,
 	getOpenAIResponsesHistoryPayload,
+	normalizeSystemPrompts,
 	resolveCacheRetention,
 	sanitizeOpenAIResponsesHistoryItemsForReplay,
 } from "../utils";
@@ -38,20 +39,26 @@ import {
 	iterateWithIdleTimeout,
 } from "../utils/idle-iterator";
 import { parseGitHubCopilotApiKey } from "../utils/oauth/github-copilot";
+import { notifyProviderResponse } from "../utils/provider-response";
 import { callWithCopilotModelRetry } from "../utils/retry";
-import { adaptSchemaForStrict, NO_STRICT } from "../utils/schema";
+import { adaptSchemaForStrict, NO_STRICT, sanitizeSchemaForOpenAIResponses, toolWireSchema } from "../utils/schema";
+import { wrapFetchForSseDebug } from "../utils/sse-debug";
 import { mapToOpenAIResponsesToolChoice, type OpenAIResponsesToolChoice } from "../utils/tool-choice";
 import {
 	buildCopilotDynamicHeaders,
 	hasCopilotVisionInput,
 	resolveGitHubCopilotBaseUrl,
 } from "./github-copilot-headers";
+import { compactGrammarDefinition } from "./grammar";
 import {
 	appendResponsesToolResultMessages,
+	applyCommonResponsesSamplingParams,
+	applyResponsesReasoningParams,
 	collectCustomCallIds,
 	collectKnownCallIds,
 	convertResponsesAssistantMessage,
 	convertResponsesInputContent,
+	createInitialResponsesAssistantMessage,
 	normalizeResponsesToolCallIdForTransform,
 	processResponsesStream,
 } from "./openai-responses-shared";
@@ -71,6 +78,13 @@ function getPromptCacheRetention(baseUrl: string, cacheRetention: CacheRetention
 	return undefined;
 }
 
+export function normalizeOpenAIResponsesPromptCacheKey(sessionId: string | undefined): string | undefined {
+	if (!sessionId || sessionId.length === 0) return undefined;
+	const wellFormed = sessionId.toWellFormed();
+	if (wellFormed.length <= 64) return wellFormed;
+	return `pc_${Bun.hash(wellFormed).toString(36)}`;
+}
+
 // OpenAI Responses-specific options
 export interface OpenAIResponsesOptions extends StreamOptions {
 	reasoning?: "minimal" | "low" | "medium" | "high" | "xhigh";
@@ -87,6 +101,32 @@ export interface OpenAIResponsesOptions extends StreamOptions {
 const OPENAI_RESPONSES_PROVIDER_SESSION_STATE_PREFIX = "openai-responses:";
 const OPENAI_RESPONSES_FIRST_EVENT_TIMEOUT_MESSAGE =
 	"OpenAI responses stream timed out while waiting for the first event";
+
+const OPENAI_RESPONSES_PROGRESS_EVENT_TYPES = new Set([
+	"response.created",
+	"response.output_item.added",
+	"response.reasoning_summary_part.added",
+	"response.reasoning_summary_text.delta",
+	"response.reasoning_summary_part.done",
+	"response.reasoning_text.delta",
+	"response.content_part.added",
+	"response.output_text.delta",
+	"response.refusal.delta",
+	"response.function_call_arguments.delta",
+	"response.function_call_arguments.done",
+	"response.custom_tool_call_input.delta",
+	"response.custom_tool_call_input.done",
+	"response.output_item.done",
+	"response.completed",
+	"response.failed",
+	"error",
+]);
+
+function isOpenAIResponsesProgressEvent(event: unknown): boolean {
+	if (!event || typeof event !== "object") return false;
+	const type = (event as { type?: unknown }).type;
+	return typeof type === "string" && OPENAI_RESPONSES_PROGRESS_EVENT_TYPES.has(type);
+}
 
 interface OpenAIResponsesProviderSessionState extends ProviderSessionState {
 	nativeHistoryReplayWarmed: boolean;
@@ -131,6 +171,7 @@ type OpenAIResponsesSamplingParams = ResponseCreateParamsStreaming & {
 	min_p?: number;
 	presence_penalty?: number;
 	repetition_penalty?: number;
+	stream_options?: { include_obfuscation?: boolean };
 };
 
 /**
@@ -148,23 +189,11 @@ export const streamOpenAIResponses: StreamFunction<"openai-responses"> = (
 		const startTime = Date.now();
 		let firstTokenTime: number | undefined;
 
-		const output: AssistantMessage = {
-			role: "assistant",
-			content: [],
-			api: "openai-responses" as Api,
-			provider: model.provider,
-			model: model.id,
-			usage: {
-				input: 0,
-				output: 0,
-				cacheRead: 0,
-				cacheWrite: 0,
-				totalTokens: 0,
-				cost: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0, total: 0 },
-			},
-			stopReason: "stop",
-			timestamp: Date.now(),
-		};
+		const output: AssistantMessage = createInitialResponsesAssistantMessage(
+			"openai-responses",
+			model.provider,
+			model.id,
+		);
 		let rawRequestDump: RawHttpRequestDump | undefined;
 		const abortTracker = createAbortSourceTracker(options?.signal);
 		const firstEventTimeoutAbortError = new Error(OPENAI_RESPONSES_FIRST_EVENT_TIMEOUT_MESSAGE);
@@ -181,10 +210,13 @@ export const streamOpenAIResponses: StreamFunction<"openai-responses"> = (
 				options?.headers,
 				options?.initiatorOverride,
 				cacheSessionId,
+				options?.onSseEvent,
+				options?.fetch,
 			);
+			const premiumRequestsTotal = copilotPremiumRequests;
 			const providerSessionState = getOpenAIResponsesProviderSessionState(model, options?.providerSessionState);
 			const { params } = buildParams(model, context, options, providerSessionState, baseUrl);
-			const idleTimeoutMs = getOpenAIStreamIdleTimeoutMs();
+			const idleTimeoutMs = options?.streamIdleTimeoutMs ?? getOpenAIStreamIdleTimeoutMs();
 			options?.onPayload?.(params);
 			rawRequestDump = {
 				provider: model.provider,
@@ -195,14 +227,20 @@ export const streamOpenAIResponses: StreamFunction<"openai-responses"> = (
 				body: params,
 			};
 			const openaiStream = await callWithCopilotModelRetry(
-				() => client.responses.create(params, { signal: requestSignal }),
+				async () => {
+					const { data, response, request_id } = await client.responses
+						.create(params, { signal: requestSignal })
+						.withResponse();
+					await notifyProviderResponse(options, response, model, request_id);
+					return data;
+				},
 				{ provider: model.provider, signal: requestSignal },
 			);
 			const firstEventWatchdog = createWatchdog(
 				options?.streamFirstEventTimeoutMs ?? getStreamFirstEventTimeoutMs(idleTimeoutMs),
 				() => abortTracker.abortLocally(firstEventTimeoutAbortError),
 			);
-			if (copilotPremiumRequests !== undefined) output.usage.premiumRequests = copilotPremiumRequests;
+			if (premiumRequestsTotal !== undefined) output.usage.premiumRequests = premiumRequestsTotal;
 			stream.push({ type: "start", partial: output });
 
 			const nativeOutputItems: Array<Record<string, unknown>> = [];
@@ -212,6 +250,8 @@ export const streamOpenAIResponses: StreamFunction<"openai-responses"> = (
 					watchdog: firstEventWatchdog,
 					errorMessage: "OpenAI responses stream stalled while waiting for the next event",
 					onIdle: () => requestAbortController.abort(),
+					abortSignal: options?.signal,
+					isProgressItem: isOpenAIResponsesProgressEvent,
 				}),
 				output,
 				stream,
@@ -225,7 +265,7 @@ export const streamOpenAIResponses: StreamFunction<"openai-responses"> = (
 					},
 				},
 			);
-			if (copilotPremiumRequests !== undefined) output.usage.premiumRequests = copilotPremiumRequests;
+			if (premiumRequestsTotal !== undefined) output.usage.premiumRequests = premiumRequestsTotal;
 
 			const firstEventTimeoutError = abortTracker.getLocalAbortReason();
 			if (firstEventTimeoutError) {
@@ -236,7 +276,7 @@ export const streamOpenAIResponses: StreamFunction<"openai-responses"> = (
 			}
 
 			if (output.stopReason === "aborted" || output.stopReason === "error") {
-				throw new Error("An unknown error occurred");
+				throw new Error(output.errorMessage ?? "An unknown error occurred");
 			}
 
 			output.providerPayload = createOpenAIResponsesHistoryPayload(model.provider, nativeOutputItems);
@@ -269,6 +309,8 @@ function createClient(
 	extraHeaders?: Record<string, string>,
 	initiatorOverride?: MessageAttribution,
 	sessionId?: string,
+	onSseEvent?: OpenAIResponsesOptions["onSseEvent"],
+	fetchOverride?: FetchImpl,
 ): {
 	client: OpenAI;
 	copilotPremiumRequests: number | undefined;
@@ -306,6 +348,7 @@ function createClient(
 		headers.session_id ??= sessionId;
 		headers["x-client-request-id"] ??= sessionId;
 	}
+	const baseFetch = fetchOverride ?? fetch;
 	return {
 		client: new OpenAI({
 			apiKey,
@@ -313,6 +356,7 @@ function createClient(
 			dangerouslyAllowBrowser: true,
 			maxRetries: 5,
 			defaultHeaders: headers,
+			fetch: onSseEvent ? wrapFetchForSseDebug(baseFetch, event => onSseEvent(event, model)) : baseFetch,
 		}),
 		copilotPremiumRequests,
 		baseUrl,
@@ -322,7 +366,9 @@ function createClient(
 function getOpenAIResponsesCacheSessionId(
 	options: Pick<OpenAIResponsesOptions, "cacheRetention" | "sessionId"> | undefined,
 ): string | undefined {
-	return resolveCacheRetention(options?.cacheRetention) === "none" ? undefined : options?.sessionId;
+	return resolveCacheRetention(options?.cacheRetention) === "none"
+		? undefined
+		: normalizeOpenAIResponsesPromptCacheKey(options?.sessionId);
 }
 
 function buildParams(
@@ -343,12 +389,11 @@ function buildParams(
 	);
 	const messages: ResponseInput = [...conversationMessages];
 
-	if (context.systemPrompt) {
-		const role = model.reasoning && supportsDeveloperRole(resolvedBaseUrl ?? model) ? "developer" : "system";
-		messages.unshift({
-			role,
-			content: context.systemPrompt.toWellFormed(),
-		});
+	const systemPrompts = normalizeSystemPrompts(context.systemPrompt);
+	if (systemPrompts.length > 0) {
+		const role: "developer" | "system" =
+			model.reasoning && supportsDeveloperRole(resolvedBaseUrl ?? model) ? "developer" : "system";
+		messages.unshift(...systemPrompts.map(systemPrompt => ({ role, content: systemPrompt })));
 	}
 
 	const cacheRetention = resolveCacheRetention(options?.cacheRetention);
@@ -360,33 +405,14 @@ function buildParams(
 		prompt_cache_key: promptCacheKey,
 		prompt_cache_retention: promptCacheKey ? getPromptCacheRetention(model.baseUrl, cacheRetention) : undefined,
 		store: false,
+		stream_options: model.provider === "openai" ? { include_obfuscation: false } : undefined,
 	};
 
-	if (options?.maxTokens) {
-		params.max_output_tokens = options?.maxTokens;
-	}
-
-	if (options?.temperature !== undefined) {
-		params.temperature = options?.temperature;
-	}
-	if (options?.topP !== undefined) {
-		params.top_p = options.topP;
-	}
-	if (options?.topK !== undefined) {
-		params.top_k = options.topK;
-	}
-	if (options?.minP !== undefined) {
-		params.min_p = options.minP;
-	}
-	if (options?.presencePenalty !== undefined) {
-		params.presence_penalty = options.presencePenalty;
-	}
-	if (options?.repetitionPenalty !== undefined) {
-		params.repetition_penalty = options.repetitionPenalty;
-	}
-	if (shouldSendServiceTier(options?.serviceTier, model.provider)) {
-		params.service_tier = options.serviceTier;
-	}
+	applyCommonResponsesSamplingParams(params, options, model.provider);
+	// TODO: openai responses has no top-level `stop`/`stop_sequences`; surface via reasoning.stop?
+	// `StreamOptions.stopSequences` is intentionally dropped for this provider.
+	// TODO: openai responses has no top-level `frequency_penalty` field as of the current SDK;
+	// `StreamOptions.frequencyPenalty` is intentionally dropped for this provider.
 
 	if (context.tools) {
 		params.tools = convertTools(context.tools, supportsStrictMode(model), model);
@@ -404,33 +430,18 @@ function buildParams(
 		}
 	}
 
-	if (model.reasoning) {
-		// Always request encrypted reasoning content so reasoning items can be
-		// replayed in multi-turn conversations when store is false (items aren't
-		// persisted server-side, so we must include the full content).
-		// See: https://github.com/can1357/oh-my-pi/issues/41
-		params.include = ["reasoning.encrypted_content"];
-
-		if (options?.reasoning || options?.reasoningSummary) {
-			params.reasoning = {
-				effort: options?.reasoning || "medium",
-				summary: options?.reasoningSummary || "auto",
-			};
-		} else if (model.name.startsWith("gpt-5")) {
-			// Jesus Christ, see https://community.openai.com/t/need-reasoning-false-option-for-gpt-5/1351588/7
-			messages.push({
-				role: "developer",
-				content: [
-					{
-						type: "input_text",
-						text: "# Juice: 0 !important",
-					},
-				],
-			});
-		}
-	}
+	applyResponsesReasoningParams(params, model, options, messages, effort =>
+		mapReasoningEffort(effort as NonNullable<OpenAIResponsesOptions["reasoning"]>, model.compat?.reasoningEffortMap),
+	);
 
 	return { conversationMessages, params };
+}
+
+function mapReasoningEffort(
+	effort: NonNullable<OpenAIResponsesOptions["reasoning"]>,
+	reasoningEffortMap: OpenAICompat["reasoningEffortMap"] | undefined,
+): string {
+	return reasoningEffortMap?.[effort] ?? effort;
 }
 
 function isAzureOpenAIBaseUrl(baseUrl: string): boolean {
@@ -577,13 +588,14 @@ export function convertTools(tools: Tool[], strictMode: boolean, model: Model<"o
 				format: {
 					type: "grammar",
 					syntax: tool.customFormat.syntax,
-					definition: tool.customFormat.definition,
+					definition: compactGrammarDefinition(tool.customFormat.syntax, tool.customFormat.definition),
 				},
 			} as unknown as OpenAITool;
 		}
 		const strict = !NO_STRICT && strictMode && tool.strict !== false;
-		const baseParameters = tool.parameters as unknown as Record<string, unknown>;
-		const { schema: parameters, strict: effectiveStrict } = adaptSchemaForStrict(baseParameters, strict);
+		const baseParameters = toolWireSchema(tool);
+		const responseParameters = sanitizeSchemaForOpenAIResponses(baseParameters);
+		const { schema: parameters, strict: effectiveStrict } = adaptSchemaForStrict(responseParameters, strict);
 		return {
 			type: "function",
 			name: tool.name,

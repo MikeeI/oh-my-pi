@@ -31,6 +31,7 @@ const PRIORITY = 70; // Below claude.ts (80) so user .claude/ overrides win
 interface ClaudePluginManifest {
 	skills?: string;
 	"slash-commands"?: string;
+	commands?: string;
 }
 
 interface ResolvedPluginDir {
@@ -59,24 +60,35 @@ function isWithinPluginRoot(rootPath: string, targetPath: string): boolean {
 
 async function resolvePluginDir(
 	root: ClaudePluginRoot,
-	manifestKey: keyof ClaudePluginManifest,
+	manifestKeys: ReadonlyArray<keyof ClaudePluginManifest>,
 	fallback: string,
 ): Promise<ResolvedPluginDir> {
 	const manifest = await readPluginManifest(root);
 	const fallbackDir = path.join(root.path, fallback);
-	const configured = manifest?.[manifestKey];
-	if (typeof configured !== "string" || !configured.trim()) {
+
+	let configured: string | undefined;
+	let matchedKey: keyof ClaudePluginManifest | undefined;
+	for (const key of manifestKeys) {
+		const val = manifest?.[key];
+		if (typeof val === "string" && val.trim()) {
+			configured = val.trim();
+			matchedKey = key;
+			break;
+		}
+	}
+
+	if (configured === undefined) {
 		return { dir: fallbackDir };
 	}
 
-	const resolved = path.resolve(root.path, configured.trim());
+	const resolved = path.resolve(root.path, configured);
 	if (isWithinPluginRoot(root.path, resolved)) {
 		return { dir: resolved };
 	}
 
 	return {
 		dir: fallbackDir,
-		warning: `[claude-plugins] Ignoring ${String(manifestKey)} path outside plugin root for ${root.id}: ${configured}`,
+		warning: `[claude-plugins] Ignoring ${String(matchedKey)} path outside plugin root for ${root.id}: ${configured}`,
 	};
 }
 
@@ -93,7 +105,7 @@ async function loadSkills(ctx: LoadContext): Promise<LoadResult<Skill>> {
 
 	const results = await Promise.all(
 		roots.map(async root => {
-			const { dir: skillsDir, warning } = await resolvePluginDir(root, "skills", "skills");
+			const { dir: skillsDir, warning } = await resolvePluginDir(root, ["skills"], "skills");
 			const result = await scanSkillsFromDir(ctx, {
 				dir: skillsDir,
 				providerId: PROVIDER_ID,
@@ -128,7 +140,7 @@ async function loadSlashCommands(ctx: LoadContext): Promise<LoadResult<SlashComm
 
 	const results = await Promise.all(
 		roots.map(async root => {
-			const { dir: commandsDir, warning } = await resolvePluginDir(root, "slash-commands", "commands");
+			const { dir: commandsDir, warning } = await resolvePluginDir(root, ["commands", "slash-commands"], "commands");
 			const result = await loadFilesFromDir<SlashCommand>(ctx, commandsDir, PROVIDER_ID, root.scope, {
 				extensions: ["md"],
 				transform: (name, content, filePath, source) => {
@@ -265,10 +277,28 @@ async function loadMCPServers(ctx: LoadContext): Promise<LoadResult<MCPServer>> 
 		}
 
 		if (!parsed || typeof parsed !== "object" || Array.isArray(parsed)) continue;
-		const config = parsed as { mcpServers?: Record<string, unknown> };
-		if (!config.mcpServers || typeof config.mcpServers !== "object") continue;
+		const obj = parsed as Record<string, unknown>;
 
-		for (const [serverName, serverCfg] of Object.entries(config.mcpServers)) {
+		// Two shapes are supported:
+		//   nested: { "mcpServers": { name: cfg, ... } }   (OMP/Claude Code project shape)
+		//   flat:   { name: cfg, ... }                      (Claude marketplace plugin shape)
+		// If "mcpServers" is present and an object, treat it as the canonical map.
+		// Otherwise, treat the whole object as the server map.
+		let servers: Record<string, unknown>;
+		if (
+			obj.mcpServers !== undefined &&
+			obj.mcpServers !== null &&
+			typeof obj.mcpServers === "object" &&
+			!Array.isArray(obj.mcpServers)
+		) {
+			servers = obj.mcpServers as Record<string, unknown>;
+		} else if (!("mcpServers" in obj)) {
+			servers = obj;
+		} else {
+			continue;
+		}
+
+		for (const [serverName, serverCfg] of Object.entries(servers)) {
 			if (!serverCfg || typeof serverCfg !== "object" || Array.isArray(serverCfg)) continue;
 			const raw = serverCfg as {
 				enabled?: boolean;
@@ -283,6 +313,13 @@ async function loadMCPServers(ctx: LoadContext): Promise<LoadResult<MCPServer>> 
 				oauth?: MCPServer["oauth"];
 				type?: string;
 			};
+			// Require either command (stdio) or url (HTTP/SSE) — Claude marketplace plugins
+			// occasionally ship .mcp.json entries with neither, which would register a useless
+			// server and surface as a connection error at runtime.
+			if (typeof raw.command !== "string" && typeof raw.url !== "string") {
+				warnings.push(`[claude-plugins] Skipping MCP server "${serverName}" in ${mcpPath}: missing command or url`);
+				continue;
+			}
 			const namespacedName = root.plugin ? `${root.plugin}:${serverName}` : serverName;
 			const server: MCPServer = {
 				name: namespacedName,

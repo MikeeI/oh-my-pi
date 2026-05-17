@@ -2,7 +2,7 @@ import { afterEach, describe, expect, it, vi } from "bun:test";
 import * as fs from "node:fs";
 import * as os from "node:os";
 import * as path from "node:path";
-import { AuthCredentialStore } from "../src/auth-storage";
+import { SqliteAuthCredentialStore } from "../src/auth-storage";
 import { buildAnthropicUrl, findAnthropicAuth } from "../src/utils/anthropic-auth";
 import { AnthropicOAuthFlow, refreshAnthropicToken } from "../src/utils/oauth/anthropic";
 import { withEnv } from "./helpers";
@@ -122,6 +122,76 @@ describe("anthropic oauth alignment", () => {
 		expect(result.refresh).toBe("new-refresh-token");
 		expect(fetchMock).toHaveBeenCalledTimes(1);
 	});
+
+	it("extracts account uuid and email from token-exchange response", async () => {
+		const fetchMock = vi.fn(async () => {
+			return new Response(
+				JSON.stringify({
+					access_token: "access-token",
+					refresh_token: "refresh-token",
+					expires_in: 3600,
+					account: {
+						uuid: "11111111-2222-3333-4444-555555555555",
+						email_address: "user@example.com",
+					},
+					organization: { uuid: "99999999-8888-7777-6666-555555555555" },
+				}),
+				{ status: 200, headers: { "Content-Type": "application/json" } },
+			);
+		});
+		global.fetch = fetchMock as unknown as typeof fetch;
+
+		const flow = new AnthropicOAuthFlow({});
+		await flow.generateAuthUrl("state-123", "http://localhost:54545/callback");
+		const result = await flow.exchangeToken("code-123", "state-123", "http://localhost:54545/callback");
+
+		expect(result.accountId).toBe("11111111-2222-3333-4444-555555555555");
+		expect(result.email).toBe("user@example.com");
+	});
+
+	it("extracts account uuid and email from refresh response", async () => {
+		const fetchMock = vi.fn(async () => {
+			return new Response(
+				JSON.stringify({
+					access_token: "new-access-token",
+					refresh_token: "new-refresh-token",
+					expires_in: 7200,
+					account: {
+						uuid: "aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee",
+						email_address: "refreshed@example.com",
+					},
+				}),
+				{ status: 200, headers: { "Content-Type": "application/json" } },
+			);
+		});
+		global.fetch = fetchMock as unknown as typeof fetch;
+
+		const result = await refreshAnthropicToken("refresh-123");
+
+		expect(result.accountId).toBe("aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee");
+		expect(result.email).toBe("refreshed@example.com");
+	});
+
+	it("leaves accountId/email undefined when token response omits account block", async () => {
+		const fetchMock = vi.fn(async () => {
+			return new Response(
+				JSON.stringify({
+					access_token: "access-token",
+					refresh_token: "refresh-token",
+					expires_in: 3600,
+				}),
+				{ status: 200, headers: { "Content-Type": "application/json" } },
+			);
+		});
+		global.fetch = fetchMock as unknown as typeof fetch;
+
+		const flow = new AnthropicOAuthFlow({});
+		await flow.generateAuthUrl("state-noaccount", "http://localhost:54545/callback");
+		const result = await flow.exchangeToken("code-noaccount", "state-noaccount", "http://localhost:54545/callback");
+
+		expect(result.accountId).toBeUndefined();
+		expect(result.email).toBeUndefined();
+	});
 });
 
 describe("anthropic auth resolution", () => {
@@ -129,7 +199,7 @@ describe("anthropic auth resolution", () => {
 		const tmpDir = path.join(os.tmpdir(), `pi-ai-auth-${Date.now()}-${Math.random().toString(16).slice(2)}`);
 		fs.mkdirSync(tmpDir, { recursive: true });
 		const dbPath = path.join(tmpDir, "agent.db");
-		const store = await AuthCredentialStore.open(dbPath);
+		const store = await SqliteAuthCredentialStore.open(dbPath);
 		try {
 			store.replaceAuthCredentialsForProvider("anthropic", [
 				{ type: "oauth", access: "sk-ant-oat-db", refresh: "refresh", expires: Date.now() + 20 * 60 * 1000 },
@@ -161,7 +231,7 @@ describe("anthropic auth resolution", () => {
 		const tmpDir = path.join(os.tmpdir(), `pi-ai-auth-${Date.now()}-${Math.random().toString(16).slice(2)}`);
 		fs.mkdirSync(tmpDir, { recursive: true });
 		const dbPath = path.join(tmpDir, "agent.db");
-		const store = await AuthCredentialStore.open(dbPath);
+		const store = await SqliteAuthCredentialStore.open(dbPath);
 		try {
 			store.replaceAuthCredentialsForProvider("anthropic", [
 				{ type: "oauth", access: "sk-ant-oat-db", refresh: "refresh", expires: Date.now() + 20 * 60 * 1000 },
@@ -191,7 +261,7 @@ describe("anthropic auth resolution", () => {
 		const tmpDir = path.join(os.tmpdir(), `pi-ai-auth-${Date.now()}-${Math.random().toString(16).slice(2)}`);
 		fs.mkdirSync(tmpDir, { recursive: true });
 		const dbPath = path.join(tmpDir, "agent.db");
-		const store = await AuthCredentialStore.open(dbPath);
+		const store = await SqliteAuthCredentialStore.open(dbPath);
 		try {
 			store.replaceAuthCredentialsForProvider("anthropic", [{ type: "api_key", key: "sk-ant-api-db" }]);
 			await withEnv(

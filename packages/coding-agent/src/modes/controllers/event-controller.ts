@@ -1,19 +1,27 @@
 import { INTENT_FIELD } from "@oh-my-pi/pi-agent-core";
+import { calculatePromptTokens } from "@oh-my-pi/pi-agent-core/compaction/compaction";
 import type { AssistantMessage, ImageContent } from "@oh-my-pi/pi-ai";
-import { Loader, TERMINAL, Text } from "@oh-my-pi/pi-tui";
+import { type Component, Loader, TERMINAL, Text } from "@oh-my-pi/pi-tui";
 import { settings } from "../../config/settings";
 import { AssistantMessageComponent } from "../../modes/components/assistant-message";
-import { ReadToolGroupComponent } from "../../modes/components/read-tool-group";
+import {
+	ReadToolGroupComponent,
+	readArgsHaveTarget,
+	readArgsTargetInternalUrl,
+} from "../../modes/components/read-tool-group";
 import { TodoReminderComponent } from "../../modes/components/todo-reminder";
 import { ToolExecutionComponent } from "../../modes/components/tool-execution";
 import { TtsrNotificationComponent } from "../../modes/components/ttsr-notification";
 import { getSymbolTheme, theme } from "../../modes/theme/theme";
 import type { InteractiveModeContext, TodoPhase } from "../../modes/types";
+import type { PlanApprovalDetails } from "../../plan-mode/approved-plan";
 import type { AgentSessionEvent } from "../../session/agent-session";
-import { calculatePromptTokens } from "../../session/compaction/compaction";
-import type { ExitPlanModeDetails } from "../../tools";
+import { isSilentAbort, readPendingDisplayTag } from "../../session/messages";
+import type { ResolveToolDetails } from "../../tools/resolve";
 
 type AgentSessionEventKind = AgentSessionEvent["type"];
+
+const IRC_MESSAGE_VISIBLE_TTL_MS = 10_000;
 
 type AgentSessionEventHandlers = {
 	[E in AgentSessionEventKind]: (event: Extract<AgentSessionEvent, { type: E }>) => Promise<void>;
@@ -29,6 +37,7 @@ export class EventController {
 	#readToolCallAssistantComponents = new Map<string, AssistantMessageComponent>();
 	#lastAssistantComponent: AssistantMessageComponent | undefined = undefined;
 	#idleCompactionTimer?: NodeJS.Timeout;
+	#ircExpiryTimers = new Map<string, NodeJS.Timeout>();
 	#handlers: AgentSessionEventHandlers;
 
 	constructor(private ctx: InteractiveModeContext) {
@@ -53,11 +62,18 @@ export class EventController {
 			todo_reminder: e => this.#handleTodoReminder(e),
 			todo_auto_clear: e => this.#handleTodoAutoClear(e),
 			irc_message: e => this.#handleIrcMessage(e),
+			notice: e => this.#handleNotice(e),
+			thinking_level_changed: async () => {},
+			goal_updated: async () => {},
 		} satisfies AgentSessionEventHandlers;
 	}
 
 	dispose(): void {
 		this.#cancelIdleCompaction();
+		for (const timer of this.#ircExpiryTimers.values()) {
+			clearTimeout(timer);
+		}
+		this.#ircExpiryTimers.clear();
 	}
 
 	#resetReadGroup(): void {
@@ -110,8 +126,11 @@ export class EventController {
 		assistantComponent.setToolResultImages(toolCallId, images);
 		return true;
 	}
-	#updateWorkingMessageFromIntent(intent: string | undefined): void {
-		const trimmed = intent?.trim();
+	#updateWorkingMessageFromIntent(intent: unknown): void {
+		// Streamed JSON can deliver non-string `_i` (object, number, boolean) before
+		// schema validation; `?.` only guards null/undefined, so guard the type too.
+		if (typeof intent !== "string") return;
+		const trimmed = intent.trim();
 		if (!trimmed || trimmed === this.#lastIntent) return;
 		this.#lastIntent = trimmed;
 		this.ctx.setWorkingMessage(`${trimmed} (esc to interrupt)`);
@@ -163,6 +182,17 @@ export class EventController {
 			this.#renderedCustomMessages.add(signature);
 			this.#resetReadGroup();
 			this.ctx.addMessageToChat(event.message);
+			// Tag-keyed pending-bar refresh: when AgentSession.#handleAgentEvent
+			// spliced this dequeued custom message out of #steeringMessages /
+			// #followUpMessages (it ran before this emit), the array state is
+			// already correct — pendingMessagesContainer just needs to be
+			// re-rendered to match. Gated on tag presence so non-queued customs
+			// (ttsr-injection, irc:*, async-result, hookMessage) skip the
+			// rebuild; their dispatch path never registered a pending chip.
+			// Mirrors the user-role refresh at the bottom of this function.
+			if (event.message.role === "custom" && readPendingDisplayTag(event.message.details)) {
+				this.ctx.updatePendingMessagesDisplay();
+			}
 			this.ctx.ui.requestRender();
 		} else if (event.message.role === "user") {
 			const textContent = this.ctx.getUserMessageText(event.message);
@@ -174,18 +204,23 @@ export class EventController {
 
 			this.#resetReadGroup();
 			const wasOptimistic = this.ctx.optimisticUserMessageSignature === signature;
+			const wasLocallySubmitted = this.ctx.locallySubmittedUserSignatures.delete(signature) || wasOptimistic;
 			if (!wasOptimistic) {
 				this.ctx.addMessageToChat(event.message);
 			}
-			this.ctx.optimisticUserMessageSignature = undefined;
+			if (wasOptimistic) {
+				this.ctx.optimisticUserMessageSignature = undefined;
+			}
 
-			// Clear the editor only when the submission did not originate from this
-			// session's optimistic flow (which already cleared the editor at submit
-			// time). Clearing here on the optimistic path would race with the user
-			// typing the next prompt while the previous large redraw lands and erase
-			// their in-progress draft (#783).
-			if (!event.message.synthetic && !wasOptimistic) {
-				this.ctx.editor.setText("");
+			// Clear the editor only when the submission did not originate from a
+			// local submission (optimistic or queued-while-streaming). Both local
+			// paths already cleared the editor at submit time; clearing again here
+			// would race with the user typing the next prompt while the previous
+			// large redraw lands and erase their in-progress draft (#783).
+			if (!event.message.synthetic) {
+				if (!wasLocallySubmitted) {
+					this.ctx.editor.setText("");
+				}
 				this.ctx.updatePendingMessagesDisplay();
 			}
 			this.ctx.ui.requestRender();
@@ -196,7 +231,9 @@ export class EventController {
 		} else if (event.message.role === "assistant") {
 			this.#lastThinkingCount = 0;
 			this.#resetReadGroup();
-			this.ctx.streamingComponent = new AssistantMessageComponent(undefined, this.ctx.hideThinkingBlock);
+			this.ctx.streamingComponent = new AssistantMessageComponent(undefined, this.ctx.hideThinkingBlock, () =>
+				this.ctx.ui.requestRender(),
+			);
 			this.ctx.streamingMessage = event.message;
 			this.ctx.chatContainer.addChild(this.ctx.streamingComponent);
 			this.ctx.streamingComponent.updateContent(this.ctx.streamingMessage);
@@ -211,8 +248,33 @@ export class EventController {
 		}
 		this.#renderedCustomMessages.add(signature);
 		this.#resetReadGroup();
-		this.ctx.addMessageToChat(event.message);
+		const components = this.ctx.addMessageToChat(event.message);
+		this.#scheduleIrcExpiry(signature, components);
 		this.ctx.ui.requestRender();
+	}
+
+	#scheduleIrcExpiry(signature: string, components: Component[]): void {
+		if (components.length === 0 || this.#ircExpiryTimers.has(signature)) return;
+		const timer = setTimeout(() => {
+			this.#ircExpiryTimers.delete(signature);
+			for (const component of components) {
+				this.ctx.chatContainer.removeChild(component);
+			}
+			this.ctx.ui.requestRender();
+		}, IRC_MESSAGE_VISIBLE_TTL_MS);
+		timer.unref?.();
+		this.#ircExpiryTimers.set(signature, timer);
+	}
+
+	async #handleNotice(event: Extract<AgentSessionEvent, { type: "notice" }>): Promise<void> {
+		const message = event.source ? `${event.source}: ${event.message}` : event.message;
+		if (event.level === "error") {
+			this.ctx.showError(message);
+		} else if (event.level === "warning") {
+			this.ctx.showWarning(message);
+		} else {
+			this.ctx.showStatus(message);
+		}
 	}
 
 	async #handleMessageUpdate(event: Extract<AgentSessionEvent, { type: "message_update" }>): Promise<void> {
@@ -231,16 +293,25 @@ export class EventController {
 			for (const content of this.ctx.streamingMessage.content) {
 				if (content.type !== "toolCall") continue;
 				if (content.name === "read") {
-					this.#trackReadToolCall(content.id, content.arguments);
-					const component = this.ctx.pendingTools.get(content.id);
-					if (component) {
-						component.updateArgs(content.arguments, content.id);
-					} else {
-						const group = this.#getReadGroup();
-						group.updateArgs(content.arguments, content.id);
-						this.ctx.pendingTools.set(content.id, group);
+					if (!readArgsHaveTarget(content.arguments)) {
+						// Args still streaming — defer until path is parseable so we can route to the
+						// read group (regular files) vs ToolExecutionComponent (internal URLs).
+						// Creating either component now would lock the read into the wrong shape.
+						continue;
 					}
-					continue;
+					if (!readArgsTargetInternalUrl(content.arguments)) {
+						this.#trackReadToolCall(content.id, content.arguments);
+						const component = this.ctx.pendingTools.get(content.id);
+						if (component) {
+							component.updateArgs(content.arguments, content.id);
+						} else {
+							const group = this.#getReadGroup();
+							group.updateArgs(content.arguments, content.id);
+							this.ctx.pendingTools.set(content.id, group);
+						}
+						continue;
+					}
+					// Internal URL read falls through to ToolExecutionComponent below.
 				}
 
 				// Preserve the raw partial JSON for renderers that need to surface fields before the JSON object closes.
@@ -260,6 +331,7 @@ export class EventController {
 							showImages: settings.get("terminal.showImages"),
 							editFuzzyThreshold: settings.get("edit.fuzzyThreshold"),
 							editAllowFuzzy: settings.get("edit.fuzzyMatch"),
+							hashlineAutoDropPureInsertDuplicates: settings.get("edit.hashlineAutoDropPureInsertDuplicates"),
 						},
 						tool,
 						this.ctx.ui,
@@ -283,7 +355,7 @@ export class EventController {
 				const args = content.arguments;
 				if (!args || typeof args !== "object") continue;
 				if (INTENT_FIELD in args) {
-					this.#updateWorkingMessageFromIntent(args[INTENT_FIELD] as string | undefined);
+					this.#updateWorkingMessageFromIntent(args[INTENT_FIELD]);
 					continue;
 				}
 				const tool = this.ctx.session.getToolByName(content.name);
@@ -307,7 +379,15 @@ export class EventController {
 		if (this.ctx.streamingComponent && event.message.role === "assistant") {
 			this.ctx.streamingMessage = event.message;
 			let errorMessage: string | undefined;
-			if (this.ctx.streamingMessage.stopReason === "aborted" && !this.ctx.session.isTtsrAbortPending) {
+			const aborted = this.ctx.streamingMessage.stopReason === "aborted";
+			const silentlyAborted = aborted && isSilentAbort(this.ctx.streamingMessage.errorMessage);
+			const ttsrSilenced = aborted && this.ctx.session.isTtsrAbortPending;
+			if (aborted && !silentlyAborted && !ttsrSilenced) {
+				// Real user-cancel / network / provider abort: surface the standard
+				// operator-facing label. AgentSession.#handleAgentEvent already stamped
+				// SILENT_ABORT_MARKER for the plan-compact transition before this
+				// controller ran, so reaching this branch implies the abort was NOT a
+				// silent internal transition.
 				const retryAttempt = this.ctx.session.retryAttempt;
 				errorMessage =
 					retryAttempt > 0
@@ -315,7 +395,10 @@ export class EventController {
 						: "Operation aborted";
 				this.ctx.streamingMessage.errorMessage = errorMessage;
 			}
-			if (this.ctx.session.isTtsrAbortPending && this.ctx.streamingMessage.stopReason === "aborted") {
+			if (silentlyAborted || ttsrSilenced) {
+				// Silence the streaming render by downgrading stopReason to "stop" for
+				// display only — does NOT mutate the persisted message's stopReason
+				// (the marker on errorMessage drives replay-side suppression).
 				const msgWithoutAbort = { ...this.ctx.streamingMessage, stopReason: "stop" as const };
 				this.ctx.streamingComponent.updateContent(msgWithoutAbort);
 			} else {
@@ -340,7 +423,7 @@ export class EventController {
 	async #handleToolExecutionStart(event: Extract<AgentSessionEvent, { type: "tool_execution_start" }>): Promise<void> {
 		this.#updateWorkingMessageFromIntent(event.intent);
 		if (!this.ctx.pendingTools.has(event.toolCallId)) {
-			if (event.toolName === "read") {
+			if (event.toolName === "read" && readArgsHaveTarget(event.args) && !readArgsTargetInternalUrl(event.args)) {
 				this.#trackReadToolCall(event.toolCallId, event.args);
 				const component = this.ctx.pendingTools.get(event.toolCallId);
 				if (component) {
@@ -363,6 +446,7 @@ export class EventController {
 					showImages: settings.get("terminal.showImages"),
 					editFuzzyThreshold: settings.get("edit.fuzzyThreshold"),
 					editAllowFuzzy: settings.get("edit.fuzzyMatch"),
+					hashlineAutoDropPureInsertDuplicates: settings.get("edit.hashlineAutoDropPureInsertDuplicates"),
 				},
 				tool,
 				this.ctx.ui,
@@ -464,10 +548,13 @@ export class EventController {
 				`Todo update failed${textContent ? `: ${textContent}` : ". Progress may be stale until todo_write succeeds."}`,
 			);
 		}
-		if (event.toolName === "exit_plan_mode" && !event.isError) {
-			const details = event.result.details as ExitPlanModeDetails | undefined;
-			if (details) {
-				await this.ctx.handleExitPlanModeTool(details);
+		if (event.toolName === "resolve" && !event.isError) {
+			const details = event.result.details as ResolveToolDetails | undefined;
+			if (details?.sourceToolName === "plan_approval" && details.action === "apply") {
+				const planDetails = details.sourceResultDetails as PlanApprovalDetails | undefined;
+				if (planDetails) {
+					await this.ctx.handlePlanApproval(planDetails);
+				}
 			}
 		}
 	}
@@ -632,9 +719,8 @@ export class EventController {
 
 	#scheduleIdleCompaction(): void {
 		this.#cancelIdleCompaction();
-		// Don't schedule while compaction/handoff is already running — the agent_end from a
-		// handoff agent turn still has the old session's bloated token counts, and scheduling
-		// here would fire after the session resets, trying to handoff an empty session.
+		// Don't schedule idle work while context maintenance is already running; the
+		// maintenance flow may reset the session before this timer fires.
 		if (this.ctx.session.isCompacting) return;
 
 		const idleSettings = settings.getGroup("compaction");
@@ -673,8 +759,7 @@ export class EventController {
 		if (this.ctx.isBackgrounded === false) return;
 		const notify = settings.get("completion.notify");
 		if (notify === "off") return;
-		const title =
-			this.ctx.sessionManager.titleSource === "auto" ? undefined : this.ctx.sessionManager.getSessionName();
+		const title = this.ctx.sessionManager.getSessionName();
 		const message = title ? `${title}: Complete` : "Complete";
 		TERMINAL.sendNotification(message);
 	}

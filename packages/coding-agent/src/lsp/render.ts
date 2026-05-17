@@ -131,9 +131,6 @@ export function renderResult(
 	}
 	if (request?.symbol) {
 		requestLines.push(theme.fg("dim", `symbol: ${sanitizeInlineText(request.symbol)}`));
-		if (request.occurrence !== undefined) {
-			requestLines.push(theme.fg("dim", `occurrence: ${request.occurrence}`));
-		}
 	}
 	if (request?.query) requestLines.push(theme.fg("dim", `query: ${request.query}`));
 	if (request?.new_name) requestLines.push(theme.fg("dim", `new name: ${request.new_name}`));
@@ -166,6 +163,10 @@ export function renderResult(
 			} else if (symbolsMatch) {
 				label = "Symbols";
 				bodyLines = renderSymbols(symbolsMatch, lines, expanded, theme);
+			} else if (result.details?.action === "diagnostics" && text === "OK") {
+				label = "Diagnostics";
+				state = "success";
+				bodyLines = [`${theme.styledSymbol("status.success", "success")} ${theme.fg("dim", "OK")}`];
 			} else {
 				label = "Response";
 				bodyLines = renderGeneric(text, lines, expanded, theme);

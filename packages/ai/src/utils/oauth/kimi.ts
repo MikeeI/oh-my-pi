@@ -3,10 +3,11 @@
  */
 
 import * as crypto from "node:crypto";
-import * as fs from "node:fs/promises";
+import * as fs from "node:fs";
 import * as os from "node:os";
 import * as path from "node:path";
-import { $env, abortableSleep, getAgentDir, isEnoent } from "@oh-my-pi/pi-utils";
+import { scheduler } from "node:timers/promises";
+import { $env, getAgentDir, isEnoent } from "@oh-my-pi/pi-utils";
 import packageJson from "../../../package.json" with { type: "json" };
 import type { OAuthController, OAuthCredentials } from "./types";
 
@@ -15,6 +16,7 @@ const DEFAULT_OAUTH_HOST = "https://auth.kimi.com";
 const DEVICE_ID_FILENAME = "kimi-device-id";
 const DEFAULT_POLL_INTERVAL_MS = 5000;
 const DEFAULT_DEVICE_FLOW_TTL_MS = 15 * 60 * 1000;
+const OAUTH_EXPIRY_SKEW_MS = 5 * 60 * 1000;
 
 interface DeviceAuthorizationResponse {
 	user_code?: string;
@@ -54,37 +56,38 @@ function getDeviceModel(): string {
 	return formatDeviceModel(label, release, arch);
 }
 
-async function getDeviceId(): Promise<string> {
+let getDeviceId = (): string => {
 	const deviceIdPath = path.join(getAgentDir(), DEVICE_ID_FILENAME);
 	try {
-		const existing = await Bun.file(deviceIdPath).text();
+		const existing = fs.readFileSync(deviceIdPath, "utf-8");
 		const trimmed = existing.trim();
-		if (trimmed) return trimmed;
+		if (trimmed) {
+			getDeviceId = () => trimmed;
+			return trimmed;
+		}
 	} catch (error) {
 		if (!isEnoent(error)) throw error;
 	}
 
 	const deviceId = crypto.randomUUID().replace(/-/g, "");
-	await Bun.write(deviceIdPath, `${deviceId}\n`);
-	await fs.chmod(deviceIdPath, 0o600).catch(() => undefined);
+	fs.writeFileSync(deviceIdPath, `${deviceId}\n`, { mode: 0o600 });
+	getDeviceId = () => deviceId;
 	return deviceId;
-}
+};
 
-async function buildCommonHeaders(): Promise<Record<string, string>> {
-	return {
+export let getKimiCommonHeaders = () => {
+	const headers = Object.freeze({
 		"User-Agent": `KimiCLI/${packageJson.version}`,
 		"X-Msh-Platform": "kimi_cli",
 		"X-Msh-Version": packageJson.version,
 		"X-Msh-Device-Name": os.hostname(),
 		"X-Msh-Device-Model": getDeviceModel(),
 		"X-Msh-Os-Version": os.version(),
-		"X-Msh-Device-Id": await getDeviceId(),
-	};
-}
-
-export async function getKimiCommonHeaders(): Promise<Record<string, string>> {
-	return buildCommonHeaders();
-}
+		"X-Msh-Device-Id": getDeviceId(),
+	});
+	getKimiCommonHeaders = () => headers;
+	return headers;
+};
 
 async function requestDeviceAuthorization(): Promise<{
 	userCode: string;
@@ -98,7 +101,7 @@ async function requestDeviceAuthorization(): Promise<{
 		method: "POST",
 		headers: {
 			"Content-Type": "application/x-www-form-urlencoded",
-			...(await buildCommonHeaders()),
+			...getKimiCommonHeaders(),
 		},
 		body: new URLSearchParams({ client_id: CLIENT_ID }),
 	});
@@ -145,7 +148,7 @@ function parseTokenPayload(payload: TokenResponse, refreshTokenFallback?: string
 	return {
 		access: payload.access_token,
 		refresh,
-		expires: Date.now() + payload.expires_in * 1000,
+		expires: Date.now() + payload.expires_in * 1000 - OAUTH_EXPIRY_SKEW_MS,
 	};
 }
 
@@ -167,7 +170,7 @@ async function pollForToken(
 			method: "POST",
 			headers: {
 				"Content-Type": "application/x-www-form-urlencoded",
-				...(await buildCommonHeaders()),
+				...getKimiCommonHeaders(),
 			},
 			body: new URLSearchParams({
 				client_id: CLIENT_ID,
@@ -183,7 +186,7 @@ async function pollForToken(
 
 		const error = payload.error;
 		if (error === "authorization_pending") {
-			await abortableSleep(waitMs, signal);
+			await scheduler.wait(waitMs, { signal });
 			continue;
 		}
 
@@ -191,7 +194,7 @@ async function pollForToken(
 			waitMs += 5000;
 			const retryAfter = typeof payload.interval === "number" ? payload.interval * 1000 : undefined;
 			if (retryAfter && retryAfter > waitMs) waitMs = retryAfter;
-			await abortableSleep(waitMs, signal);
+			await scheduler.wait(waitMs, { signal });
 			continue;
 		}
 
@@ -231,7 +234,7 @@ export async function refreshKimiToken(refreshToken: string): Promise<OAuthCrede
 		method: "POST",
 		headers: {
 			"Content-Type": "application/x-www-form-urlencoded",
-			...(await buildCommonHeaders()),
+			...getKimiCommonHeaders(),
 		},
 		body: new URLSearchParams({
 			grant_type: "refresh_token",

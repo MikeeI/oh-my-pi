@@ -5,23 +5,30 @@
  * and provides a transformer to convert them to LLM-compatible messages.
  */
 import type { AgentMessage } from "@oh-my-pi/pi-agent-core";
+import {
+	type BranchSummaryMessage,
+	type CompactionSummaryMessage,
+	renderBranchSummaryContext,
+	renderCompactionSummaryContext,
+} from "@oh-my-pi/pi-agent-core/compaction/messages";
 import type {
 	AssistantMessage,
 	ImageContent,
 	Message,
 	MessageAttribution,
-	ProviderPayload,
 	TextContent,
 	ToolResultMessage,
 } from "@oh-my-pi/pi-ai";
-import { prompt } from "@oh-my-pi/pi-utils";
-import branchSummaryContextPrompt from "../prompts/compaction/branch-summary-context.md" with { type: "text" };
-import compactionSummaryContextPrompt from "../prompts/compaction/compaction-summary-context.md" with { type: "text" };
+
+export {
+	type BranchSummaryMessage,
+	type CompactionSummaryMessage,
+	createBranchSummaryMessage,
+	createCompactionSummaryMessage,
+} from "@oh-my-pi/pi-agent-core/compaction/messages";
+
 import type { OutputMeta } from "../tools/output-meta";
 import { formatOutputNotice } from "../tools/output-meta";
-
-const COMPACTION_SUMMARY_TEMPLATE = compactionSummaryContextPrompt;
-const BRANCH_SUMMARY_TEMPLATE = branchSummaryContextPrompt;
 
 export const SKILL_PROMPT_MESSAGE_TYPE = "skill-prompt";
 
@@ -30,6 +37,72 @@ export interface SkillPromptDetails {
 	path: string;
 	args?: string;
 	lineCount: number;
+	/** Internal: tag used by AgentSession to remove the pending-display chip
+	 *  from `#steeringMessages` / `#followUpMessages` when the agent consumes
+	 *  this message. Not surfaced to renderers; the `__` prefix signals
+	 *  "private". Optional — non-streaming skill prompts never set it. Stripped
+	 *  from persisted `details` by `SessionManager.appendCustomMessageEntry`
+	 *  via the `INTERNAL_DETAILS_FIELDS` allowlist below. */
+	__pendingDisplayTag?: string;
+}
+
+/** Sentinel value for `AssistantMessage.errorMessage` indicating that the abort
+ *  was an *expected internal transition* (plan-mode → execution compaction)
+ *  and must NOT surface as a red "Operation aborted" line. Distinct from
+ *  `undefined` (default) so user-cancel aborts with no errorMessage still
+ *  render normally. Persists through SessionManager so history replay
+ *  branches identically.
+ *
+ *  Consumers: `AgentSession.#handleAgentEvent` (stamper) writes this value;
+ *  `EventController.#handleMessageEnd`, `AssistantMessageComponent`,
+ *  `ui-helpers.addMessageToChat` (renderers), `SessionObserverOverlay
+ *  #buildTranscriptLines`, `runPrintMode`, and `AcpAgent#replayAssistantMessage`
+ *  (fallback error emission) read it via `isSilentAbort`. */
+export const SILENT_ABORT_MARKER = "__omp.silent_abort__";
+
+/** Type-guard for `SILENT_ABORT_MARKER`. Renderers MUST branch on this rather
+ *  than string-comparing inline so refactors to the marker constant (e.g.,
+ *  namespacing changes) propagate through every consumer in lockstep. */
+export function isSilentAbort(errorMessage: string | undefined): boolean {
+	return errorMessage === SILENT_ABORT_MARKER;
+}
+
+/** Extract the optional `__pendingDisplayTag` field from a CustomMessage's
+ *  `details` blob. Safe over `unknown`; returns undefined when the field is
+ *  absent or non-string. */
+export function readPendingDisplayTag(details: unknown): string | undefined {
+	if (typeof details !== "object" || details === null) return undefined;
+	const candidate = (details as { __pendingDisplayTag?: unknown }).__pendingDisplayTag;
+	return typeof candidate === "string" ? candidate : undefined;
+}
+
+/** Explicit allowlist of `details` field names that are AgentSession-internal
+ *  transient bookkeeping and MUST be removed before SessionManager persists
+ *  the CustomMessageEntry to disk. Scoped intentionally narrow: only fields
+ *  declared here are stripped. Adding a new entry is a deliberate, reviewed
+ *  change — unrelated future payload fields are never silently dropped. */
+export const INTERNAL_DETAILS_FIELDS = ["__pendingDisplayTag"] as const;
+
+/** Return a `details` copy with every key in `INTERNAL_DETAILS_FIELDS`
+ *  removed. Returns the input unchanged when there is nothing to strip
+ *  (null/non-object, or no listed fields present) so callers don't pay a
+ *  clone cost on the common path. */
+export function stripInternalDetailsFields<T>(details: T | undefined): T | undefined {
+	if (details == null || typeof details !== "object") return details;
+	const obj = details as Record<string, unknown>;
+	let hit = false;
+	for (const key of INTERNAL_DETAILS_FIELDS) {
+		if (key in obj) {
+			hit = true;
+			break;
+		}
+	}
+	if (!hit) return details;
+	const cleaned: Record<string, unknown> = { ...obj };
+	for (const key of INTERNAL_DETAILS_FIELDS) {
+		delete cleaned[key];
+	}
+	return cleaned as T;
 }
 
 function getPrunedToolResultContent(message: ToolResultMessage): (TextContent | ImageContent)[] {
@@ -59,7 +132,7 @@ export interface BashExecutionMessage {
 
 /**
  * Message type for user-initiated Python executions via the $ command.
- * Shares the same kernel session as the agent's Python tool.
+ * Shares the same kernel session as eval's Python backend.
  */
 export interface PythonExecutionMessage {
 	role: "pythonExecution";
@@ -99,22 +172,6 @@ export interface HookMessage<T = unknown> {
 	details?: T;
 	/** Who initiated this message for billing/attribution semantics. */
 	attribution?: MessageAttribution;
-	timestamp: number;
-}
-
-export interface BranchSummaryMessage {
-	role: "branchSummary";
-	summary: string;
-	fromId: string;
-	timestamp: number;
-}
-
-export interface CompactionSummaryMessage {
-	role: "compactionSummary";
-	summary: string;
-	shortSummary?: string;
-	tokensBefore: number;
-	providerPayload?: ProviderPayload;
 	timestamp: number;
 }
 
@@ -186,32 +243,6 @@ export function pythonExecutionToText(msg: PythonExecutionMessage): string {
 	}
 	text += formatOutputNotice(msg.meta);
 	return text;
-}
-
-export function createBranchSummaryMessage(summary: string, fromId: string, timestamp: string): BranchSummaryMessage {
-	return {
-		role: "branchSummary",
-		summary,
-		fromId,
-		timestamp: new Date(timestamp).getTime(),
-	};
-}
-
-export function createCompactionSummaryMessage(
-	summary: string,
-	tokensBefore: number,
-	timestamp: string,
-	shortSummary?: string,
-	providerPayload?: ProviderPayload,
-): CompactionSummaryMessage {
-	return {
-		role: "compactionSummary",
-		summary,
-		shortSummary,
-		tokensBefore,
-		providerPayload,
-		timestamp: new Date(timestamp).getTime(),
-	};
 }
 
 export function sanitizeRehydratedOpenAIResponsesAssistantMessage(message: AssistantMessage): AssistantMessage {
@@ -310,7 +341,7 @@ export function convertToLlm(messages: AgentMessage[]): Message[] {
 						content: [
 							{
 								type: "text" as const,
-								text: prompt.render(BRANCH_SUMMARY_TEMPLATE, { summary: m.summary }),
+								text: renderBranchSummaryContext(m.summary),
 							},
 						],
 						attribution: "agent",
@@ -322,7 +353,7 @@ export function convertToLlm(messages: AgentMessage[]): Message[] {
 						content: [
 							{
 								type: "text" as const,
-								text: prompt.render(COMPACTION_SUMMARY_TEMPLATE, { summary: m.summary }),
+								text: renderCompactionSummaryContext(m.summary),
 							},
 						],
 						attribution: "agent",
@@ -364,8 +395,7 @@ export function convertToLlm(messages: AgentMessage[]): Message[] {
 						attribution: m.attribution ?? "agent",
 					};
 				default:
-					// biome-ignore lint/correctness/noSwitchDeclarations: fine
-					const _exhaustiveCheck: never = m;
+					m satisfies never;
 					return undefined;
 			}
 		})

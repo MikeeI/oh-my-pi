@@ -6,8 +6,8 @@
  */
 import * as path from "node:path";
 import * as url from "node:url";
+import type { TSchema } from "@oh-my-pi/pi-ai";
 import { logger } from "@oh-my-pi/pi-utils";
-import type { TSchema } from "@sinclair/typebox";
 import type { SourceMeta } from "../capability/types";
 import { resolveConfigValue } from "../config/resolve-config-value";
 import type { CustomTool } from "../extensibility/custom-tools/types";
@@ -78,6 +78,21 @@ function delay(ms: number): Promise<void> {
 	return Bun.sleep(ms);
 }
 
+/**
+ * Stable, total ordering on MCP tools by name.
+ *
+ * Anthropic prompt caching keys on byte-identical tool definitions: any reorder
+ * of the tools array invalidates the tools cache breakpoint and forces a full
+ * prefix rebuild on the next request. MCP servers connect/reconnect at arbitrary
+ * times, so the natural "insertion order" of `#tools` is non-deterministic.
+ * Sorting after every mutation makes the array bytes independent of connection
+ * sequence.
+ */
+export function sortMCPToolsByName<T extends { name: string }>(tools: T[]): T[] {
+	tools.sort((a, b) => (a.name < b.name ? -1 : a.name > b.name ? 1 : 0));
+	return tools;
+}
+
 export function resolveSubscriptionPostAction(
 	notificationsEnabled: boolean,
 	currentEpoch: number,
@@ -117,6 +132,23 @@ export interface MCPDiscoverOptions {
  * Manages connections to MCP servers and provides tools to the agent.
  */
 export class MCPManager {
+	static #instance: MCPManager | undefined;
+
+	/** Process-global instance shared by internal URL protocol handlers and tools. */
+	static instance(): MCPManager | undefined {
+		return MCPManager.#instance;
+	}
+
+	/** Install or clear the process-global instance. */
+	static setInstance(value: MCPManager | undefined): void {
+		MCPManager.#instance = value;
+	}
+
+	/** Reset the process-global instance. Test-only. */
+	static resetForTests(): void {
+		MCPManager.#instance = undefined;
+	}
+
 	#connections = new Map<string, MCPServerConnection>();
 	#tools: CustomTool<TSchema, MCPToolDetails>[] = [];
 	#pendingConnections = new Map<string, Promise<MCPServerConnection>>();
@@ -459,6 +491,10 @@ export class MCPManager {
 			}
 		}
 
+		// Stable sort by name so the order is independent of connection completion.
+		// See `sortMCPToolsByName` for the cache-stability rationale.
+		sortMCPToolsByName(allTools);
+
 		// Update cached tools
 		this.#tools = allTools;
 		allowBackgroundLogging = true;
@@ -472,8 +508,11 @@ export class MCPManager {
 	}
 
 	#replaceServerTools(name: string, tools: CustomTool<TSchema, MCPToolDetails>[]): void {
-		this.#tools = this.#tools.filter(t => !t.name.startsWith(`mcp_${name}_`));
+		this.#tools = this.#tools.filter(t => !t.name.startsWith(`mcp__${name}_`));
 		this.#tools.push(...tools);
+		// Stable sort by name so reconnect order does not perturb the array.
+		// See `sortMCPToolsByName` for the cache-stability rationale.
+		sortMCPToolsByName(this.#tools);
 	}
 
 	#triggerNotificationRefresh(serverName: string, kind: "tools" | "resources" | "prompts"): void {
@@ -644,8 +683,8 @@ export class MCPManager {
 		}
 
 		// Remove tools from this server and notify consumers
-		const hadTools = this.#tools.some(t => t.name.startsWith(`mcp_${name}_`));
-		this.#tools = this.#tools.filter(t => !t.name.startsWith(`mcp_${name}_`));
+		const hadTools = this.#tools.some(t => t.name.startsWith(`mcp__${name}_`));
+		this.#tools = this.#tools.filter(t => !t.name.startsWith(`mcp__${name}_`));
 		if (hadTools) this.#onToolsChanged?.(this.#tools);
 
 		// Notify prompt consumers so stale commands are cleared

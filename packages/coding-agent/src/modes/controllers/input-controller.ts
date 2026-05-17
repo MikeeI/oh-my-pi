@@ -1,9 +1,9 @@
 import * as fs from "node:fs/promises";
 import { type AgentMessage, ThinkingLevel } from "@oh-my-pi/pi-agent-core";
-import { sanitizeText } from "@oh-my-pi/pi-natives";
 import type { AutocompleteProvider, SlashCommand } from "@oh-my-pi/pi-tui";
-import { $env } from "@oh-my-pi/pi-utils";
-import { settings } from "../../config/settings";
+import { $env, sanitizeText } from "@oh-my-pi/pi-utils";
+import { isSettingsInitialized, settings } from "../../config/settings";
+import { expandEmoticons } from "../../modes/emoji-autocomplete";
 import { createPromptActionAutocompleteProvider } from "../../modes/prompt-action-autocomplete";
 import { theme } from "../../modes/theme/theme";
 import type { InteractiveModeContext } from "../../modes/types";
@@ -37,13 +37,22 @@ export class InputController {
 					this.ctx.session.isCompacting ||
 					this.ctx.session.isGeneratingHandoff ||
 					this.ctx.session.isBashRunning ||
-					this.ctx.session.isPythonRunning ||
+					this.ctx.session.isEvalRunning ||
 					this.ctx.autoCompactionLoader ||
 					this.ctx.retryLoader ||
 					this.ctx.autoCompactionEscapeHandler ||
 					this.ctx.retryEscapeHandler,
 			);
 		this.ctx.editor.onEscape = () => {
+			if (this.ctx.loopModeEnabled) {
+				this.ctx.pauseLoop();
+				if (this.ctx.session.isStreaming) {
+					void this.ctx.session.abort();
+				} else {
+					this.ctx.cancelPendingSubmission();
+				}
+				return;
+			}
 			if (this.ctx.hasActiveBtw() && this.ctx.handleBtwEscape()) {
 				return;
 			}
@@ -58,8 +67,8 @@ export class InputController {
 				this.ctx.editor.setText("");
 				this.ctx.isBashMode = false;
 				this.ctx.updateEditorBorderColor();
-			} else if (this.ctx.session.isPythonRunning) {
-				this.ctx.session.abortPython();
+			} else if (this.ctx.session.isEvalRunning) {
+				this.ctx.session.abortEval();
 			} else if (this.ctx.isPythonMode) {
 				this.ctx.editor.setText("");
 				this.ctx.isPythonMode = false;
@@ -178,6 +187,7 @@ export class InputController {
 	setupEditorSubmitHandler(): void {
 		this.ctx.editor.onSubmit = async (text: string) => {
 			text = text.trim();
+			if ((!isSettingsInitialized() || settings.get("emojiAutocomplete")) && text) text = expandEmoticons(text);
 
 			// Empty submit while streaming with queued messages: flush queues immediately
 			if (!text && this.ctx.session.isStreaming && this.ctx.session.queuedMessageCount > 0) {
@@ -231,45 +241,12 @@ export class InputController {
 				text = slashResult;
 			}
 
-			// Handle skill commands (/skill:name [args])
-			if (text.startsWith("/skill:")) {
-				const spaceIndex = text.indexOf(" ");
-				const commandName = spaceIndex === -1 ? text.slice(1) : text.slice(1, spaceIndex);
-				const args = spaceIndex === -1 ? "" : text.slice(spaceIndex + 1).trim();
-				const skillPath = this.ctx.skillCommands?.get(commandName);
-				if (skillPath) {
-					this.ctx.editor.addToHistory(text);
-					this.ctx.editor.setText("");
-					try {
-						const content = await Bun.file(skillPath).text();
-						const body = content.replace(/^---\n[\s\S]*?\n---\n/, "").trim();
-						const metaLines = [`Skill: ${skillPath}`];
-						if (args) {
-							metaLines.push(`User: ${args}`);
-						}
-						const message = `${body}\n\n---\n\n${metaLines.join("\n")}`;
-						const skillName = commandName.slice("skill:".length);
-						const details: SkillPromptDetails = {
-							name: skillName || commandName,
-							path: skillPath,
-							args: args || undefined,
-							lineCount: body ? body.split("\n").length : 0,
-						};
-						await this.ctx.session.promptCustomMessage(
-							{
-								customType: SKILL_PROMPT_MESSAGE_TYPE,
-								content: message,
-								display: true,
-								details,
-								attribution: "user",
-							},
-							{ streamingBehavior: "followUp" },
-						);
-					} catch (err) {
-						this.ctx.showError(`Failed to load skill: ${err instanceof Error ? err.message : String(err)}`);
-					}
-					return;
-				}
+			// Handle skill commands (/skill:name [args]). Enter ⇒ steer (matches the
+			// free-text Enter semantics applied a few lines below at the streaming
+			// branch). Ctrl+Enter routes through `handleFollowUp` and dispatches the
+			// same helper with `"followUp"`.
+			if (await this.#invokeSkillCommand(text, "steer")) {
+				return;
 			}
 
 			// Handle bash command (! for normal, !! for excluded from context)
@@ -295,7 +272,7 @@ export class InputController {
 				const isExcluded = text.startsWith("$$");
 				const code = isExcluded ? text.slice(2).trim() : text.slice(1).trim();
 				if (code) {
-					if (this.ctx.session.isPythonRunning) {
+					if (this.ctx.session.isEvalRunning) {
 						this.ctx.showWarning("A Python execution is already running. Press Esc to cancel it first.");
 						this.ctx.editor.setText(text);
 						return;
@@ -306,6 +283,12 @@ export class InputController {
 					this.ctx.updateEditorBorderColor();
 					return;
 				}
+			}
+
+			// While loop mode is on, every user-typed prompt becomes the new loop
+			// prompt that auto-resubmits after each yield.
+			if (this.ctx.loopModeEnabled) {
+				this.ctx.loopPrompt = text;
 			}
 
 			// Queue input during compaction
@@ -325,7 +308,15 @@ export class InputController {
 				this.ctx.editor.setText("");
 				const images = inputImages && inputImages.length > 0 ? [...inputImages] : undefined;
 				this.ctx.pendingImages = [];
-				await this.ctx.session.prompt(text, { streamingBehavior: "steer", images });
+				// Record the signature so the queued message's eventual delivery
+				// (a user-role `message_start` event) leaves any draft the user has
+				// typed since queuing intact. Same protection as #783, applied to
+				// the streaming/queue path.
+				await this.ctx.withLocalSubmission(
+					text,
+					() => this.ctx.session.prompt(text, { streamingBehavior: "steer", images }),
+					{ imageCount: images?.length ?? 0 },
+				);
 				this.ctx.updatePendingMessagesDisplay();
 				this.ctx.ui.requestRender();
 				return;
@@ -339,7 +330,14 @@ export class InputController {
 			const hasUserMessages = this.ctx.session.messages.some((m: AgentMessage) => m.role === "user");
 			if (!hasUserMessages && !this.ctx.sessionManager.getSessionName() && !$env.PI_NO_TITLE) {
 				const registry = this.ctx.session.modelRegistry;
-				generateSessionTitle(text, registry, this.ctx.settings, this.ctx.session.sessionId, this.ctx.session.model)
+				generateSessionTitle(
+					text,
+					registry,
+					this.ctx.settings,
+					this.ctx.session.sessionId,
+					this.ctx.session.model,
+					provider => this.ctx.session.agent.metadataForProvider(provider),
+				)
 					.then(async title => {
 						if (title) {
 							const applied = await this.ctx.sessionManager.setSessionName(title, "auto");
@@ -347,7 +345,6 @@ export class InputController {
 								setSessionTerminalTitle(
 									this.ctx.sessionManager.getSessionName()!,
 									this.ctx.sessionManager.getCwd(),
-									this.ctx.sessionManager.titleSource,
 								);
 								this.ctx.updateEditorBorderColor();
 							}
@@ -381,7 +378,9 @@ export class InputController {
 	}
 
 	handleCtrlD(): void {
-		// Only called when editor is empty (enforced by CustomEditor)
+		// Editor text (if any) is snapshotted at the start of shutdown() and
+		// persisted as a draft for the next resume. Empty text is also fine —
+		// shutdown clears any stale sidecar in that case.
 		void this.ctx.shutdown();
 	}
 
@@ -408,20 +407,101 @@ export class InputController {
 		}
 	}
 
+	/**
+	 * Dispatch a `/skill:<name> [args]` invocation through `promptCustomMessage`
+	 * using the supplied `streamingBehavior`. Returns true if the text was a
+	 * recognised skill command and was dispatched. A failure to load the skill
+	 * file is surfaced via `showError` but still returns true — the editor was
+	 * already cleared on the success path, so falling through to plain-text
+	 * handling at that point would double-submit. Returns false when the text
+	 * isn't a `/skill:` prefix or the command name isn't a registered skill,
+	 * so the caller can fall through to plain-text handling (this branch
+	 * leaves the editor state untouched). `streamingBehavior` is only consulted
+	 * while the agent is streaming; the idle path of `promptCustomMessage`
+	 * ignores it.
+	 */
+	async #invokeSkillCommand(text: string, streamingBehavior: "steer" | "followUp"): Promise<boolean> {
+		if (!text.startsWith("/skill:")) return false;
+		const spaceIndex = text.indexOf(" ");
+		const commandName = spaceIndex === -1 ? text.slice(1) : text.slice(1, spaceIndex);
+		const args = spaceIndex === -1 ? "" : text.slice(spaceIndex + 1).trim();
+		const skillPath = this.ctx.skillCommands?.get(commandName);
+		if (!skillPath) return false;
+		this.ctx.editor.addToHistory(text);
+		this.ctx.editor.setText("");
+		try {
+			const content = await Bun.file(skillPath).text();
+			const body = content.replace(/^---\n[\s\S]*?\n---\n/, "").trim();
+			const metaLines = [`Skill: ${skillPath}`];
+			if (args) {
+				metaLines.push(`User: ${args}`);
+			}
+			const message = `${body}\n\n---\n\n${metaLines.join("\n")}`;
+			const skillName = commandName.slice("skill:".length);
+			const details: SkillPromptDetails = {
+				name: skillName || commandName,
+				path: skillPath,
+				args: args || undefined,
+				lineCount: body ? body.split("\n").length : 0,
+			};
+			// When the agent is streaming, register the compact slash-form text as
+			// the pending-display twin BEFORE dispatching the CustomMessage. The
+			// returned tag is embedded in details so AgentSession.#handleAgentEvent
+			// can remove the matching display entry when the agent consumes this
+			// message (mirrors the user-message dequeue path).
+			if (this.ctx.session.isStreaming) {
+				const tag = this.ctx.session.enqueueCustomMessageDisplay(text, streamingBehavior);
+				details.__pendingDisplayTag = tag;
+			}
+			await this.ctx.session.promptCustomMessage(
+				{
+					customType: SKILL_PROMPT_MESSAGE_TYPE,
+					content: message,
+					display: true,
+					details,
+					attribution: "user",
+				},
+				{ streamingBehavior },
+			);
+			if (this.ctx.session.isStreaming) {
+				this.ctx.updatePendingMessagesDisplay();
+				this.ctx.ui.requestRender();
+			}
+		} catch (err) {
+			this.ctx.showError(`Failed to load skill: ${err instanceof Error ? err.message : String(err)}`);
+		}
+		return true;
+	}
+
 	/** Send editor text as a follow-up message (queued behind current stream). */
 	async handleFollowUp(): Promise<void> {
 		const text = this.ctx.editor.getText().trim();
 		if (!text) return;
 
+		// Compaction first: while compacting, free text gets queued via
+		// `queueCompactionMessage`, and `/skill:*` rides the same queue so a
+		// skill typed during compaction is not lost or short-circuited through
+		// `promptCustomMessage`. The skill text is queued verbatim; whether
+		// the queued entry is later re-parsed into a skill invocation is a
+		// separate concern owned by the compaction-resume path.
 		if (this.ctx.session.isCompacting) {
 			this.ctx.queueCompactionMessage(text, "followUp");
+			return;
+		}
+
+		// Skill commands invoke through the custom-message path regardless of
+		// which keybinding submitted them. Enter routes them as `steer`;
+		// Ctrl+Enter (this handler) routes them as `followUp`.
+		if (await this.#invokeSkillCommand(text, "followUp")) {
 			return;
 		}
 
 		if (this.ctx.session.isStreaming) {
 			this.ctx.editor.addToHistory(text);
 			this.ctx.editor.setText("");
-			await this.ctx.session.prompt(text, { streamingBehavior: "followUp" });
+			await this.ctx.withLocalSubmission(text, () =>
+				this.ctx.session.prompt(text, { streamingBehavior: "followUp" }),
+			);
 			this.ctx.updatePendingMessagesDisplay();
 			this.ctx.ui.requestRender();
 			return;
@@ -430,10 +510,11 @@ export class InputController {
 		// Not streaming — just submit normally
 		this.ctx.editor.addToHistory(text);
 		this.ctx.editor.setText("");
-		await this.ctx.session.prompt(text);
+		await this.ctx.withLocalSubmission(text, () => this.ctx.session.prompt(text));
 	}
 
 	restoreQueuedMessagesToEditor(options?: { abort?: boolean; currentText?: string }): number {
+		this.ctx.locallySubmittedUserSignatures.clear();
 		const { steering, followUp } = this.ctx.session.clearQueue();
 		const allQueued = [...steering, ...followUp];
 		if (allQueued.length === 0) {
@@ -674,6 +755,7 @@ export class InputController {
 	toggleThinkingBlockVisibility(): void {
 		this.ctx.hideThinkingBlock = !this.ctx.hideThinkingBlock;
 		settings.set("hideThinkingBlock", this.ctx.hideThinkingBlock);
+		this.ctx.session.agent.hideThinkingSummary = this.ctx.hideThinkingBlock;
 
 		// Rebuild chat from session messages
 		this.ctx.chatContainer.clear();

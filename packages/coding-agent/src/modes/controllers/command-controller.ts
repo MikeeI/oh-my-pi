@@ -1,6 +1,7 @@
 import * as fs from "node:fs/promises";
 import * as os from "node:os";
 import * as path from "node:path";
+import { CompactionCancelledError, type CompactionOutcome } from "@oh-my-pi/pi-agent-core/compaction";
 import {
 	getEnvApiKey,
 	getProviderDetails,
@@ -16,14 +17,23 @@ import { reset as resetCapabilities } from "../../capability";
 import { clearClaudePluginRootsCache } from "../../discovery/helpers";
 import { loadCustomShare } from "../../export/custom-share";
 import type { CompactOptions } from "../../extensibility/extensions/types";
-import { getGatewayStatus } from "../../ipy/gateway-coordinator";
-import { buildMemoryToolDeveloperInstructions, clearMemoryData, enqueueMemoryConsolidation } from "../../memories";
+import {
+	diffMentalModelContent,
+	type HindsightApi,
+	type HindsightSessionState,
+	loadHindsightConfig,
+	reloadMentalModelsForSession,
+	resolveSeedsForScope,
+	summarizeMentalModel,
+} from "../../hindsight";
+import { resolveMemoryBackend } from "../../memory-backend";
 import { BashExecutionComponent } from "../../modes/components/bash-execution";
 import { BorderedLoader } from "../../modes/components/bordered-loader";
 import { DynamicBorder } from "../../modes/components/dynamic-border";
-import { PythonExecutionComponent } from "../../modes/components/python-execution";
+import { EvalExecutionComponent } from "../../modes/components/eval-execution";
 import { getMarkdownTheme, getSymbolTheme, theme } from "../../modes/theme/theme";
 import type { InteractiveModeContext } from "../../modes/types";
+import { computeContextBreakdown, renderContextUsage } from "../../modes/utils/context-usage";
 import { buildHotkeysMarkdown } from "../../modes/utils/hotkeys-markdown";
 import { buildToolsMarkdown } from "../../modes/utils/tools-markdown";
 import type { AsyncJobSnapshotItem } from "../../session/agent-session";
@@ -35,16 +45,7 @@ import { replaceTabs } from "../../tools/render-utils";
 import { getChangelogPath, parseChangelog } from "../../utils/changelog";
 import { copyToClipboard } from "../../utils/clipboard";
 import { openPath } from "../../utils/open";
-import { regenerateSessionTitle, setSessionTerminalTitle } from "../../utils/title-generator";
-
-/** Extract text content from any message type. */
-function extractMessageText(msg: { content: string | { type: string; text?: string }[] }): string {
-	if (typeof msg.content === "string") return msg.content;
-	return msg.content
-		.filter(c => c.type === "text" && c.text)
-		.map(c => c.text!)
-		.join("");
-}
+import { setSessionTerminalTitle } from "../../utils/title-generator";
 
 function showMarkdownPanel(ctx: InteractiveModeContext, title: string, markdown: string): void {
 	ctx.chatContainer.addChild(new Spacer(1));
@@ -255,12 +256,21 @@ export class CommandController {
 	}
 
 	#copyLastMessage() {
-		const text = this.ctx.session.getLastAssistantText();
-		if (!text) {
-			this.ctx.showError("No agent messages to copy yet.");
+		const assistantText = this.ctx.session.getLastAssistantText();
+		if (assistantText) {
+			this.#doCopy(assistantText, "Copied last agent message to clipboard");
 			return;
 		}
-		this.#doCopy(text, "Copied last agent message to clipboard");
+
+		if (!this.ctx.session.hasCopyCandidateAssistantMessage()) {
+			const handoffText = this.ctx.session.getLastVisibleHandoffText();
+			if (handoffText) {
+				this.#doCopy(handoffText, "Copied handoff context to clipboard");
+				return;
+			}
+		}
+
+		this.ctx.showError("No agent messages to copy yet.");
 	}
 
 	#copyCode() {
@@ -293,9 +303,26 @@ export class CommandController {
 		this.#doCopy(combined, `Copied ${matches.length} code block${matches.length > 1 ? "s" : ""} to clipboard`);
 	}
 
+	#extractEvalCode(args: unknown): string | undefined {
+		if (!args || typeof args !== "object") return undefined;
+		const cells = (args as { cells?: unknown }).cells;
+		if (!Array.isArray(cells)) return undefined;
+
+		const codeBlocks: string[] = [];
+		for (const cell of cells) {
+			if (!cell || typeof cell !== "object") continue;
+			const code = (cell as { code?: unknown }).code;
+			if (typeof code === "string" && code.length > 0) {
+				codeBlocks.push(code);
+			}
+		}
+
+		return codeBlocks.length > 0 ? codeBlocks.join("\n\n") : undefined;
+	}
+
 	#copyLastCommand() {
 		const messages = this.ctx.session.messages;
-		// Walk backwards to find the last bash/python tool call
+		// Walk backwards to find the last bash/eval tool call
 		for (let i = messages.length - 1; i >= 0; i--) {
 			const msg = messages[i];
 			if (msg.role !== "assistant") continue;
@@ -306,13 +333,16 @@ export class CommandController {
 					this.#doCopy(tc.arguments.command, "Copied last bash command to clipboard");
 					return;
 				}
-				if (tc.name === "python" && typeof tc.arguments.code === "string") {
-					this.#doCopy(tc.arguments.code, "Copied last python code to clipboard");
-					return;
+				if (tc.name === "eval") {
+					const code = this.#extractEvalCode(tc.arguments);
+					if (code) {
+						this.#doCopy(code, "Copied last eval code to clipboard");
+						return;
+					}
 				}
 			}
 		}
-		this.ctx.showWarning("No bash or python command found in the conversation.");
+		this.ctx.showWarning("No bash or eval command found in the conversation.");
 	}
 
 	#doCopy(content: string, label: string) {
@@ -344,10 +374,15 @@ export class CommandController {
 			const openaiWebsocketSetting = this.ctx.settings.get("providers.openaiWebsockets") ?? "auto";
 			const preferOpenAICodexWebsockets =
 				openaiWebsocketSetting === "on" ? true : openaiWebsocketSetting === "off" ? false : undefined;
+			const credentialSource = this.ctx.session.modelRegistry.authStorage.describeCredentialSource(
+				model.provider,
+				stats.sessionId,
+			);
 			const providerDetails = getProviderDetails({
 				model,
 				sessionId: stats.sessionId,
 				authMode,
+				credentialSource,
 				preferWebsockets: preferOpenAICodexWebsockets,
 				providerSessionState: this.ctx.session.providerSessionState,
 			});
@@ -379,28 +414,6 @@ export class CommandController {
 			if (normalizedPremiumRequests > 0) {
 				info += `${theme.fg("dim", "Premium Requests:")} ${normalizedPremiumRequests.toLocaleString()}\n`;
 			}
-		}
-
-		const gateway = await getGatewayStatus();
-		info += `\n${theme.bold("Python Gateway")}\n`;
-		if (gateway.active) {
-			info += `${theme.fg("dim", "Status:")} ${theme.fg("success", "Active (Global)")}\n`;
-			info += `${theme.fg("dim", "URL:")} ${gateway.url}\n`;
-			info += `${theme.fg("dim", "PID:")} ${gateway.pid}\n`;
-			if (gateway.pythonPath) {
-				info += `${theme.fg("dim", "Python:")} ${gateway.pythonPath}\n`;
-			}
-			if (gateway.venvPath) {
-				info += `${theme.fg("dim", "Venv:")} ${gateway.venvPath}\n`;
-			}
-			if (gateway.uptime !== null) {
-				const uptimeSec = Math.floor(gateway.uptime / 1000);
-				const mins = Math.floor(uptimeSec / 60);
-				const secs = uptimeSec % 60;
-				info += `${theme.fg("dim", "Uptime:")} ${mins}m ${secs}s\n`;
-			}
-		} else {
-			info += `${theme.fg("dim", "Status:")} ${theme.fg("dim", "Inactive")}\n`;
 		}
 
 		if (this.ctx.lspServers && this.ctx.lspServers.length > 0) {
@@ -495,7 +508,8 @@ export class CommandController {
 			return;
 		}
 
-		const output = renderUsageReports(usageReports, theme, Date.now());
+		const availableWidth = Math.max(40, (this.ctx.ui.terminal.columns ?? 100) - 2);
+		const output = renderUsageReports(usageReports, theme, Date.now(), availableWidth);
 		this.ctx.chatContainer.addChild(new Spacer(1));
 		this.ctx.chatContainer.addChild(new Text(output, 1, 0));
 		this.ctx.ui.requestRender();
@@ -538,15 +552,32 @@ export class CommandController {
 		showMarkdownPanel(this.ctx, "Available Tools", tools);
 	}
 
+	handleContextCommand(): void {
+		const breakdown = computeContextBreakdown(this.ctx.session);
+		if (breakdown.contextWindow <= 0) {
+			this.ctx.showWarning("Context usage is unavailable: no model is selected for this session.");
+			return;
+		}
+		const output = renderContextUsage(breakdown, theme);
+		this.ctx.chatContainer.addChild(new Spacer(1));
+		this.ctx.chatContainer.addChild(new DynamicBorder());
+		this.ctx.chatContainer.addChild(new Text(theme.bold(theme.fg("accent", "Context Usage")), 1, 0));
+		this.ctx.chatContainer.addChild(new Spacer(1));
+		this.ctx.chatContainer.addChild(new Text(output, 1, 0));
+		this.ctx.chatContainer.addChild(new DynamicBorder());
+		this.ctx.ui.requestRender();
+	}
+
 	async handleMemoryCommand(text: string): Promise<void> {
 		const argumentText = text.slice(7).trim();
 		const action = argumentText.split(/\s+/, 1)[0]?.toLowerCase() || "view";
 		const agentDir = this.ctx.settings.getAgentDir();
+		const backend = resolveMemoryBackend(this.ctx.settings);
 
 		if (action === "view") {
-			const payload = await buildMemoryToolDeveloperInstructions(agentDir, this.ctx.settings);
+			const payload = await backend.buildDeveloperInstructions(agentDir, this.ctx.settings, this.ctx.session);
 			if (!payload) {
-				this.ctx.showWarning("Memory payload is empty (memories disabled or no memory summary found).");
+				this.ctx.showWarning("Memory payload is empty (memory backend off, disabled, or no memory available).");
 				return;
 			}
 			this.ctx.chatContainer.addChild(new Spacer(1));
@@ -561,7 +592,7 @@ export class CommandController {
 
 		if (action === "reset" || action === "clear") {
 			try {
-				await clearMemoryData(agentDir, this.ctx.sessionManager.getCwd());
+				await backend.clear(agentDir, this.ctx.sessionManager.getCwd(), this.ctx.session);
 				await this.ctx.session.refreshBaseSystemPrompt();
 				this.ctx.showStatus("Memory data cleared and system prompt refreshed.");
 			} catch (error) {
@@ -572,7 +603,7 @@ export class CommandController {
 
 		if (action === "enqueue" || action === "rebuild") {
 			try {
-				enqueueMemoryConsolidation(agentDir, this.ctx.sessionManager.getCwd());
+				await backend.enqueue(agentDir, this.ctx.sessionManager.getCwd(), this.ctx.session);
 				this.ctx.showStatus("Memory consolidation enqueued.");
 			} catch (error) {
 				this.ctx.showError(`Memory enqueue failed: ${error instanceof Error ? error.message : String(error)}`);
@@ -580,7 +611,257 @@ export class CommandController {
 			return;
 		}
 
-		this.ctx.showError("Usage: /memory <view|clear|reset|enqueue|rebuild>");
+		if (action === "mm") {
+			await this.#handleMentalModelsSubcommand(argumentText);
+			return;
+		}
+
+		this.ctx.showError("Usage: /memory <view|clear|reset|enqueue|rebuild|mm ...>");
+	}
+
+	async #handleMentalModelsSubcommand(argumentText: string): Promise<void> {
+		// Parse: "mm <verb> [arg]"
+		const parts = argumentText.split(/\s+/).slice(1);
+		const verb = parts[0]?.toLowerCase() ?? "list";
+		const arg = parts[1];
+
+		const state = this.ctx.session.getHindsightSessionState();
+		const primary = state && !state.aliasOf ? state : undefined;
+		if (!primary) {
+			this.ctx.showError("Hindsight backend is not active for this session.");
+			return;
+		}
+		if (!primary.config.mentalModelsEnabled) {
+			this.ctx.showError("Mental models are disabled (hindsight.mentalModelsEnabled = false).");
+			return;
+		}
+
+		switch (verb) {
+			case "list":
+				await this.#mmList(primary);
+				return;
+			case "show":
+				if (!arg) return this.ctx.showError("Usage: /memory mm show <id>");
+				await this.#mmShow(primary, arg);
+				return;
+			case "refresh":
+				await this.#mmRefresh(primary, arg);
+				return;
+			case "history":
+				if (!arg) return this.ctx.showError("Usage: /memory mm history <id>");
+				await this.#mmHistory(primary, arg);
+				return;
+			case "seed":
+				await this.#mmSeed(primary);
+				return;
+			case "reload":
+				await this.#mmReload(primary);
+				return;
+			case "delete":
+			case "remove":
+				if (!arg) return this.ctx.showError("Usage: /memory mm delete <id>");
+				await this.#mmDelete(primary, arg);
+				return;
+			default:
+				this.ctx.showError("Usage: /memory mm <list|show|refresh|history|seed|reload|delete>");
+		}
+	}
+
+	async #mmList(state: HindsightSessionState): Promise<void> {
+		const client: HindsightApi = state.client;
+		try {
+			const response = await client.listMentalModels(state.bankId, { detail: "metadata" });
+			const items = response.items ?? [];
+			if (items.length === 0) {
+				this.ctx.showStatus(`No mental models on bank ${state.bankId}.`);
+				return;
+			}
+			const lines = items
+				.slice()
+				.sort((a, b) => a.id.localeCompare(b.id))
+				.map(summarizeMentalModel);
+			showMarkdownPanel(this.ctx, `Mental Models — ${state.bankId}`, lines.join("\n"));
+		} catch (error) {
+			this.ctx.showError(`mm list failed: ${error instanceof Error ? error.message : String(error)}`);
+		}
+	}
+
+	async #mmShow(state: HindsightSessionState, id: string): Promise<void> {
+		try {
+			const model = await state.client.getMentalModel(state.bankId, id, { detail: "content" });
+			if (!model) {
+				this.ctx.showError(`Mental model not found: ${id}`);
+				return;
+			}
+			const tags = model.tags && model.tags.length > 0 ? `\n_tags: ${model.tags.join(", ")}_` : "";
+			const refreshed = model.last_refreshed_at ? `\n_last refreshed: ${model.last_refreshed_at}_` : "";
+			const sourceQuery = model.source_query ? `\n\n**Source query:** ${model.source_query}` : "";
+			const content = (model.content ?? "_(empty — background reflect may still be running)_").trim();
+			showMarkdownPanel(
+				this.ctx,
+				model.name,
+				`**id:** \`${model.id}\`${tags}${refreshed}${sourceQuery}\n\n${content}`,
+			);
+		} catch (error) {
+			this.ctx.showError(`mm show failed: ${error instanceof Error ? error.message : String(error)}`);
+		}
+	}
+
+	async #mmRefresh(state: HindsightSessionState, id: string | undefined): Promise<void> {
+		try {
+			if (id) {
+				// Single-model refresh is explicit operator intent: bypass the
+				// auto-refresh filter so curated/manual models can still be
+				// refreshed on demand.
+				await state.client.refreshMentalModel(state.bankId, id);
+				this.ctx.showStatus(`Refresh queued for mental model ${id}.`);
+			} else {
+				// Bulk refresh: only touch models that opted into automatic
+				// refresh via `trigger.refresh_after_consolidation`. Curated
+				// models are reviewed before publishing and must not be
+				// silently regenerated by a bank-wide refresh sweep. Reading
+				// `detail: "content"` here is required because the trigger
+				// field is excluded from `detail: "metadata"`.
+				const list = await state.client.listMentalModels(state.bankId, { detail: "content" });
+				const items = list.items ?? [];
+				if (items.length === 0) {
+					this.ctx.showStatus(`No mental models on bank ${state.bankId}.`);
+					return;
+				}
+				const targets = items.filter(m => m.trigger?.refresh_after_consolidation === true);
+				const skipped = items.length - targets.length;
+				if (targets.length === 0) {
+					this.ctx.showStatus(
+						`No mental models opted into auto-refresh; ${skipped} curated model(s) left untouched. Pass an explicit id to refresh one of them.`,
+					);
+					return;
+				}
+				let queued = 0;
+				for (const item of targets) {
+					try {
+						await state.client.refreshMentalModel(state.bankId, item.id);
+						queued++;
+					} catch (error) {
+						this.ctx.showWarning(
+							`Refresh failed for ${item.id}: ${error instanceof Error ? error.message : String(error)}`,
+						);
+					}
+				}
+				const skippedSuffix = skipped > 0 ? `; skipped ${skipped} curated model(s)` : "";
+				this.ctx.showStatus(
+					`Refresh queued for ${queued}/${targets.length} auto-refresh model(s)${skippedSuffix}.`,
+				);
+			}
+			// Reload the cache after a brief grace so the new content (if the refresh
+			// completes synchronously on the server) flows into the system prompt.
+			await Bun.sleep(500);
+			await reloadMentalModelsForSession(state.session);
+		} catch (error) {
+			this.ctx.showError(`mm refresh failed: ${error instanceof Error ? error.message : String(error)}`);
+		}
+	}
+
+	async #mmHistory(state: HindsightSessionState, id: string): Promise<void> {
+		try {
+			const [model, history] = await Promise.all([
+				state.client.getMentalModel(state.bankId, id, { detail: "content" }),
+				state.client.getMentalModelHistory(state.bankId, id),
+			]);
+			if (!model) {
+				this.ctx.showError(`Mental model not found: ${id}`);
+				return;
+			}
+			if (history.length === 0) {
+				this.ctx.showStatus(`No history recorded for ${id}.`);
+				return;
+			}
+			// History is most-recent first. Each entry stores the content BEFORE that
+			// change. To diff "what changed at entry N", compare entry N's
+			// previous_content (= state before that change) with entry N-1's
+			// previous_content (= state after that change, which was state before
+			// the next change). For the most recent change, compare against the
+			// model's CURRENT content.
+			const sections: string[] = [];
+			for (let i = 0; i < history.length; i++) {
+				const before = history[i].previous_content ?? "";
+				const after = i === 0 ? (model.content ?? "") : (history[i - 1].previous_content ?? "");
+				const diff = diffMentalModelContent(before, after);
+				sections.push(`### ${history[i].changed_at}\n\n\`\`\`diff\n${diff}\n\`\`\``);
+			}
+			showMarkdownPanel(this.ctx, `History — ${model.name}`, sections.join("\n\n"));
+		} catch (error) {
+			this.ctx.showError(`mm history failed: ${error instanceof Error ? error.message : String(error)}`);
+		}
+	}
+
+	async #mmSeed(state: HindsightSessionState): Promise<void> {
+		try {
+			const config = loadHindsightConfig(this.ctx.settings);
+			const seeds = resolveSeedsForScope(
+				{
+					bankId: state.bankId,
+					retainTags: state.retainTags,
+					recallTags: state.recallTags,
+					recallTagsMatch: state.recallTagsMatch,
+				},
+				config.scoping,
+			);
+			if (seeds.length === 0) {
+				this.ctx.showStatus(`No built-in seeds apply to scoping=${config.scoping}.`);
+				return;
+			}
+			const list = await state.client.listMentalModels(state.bankId, { detail: "metadata" });
+			const existing = new Set((list.items ?? []).map(m => m.id));
+			let created = 0;
+			let skipped = 0;
+			for (const seed of seeds) {
+				if (existing.has(seed.id)) {
+					skipped++;
+					continue;
+				}
+				try {
+					await state.client.createMentalModel(state.bankId, seed.name, seed.sourceQuery, {
+						id: seed.id,
+						tags: seed.tags.length > 0 ? seed.tags : undefined,
+						maxTokens: seed.maxTokens,
+						trigger: seed.trigger,
+					});
+					created++;
+				} catch (error) {
+					this.ctx.showWarning(
+						`Seed failed for ${seed.id}: ${error instanceof Error ? error.message : String(error)}`,
+					);
+				}
+			}
+			this.ctx.showStatus(`Seeded ${created} new mental model(s); ${skipped} already present.`);
+		} catch (error) {
+			this.ctx.showError(`mm seed failed: ${error instanceof Error ? error.message : String(error)}`);
+		}
+	}
+
+	async #mmReload(state: HindsightSessionState): Promise<void> {
+		const ok = await reloadMentalModelsForSession(state.session);
+		if (ok) {
+			this.ctx.showStatus("Mental-model cache reloaded.");
+		} else {
+			this.ctx.showError("Reload failed (Hindsight backend not active or mental models disabled).");
+		}
+	}
+
+	async #mmDelete(state: HindsightSessionState, id: string): Promise<void> {
+		try {
+			const removed = await state.client.deleteMentalModel(state.bankId, id);
+			if (!removed) {
+				this.ctx.showError(`Mental model not found: ${id}`);
+				return;
+			}
+			// Drop the cached snippet so the closing tag does not silently keep
+			// stale content in the system prompt until the next agent_end TTL.
+			await reloadMentalModelsForSession(state.session);
+			this.ctx.showStatus(`Deleted mental model ${id} from bank ${state.bankId}.`);
+		} catch (error) {
+			this.ctx.showError(`mm delete failed: ${error instanceof Error ? error.message : String(error)}`);
+		}
 	}
 
 	async #runNewSessionFlow(options?: NewSessionOptions, label: string = "New session started"): Promise<void> {
@@ -598,11 +879,7 @@ export class CommandController {
 		}
 		if (!(await this.ctx.session.newSession(options))) return;
 		this.ctx.resetObserverRegistry();
-		setSessionTerminalTitle(
-			this.ctx.sessionManager.getSessionName(),
-			this.ctx.sessionManager.getCwd(),
-			this.ctx.sessionManager.titleSource,
-		);
+		setSessionTerminalTitle(this.ctx.sessionManager.getSessionName(), this.ctx.sessionManager.getCwd());
 
 		this.ctx.statusLine.invalidate();
 		this.ctx.statusLine.setSessionStartTime(Date.now());
@@ -697,6 +974,7 @@ export class CommandController {
 			clearClaudePluginRootsCache(); // re-warms preloadedPluginRoots with new project dir (async)
 			resetCapabilities();
 			await this.ctx.refreshSlashCommandState(resolvedPath);
+			await this.ctx.session.refreshSshTool({ activateIfAvailable: true });
 
 			this.ctx.statusLine.invalidate();
 			this.ctx.updateEditorTopBorder();
@@ -711,127 +989,18 @@ export class CommandController {
 		}
 	}
 
-	async handleRenameCommand(title?: string): Promise<void> {
-		const wasManual = title !== undefined;
+	async handleRenameCommand(title: string): Promise<void> {
 		try {
-			if (!title) {
-				// Build compact context summary from recent conversation
-				const messages = this.ctx.session.messages;
-				if (!messages.some(m => m.role === "user")) {
-					this.ctx.showError("No messages yet \u2014 provide a title manually.");
-					return;
-				}
-				const MAX_PAIRS = 5;
-				const lines: string[] = [];
-				const toolNames = new Set<string>();
-
-				// Walk messages: for each user message, grab the next assistant first-line
-				const pairs: { user: string; assistant?: string }[] = [];
-				for (let i = 0; i < messages.length; i++) {
-					const msg = messages[i];
-					if (msg.role === "toolResult") {
-						const toolMsg = msg as { toolName?: string };
-						if (toolMsg.toolName) toolNames.add(toolMsg.toolName);
-						continue;
-					}
-					if (msg.role !== "user") continue;
-					const userText = extractMessageText(msg).trim();
-					if (!userText) continue;
-
-					// Find the next assistant message after this user message
-					let assistantLine: string | undefined;
-					for (let j = i + 1; j < messages.length; j++) {
-						const next = messages[j];
-						if (next.role === "user") break;
-						if (next.role === "toolResult") {
-							const toolMsg = next as { toolName?: string };
-							if (toolMsg.toolName) toolNames.add(toolMsg.toolName);
-							continue;
-						}
-						if (next.role === "assistant") {
-							const fullText = extractMessageText(next).trim();
-							if (fullText) {
-								// First meaningful non-heading line
-								assistantLine = fullText.split("\n").find(l => l.trim() && !l.startsWith("#")) ?? "";
-							}
-							break;
-						}
-					}
-
-					pairs.push({ user: userText, assistant: assistantLine });
-				}
-
-				// Last N pairs for recency
-				const selected = pairs.slice(-MAX_PAIRS);
-				for (const pair of selected) {
-					lines.push(`user: ${pair.user}`);
-					if (pair.assistant) lines.push(`assistant: ${pair.assistant}`);
-				}
-
-				if (toolNames.size > 0) {
-					lines.push(`Tools used: ${[...toolNames].slice(-15).join(", ")}`);
-				}
-
-				// Add compaction summary as context
-				const entries = this.ctx.sessionManager.getEntries();
-				const compactionEntry = entries.findLast(
-					e => e.type === "compaction" && typeof (e as { shortSummary?: string }).shortSummary === "string",
-				);
-				if (compactionEntry) {
-					lines.push(`Summary: ${(compactionEntry as { shortSummary: string }).shortSummary}`);
-				}
-
-				const contextSummary = lines.join("\n");
-				const projectName = path.basename(this.ctx.sessionManager.getCwd());
-				const loader = new Loader(
-					this.ctx.ui,
-					s => theme.fg("accent", s),
-					t => theme.fg("muted", t),
-					"Generating title...",
-				);
-				this.ctx.statusContainer.addChild(loader);
-				this.ctx.ui.requestRender();
-				try {
-					title =
-						(await regenerateSessionTitle(
-							contextSummary,
-							this.ctx.sessionManager.getSessionName(),
-							this.ctx.session.modelRegistry,
-							this.ctx.settings,
-							this.ctx.session.sessionId,
-							this.ctx.session.model,
-							projectName,
-						)) ?? undefined;
-				} finally {
-					loader.stop();
-					this.ctx.statusContainer.clear();
-				}
-
-				if (!title) {
-					this.ctx.showError("Could not generate a title. Try /rename <title> instead.");
-					return;
-				}
-			}
-
-			// Same-title guard: if auto-generated title matches current, skip the update
-			const currentName = this.ctx.sessionManager.getSessionName();
-			if (!wasManual && currentName && title.toLowerCase() === currentName.toLowerCase()) {
-				this.ctx.showStatus("Title unchanged.");
-				return;
-			}
-
-			const source = wasManual ? "user" : "auto";
-			const stored = await this.ctx.sessionManager.setSessionName(title, source);
+			const stored = await this.ctx.sessionManager.setSessionName(title, "user");
 			if (!stored) {
 				this.ctx.showError("Session name cannot be empty.");
 				return;
 			}
 			const name = this.ctx.sessionManager.getSessionName()!;
-			setSessionTerminalTitle(name, this.ctx.sessionManager.getCwd(), this.ctx.sessionManager.titleSource);
+			setSessionTerminalTitle(name, this.ctx.sessionManager.getCwd());
 			this.ctx.statusLine.invalidate();
 			this.ctx.updateEditorBorderColor();
-			const verb = source === "auto" ? "Title generated" : "Session renamed to";
-			this.ctx.showStatus(`${verb} "${name}".`);
+			this.ctx.showStatus(`Session renamed to "${name}".`);
 		} catch (err) {
 			this.ctx.showError(`Rename failed: ${err instanceof Error ? err.message : String(err)}`);
 		}
@@ -880,7 +1049,7 @@ export class CommandController {
 
 	async handlePythonCommand(code: string, excludeFromContext = false): Promise<void> {
 		const isDeferred = this.ctx.session.isStreaming;
-		this.ctx.pythonComponent = new PythonExecutionComponent(code, this.ctx.ui, excludeFromContext);
+		this.ctx.pythonComponent = new EvalExecutionComponent(code, this.ctx.ui, excludeFromContext);
 
 		if (isDeferred) {
 			this.ctx.pendingMessagesContainer.addChild(this.ctx.pythonComponent);
@@ -919,16 +1088,16 @@ export class CommandController {
 		this.ctx.ui.requestRender();
 	}
 
-	async handleCompactCommand(customInstructions?: string): Promise<void> {
+	async handleCompactCommand(customInstructions?: string): Promise<CompactionOutcome> {
 		const entries = this.ctx.sessionManager.getEntries();
 		const messageCount = entries.filter(e => e.type === "message").length;
 
 		if (messageCount < 2) {
 			this.ctx.showWarning("Nothing to compact (no messages yet)");
-			return;
+			return "ok";
 		}
 
-		await this.executeCompaction(customInstructions, false);
+		return this.executeCompaction(customInstructions, false);
 	}
 
 	async handleSkillCommand(skillPath: string, args: string): Promise<void> {
@@ -946,7 +1115,10 @@ export class CommandController {
 		}
 	}
 
-	async executeCompaction(customInstructionsOrOptions?: string | CompactOptions, isAuto = false): Promise<void> {
+	async executeCompaction(
+		customInstructionsOrOptions?: string | CompactOptions,
+		isAuto = false,
+	): Promise<CompactionOutcome> {
 		if (this.ctx.loadingAnimation) {
 			this.ctx.loadingAnimation.stop();
 			this.ctx.loadingAnimation = undefined;
@@ -970,6 +1142,7 @@ export class CommandController {
 		this.ctx.statusContainer.addChild(compactingLoader);
 		this.ctx.ui.requestRender();
 
+		let outcome: CompactionOutcome = "ok";
 		try {
 			const instructions = typeof customInstructionsOrOptions === "string" ? customInstructionsOrOptions : undefined;
 			const options =
@@ -983,10 +1156,12 @@ export class CommandController {
 			this.ctx.statusLine.invalidate();
 			this.ctx.updateEditorTopBorder();
 		} catch (error) {
-			const message = error instanceof Error ? error.message : String(error);
-			if (message === "Compaction cancelled" || (error instanceof Error && error.name === "AbortError")) {
+			if (error instanceof CompactionCancelledError) {
+				outcome = "cancelled";
 				this.ctx.showError("Compaction cancelled");
 			} else {
+				outcome = "failed";
+				const message = error instanceof Error ? error.message : String(error);
 				this.ctx.showError(`Compaction failed: ${message}`);
 			}
 		} finally {
@@ -995,6 +1170,7 @@ export class CommandController {
 			this.ctx.editor.onEscape = originalOnEscape;
 		}
 		await this.ctx.flushCompactionQueue({ willRetry: false });
+		return outcome;
 	}
 
 	async handleHandoffCommand(customInstructions?: string): Promise<void> {
@@ -1006,8 +1182,29 @@ export class CommandController {
 			return;
 		}
 
+		if (this.ctx.loadingAnimation) {
+			this.ctx.loadingAnimation.stop();
+			this.ctx.loadingAnimation = undefined;
+		}
+		this.ctx.statusContainer.clear();
+
+		const originalOnEscape = this.ctx.editor.onEscape;
+		this.ctx.editor.onEscape = () => {
+			this.ctx.session.abortHandoff();
+		};
+
+		const handoffLoader = new Loader(
+			this.ctx.ui,
+			spinner => theme.fg("accent", spinner),
+			text => theme.fg("muted", text),
+			"Generating handoff… (esc to cancel)",
+			getSymbolTheme().spinnerFrames,
+		);
+		this.ctx.statusContainer.addChild(handoffLoader);
+		this.ctx.ui.requestRender();
+
 		try {
-			// The agent will visibly generate the handoff document in chat
+			// Handoff generation runs as a oneshot request; the new session is shown after it completes.
 			const result = await this.ctx.session.handoff(customInstructions);
 
 			if (!result) {
@@ -1037,13 +1234,17 @@ export class CommandController {
 			} else {
 				this.ctx.showError(`Handoff failed: ${message}`);
 			}
+		} finally {
+			handoffLoader.stop();
+			this.ctx.statusContainer.clear();
+			this.ctx.editor.onEscape = originalOnEscape;
 		}
 		this.ctx.ui.requestRender();
 	}
 }
 
-const BAR_WIDTH = 24;
-const COLUMN_WIDTH = BAR_WIDTH + 2;
+const BAR_WIDTH_MAX = 24;
+const BAR_WIDTH_MIN = 4;
 
 function renderJobLine(job: AsyncJobSnapshotItem, now: number): string {
 	const duration = formatDuration(Math.max(0, now - job.startTime));
@@ -1071,6 +1272,7 @@ function truncateJobLabel(label: string, maxWidth: number): string {
 
 	return `${out}…`;
 }
+
 function formatProviderName(provider: string): string {
 	return provider
 		.split(/[-_]/g)
@@ -1080,10 +1282,6 @@ function formatProviderName(provider: string): string {
 
 function formatNumber(value: number, maxFractionDigits = 1): string {
 	return new Intl.NumberFormat("en-US", { maximumFractionDigits: maxFractionDigits }).format(value);
-}
-
-function formatUsedAccounts(value: number): string {
-	return `${value.toFixed(2)} used`;
 }
 
 function resolveProviderAuthMode(authStorage: AuthStorage, provider: string): string {
@@ -1169,11 +1367,39 @@ function formatResetShort(limit: UsageLimit, nowMs: number): string | undefined 
 	return undefined;
 }
 
-function formatAccountHeader(limit: UsageLimit, report: UsageReport, index: number, nowMs: number): string {
-	const label = formatAccountLabel(limit, report, index);
-	const reset = formatResetShort(limit, nowMs);
-	if (!reset) return label;
-	return `${label} (${reset})`;
+function formatAccountHeaderRow(
+	limits: UsageLimit[],
+	reports: UsageReport[],
+	nowMs: number,
+	columnWidth: number,
+	uiTheme: typeof theme,
+): string[] {
+	const parts = limits.map((limit, index) => {
+		const reset = formatResetShort(limit, nowMs);
+		return {
+			label: formatAccountLabel(limit, reports[index], index),
+			suffix: reset ? `(${reset})` : "",
+		};
+	});
+	const maxSuffixWidth = parts.reduce((max, p) => Math.max(max, visibleWidth(p.suffix)), 0);
+	const gap = maxSuffixWidth > 0 ? 1 : 0;
+	const prefixBudget = columnWidth - maxSuffixWidth - gap;
+
+	// If suffix can't share the cell with at least `x…`, fall back to whole-label truncation.
+	if (prefixBudget < 2) {
+		return parts.map(p => {
+			const full = p.suffix ? `${p.label} ${p.suffix}` : p.label;
+			return padColumn(truncateJobLabel(full, columnWidth), columnWidth);
+		});
+	}
+
+	return parts.map(p => {
+		const prefix = truncateJobLabel(p.label, prefixBudget);
+		const prefixCell = prefix + " ".repeat(prefixBudget - visibleWidth(prefix));
+		if (!p.suffix) return prefixCell + " ".repeat(maxSuffixWidth + gap);
+		const suffixPad = " ".repeat(maxSuffixWidth - visibleWidth(p.suffix));
+		return `${prefixCell} ${suffixPad}${uiTheme.fg("dim", p.suffix)}`;
+	});
 }
 
 function padColumn(text: string, width: number): string {
@@ -1200,10 +1426,8 @@ function formatAggregateAmount(limits: UsageLimit[]): string {
 		.filter((value): value is number => value !== undefined);
 	if (fractions.length === limits.length && fractions.length > 0) {
 		const sum = fractions.reduce((total, value) => total + value, 0);
-		const usedPct = Math.max(sum * 100, 0);
-		const remainingPct = Math.max(0, limits.length * 100 - usedPct);
-		const avgRemaining = limits.length > 0 ? remainingPct / limits.length : remainingPct;
-		return `${formatUsedAccounts(sum)} (${formatNumber(avgRemaining)}% left)`;
+		const avgRemaining = Math.max(0, ((limits.length - sum) / limits.length) * 100);
+		return `${formatNumber(avgRemaining)}% free`;
 	}
 
 	const amounts = limits
@@ -1212,13 +1436,11 @@ function formatAggregateAmount(limits: UsageLimit[]): string {
 	if (amounts.length === limits.length && amounts.length > 0) {
 		const totalUsed = amounts.reduce((sum, amount) => sum + (amount.used ?? 0), 0);
 		const totalLimit = amounts.reduce((sum, amount) => sum + (amount.limit ?? 0), 0);
-		const usedPct = totalLimit > 0 ? (totalUsed / totalLimit) * 100 : 0;
-		const remainingPct = Math.max(0, 100 - usedPct);
-		const usedAccounts = totalLimit > 0 ? (usedPct / 100) * limits.length : 0;
-		return `${formatUsedAccounts(usedAccounts)} (${formatNumber(remainingPct)}% left)`;
+		const remainingPct = totalLimit > 0 ? Math.max(0, 100 - (totalUsed / totalLimit) * 100) : 0;
+		return `${formatNumber(remainingPct)}% free`;
 	}
 
-	return `Accounts: ${limits.length}`;
+	return `${limits.length} accts`;
 }
 
 function resolveResetRange(limits: UsageLimit[], nowMs: number): string | null {
@@ -1249,20 +1471,47 @@ function resolveStatusColor(status: UsageLimit["status"]): "success" | "warning"
 	return "dim";
 }
 
-function renderUsageBar(limit: UsageLimit, uiTheme: typeof theme): string {
+function renderUsageBar(limit: UsageLimit, uiTheme: typeof theme, barWidth: number): string {
 	const fraction = resolveFraction(limit);
 	if (fraction === undefined) {
-		return uiTheme.fg("dim", `[${"·".repeat(BAR_WIDTH)}]`);
+		return uiTheme.fg("dim", "·".repeat(barWidth));
 	}
 	const clamped = Math.min(Math.max(fraction, 0), 1);
-	const filled = Math.round(clamped * BAR_WIDTH);
-	const filledBar = "█".repeat(filled);
-	const emptyBar = "░".repeat(Math.max(0, BAR_WIDTH - filled));
+	const exact = clamped * barWidth;
+	const fullCells = Math.floor(exact);
+	const remainder = exact - fullCells;
+	let partial = "";
+	if (remainder >= 2 / 3) partial = "▓";
+	else if (remainder >= 1 / 3) partial = "▒";
+	const leading = "█".repeat(fullCells) + partial;
+	const empty = "░".repeat(Math.max(0, barWidth - fullCells - (partial ? 1 : 0)));
 	const color = resolveStatusColor(limit.status);
-	return `${uiTheme.fg("dim", "[")}${uiTheme.fg(color, filledBar)}${uiTheme.fg("dim", emptyBar)}${uiTheme.fg("dim", "]")}`;
+	return `${uiTheme.fg(color, leading)}${uiTheme.fg("dim", empty)}`;
 }
 
-function renderUsageReports(reports: UsageReport[], uiTheme: typeof theme, nowMs: number): string {
+/**
+ * Pick a per-column width so n bars + a trailing amount string fit in `available` columns.
+ * Falls back to the minimum when the terminal is too narrow rather than wrapping.
+ */
+function resolveColumnWidth(count: number, available: number, trailing: number): number {
+	if (count <= 0) return BAR_WIDTH_MAX;
+	const indent = 2;
+	const gaps = count - 1;
+	const spaceForBars = available - indent - gaps - (trailing > 0 ? trailing + 1 : 0);
+	const ideal = Math.floor(spaceForBars / count);
+	const min = BAR_WIDTH_MIN;
+	const max = BAR_WIDTH_MAX;
+	if (ideal < min) return min;
+	if (ideal > max) return max;
+	return ideal;
+}
+
+function renderUsageReports(
+	reports: UsageReport[],
+	uiTheme: typeof theme,
+	nowMs: number,
+	availableWidth: number,
+): string {
 	const lines: string[] = [];
 	const latestFetchedAt = Math.max(...reports.map(report => report.fetchedAt ?? 0));
 	const headerSuffix = latestFetchedAt ? ` (${formatDuration(nowMs - latestFetchedAt)} ago)` : "";
@@ -1311,7 +1560,7 @@ function renderUsageReports(reports: UsageReport[], uiTheme: typeof theme, nowMs
 
 		lines.push(uiTheme.bold(uiTheme.fg("accent", providerName)));
 
-		for (const group of limitGroups.values()) {
+		const renderableGroups = Array.from(limitGroups.values()).map(group => {
 			const entries = group.limits.map((limit, index) => ({
 				limit,
 				report: group.reports[index],
@@ -1326,18 +1575,25 @@ function renderUsageReports(reports: UsageReport[], uiTheme: typeof theme, nowMs
 			});
 			const sortedLimits = entries.map(entry => entry.limit);
 			const sortedReports = entries.map(entry => entry.report);
+			return { group, sortedLimits, sortedReports, amountText: formatAggregateAmount(sortedLimits) };
+		});
 
+		const sectionCount = renderableGroups.reduce((max, g) => Math.max(max, g.sortedLimits.length), 0);
+		const sectionTrailing = renderableGroups.reduce((max, g) => Math.max(max, visibleWidth(g.amountText)), 0);
+		const sectionColumnWidth = resolveColumnWidth(sectionCount, availableWidth, sectionTrailing);
+
+		for (const { group, sortedLimits, sortedReports, amountText } of renderableGroups) {
 			const status = resolveAggregateStatus(sortedLimits);
 			const statusIcon = resolveStatusIcon(status, uiTheme);
 
 			const windowSuffix = formatWindowSuffix(group.label, group.windowLabel, uiTheme);
 			lines.push(`${statusIcon} ${uiTheme.bold(group.label)} ${windowSuffix}`.trim());
-			const accountLabels = sortedLimits.map((limit, index) =>
-				padColumn(formatAccountHeader(limit, sortedReports[index], index, nowMs), COLUMN_WIDTH),
-			);
+			const accountLabels = formatAccountHeaderRow(sortedLimits, sortedReports, nowMs, sectionColumnWidth, uiTheme);
 			lines.push(`  ${accountLabels.join(" ")}`.trimEnd());
-			const bars = sortedLimits.map(limit => padColumn(renderUsageBar(limit, uiTheme), COLUMN_WIDTH));
-			lines.push(`  ${bars.join(" ")} ${formatAggregateAmount(sortedLimits)}`.trimEnd());
+			const bars = sortedLimits.map(limit =>
+				padColumn(renderUsageBar(limit, uiTheme, sectionColumnWidth), sectionColumnWidth),
+			);
+			lines.push(`  ${bars.join(" ")} ${amountText}`.trimEnd());
 			const resetText = sortedLimits.length <= 1 ? resolveResetRange(sortedLimits, nowMs) : null;
 			if (resetText) {
 				lines.push(`  ${uiTheme.fg("dim", resetText)}`.trimEnd());

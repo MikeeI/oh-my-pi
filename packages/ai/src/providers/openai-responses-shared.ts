@@ -12,21 +12,25 @@ import type {
 	ResponseReasoningItem,
 } from "openai/resources/responses/responses";
 import { calculateCost } from "../models";
-import type {
-	Api,
-	AssistantMessage,
-	ImageContent,
-	Model,
-	StopReason,
-	TextContent,
-	TextSignatureV1,
-	ThinkingContent,
-	ToolCall,
-	ToolResultMessage,
+import {
+	type Api,
+	type AssistantMessage,
+	type ImageContent,
+	type Model,
+	type ServiceTier,
+	type StopReason,
+	type StreamOptions,
+	shouldSendServiceTier,
+	type TextContent,
+	type TextSignatureV1,
+	type ThinkingContent,
+	type ToolCall,
+	type ToolResultMessage,
 } from "../types";
 import { normalizeResponsesToolCallId } from "../utils";
 import type { AssistantMessageEventStream } from "../utils/event-stream";
 import { parseStreamingJson } from "../utils/json-parse";
+import { joinTextWithImagePlaceholder, NON_VISION_IMAGE_PLACEHOLDER, partitionVisionContent } from "./vision-guard";
 
 export function encodeTextSignatureV1(id: string, phase?: TextSignatureV1["phase"]): string {
 	const payload: TextSignatureV1 = { v: 1, id };
@@ -121,23 +125,29 @@ export function convertResponsesInputContent(
 		return [{ type: "input_text", text: content.toWellFormed() } satisfies ResponseInputText];
 	}
 
-	const normalizedContent = content
-		.map((item): ResponseInputContent => {
-			if (item.type === "text") {
-				return {
-					type: "input_text",
-					text: item.text.toWellFormed(),
-				} satisfies ResponseInputText;
-			}
-			return {
-				type: "input_image",
-				detail: "auto",
-				image_url: `data:${item.mimeType};base64,${item.data}`,
-			} satisfies ResponseInputImage;
-		})
-		.filter(item => supportsImages || item.type !== "input_image")
-		.filter(item => item.type !== "input_text" || item.text.trim().length > 0);
-
+	const { textBlocks, imageBlocks, omittedImages } = partitionVisionContent(content, supportsImages);
+	const normalizedContent: ResponseInputContent[] = [];
+	for (const item of textBlocks) {
+		const text = item.text.toWellFormed();
+		if (text.trim().length === 0) continue;
+		normalizedContent.push({
+			type: "input_text",
+			text,
+		} satisfies ResponseInputText);
+	}
+	for (const item of imageBlocks) {
+		normalizedContent.push({
+			type: "input_image",
+			detail: "auto",
+			image_url: `data:${item.mimeType};base64,${item.data}`,
+		} satisfies ResponseInputImage);
+	}
+	if (omittedImages) {
+		normalizedContent.push({
+			type: "input_text",
+			text: NON_VISION_IMAGE_PLACEHOLDER,
+		} satisfies ResponseInputText);
+	}
 	return normalizedContent.length > 0 ? normalizedContent : undefined;
 }
 
@@ -187,9 +197,9 @@ export function convertResponsesAssistantMessage<TApi extends Api>(
 			continue;
 		}
 
-		const normalized = normalizeResponsesToolCallId(block.id);
+		const normalized = normalizeResponsesToolCallId(block.id, block.customWireName ? "ctc" : "fc");
 		let itemId: string | undefined = normalized.itemId;
-		if (isDifferentModel && (itemId?.startsWith("fc_") || itemId?.startsWith("fcr_"))) {
+		if (isDifferentModel && (itemId?.startsWith("fc_") || itemId?.startsWith("fcr_") || itemId?.startsWith("ctc_"))) {
 			itemId = undefined;
 		}
 		knownCallIds.add(normalized.callId);
@@ -225,17 +235,25 @@ export function appendResponsesToolResultMessages<TApi extends Api>(
 	knownCallIds: ReadonlySet<string>,
 	customCallIds?: ReadonlySet<string>,
 ): void {
+	const supportsImages = model.input.includes("image");
 	const textResult = toolResult.content
 		.filter((block): block is TextContent => block.type === "text")
 		.map(block => block.text)
 		.join("\n");
 	const hasImages = toolResult.content.some((block): block is ImageContent => block.type === "image");
+	const omittedImages = hasImages && !supportsImages;
 	const normalized = normalizeResponsesToolCallId(toolResult.toolCallId);
 	if (strictResponsesPairing && !knownCallIds.has(normalized.callId)) {
 		return;
 	}
 
-	const output = (textResult.length > 0 ? textResult : "(see attached image)").toWellFormed();
+	const output = (
+		omittedImages
+			? joinTextWithImagePlaceholder(textResult, true)
+			: textResult.length > 0
+				? textResult
+				: "(see attached image)"
+	).toWellFormed();
 	if (customCallIds?.has(normalized.callId)) {
 		messages.push({
 			type: "custom_tool_call_output",
@@ -250,7 +268,7 @@ export function appendResponsesToolResultMessages<TApi extends Api>(
 		});
 	}
 
-	if (!hasImages || !model.input.includes("image")) {
+	if (!hasImages || !supportsImages) {
 		return;
 	}
 
@@ -525,26 +543,29 @@ export async function processResponsesStream<TApi extends Api>(
 			if (response?.id) {
 				output.responseId = response.id;
 			}
-			if (response?.usage) {
-				const cachedTokens = response.usage.input_tokens_details?.cached_tokens || 0;
-				output.usage = {
-					input: (response.usage.input_tokens || 0) - cachedTokens,
-					output: response.usage.output_tokens || 0,
-					cacheRead: cachedTokens,
-					cacheWrite: 0,
-					totalTokens: response.usage.total_tokens || 0,
-					cost: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0, total: 0 },
-				};
-			}
+			populateResponsesUsageFromResponse(output, response?.usage);
 			calculateCost(model, output.usage);
 			output.stopReason = mapOpenAIResponsesStopReason(response?.status);
+			if (response?.status === "failed" || response?.status === "cancelled") {
+				const error = response?.error ?? (response as any)?.status_details?.error;
+				const details = response?.incomplete_details;
+				const statusDetailsReason = (response as any)?.status_details?.reason;
+				const message = error
+					? `${error.code || "unknown"}: ${error.message || "no message"}`
+					: details?.reason
+						? `incomplete: ${details.reason}`
+						: typeof statusDetailsReason === "string" && statusDetailsReason.length > 0
+							? `status_details: ${statusDetailsReason}`
+							: "Unknown error (no error details in response)";
+				throw new Error(message);
+			}
 			if (output.content.some(block => block.type === "toolCall") && output.stopReason === "stop") {
 				output.stopReason = "toolUse";
 			}
 		} else if (event.type === "error") {
 			throw new Error(`Error Code ${event.code}: ${event.message}` || "Unknown error");
 		} else if (event.type === "response.failed") {
-			const error = event.response?.error;
+			const error = event.response?.error ?? (event.response as any)?.status_details?.error;
 			const details = event.response?.incomplete_details;
 			const message = error
 				? `${error.code || "unknown"}: ${error.message || "no message"}`
@@ -574,4 +595,132 @@ export function mapOpenAIResponsesStopReason(status: OpenAI.Responses.ResponseSt
 			throw new Error(`Unhandled stop reason: ${exhaustive}`);
 		}
 	}
+}
+
+/** Initial empty `AssistantMessage` that streaming providers accumulate into. */
+export function createInitialResponsesAssistantMessage(api: Api, provider: string, modelId: string): AssistantMessage {
+	return {
+		role: "assistant",
+		content: [],
+		api,
+		provider,
+		model: modelId,
+		usage: {
+			input: 0,
+			output: 0,
+			cacheRead: 0,
+			cacheWrite: 0,
+			totalTokens: 0,
+			cost: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0, total: 0 },
+		},
+		stopReason: "stop",
+		timestamp: Date.now(),
+	};
+}
+
+/** Extension fields we add on top of `ResponseCreateParamsStreaming` across the Responses-family providers. */
+export type ResponsesSamplingParamsExtras = {
+	top_p?: number;
+	top_k?: number;
+	min_p?: number;
+	presence_penalty?: number;
+	repetition_penalty?: number;
+};
+
+type CommonResponsesParams = OpenAI.Responses.ResponseCreateParamsStreaming & ResponsesSamplingParamsExtras;
+
+type CommonSamplingOptions = Pick<
+	StreamOptions,
+	"temperature" | "topP" | "topK" | "minP" | "presencePenalty" | "repetitionPenalty" | "maxTokens"
+> & { serviceTier?: ServiceTier };
+
+/**
+ * Apply the common `StreamOptions` → Responses sampling-parameter mapping (max output tokens,
+ * temperature, top-p/k, min-p, presence/repetition penalties, service tier). Mutates `params`.
+ */
+export function applyCommonResponsesSamplingParams<P extends CommonResponsesParams>(
+	params: P,
+	options: CommonSamplingOptions | undefined,
+	provider: string,
+): void {
+	if (options?.maxTokens) params.max_output_tokens = options.maxTokens;
+	if (options?.temperature !== undefined) params.temperature = options.temperature;
+	if (options?.topP !== undefined) params.top_p = options.topP;
+	if (options?.topK !== undefined) params.top_k = options.topK;
+	if (options?.minP !== undefined) params.min_p = options.minP;
+	if (options?.presencePenalty !== undefined) params.presence_penalty = options.presencePenalty;
+	if (options?.repetitionPenalty !== undefined) params.repetition_penalty = options.repetitionPenalty;
+	if (shouldSendServiceTier(options?.serviceTier, provider)) {
+		params.service_tier = options.serviceTier;
+	}
+}
+
+type ReasoningOptions = {
+	reasoning?: string;
+	reasoningSummary?: "auto" | "detailed" | "concise" | null;
+};
+
+/**
+ * Apply reasoning-related Responses parameters: enable encrypted reasoning content for replay,
+ * set effort/summary when requested, and otherwise inject the GPT-5 "Juice: 0" no-reasoning hack.
+ * Mutates `params` and may push a developer message into `messages`.
+ */
+export function applyResponsesReasoningParams<P extends OpenAI.Responses.ResponseCreateParamsStreaming>(
+	params: P,
+	model: Model<Api>,
+	options: ReasoningOptions | undefined,
+	messages: ResponseInput,
+	mapEffort?: (effort: string) => string,
+): void {
+	if (!model.reasoning) return;
+	// Always request encrypted reasoning content so reasoning items can be replayed in
+	// multi-turn conversations when store is false (items aren't persisted server-side, so
+	// we must include the full content). See: https://github.com/can1357/oh-my-pi/issues/41
+	params.include = ["reasoning.encrypted_content"];
+
+	if (options?.reasoning || options?.reasoningSummary !== undefined) {
+		const requested = options?.reasoning || "medium";
+		type ReasoningParam = NonNullable<OpenAI.Responses.ResponseCreateParamsStreaming["reasoning"]>;
+		const reasoningParams: ReasoningParam = {
+			effort: (mapEffort ? mapEffort(requested) : requested) as ReasoningParam["effort"],
+		};
+		if (options?.reasoningSummary !== null) {
+			reasoningParams.summary = options?.reasoningSummary || "auto";
+		}
+		params.reasoning = reasoningParams as P["reasoning"];
+	} else if (model.name.toLowerCase().startsWith("gpt-5")) {
+		// Jesus Christ, see https://community.openai.com/t/need-reasoning-false-option-for-gpt-5/1351588/7
+		messages.push({
+			role: "developer",
+			content: [{ type: "input_text", text: "# Juice: 0 !important" }],
+		});
+	}
+}
+
+/** Populate `output.usage` from a Responses-API `response.usage` payload. Does not invoke `calculateCost`. */
+export function populateResponsesUsageFromResponse(
+	output: AssistantMessage,
+	usage:
+		| {
+				input_tokens?: number | null;
+				output_tokens?: number | null;
+				total_tokens?: number | null;
+				input_tokens_details?: { cached_tokens?: number | null } | null;
+				output_tokens_details?: { reasoning_tokens?: number | null } | null;
+		  }
+		| null
+		| undefined,
+): void {
+	if (!usage) return;
+	const cachedTokens = usage.input_tokens_details?.cached_tokens || 0;
+	const reasoningTokens = usage.output_tokens_details?.reasoning_tokens || 0;
+	output.usage = {
+		input: (usage.input_tokens || 0) - cachedTokens,
+		output: usage.output_tokens || 0,
+		cacheRead: cachedTokens,
+		cacheWrite: 0,
+		totalTokens: usage.total_tokens || 0,
+		...(reasoningTokens > 0 ? { reasoningTokens } : {}),
+		cost: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0, total: 0 },
+	};
 }

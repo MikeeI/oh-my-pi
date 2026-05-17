@@ -15,10 +15,13 @@ const emptyUsage: Usage = {
 const compat: Required<OpenAICompat> = {
 	supportsStore: true,
 	supportsDeveloperRole: true,
+	supportsMultipleSystemMessages: true,
 	supportsReasoningEffort: true,
 	reasoningEffortMap: {},
 	supportsUsageInStreaming: true,
 	supportsToolChoice: true,
+	disableReasoningOnForcedToolChoice: false,
+	disableReasoningOnToolChoice: false,
 	maxTokensField: "max_completion_tokens",
 	requiresToolResultName: false,
 	requiresAssistantAfterToolResult: false,
@@ -27,6 +30,7 @@ const compat: Required<OpenAICompat> = {
 	thinkingFormat: "openai",
 	reasoningContentField: "reasoning_content",
 	requiresReasoningContentForToolCalls: false,
+	allowsSyntheticReasoningContentForToolCalls: true,
 	requiresAssistantContentForToolCalls: false,
 	openRouterRouting: {},
 	vercelGatewayRouting: {},
@@ -51,7 +55,7 @@ function buildToolResult(toolCallId: string, timestamp: number): ToolResultMessa
 
 describe("openai-completions convertMessages", () => {
 	it("batches tool-result images after consecutive tool results", () => {
-		const baseModel = getBundledModel("openai", "gpt-4o-mini");
+		const baseModel = getBundledModel("openai", "gpt-4o-mini") as Model<"openai-completions">;
 		const model: Model<"openai-completions"> = {
 			...baseModel,
 			api: "openai-completions",
@@ -94,7 +98,7 @@ describe("openai-completions convertMessages", () => {
 		expect(imageParts.length).toBe(2);
 	});
 	it("uses generated tool_call_id values when assistant/tool IDs are empty", () => {
-		const baseModel = getBundledModel("openai", "gpt-4o-mini");
+		const baseModel = getBundledModel("openai", "gpt-4o-mini") as Model<"openai-completions">;
 		const model: Model<"openai-completions"> = {
 			...baseModel,
 			api: "openai-completions",
@@ -143,7 +147,7 @@ describe("openai-completions convertMessages", () => {
 	});
 
 	it("serializes string tool arguments into valid JSON objects", () => {
-		const baseModel = getBundledModel("openai", "gpt-4o-mini");
+		const baseModel = getBundledModel("openai", "gpt-4o-mini") as Model<"openai-completions">;
 		const model: Model<"openai-completions"> = {
 			...baseModel,
 			api: "openai-completions",

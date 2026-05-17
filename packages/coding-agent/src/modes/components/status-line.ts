@@ -1,5 +1,4 @@
 import * as fs from "node:fs";
-import type { AssistantMessage } from "@oh-my-pi/pi-ai";
 import { type Component, truncateToWidth, visibleWidth } from "@oh-my-pi/pi-tui";
 import { formatCount, getProjectDir } from "@oh-my-pi/pi-utils";
 import { $ } from "bun";
@@ -7,10 +6,10 @@ import { settings } from "../../config/settings";
 import type { StatusLinePreset, StatusLineSegmentId, StatusLineSeparatorStyle } from "../../config/settings-schema";
 import { theme } from "../../modes/theme/theme";
 import type { AgentSession } from "../../session/agent-session";
-import { calculatePromptTokens } from "../../session/compaction/compaction";
 import * as git from "../../utils/git";
-import { getSessionAccentAnsi, getSessionAccentHexForTitle } from "../../utils/session-color";
+import { getSessionAccentAnsi, getSessionAccentHex } from "../../utils/session-color";
 import { sanitizeStatusText } from "../shared";
+import { computeContextBreakdown } from "../utils/context-usage";
 import {
 	canReuseCachedPr,
 	createPrCacheContext,
@@ -36,6 +35,7 @@ export interface StatusLineSettings {
 	separator?: StatusLineSeparatorStyle;
 	segmentOptions?: StatusLineSegmentOptions;
 	showHookStatus?: boolean;
+	sessionAccent?: boolean;
 }
 
 // ═══════════════════════════════════════════════════════════════════════════
@@ -57,6 +57,8 @@ export class StatusLineComponent implements Component {
 	#subagentCount: number = 0;
 	#sessionStartTime: number = Date.now();
 	#planModeStatus: { enabled: boolean; paused: boolean } | null = null;
+	#loopModeStatus: { enabled: boolean } | null = null;
+	#goalModeStatus: { enabled: boolean; paused: boolean } | null = null;
 
 	// Git status caching (1s TTL)
 	#cachedGitStatus: { staged: number; unstaged: number; untracked: number } | null = null;
@@ -71,6 +73,10 @@ export class StatusLineComponent implements Component {
 	#lastTokensPerSecond: number | null = null;
 	#lastTokensPerSecondTimestamp: number | null = null;
 
+	// Context breakdown caching (2s TTL — aligns with /context command output)
+	#cachedBreakdown: { usedTokens: number; contextWindow: number } | null = null;
+	#breakdownFetchedAt = 0;
+
 	constructor(private readonly session: AgentSession) {
 		this.#settings = {
 			preset: settings.get("statusLine.preset"),
@@ -79,6 +85,7 @@ export class StatusLineComponent implements Component {
 			separator: settings.get("statusLine.separator"),
 			showHookStatus: settings.get("statusLine.showHookStatus"),
 			segmentOptions: settings.getGroup("statusLine").segmentOptions,
+			sessionAccent: settings.get("statusLine.sessionAccent"),
 		};
 	}
 
@@ -100,6 +107,14 @@ export class StatusLineComponent implements Component {
 
 	setPlanModeStatus(status: { enabled: boolean; paused: boolean } | undefined): void {
 		this.#planModeStatus = status ?? null;
+	}
+
+	setLoopModeStatus(status: { enabled: boolean } | undefined): void {
+		this.#loopModeStatus = status ?? null;
+	}
+
+	setGoalModeStatus(status: { enabled: boolean; paused: boolean } | undefined): void {
+		this.#goalModeStatus = status ?? null;
 	}
 
 	setHookStatus(key: string, text: string | undefined): void {
@@ -294,6 +309,19 @@ export class StatusLineComponent implements Component {
 		return null;
 	}
 
+	#getCachedContextBreakdown(): { usedTokens: number; contextWindow: number } {
+		const now = Date.now();
+		if (!this.#cachedBreakdown || now - this.#breakdownFetchedAt > 2_000) {
+			const breakdown = computeContextBreakdown(this.session);
+			this.#cachedBreakdown = {
+				usedTokens: breakdown.usedTokens,
+				contextWindow: breakdown.contextWindow,
+			};
+			this.#breakdownFetchedAt = now;
+		}
+		return this.#cachedBreakdown;
+	}
+
 	#buildSegmentContext(width: number): SegmentContext {
 		const state = this.session.state;
 
@@ -311,14 +339,10 @@ export class StatusLineComponent implements Component {
 			tokensPerSecond: this.#getTokensPerSecond(),
 		};
 
-		// Get context percentage
-		const lastAssistantMessage = state.messages
-			.slice()
-			.reverse()
-			.find(m => m.role === "assistant" && m.stopReason !== "aborted") as AssistantMessage | undefined;
-
-		const contextTokens = lastAssistantMessage ? calculatePromptTokens(lastAssistantMessage.usage) : 0;
-		const contextWindow = state.model?.contextWindow || 0;
+		// Context usage — aligned with /context command so both surfaces report the same value
+		const breakdown = this.#getCachedContextBreakdown();
+		const contextTokens = breakdown.usedTokens;
+		const contextWindow = breakdown.contextWindow || state.model?.contextWindow || 0;
 		const contextPercent = contextWindow > 0 ? (contextTokens / contextWindow) * 100 : 0;
 
 		return {
@@ -326,6 +350,8 @@ export class StatusLineComponent implements Component {
 			width,
 			options: this.#resolveSettings().segmentOptions ?? {},
 			planMode: this.#planModeStatus,
+			loopMode: this.#loopModeStatus,
+			goalMode: this.#goalModeStatus,
 			usageStats,
 			contextPercent,
 			contextWindow,
@@ -508,10 +534,9 @@ export class StatusLineComponent implements Component {
 		leftWidth = groupWidth(left, leftCapWidth, leftSepWidth);
 		rightWidth = groupWidth(right, rightCapWidth, rightSepWidth);
 		const gapWidth = Math.max(1, topFillWidth - leftWidth - rightWidth);
-		const accentHex = getSessionAccentHexForTitle(
-			this.session.sessionManager?.getSessionName(),
-			this.session.sessionManager?.titleSource,
-		);
+		const sessionName =
+			effectiveSettings.sessionAccent !== false ? this.session.sessionManager?.getSessionName() : undefined;
+		const accentHex = sessionName ? getSessionAccentHex(sessionName) : undefined;
 		const gapColor = getSessionAccentAnsi(accentHex) ?? theme.getFgAnsi("border");
 		const gapFill = `${gapColor}${theme.boxRound.horizontal.repeat(gapWidth)}\x1b[39m`;
 		return leftGroup + gapFill + rightGroup;

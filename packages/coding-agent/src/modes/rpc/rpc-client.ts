@@ -4,13 +4,15 @@
  * Spawns the agent in RPC mode and provides a typed API for all operations.
  */
 import type { AgentEvent, AgentMessage, AgentToolResult, ThinkingLevel } from "@oh-my-pi/pi-agent-core";
+import type { CompactionResult } from "@oh-my-pi/pi-agent-core/compaction";
 import type { ImageContent, Model } from "@oh-my-pi/pi-ai";
 import { isRecord, ptree, readJsonl } from "@oh-my-pi/pi-utils";
 import type { BashResult } from "../../exec/bash-executor";
 import type { SessionStats } from "../../session/agent-session";
-import type { CompactionResult } from "../../session/compaction";
 import type {
 	RpcCommand,
+	RpcExtensionUIRequest,
+	RpcHandoffResult,
 	RpcHostToolCallRequest,
 	RpcHostToolCancelRequest,
 	RpcHostToolDefinition,
@@ -123,6 +125,11 @@ function isRpcHostToolCancelRequest(value: unknown): value is RpcHostToolCancelR
 	return value.type === "host_tool_cancel" && typeof value.id === "string" && typeof value.targetId === "string";
 }
 
+function isRpcExtensionUiRequest(value: unknown): value is RpcExtensionUIRequest {
+	if (!isRecord(value)) return false;
+	return value.type === "extension_ui_request" && typeof value.id === "string" && typeof value.method === "string";
+}
+
 function normalizeToolResult<TDetails>(result: RpcClientToolResult<TDetails>): AgentToolResult<TDetails> {
 	if (typeof result === "string") {
 		return {
@@ -144,6 +151,7 @@ export class RpcClient {
 	#customTools: RpcClientCustomTool[] = [];
 	#pendingHostToolCalls = new Map<string, { controller: AbortController }>();
 	#requestId = 0;
+	#extensionUiListeners: Set<(req: RpcExtensionUIRequest) => void> = new Set();
 	#abortController = new AbortController();
 
 	constructor(private options: RpcClientOptions = {}) {
@@ -458,6 +466,14 @@ export class RpcClient {
 	}
 
 	/**
+	 * Hand off session context to a new session.
+	 */
+	async handoff(customInstructions?: string): Promise<RpcHandoffResult | null> {
+		const response = await this.#send({ type: "handoff", customInstructions });
+		return this.#getData(response);
+	}
+
+	/**
 	 * Export session to HTML.
 	 */
 	async exportHtml(outputPath?: string): Promise<{ path: string }> {
@@ -505,6 +521,43 @@ export class RpcClient {
 	async getMessages(): Promise<AgentMessage[]> {
 		const response = await this.#send({ type: "get_messages" });
 		return this.#getData<{ messages: AgentMessage[] }>(response).messages;
+	}
+
+	/**
+	 * Get list of OAuth providers available for login, with their current authentication status.
+	 */
+	async getLoginProviders(): Promise<Array<{ id: string; name: string; available: boolean; authenticated: boolean }>> {
+		const response = await this.#send({ type: "get_login_providers" });
+		return this.#getData<{
+			providers: Array<{ id: string; name: string; available: boolean; authenticated: boolean }>;
+		}>(response).providers;
+	}
+
+	/**
+	 * Trigger OAuth login for the given provider.
+	 * The server will emit an `open_url` extension_ui_request for the auth URL.
+	 * Resolves when login completes or rejects on failure.
+	 *
+	 * @param onOpenUrl Called when the server emits the auth URL. The host must open
+	 *   it in a browser for the callback-server OAuth flow to complete.
+	 */
+	async login(
+		providerId: string,
+		options?: { onOpenUrl?: (url: string, instructions?: string) => void },
+	): Promise<{ providerId: string }> {
+		const { onOpenUrl } = options ?? {};
+		const listener = onOpenUrl
+			? (req: RpcExtensionUIRequest) => {
+					if (req.method === "open_url") onOpenUrl(req.url, req.instructions);
+				}
+			: undefined;
+		if (listener) this.#extensionUiListeners.add(listener);
+		try {
+			const response = await this.#send({ type: "login", providerId }, 600_000);
+			return this.#getData<{ providerId: string }>(response);
+		} finally {
+			if (listener) this.#extensionUiListeners.delete(listener);
+		}
 	}
 
 	/**
@@ -612,6 +665,13 @@ export class RpcClient {
 			return;
 		}
 
+		if (isRpcExtensionUiRequest(data)) {
+			for (const listener of this.#extensionUiListeners) {
+				listener(data);
+			}
+			return;
+		}
+
 		if (isRpcHostToolCancelRequest(data)) {
 			this.#pendingHostToolCalls.get(data.targetId)?.controller.abort();
 			return;
@@ -625,7 +685,7 @@ export class RpcClient {
 		}
 	}
 
-	#send(command: RpcCommandBody): Promise<RpcResponse> {
+	#send(command: RpcCommandBody, timeoutMs = 30_000): Promise<RpcResponse> {
 		if (!this.#process?.stdin) {
 			throw new Error("Client not started");
 		}
@@ -634,7 +694,7 @@ export class RpcClient {
 		const fullCommand = { ...command, id } as RpcCommand;
 		const { promise, resolve, reject } = Promise.withResolvers<RpcResponse>();
 		let settled = false;
-		const timeoutId = this.#startTimeout(30000, () => {
+		const timeoutId = this.#startTimeout(timeoutMs, () => {
 			if (settled) return;
 			this.#pendingRequests.delete(id);
 			settled = true;

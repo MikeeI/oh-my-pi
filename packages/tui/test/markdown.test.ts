@@ -1,7 +1,8 @@
-import { describe, expect, it } from "bun:test";
+import { afterAll, beforeAll, describe, expect, it } from "bun:test";
 import type { Terminal as XtermTerminalType } from "@xterm/headless";
 import { Chalk } from "chalk";
 import { Markdown, renderInlineMarkdown } from "../src/components/markdown.js";
+import { TERMINAL } from "../src/terminal-capabilities.js";
 import { type Component, TUI } from "../src/tui.js";
 import { defaultMarkdownTheme } from "./test-themes.js";
 import { VirtualTerminal } from "./virtual-terminal.js";
@@ -1025,6 +1026,18 @@ bar`,
 		line.replace(/\x1b\]8;;[^\x07]*\x07/g, "").replace(/\x1b\[[0-9;]*m/g, "");
 
 	describe("Links", () => {
+		// CI environments often resolve to the "base" terminal which has hyperlinks
+		// disabled; force them on so OSC 8 assertions are deterministic. The render
+		// cache keys on TERMINAL.hyperlinks, so flipping the bit invalidates entries.
+		const terminalState = TERMINAL as unknown as { hyperlinks: boolean };
+		const originalHyperlinks = terminalState.hyperlinks;
+		beforeAll(() => {
+			terminalState.hyperlinks = true;
+		});
+		afterAll(() => {
+			terminalState.hyperlinks = originalHyperlinks;
+		});
+
 		it("should not duplicate URL for autolinked emails", () => {
 			const markdown = new Markdown("Contact user@example.com for help", 0, 0, defaultMarkdownTheme);
 
@@ -1140,5 +1153,37 @@ bar`,
 				"Should render HTML in code blocks",
 			).toBeTruthy();
 		});
+	});
+});
+
+describe("Module-level LRU render cache", () => {
+	it("invokes highlightCode only once for two distinct instances with identical (text, width, theme)", () => {
+		// Build a theme with a spy on highlightCode. The theme object reference
+		// is stable across both instances so objectId() returns the same ID,
+		// meaning the L2 cache key is identical for both renders.
+		let highlightCallCount = 0;
+		const themeWithSpy = {
+			...defaultMarkdownTheme,
+			highlightCode: (code: string, _lang?: string): string[] => {
+				highlightCallCount++;
+				return [code]; // trivial passthrough
+			},
+		};
+
+		const text = "```js\nconst x = 1;\n```";
+		const width = 80;
+
+		// First instance: cold cache → highlightCode MUST be called.
+		const md1 = new Markdown(text, 0, 0, themeWithSpy);
+		const lines1 = md1.render(width);
+		expect(highlightCallCount, "First render should call highlightCode exactly once").toBe(1);
+
+		// Second distinct instance with identical inputs: L2 cache hit → highlightCode must NOT be called again.
+		const md2 = new Markdown(text, 0, 0, themeWithSpy);
+		const lines2 = md2.render(width);
+		expect(highlightCallCount, "Second render (different instance, same key) must use L2 cache").toBe(1);
+
+		// Output must be byte-identical — cache is transparent to callers.
+		expect(lines2).toEqual(lines1);
 	});
 });

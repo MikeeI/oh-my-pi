@@ -50,6 +50,42 @@ function getStatusIcon(status: AgentProgress["status"], theme: Theme, spinnerFra
 	}
 }
 
+/** Append tool-count, context, cumulative-tokens, and cost stats to a status line string. */
+function appendAgentStats(
+	line: string,
+	opts: {
+		toolCount?: number;
+		tokens: number;
+		contextTokens?: number;
+		contextWindow?: number;
+		cost: number;
+	},
+	theme: Theme,
+): string {
+	if (opts.toolCount) {
+		line += `${theme.sep.dot}${theme.fg("dim", `${opts.toolCount} tools`)}`;
+	}
+	// Current per-turn context — what the user reads as "how full is the context".
+	// Cumulative tokens (billing volume) renders separately with a Σ sigil to avoid
+	// being mistaken for current window pressure.
+	if (opts.contextTokens && opts.contextTokens > 0) {
+		const ctx =
+			opts.contextWindow && opts.contextWindow > 0
+				? `${formatNumber(opts.contextTokens)}/${formatNumber(opts.contextWindow)} ctx`
+				: `${formatNumber(opts.contextTokens)} ctx`;
+		line += `${theme.sep.dot}${theme.fg("dim", ctx)}`;
+		if (opts.tokens > 0) {
+			line += `${theme.sep.dot}${theme.fg("dim", `Σ${formatNumber(opts.tokens)}`)}`;
+		}
+	} else if (opts.tokens > 0) {
+		line += `${theme.sep.dot}${theme.fg("dim", `Σ${formatNumber(opts.tokens)}`)}`;
+	}
+	if (opts.cost > 0) {
+		line += `${theme.sep.dot}${theme.fg("statusLineCost", `$${opts.cost.toFixed(2)}`)}`;
+	}
+	return line;
+}
+
 function formatFindingSummary(findings: ReportFindingDetails[], theme: Theme): string {
 	if (findings.length === 0) return theme.fg("dim", "Findings: none");
 
@@ -470,14 +506,16 @@ export function renderCall(args: TaskParams, _options: RenderResultOptions, them
 			lines.push(` ${vertical}  ${content}`);
 		}
 		const taskPrefix = showIsolated ? branch : last;
-		lines.push(` ${taskPrefix} ${theme.fg("dim", "Tasks")}: ${theme.fg("muted", `${args.tasks.length} agents`)}`);
+		lines.push(
+			` ${taskPrefix} ${theme.fg("dim", "Tasks")}: ${theme.fg("muted", `${args.tasks?.length ?? 0} agents`)}`,
+		);
 		if (showIsolated) {
 			lines.push(` ${last} ${theme.fg("dim", "Isolated")}: ${theme.fg("muted", "true")}`);
 		}
 		return new Text(lines.join("\n"), 0, 0);
 	}
 
-	lines.push(`${theme.fg("dim", "Tasks")}: ${theme.fg("muted", `${args.tasks.length} agents`)}`);
+	lines.push(`${theme.fg("dim", "Tasks")}: ${theme.fg("muted", `${args.tasks?.length ?? 0} agents`)}`);
 	if (showIsolated) {
 		lines.push(`${theme.fg("dim", "Isolated")}: ${theme.fg("muted", "true")}`);
 	}
@@ -524,19 +562,9 @@ function renderAgentProgress(
 			const taskPreview = truncateToWidth(progress.assignment ?? progress.task, 40);
 			statusLine += ` ${theme.fg("muted", taskPreview)}`;
 		}
-		if (progress.toolCount > 0) {
-			statusLine += `${theme.sep.dot}${theme.fg("dim", `${progress.toolCount} tools`)}`;
-		}
-		if (progress.tokens > 0) {
-			statusLine += `${theme.sep.dot}${theme.fg("dim", `${formatNumber(progress.tokens)} tokens`)}`;
-		}
+		statusLine = appendAgentStats(statusLine, progress, theme);
 	} else if (progress.status === "completed") {
-		if (progress.toolCount > 0) {
-			statusLine += `${theme.sep.dot}${theme.fg("dim", `${progress.toolCount} tools`)}`;
-		}
-		if (progress.tokens > 0) {
-			statusLine += `${theme.sep.dot}${theme.fg("dim", `${formatNumber(progress.tokens)} tokens`)}`;
-		}
+		statusLine = appendAgentStats(statusLine, progress, theme);
 	}
 
 	lines.push(statusLine);
@@ -659,8 +687,10 @@ function renderReviewResult(
 				lines.push(`${continuePrefix}  ${theme.fg("dim", replaceTabs(line))}`);
 			}
 		} else {
-			// Preview: first sentence or ~100 chars
-			const preview = truncateToWidth(`${summary.explanation.split(/[.!?]/)[0]}.`, 100);
+			// Preview: first sentence or ~100 chars (flatten tabs/newlines first)
+			const flat = replaceTabs(summary.explanation).replace(/[\r\n]+/g, " ");
+			const firstSentence = flat.split(/[.!?]/)[0].trim();
+			const preview = truncateToWidth(`${firstSentence}.`, 100);
 			lines.push(`${continuePrefix}${theme.fg("dim", preview)}`);
 		}
 	}
@@ -699,7 +729,8 @@ function renderFindings(
 		const findingContinue = isLastFinding ? "   " : `${theme.tree.vertical}  `;
 
 		const { color } = getPriorityInfo(finding.priority);
-		const titleText = finding.title?.replace(/^\[P\d\]\s*/, "") ?? "Untitled";
+		const rawTitle = finding.title?.replace(/^\[P\d\]\s*/, "") ?? "Untitled";
+		const titleText = replaceTabs(rawTitle).replace(/[\r\n]+/g, " ");
 		const loc = `${path.basename(finding.file_path || "<unknown>")}:${finding.line_start}`;
 
 		lines.push(
@@ -763,9 +794,16 @@ function renderAgentResult(result: SingleResult, isLast: boolean, expanded: bool
 		iconColor,
 		theme,
 	)}`;
-	if (result.tokens > 0) {
-		statusLine += `${theme.sep.dot}${theme.fg("dim", `${formatNumber(result.tokens)} tokens`)}`;
-	}
+	statusLine = appendAgentStats(
+		statusLine,
+		{
+			tokens: result.tokens,
+			contextTokens: result.contextTokens,
+			contextWindow: result.contextWindow,
+			cost: result.usage?.cost.total ?? 0,
+		},
+		theme,
+	);
 	statusLine += `${theme.sep.dot}${theme.fg("dim", formatDuration(result.durationMs))}`;
 
 	if (result.truncated) {

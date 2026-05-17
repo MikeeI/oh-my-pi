@@ -16,6 +16,7 @@ import type {
 	SendUserMessageHandler,
 	TerminalInputHandler,
 } from "../../extensibility/extensions";
+import { getSessionSlashCommands } from "../../extensibility/extensions/get-commands-handler";
 import { HookEditorComponent } from "../../modes/components/hook-editor";
 import { HookInputComponent } from "../../modes/components/hook-input";
 import { HookSelectorComponent } from "../../modes/components/hook-selector";
@@ -68,7 +69,7 @@ export class ExtensionUiController {
 			},
 			setFooter: () => {},
 			setHeader: () => {},
-			setEditorComponent: () => {},
+			setEditorComponent: factory => this.ctx.setEditorComponent(factory),
 			getToolsExpanded: () => this.ctx.toolOutputExpanded,
 			setToolsExpanded: expanded => this.ctx.setToolsExpanded(expanded),
 		};
@@ -109,7 +110,7 @@ export class ExtensionUiController {
 			},
 			getThinkingLevel: () => this.ctx.session.thinkingLevel,
 			setThinkingLevel: level => this.ctx.session.setThinkingLevel(level),
-			getCommands: () => [],
+			getCommands: () => getSessionSlashCommands(this.ctx.session),
 			getSessionName: () => this.ctx.sessionManager.getSessionName(),
 			setSessionName: name => this.#updateSessionName(name),
 		};
@@ -119,7 +120,10 @@ export class ExtensionUiController {
 			abort: () => this.ctx.session.abort(),
 			hasPendingMessages: () => this.ctx.session.queuedMessageCount > 0,
 			shutdown: () => {
-				// Signal shutdown request (will be handled by main loop)
+				// Defer the actual teardown to the main loop, which calls
+				// `checkShutdownRequested()` at idle boundaries so any queued
+				// steering / follow-up messages drain first (see issue #1020).
+				this.ctx.shutdownRequested = true;
 			},
 			getContextUsage: () => this.ctx.session.getContextUsage(),
 			compact: instructionsOrOptions => this.#compactSession(instructionsOrOptions),
@@ -150,11 +154,7 @@ export class ExtensionUiController {
 				if (!success) {
 					return { cancelled: true };
 				}
-				setSessionTerminalTitle(
-					this.ctx.sessionManager.getSessionName(),
-					this.ctx.sessionManager.getCwd(),
-					this.ctx.sessionManager.titleSource,
-				);
+				setSessionTerminalTitle(this.ctx.sessionManager.getSessionName(), this.ctx.sessionManager.getCwd());
 
 				// Call setup callback if provided
 				if (options?.setup) {
@@ -223,11 +223,7 @@ export class ExtensionUiController {
 				if (!result) {
 					return { cancelled: true };
 				}
-				setSessionTerminalTitle(
-					this.ctx.sessionManager.getSessionName(),
-					this.ctx.sessionManager.getCwd(),
-					this.ctx.sessionManager.titleSource,
-				);
+				setSessionTerminalTitle(this.ctx.sessionManager.getSessionName(), this.ctx.sessionManager.getCwd());
 				this.ctx.chatContainer.clear();
 				this.ctx.renderInitialMessages();
 				await this.ctx.reloadTodos();
@@ -354,7 +350,7 @@ export class ExtensionUiController {
 			},
 			getThinkingLevel: () => this.ctx.session.thinkingLevel,
 			setThinkingLevel: (level, persist) => this.ctx.session.setThinkingLevel(level, persist),
-			getCommands: () => [],
+			getCommands: () => getSessionSlashCommands(this.ctx.session),
 			getSessionName: () => this.ctx.sessionManager.getSessionName(),
 			setSessionName: name => this.#updateSessionName(name),
 		};
@@ -364,7 +360,10 @@ export class ExtensionUiController {
 			abort: () => this.ctx.session.abort(),
 			hasPendingMessages: () => this.ctx.session.queuedMessageCount > 0,
 			shutdown: () => {
-				// Signal shutdown request (will be handled by main loop)
+				// Defer the actual teardown to the main loop, which calls
+				// `checkShutdownRequested()` at idle boundaries so any queued
+				// steering / follow-up messages drain first (see issue #1020).
+				this.ctx.shutdownRequested = true;
 			},
 			getContextUsage: () => this.ctx.session.getContextUsage(),
 			compact: instructionsOrOptions => this.#compactSession(instructionsOrOptions),
@@ -875,11 +874,7 @@ export class ExtensionUiController {
 
 	async #updateSessionName(name: string): Promise<void> {
 		await this.ctx.sessionManager.setSessionName(name, "user");
-		setSessionTerminalTitle(
-			this.ctx.sessionManager.getSessionName(),
-			this.ctx.sessionManager.getCwd(),
-			this.ctx.sessionManager.titleSource,
-		);
+		setSessionTerminalTitle(this.ctx.sessionManager.getSessionName(), this.ctx.sessionManager.getCwd());
 	}
 
 	#sendExtensionUserMessage: SendUserMessageHandler = (content, options) => {

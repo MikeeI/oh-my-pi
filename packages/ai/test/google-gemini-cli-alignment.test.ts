@@ -1,13 +1,12 @@
 import { afterEach, describe, expect, it, vi } from "bun:test";
 import { hookFetch } from "@oh-my-pi/pi-utils";
-import type { TSchema } from "@sinclair/typebox";
 import {
 	buildRequest,
 	parseGeminiCliCredentials,
 	shouldRefreshGeminiCliCredentials,
 	streamGoogleGeminiCli,
 } from "../src/providers/google-gemini-cli";
-import type { Context, Model } from "../src/types";
+import type { Context, Model, TJsonSchema } from "../src/types";
 import { getOAuthApiKey } from "../src/utils/oauth";
 
 function createModel(provider: "google-gemini-cli" | "google-antigravity"): Model<"google-gemini-cli"> {
@@ -129,6 +128,25 @@ describe("Google Gemini CLI alignment", () => {
 		expect(payload.userAgent).toBeUndefined();
 		expect(payload.requestId).toBeUndefined();
 	});
+	it("keeps every system prompt block in systemInstruction instead of conversation contents", () => {
+		const model = createModel("google-gemini-cli");
+		const context: Context = {
+			systemPrompt: ["primary instruction", "", "supplemental \uD800instruction"],
+			messages: [{ role: "user", content: "implement token refresh", timestamp: Date.now() }],
+		};
+		const payload = buildRequest(model, context, "proj-123", {}, false) as {
+			request: {
+				contents: Array<{ role?: string; parts?: Array<{ text?: string }> }>;
+				systemInstruction?: { role?: string; parts: Array<{ text: string }> };
+			};
+		};
+
+		expect(payload.request.systemInstruction).toEqual({
+			parts: [{ text: "primary instruction" }, { text: "supplemental �instruction" }],
+		});
+		expect(payload.request.systemInstruction?.role).toBeUndefined();
+		expect(payload.request.contents).toEqual([{ role: "user", parts: [{ text: "implement token refresh" }] }]);
+	});
 
 	it("keeps antigravity metadata in antigravity request payloads", () => {
 		const model = createModel("google-antigravity");
@@ -164,7 +182,7 @@ describe("Google Gemini CLI alignment", () => {
 							},
 						},
 						required: ["rules"],
-					} as unknown as TSchema,
+					} as TJsonSchema,
 				},
 			],
 		};
@@ -225,7 +243,7 @@ describe("Google Gemini CLI alignment", () => {
 			const result = await stream.result();
 			expect(fetchCalls).toBe(1);
 			expect(result.stopReason).toBe("error");
-			expect(result.errorMessage).toContain("Server requested 121s retry delay (max: 1s)");
+			expect(result.errorMessage).toContain("Cloud Code Assist API error (503)");
 		});
 	});
 });

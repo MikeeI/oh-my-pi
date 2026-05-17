@@ -8,31 +8,30 @@
  * the `patch` mode.
  */
 
-import { type Static, Type } from "@sinclair/typebox";
+import * as z from "zod/v4";
 import { parseApplyPatch, parseApplyPatchStreaming } from "../apply-patch/parser";
 import { ApplyPatchError } from "../diff";
 import type { PatchEditEntry } from "./patch";
 
-export const applyPatchSchema = Type.Object({
-	input: Type.String({
-		description:
-			"Full Codex apply_patch envelope, including '*** Begin Patch' and '*** End Patch'. Contains any mix of Add/Delete/Update (with optional Move to) file operations.",
-	}),
+export const applyPatchSchema = z.object({
+	input: z.string().describe("apply_patch envelope"),
 });
 
-export type ApplyPatchParams = Static<typeof applyPatchSchema>;
+export type ApplyPatchParams = z.infer<typeof applyPatchSchema>;
+
+export type ApplyPatchEntry = PatchEditEntry & { path: string };
 
 /**
  * Parse the envelope and lower each hunk to a `PatchEditEntry` so it can
  * be routed through `executePatchSingle`.
  */
-export function expandApplyPatchToEntries(params: ApplyPatchParams): PatchEditEntry[] {
+export function expandApplyPatchToEntries(params: ApplyPatchParams): ApplyPatchEntry[] {
 	const hunks = parseApplyPatch(params.input);
 	if (hunks.length === 0) {
 		throw new ApplyPatchError("No files were modified.");
 	}
 	return hunks.map(
-		(h): PatchEditEntry => ({
+		(h): ApplyPatchEntry => ({
 			path: h.path,
 			op: h.op,
 			rename: h.rename,
@@ -41,10 +40,10 @@ export function expandApplyPatchToEntries(params: ApplyPatchParams): PatchEditEn
 	);
 }
 
-export function expandApplyPatchToPreviewEntries(params: ApplyPatchParams): PatchEditEntry[] {
+export function expandApplyPatchToPreviewEntries(params: ApplyPatchParams): ApplyPatchEntry[] {
 	const hunks = parseApplyPatchStreaming(params.input);
 	return hunks.map(
-		(h): PatchEditEntry => ({
+		(h): ApplyPatchEntry => ({
 			path: h.path,
 			op: h.op,
 			rename: h.rename,

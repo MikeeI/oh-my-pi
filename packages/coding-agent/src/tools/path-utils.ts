@@ -2,8 +2,14 @@ import * as fs from "node:fs";
 import * as os from "node:os";
 import * as path from "node:path";
 import * as url from "node:url";
+import { isEnoent } from "@oh-my-pi/pi-utils";
+import { InternalUrlRouter } from "../internal-urls";
+import { ToolError } from "./tool-errors";
 
 const UNICODE_SPACES = /[\u00A0\u2000-\u200A\u202F\u205F\u3000]/g;
+const FILE_LINE_RANGE_RE = /^(?:L?\d+(?:[-+]L?\d+|-)?(?:,L?\d+(?:[-+]L?\d+|-)?)*|raw|conflicts)$/i;
+const FILE_LINE_RANGE_ONLY_RE = /^L?\d+(?:[-+]L?\d+|-)?(?:,L?\d+(?:[-+]L?\d+|-)?)*$/i;
+const FILE_RAW_ONLY_RE = /^raw$/i;
 const NARROW_NO_BREAK_SPACE = "\u202F";
 const TOP_LEVEL_INTERNAL_URL_PREFIXES = [
 	"agent://",
@@ -41,15 +47,6 @@ function tryShellEscapedPath(filePath: string): string {
 function fileExists(filePath: string): boolean {
 	try {
 		fs.accessSync(filePath, fs.constants.F_OK);
-		return true;
-	} catch {
-		return false;
-	}
-}
-
-async function pathExists(filePath: string): Promise<boolean> {
-	try {
-		await fs.promises.access(filePath, fs.constants.F_OK);
 		return true;
 	} catch {
 		return false;
@@ -110,6 +107,34 @@ export function expandPath(filePath: string): string {
 	return expandTilde(normalized);
 }
 
+export function splitPathAndSel(rawPath: string): { path: string; sel?: string } {
+	const colon = rawPath.lastIndexOf(":");
+	if (colon <= 0) return { path: rawPath };
+
+	const candidate = rawPath.slice(colon + 1);
+	if (!FILE_LINE_RANGE_RE.test(candidate)) return { path: rawPath };
+
+	let basePath = rawPath.slice(0, colon);
+	let sel = candidate;
+
+	// Allow a compound trailing selector: `path:1-50:raw` or `path:raw:1-50`.
+	// The two chunks must be one line-range plus one `raw`, in either order.
+	const innerColon = basePath.lastIndexOf(":");
+	if (innerColon > 0) {
+		const innerCandidate = basePath.slice(innerColon + 1);
+		const innerIsRaw = FILE_RAW_ONLY_RE.test(innerCandidate);
+		const outerIsRaw = FILE_RAW_ONLY_RE.test(candidate);
+		const innerIsRange = FILE_LINE_RANGE_ONLY_RE.test(innerCandidate);
+		const outerIsRange = FILE_LINE_RANGE_ONLY_RE.test(candidate);
+		if ((innerIsRaw && outerIsRange) || (innerIsRange && outerIsRaw)) {
+			sel = `${innerCandidate}:${candidate}`;
+			basePath = basePath.slice(0, innerColon);
+		}
+	}
+
+	return { path: basePath, sel };
+}
+
 function assertNotInternalUrl(expanded: string, original: string): void {
 	for (const prefix of TOP_LEVEL_INTERNAL_URL_PREFIXES) {
 		if (expanded.startsWith(prefix)) {
@@ -157,6 +182,27 @@ export function resolveToCwd(filePath: string, cwd: string): string {
 	return path.resolve(cwd, expanded);
 }
 
+export function formatPathRelativeToCwd(
+	filePath: string,
+	cwd: string,
+	options: { trailingSlash?: boolean } = {},
+): string {
+	const resolvedCwd = path.resolve(cwd);
+	const normalized = normalizeLocalScheme(filePath);
+	if (isInternalUrlPath(normalized)) {
+		return normalized;
+	}
+	const expanded = expandPath(normalized);
+	const resolvedPath = path.isAbsolute(expanded) ? path.resolve(expanded) : path.resolve(cwd, expanded);
+	const relative = path.relative(resolvedCwd, resolvedPath);
+	const isWithinCwd = relative === "" || (!relative.startsWith("..") && !path.isAbsolute(relative));
+	let displayPath = normalizePosixPath(isWithinCwd ? relative || "." : resolvedPath);
+	if (options.trailingSlash && displayPath !== "." && !displayPath.endsWith("/")) {
+		displayPath += "/";
+	}
+	return displayPath;
+}
+
 /**
  * Strip matching surrounding double quotes from a path string.
  * Common when users paste quoted paths from Windows Explorer or shell copy-paste.
@@ -189,11 +235,17 @@ export interface ParsedFindPattern {
 	hasGlob: boolean;
 }
 
+export interface ResolvedSearchTarget {
+	basePath: string;
+	glob?: string;
+}
+
 export interface ResolvedMultiSearchPath {
 	basePath: string;
 	glob?: string;
 	scopePath: string;
 	exactFilePaths?: string[];
+	targets?: ResolvedSearchTarget[];
 }
 
 export interface ResolvedMultiFindPattern {
@@ -273,77 +325,6 @@ export function combineSearchGlobs(prefixGlob?: string, suffixGlob?: string): st
 	return `${normalizedPrefix}/${normalizedSuffix}`;
 }
 
-type TopLevelSeparator = "comma" | "whitespace";
-
-function splitTopLevel(value: string, separator: TopLevelSeparator): string[] {
-	const parts: string[] = [];
-	let current = "";
-	let braceDepth = 0;
-	let bracketDepth = 0;
-	let parenDepth = 0;
-	let quote: '"' | "'" | undefined;
-	let escaped = false;
-
-	const pushCurrent = () => {
-		const normalized = current.trim();
-		if (normalized.length > 0) {
-			parts.push(normalized);
-		}
-		current = "";
-	};
-
-	for (const char of value) {
-		if (escaped) {
-			current += char;
-			escaped = false;
-			continue;
-		}
-
-		if (char === "\\") {
-			current += char;
-			escaped = true;
-			continue;
-		}
-
-		if (quote) {
-			current += char;
-			if (char === quote) {
-				quote = undefined;
-			}
-			continue;
-		}
-
-		if (char === '"' || char === "'") {
-			quote = char;
-			current += char;
-			continue;
-		}
-
-		if (char === "{") braceDepth += 1;
-		else if (char === "}" && braceDepth > 0) braceDepth -= 1;
-		else if (char === "[") bracketDepth += 1;
-		else if (char === "]" && bracketDepth > 0) bracketDepth -= 1;
-		else if (char === "(") parenDepth += 1;
-		else if (char === ")" && parenDepth > 0) parenDepth -= 1;
-
-		const topLevel = braceDepth === 0 && bracketDepth === 0 && parenDepth === 0;
-		const isWhitespace = /\s/.test(char);
-		if (topLevel && separator === "comma" && char === ",") {
-			pushCurrent();
-			continue;
-		}
-		if (topLevel && separator === "whitespace" && isWhitespace) {
-			pushCurrent();
-			continue;
-		}
-
-		current += char;
-	}
-
-	pushCurrent();
-	return parts.length > 1 ? parts : [value.trim()];
-}
-
 function normalizePosixPath(filePath: string): string {
 	return filePath.replace(/\\/g, "/");
 }
@@ -381,125 +362,22 @@ function findCommonBasePath(paths: string[]): string {
 	return joined || path.parse(path.resolve(paths[0])).root;
 }
 
-function toScopeDisplay(items: string[]): string {
-	return items.map(item => normalizePosixPath(item)).join(", ");
+function toScopeDisplay(items: string[], cwd: string): string {
+	return items
+		.map(item =>
+			formatPathRelativeToCwd(item, cwd, {
+				trailingSlash: item.endsWith("/") || item.endsWith("\\"),
+			}),
+		)
+		.join(", ");
 }
 
-function looksLikeDelimitedPathToken(token: string): boolean {
-	return (
-		TOP_LEVEL_INTERNAL_URL_PREFIXES.some(prefix => token.startsWith(prefix)) ||
-		token.startsWith(".") ||
-		token.startsWith("/") ||
-		token.startsWith("~") ||
-		token.startsWith("@") ||
-		token.includes("/") ||
-		token.includes("\\") ||
-		hasGlobPathChars(token) ||
-		/\.[^./\\]+$/.test(token)
-	);
-}
-
-async function areDelimitedTokensResolvable(
-	tokens: string[],
-	cwd: string,
-	parseBasePath: (value: string) => string,
-	allowBareExistingTokens: boolean,
-): Promise<boolean> {
-	for (const token of tokens) {
-		if (TOP_LEVEL_INTERNAL_URL_PREFIXES.some(prefix => token.startsWith(prefix))) {
-			return false;
-		}
-
-		if (!allowBareExistingTokens && !looksLikeDelimitedPathToken(token)) {
-			// Bare names like "packages" don't look like path tokens syntactically,
-			// but may still be valid directory names. Check existence before rejecting.
-			const resolvedExactPath = resolveToCwd(token, cwd);
-			if (!(await pathExists(resolvedExactPath))) {
-				return false;
-			}
-			continue;
-		}
-
-		const basePath = parseBasePath(token);
-		const resolvedBasePath = resolveToCwd(basePath, cwd);
-		if (await pathExists(resolvedBasePath)) {
-			continue;
-		}
-
-		if (!allowBareExistingTokens) {
-			return false;
-		}
-
-		const resolvedExactPath = resolveToCwd(token, cwd);
-		if (!(await pathExists(resolvedExactPath))) {
-			return false;
-		}
-	}
-
-	return true;
-}
-
-async function filterResolvableTokens(
-	tokens: string[],
-	cwd: string,
-	parseBasePath: (value: string) => string,
-): Promise<string[]> {
-	const out: string[] = [];
-	for (const token of tokens) {
-		if (TOP_LEVEL_INTERNAL_URL_PREFIXES.some(prefix => token.startsWith(prefix))) continue;
-		const basePath = parseBasePath(token);
-		const resolvedBasePath = resolveToCwd(basePath, cwd);
-		if (await pathExists(resolvedBasePath)) {
-			out.push(token);
-			continue;
-		}
-		const resolvedExactPath = resolveToCwd(token, cwd);
-		if (await pathExists(resolvedExactPath)) {
-			out.push(token);
-		}
-	}
-	return out;
-}
-
-async function splitDelimitedSearchInput(
-	rawInput: string,
-	cwd: string,
-	parseBasePath: (value: string) => string,
-): Promise<string[] | undefined> {
-	const trimmed = rawInput.trim();
-	if (!trimmed) return undefined;
-
-	const resolvedExactPath = resolveToCwd(trimmed, cwd);
-	if (await pathExists(resolvedExactPath)) {
-		return undefined;
-	}
-
-	const commaSeparated = splitTopLevel(trimmed, "comma");
-	if (commaSeparated.length > 1) {
-		const resolvable = await filterResolvableTokens(commaSeparated, cwd, parseBasePath);
-		if (resolvable.length >= 1) {
-			return [...new Set(resolvable)];
-		}
-	}
-
-	const whitespaceSeparated = splitTopLevel(trimmed, "whitespace");
-	if (
-		whitespaceSeparated.length > 1 &&
-		(await areDelimitedTokensResolvable(whitespaceSeparated, cwd, parseBasePath, false))
-	) {
-		return [...new Set(whitespaceSeparated)];
-	}
-
-	return undefined;
-}
-
-export async function resolveMultiSearchPath(
-	rawPath: string,
+async function resolveSearchPathItems(
+	pathItems: string[],
 	cwd: string,
 	suffixGlob?: string,
 ): Promise<ResolvedMultiSearchPath | undefined> {
-	const pathItems = await splitDelimitedSearchInput(rawPath, cwd, value => parseSearchPath(value).basePath);
-	if (!pathItems || pathItems.length < 1) {
+	if (pathItems.length < 1) {
 		return undefined;
 	}
 
@@ -529,21 +407,37 @@ export async function resolveMultiSearchPath(
 		}
 		return relativeBasePath === "." ? path.basename(item.absoluteBasePath) : relativeBasePath;
 	});
+	const rootPath = path.parse(commonBasePath).root;
+	const isDegenerateRoot = commonBasePath === rootPath && parsedItems.length > 1;
+	const targets = isDegenerateRoot
+		? parsedItems.map(item => ({
+				basePath: item.absoluteBasePath,
+				glob: item.parsedPath.glob ? combineSearchGlobs(item.parsedPath.glob, suffixGlob) : suffixGlob,
+			}))
+		: undefined;
 
 	return {
 		basePath: commonBasePath,
 		glob: buildBraceUnion(combinedPatterns),
-		scopePath: toScopeDisplay(pathItems),
+		scopePath: toScopeDisplay(pathItems, cwd),
 		exactFilePaths: allExactFiles ? parsedItems.map(item => item.absoluteBasePath) : undefined,
+		targets,
 	};
 }
 
-export async function resolveMultiFindPattern(
-	rawPattern: string,
+export async function resolveExplicitSearchPaths(
+	pathItems: string[],
+	cwd: string,
+	suffixGlob?: string,
+): Promise<ResolvedMultiSearchPath | undefined> {
+	return resolveSearchPathItems([...new Set(pathItems)], cwd, suffixGlob);
+}
+
+async function resolveFindPatternItems(
+	patternItems: string[],
 	cwd: string,
 ): Promise<ResolvedMultiFindPattern | undefined> {
-	const patternItems = await splitDelimitedSearchInput(rawPattern, cwd, value => parseFindPattern(value).basePath);
-	if (!patternItems || patternItems.length <= 1) {
+	if (patternItems.length <= 1) {
 		return undefined;
 	}
 
@@ -571,8 +465,69 @@ export async function resolveMultiFindPattern(
 	return {
 		basePath: commonBasePath,
 		globPattern: buildBraceUnion(combinedPatterns) ?? "**/*",
-		scopePath: toScopeDisplay(patternItems),
+		scopePath: toScopeDisplay(patternItems, cwd),
 	};
+}
+
+export async function resolveExplicitFindPatterns(
+	patternItems: string[],
+	cwd: string,
+): Promise<ResolvedMultiFindPattern | undefined> {
+	return resolveFindPatternItems([...new Set(patternItems)], cwd);
+}
+
+/**
+ * Result of partitioning a list of user-supplied paths/globs into entries whose
+ * base directory currently exists on disk versus those that do not.
+ *
+ * Used by multi-path tools (search, find, ast_grep, ast_edit) to tolerate one
+ * or more missing entries in a multi-path call: the surviving entries should
+ * still be searched, with the missing entries surfaced as a non-fatal warning.
+ */
+export interface PartitionedPaths {
+	/** Raw input strings whose resolved base path exists. */
+	valid: string[];
+	/** Raw input strings whose resolved base path is missing (ENOENT). */
+	missing: string[];
+}
+
+/**
+ * Stat each input's base path concurrently; return entries split by existence.
+ *
+ * `splitter` is expected to be {@link parseFindPattern} or
+ * {@link parseSearchPath}: both return a `basePath` field that this helper
+ * resolves against `cwd` and stats. ENOENT is the only swallowed error — every
+ * other stat failure (permission, IO, etc.) propagates so callers do not silently
+ * skip paths that exist but are unreadable.
+ *
+ * Order of `valid` and `missing` follows the input order, so callers can rely
+ * on `valid[0]` matching the first surviving user-supplied entry.
+ */
+export async function partitionExistingPaths(
+	items: string[],
+	cwd: string,
+	splitter: (item: string) => { basePath: string },
+): Promise<PartitionedPaths> {
+	const settled = await Promise.all(
+		items.map(async item => {
+			const { basePath } = splitter(item);
+			const absoluteBasePath = resolveToCwd(basePath, cwd);
+			try {
+				await fs.promises.stat(absoluteBasePath);
+				return { item, exists: true } as const;
+			} catch (err) {
+				if (isEnoent(err)) return { item, exists: false } as const;
+				throw err;
+			}
+		}),
+	);
+	const valid: string[] = [];
+	const missing: string[] = [];
+	for (const entry of settled) {
+		if (entry.exists) valid.push(entry.item);
+		else missing.push(entry.item);
+	}
+	return { valid, missing };
 }
 
 export function resolveReadPath(filePath: string, cwd: string): string {
@@ -613,4 +568,125 @@ export function resolveReadPath(filePath: string, cwd: string): string {
 	}
 
 	return resolved;
+}
+
+// =============================================================================
+// Tool-scope resolution (search/ast tools)
+// =============================================================================
+
+export interface ToolScopeOptions {
+	rawPaths: string[];
+	cwd: string;
+	/** Verb used in the "Cannot {action} internal URL without a backing file: …" message. */
+	internalUrlAction: string;
+	/** Collect absolute paths flagged immutable by their internal-URL handler. */
+	trackImmutableSources?: boolean;
+	/** Honor `exactFilePaths` from {@link resolveExplicitSearchPaths} (search-only). */
+	surfaceExactFilePaths?: boolean;
+	/** Extra hint appended to "Path not found" when stat fails and the user supplied multiple paths. */
+	multipathStatHint?: string;
+}
+
+export interface ToolScopeResolution {
+	searchPath: string;
+	scopePath: string;
+	globFilter: string | undefined;
+	isDirectory: boolean;
+	multiTargets?: ResolvedSearchTarget[];
+	exactFilePaths?: string[];
+	missingPaths: string[];
+	immutableSourcePaths: Set<string>;
+}
+
+/**
+ * Shared path-input pipeline for `search`, `ast_grep`, and `ast_edit`:
+ *  1. normalize + reject empty paths,
+ *  2. resolve internal URLs through {@link InternalUrlRouter} to backing files,
+ *  3. partition existing vs missing when multiple paths are supplied,
+ *  4. derive a single search base path / glob, or a multi-target list,
+ *  5. stat the resolved base path so callers can branch on directory vs file scope.
+ */
+export async function resolveToolSearchScope(opts: ToolScopeOptions): Promise<ToolScopeResolution> {
+	const { rawPaths: inputs, cwd, internalUrlAction } = opts;
+	const rawPaths = inputs.map(normalizePathLikeInput);
+	if (rawPaths.some(rawPath => rawPath.length === 0)) {
+		throw new ToolError("`paths` must contain non-empty paths or globs");
+	}
+	const internalRouter = InternalUrlRouter.instance();
+	const resolvedPathInputs: string[] = [];
+	const immutableSourcePaths = new Set<string>();
+	for (const rawPath of rawPaths) {
+		if (!internalRouter.canHandle(rawPath)) {
+			resolvedPathInputs.push(rawPath);
+			continue;
+		}
+		if (hasGlobPathChars(rawPath)) {
+			throw new ToolError(`Glob patterns are not supported for internal URLs: ${rawPath}`);
+		}
+		const resource = await internalRouter.resolve(rawPath);
+		if (!resource.sourcePath) {
+			throw new ToolError(`Cannot ${internalUrlAction} internal URL without a backing file: ${rawPath}`);
+		}
+		if (opts.trackImmutableSources && resource.immutable) {
+			immutableSourcePaths.add(path.resolve(resource.sourcePath));
+		}
+		resolvedPathInputs.push(resource.sourcePath);
+	}
+
+	let missingPaths: string[] = [];
+	let effectivePaths = resolvedPathInputs;
+	if (resolvedPathInputs.length > 1) {
+		const partition = await partitionExistingPaths(resolvedPathInputs, cwd, parseSearchPath);
+		if (partition.valid.length === 0) {
+			throw new ToolError(`Path not found: ${partition.missing.join(", ")}`);
+		}
+		effectivePaths = partition.valid;
+		missingPaths = partition.missing;
+	}
+
+	let searchPath: string;
+	let scopePath: string;
+	let globFilter: string | undefined;
+	let multiTargets: ResolvedSearchTarget[] | undefined;
+	let exactFilePaths: string[] | undefined;
+	if (effectivePaths.length === 1) {
+		const parsedPath = parseSearchPath(effectivePaths[0] ?? ".");
+		searchPath = resolveToCwd(parsedPath.basePath, cwd);
+		globFilter = parsedPath.glob;
+		scopePath = formatPathRelativeToCwd(searchPath, cwd);
+	} else {
+		const multiSearchPath = await resolveExplicitSearchPaths(effectivePaths, cwd);
+		if (!multiSearchPath) {
+			throw new ToolError("`paths` must contain at least one path or glob");
+		}
+		searchPath = multiSearchPath.basePath;
+		multiTargets = multiSearchPath.targets;
+		if (opts.surfaceExactFilePaths) {
+			exactFilePaths = multiSearchPath.exactFilePaths;
+			globFilter = exactFilePaths || multiTargets ? undefined : multiSearchPath.glob;
+		} else {
+			globFilter = multiTargets ? undefined : multiSearchPath.glob;
+		}
+		scopePath = multiSearchPath.scopePath;
+	}
+
+	let isDirectory: boolean;
+	try {
+		const stat = await Bun.file(searchPath).stat();
+		isDirectory = stat.isDirectory();
+	} catch {
+		const hint = opts.multipathStatHint && rawPaths.length > 1 ? opts.multipathStatHint : "";
+		throw new ToolError(`Path not found: ${scopePath}${hint}`);
+	}
+
+	return {
+		searchPath,
+		scopePath,
+		globFilter,
+		isDirectory,
+		multiTargets,
+		exactFilePaths,
+		missingPaths,
+		immutableSourcePaths,
+	};
 }

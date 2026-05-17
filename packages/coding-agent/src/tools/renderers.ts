@@ -6,6 +6,7 @@
 import type { Component } from "@oh-my-pi/pi-tui";
 import { editToolRenderer } from "../edit/renderer";
 import type { RenderResultOptions } from "../extensibility/custom-tools/types";
+import { goalToolRenderer } from "../goals/tools/goal-tool";
 import { lspToolRenderer } from "../lsp/render";
 import type { Theme } from "../modes/theme/theme";
 import { taskToolRenderer } from "../task/render";
@@ -14,17 +15,18 @@ import { askToolRenderer } from "./ask";
 import { astEditToolRenderer } from "./ast-edit";
 import { astGrepToolRenderer } from "./ast-grep";
 import { bashToolRenderer } from "./bash";
+import { browserToolRenderer } from "./browser/render";
 import { calculatorToolRenderer } from "./calculator";
 import { debugToolRenderer } from "./debug";
+import { evalToolRenderer } from "./eval";
 import { findToolRenderer } from "./find";
 import { githubToolRenderer } from "./gh-renderer";
-import { grepToolRenderer } from "./grep";
 import { inspectImageToolRenderer } from "./inspect-image-renderer";
 import { jobToolRenderer } from "./job";
-import { notebookToolRenderer } from "./notebook";
-import { pythonToolRenderer } from "./python";
 import { readToolRenderer } from "./read";
+import { recipeToolRenderer } from "./recipe/render";
 import { resolveToolRenderer } from "./resolve";
+import { searchToolRenderer } from "./search";
 import { searchToolBm25Renderer } from "./search-tool-bm25";
 import { sshToolRenderer } from "./ssh";
 import { todoWriteToolRenderer } from "./todo-write";
@@ -48,15 +50,16 @@ export const toolRenderers: Record<string, ToolRenderer> = {
 	ast_grep: astGrepToolRenderer as ToolRenderer,
 	ast_edit: astEditToolRenderer as ToolRenderer,
 	bash: bashToolRenderer as ToolRenderer,
+	browser: browserToolRenderer as ToolRenderer,
+	recipe: recipeToolRenderer as ToolRenderer,
 	debug: debugToolRenderer as ToolRenderer,
-	python: pythonToolRenderer as ToolRenderer,
+	eval: evalToolRenderer as ToolRenderer,
 	calc: calculatorToolRenderer as ToolRenderer,
 	edit: editToolRenderer as ToolRenderer,
 	apply_patch: editToolRenderer as ToolRenderer,
 	find: findToolRenderer as ToolRenderer,
-	grep: grepToolRenderer as ToolRenderer,
+	search: searchToolRenderer as ToolRenderer,
 	lsp: lspToolRenderer as ToolRenderer,
-	notebook: notebookToolRenderer as ToolRenderer,
 	inspect_image: inspectImageToolRenderer as ToolRenderer,
 	read: readToolRenderer as ToolRenderer,
 	job: jobToolRenderer as ToolRenderer,
@@ -66,6 +69,7 @@ export const toolRenderers: Record<string, ToolRenderer> = {
 	task: taskToolRenderer as ToolRenderer,
 	todo_write: todoWriteToolRenderer as ToolRenderer,
 	github: githubToolRenderer as ToolRenderer,
+	goal: goalToolRenderer as ToolRenderer,
 	web_search: webSearchToolRenderer as ToolRenderer,
 	write: writeToolRenderer as ToolRenderer,
 };

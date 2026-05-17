@@ -1,7 +1,7 @@
 import * as fs from "node:fs";
 import * as os from "node:os";
 import * as path from "node:path";
-import { $env, $pickenv } from "@oh-my-pi/pi-utils";
+import { $env, $pickenv, extractHttpStatusFromError } from "@oh-my-pi/pi-utils";
 import { getCustomApi } from "./api-registry";
 import type { Effort } from "./model-thinking";
 import {
@@ -9,24 +9,42 @@ import {
 	mapEffortToGoogleThinkingLevel,
 	requireSupportedEffort,
 } from "./model-thinking";
-import { type BedrockOptions, streamBedrock } from "./providers/amazon-bedrock";
-import { type AnthropicOptions, streamAnthropic } from "./providers/anthropic";
-import { streamAzureOpenAIResponses } from "./providers/azure-openai-responses";
-import { type CursorOptions, streamCursor } from "./providers/cursor";
+import type { BedrockOptions } from "./providers/amazon-bedrock";
+import type { AnthropicOptions } from "./providers/anthropic";
+import type { CursorOptions } from "./providers/cursor";
 import { isGitLabDuoModel, streamGitLabDuo } from "./providers/gitlab-duo";
-import { type GoogleOptions, streamGoogle } from "./providers/google";
-import { type GoogleGeminiCliOptions, streamGoogleGeminiCli } from "./providers/google-gemini-cli";
-import { type GoogleVertexOptions, streamGoogleVertex } from "./providers/google-vertex";
+import type { GoogleOptions } from "./providers/google";
+import type { GoogleGeminiCliOptions } from "./providers/google-gemini-cli";
+import type { GoogleVertexOptions } from "./providers/google-vertex";
 import { isKimiModel, streamKimi } from "./providers/kimi";
-import { type OllamaChatOptions, streamOllama } from "./providers/ollama";
-import { streamOpenAICodexResponses } from "./providers/openai-codex-responses";
-import { type OpenAICompletionsOptions, streamOpenAICompletions } from "./providers/openai-completions";
-import { streamOpenAIResponses } from "./providers/openai-responses";
+import type { OllamaChatOptions } from "./providers/ollama";
+import type { OpenAICompletionsOptions } from "./providers/openai-completions";
+import { streamPiNative } from "./providers/pi-native-client";
+// Heavy provider stream functions are imported lazily via register-builtins,
+// which wraps each provider module in a dynamic import. This keeps the
+// AWS SDK, google-auth-library, @google/genai, @bufbuild/protobuf, and
+// other provider SDKs out of the CLI startup parse graph. The
+// gitlab-duo / kimi / synthetic providers stay eager because their modules
+// export routing predicates (isGitLabDuoModel, isKimiModel, isSyntheticModel)
+// that must be callable synchronously before streaming begins, and their
+// modules are thin wrappers with no heavy SDK dependencies.
+import {
+	streamAnthropic,
+	streamAzureOpenAIResponses,
+	streamBedrock,
+	streamCursor,
+	streamGoogle,
+	streamGoogleGeminiCli,
+	streamGoogleVertex,
+	streamOllama,
+	streamOpenAICodexResponses,
+	streamOpenAICompletions,
+	streamOpenAIResponses,
+} from "./providers/register-builtins";
 import { isSyntheticModel, streamSynthetic } from "./providers/synthetic";
 import type {
 	Api,
 	AssistantMessage,
-	AssistantMessageEventStream,
 	Context,
 	Model,
 	OptionsForApi,
@@ -35,6 +53,7 @@ import type {
 	ThinkingBudgets,
 	ToolChoice,
 } from "./types";
+import { AssistantMessageEventStream } from "./utils/event-stream";
 import { isFoundryEnabled } from "./utils/foundry";
 
 let cachedVertexAdcCredentialsExists: boolean | null = null;
@@ -158,6 +177,15 @@ export function getEnvApiKey(provider: string): string | undefined {
 	return resolver?.();
 }
 
+/**
+ * Enumerate every provider that has an env-var fallback for `getEnvApiKey`.
+ * Used by `omp auth-broker migrate --include-env` to discover env-sourced keys
+ * that should be uploaded to the broker.
+ */
+export function listProvidersWithEnvKey(): string[] {
+	return Object.keys(serviceProviderMap);
+}
+
 export function stream<TApi extends Api>(
 	model: Model<TApi>,
 	context: Context,
@@ -196,8 +224,13 @@ export function stream<TApi extends Api>(
 
 	const api: Api = model.api;
 	switch (api) {
-		case "anthropic-messages":
-			return streamAnthropic(model as Model<"anthropic-messages">, context, providerOptions);
+		case "anthropic-messages": {
+			const anthropicOptions = providerOptions as AnthropicOptions;
+			return streamAnthropic(model as Model<"anthropic-messages">, context, {
+				...anthropicOptions,
+				isOAuth: anthropicOptions.isOAuth ?? model.isOAuth,
+			});
+		}
 
 		case "openai-completions":
 			return streamOpenAICompletions(model as Model<"openai-completions">, context, providerOptions as any);
@@ -246,7 +279,61 @@ export function streamSimple<TApi extends Api>(
 	context: Context,
 	options?: SimpleStreamOptions,
 ): AssistantMessageEventStream {
-	// Check custom API registry first (extension-provided APIs)
+	const retryApiKey = options?.onAuthError ? (options.apiKey ?? getEnvApiKey(model.provider)) : undefined;
+	if (retryApiKey) {
+		const outer = new AssistantMessageEventStream();
+		const onAuthError = options!.onAuthError!;
+		let emitted = false;
+		void (async () => {
+			try {
+				const inner = streamSimple(model, context, { ...options, apiKey: retryApiKey, onAuthError: undefined });
+				for await (const event of inner) {
+					emitted = true;
+					outer.push(event);
+					if (outer.done) return;
+				}
+				if (!outer.done) outer.end(await inner.result());
+			} catch (error) {
+				if (emitted || extractHttpStatusFromError(error) !== 401) {
+					outer.fail(error);
+					return;
+				}
+				let nextKey: string | undefined;
+				try {
+					nextKey = await onAuthError(model.provider, retryApiKey, error);
+				} catch {
+					nextKey = undefined;
+				}
+				if (!nextKey || nextKey === retryApiKey) {
+					outer.fail(error);
+					return;
+				}
+				try {
+					const retried = streamSimple(model, context, { ...options, apiKey: nextKey, onAuthError: undefined });
+					for await (const event of retried) {
+						outer.push(event);
+						if (outer.done) return;
+					}
+					if (!outer.done) outer.end(await retried.result());
+				} catch (retryError) {
+					outer.fail(retryError);
+				}
+			}
+		})();
+		return outer;
+	}
+
+	// Pi-native transport short-circuits the per-provider dispatch entirely:
+	// the gateway resolves provider + credential server-side, so we don't
+	// need an `apiKey` from `getEnvApiKey` here — `options.apiKey` carries
+	// the gateway bearer instead. Comes BEFORE the custom-API check so
+	// extension-registered APIs can't accidentally override a configured
+	// pi-native transport.
+	if (model.transport === "pi-native") {
+		return streamPiNative(model, context, options);
+	}
+
+	// Check custom API registry (extension-provided APIs)
 	const customApiProvider = getCustomApi(model.api);
 	if (customApiProvider) {
 		return customApiProvider.streamSimple(model, context, options);
@@ -426,6 +513,8 @@ function mapOptionsForApi<TApi extends Api>(
 		sessionId: options?.sessionId,
 		providerSessionState: options?.providerSessionState,
 		onPayload: options?.onPayload,
+		onResponse: options?.onResponse,
+		onSseEvent: options?.onSseEvent,
 		execHandlers: options?.execHandlers,
 	};
 
@@ -438,6 +527,7 @@ function mapOptionsForApi<TApi extends Api>(
 					...base,
 					thinkingEnabled: false,
 					toolChoice: mapAnthropicToolChoice(options?.toolChoice),
+					thinkingDisplay: options?.hideThinkingSummary ? "omitted" : undefined,
 				});
 			}
 
@@ -447,6 +537,7 @@ function mapOptionsForApi<TApi extends Api>(
 					...base,
 					thinkingEnabled: false,
 					toolChoice: mapAnthropicToolChoice(options?.toolChoice),
+					thinkingDisplay: options?.hideThinkingSummary ? "omitted" : undefined,
 				});
 			}
 
@@ -459,6 +550,7 @@ function mapOptionsForApi<TApi extends Api>(
 					thinkingEnabled: true,
 					effort,
 					toolChoice: mapAnthropicToolChoice(options?.toolChoice),
+					thinkingDisplay: options?.hideThinkingSummary ? "omitted" : undefined,
 				});
 			}
 
@@ -468,6 +560,7 @@ function mapOptionsForApi<TApi extends Api>(
 					thinkingEnabled: true,
 					thinkingBudgetTokens: thinkingBudget,
 					toolChoice: mapAnthropicToolChoice(options?.toolChoice),
+					thinkingDisplay: options?.hideThinkingSummary ? "omitted" : undefined,
 				});
 			}
 
@@ -485,6 +578,7 @@ function mapOptionsForApi<TApi extends Api>(
 					...base,
 					thinkingEnabled: false,
 					toolChoice: mapAnthropicToolChoice(options?.toolChoice),
+					thinkingDisplay: options?.hideThinkingSummary ? "omitted" : undefined,
 				});
 			} else {
 				return castApi<"anthropic-messages">({
@@ -493,6 +587,7 @@ function mapOptionsForApi<TApi extends Api>(
 					thinkingEnabled: true,
 					thinkingBudgetTokens: thinkingBudget,
 					toolChoice: mapAnthropicToolChoice(options?.toolChoice),
+					thinkingDisplay: options?.hideThinkingSummary ? "omitted" : undefined,
 				});
 			}
 		}
@@ -529,6 +624,7 @@ function mapOptionsForApi<TApi extends Api>(
 			return castApi<"openai-completions">({
 				...base,
 				reasoning: resolveOpenAiReasoningEffort(model, options),
+				disableReasoning: options?.disableReasoning,
 				toolChoice: mapOpenAiToolChoice(options?.toolChoice),
 				serviceTier: options?.serviceTier,
 			});
@@ -539,6 +635,7 @@ function mapOptionsForApi<TApi extends Api>(
 				reasoning: resolveOpenAiReasoningEffort(model, options),
 				toolChoice: mapOpenAiToolChoice(options?.toolChoice),
 				serviceTier: options?.serviceTier,
+				reasoningSummary: options?.hideThinkingSummary ? null : undefined,
 			});
 
 		case "azure-openai-responses":
@@ -547,6 +644,7 @@ function mapOptionsForApi<TApi extends Api>(
 				reasoning: resolveOpenAiReasoningEffort(model, options),
 				toolChoice: mapOpenAiToolChoice(options?.toolChoice),
 				serviceTier: options?.serviceTier,
+				reasoningSummary: options?.hideThinkingSummary ? null : undefined,
 			});
 
 		case "openai-codex-responses":
@@ -556,6 +654,7 @@ function mapOptionsForApi<TApi extends Api>(
 				toolChoice: mapOpenAiToolChoice(options?.toolChoice),
 				serviceTier: options?.serviceTier,
 				preferWebsockets: options?.preferWebsockets,
+				reasoningSummary: options?.hideThinkingSummary ? null : undefined,
 			});
 
 		case "google-generative-ai": {

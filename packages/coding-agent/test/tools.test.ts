@@ -12,12 +12,11 @@ import { SessionManager } from "@oh-my-pi/pi-coding-agent/session/session-manage
 import type { ToolSession } from "@oh-my-pi/pi-coding-agent/tools";
 import { BashTool } from "@oh-my-pi/pi-coding-agent/tools/bash";
 import { FindTool } from "@oh-my-pi/pi-coding-agent/tools/find";
-import { GrepTool } from "@oh-my-pi/pi-coding-agent/tools/grep";
 import { JobTool } from "@oh-my-pi/pi-coding-agent/tools/job";
 import { wrapToolWithMetaNotice } from "@oh-my-pi/pi-coding-agent/tools/output-meta";
 import { ReadTool } from "@oh-my-pi/pi-coding-agent/tools/read";
+import { DEFAULT_FILE_LIMIT, MULTI_FILE_PER_FILE_MATCHES, SearchTool } from "@oh-my-pi/pi-coding-agent/tools/search";
 import { WriteTool } from "@oh-my-pi/pi-coding-agent/tools/write";
-import * as markitUtils from "@oh-my-pi/pi-coding-agent/utils/markit";
 import { $which, Snowflake } from "@oh-my-pi/pi-utils";
 import { unzipSync } from "fflate";
 
@@ -29,6 +28,13 @@ function getTextOutput(result: any): string {
 			.map((c: any) => c.text)
 			.join("\n") || ""
 	);
+}
+
+function writeFileWithMtime(filePath: string, content: string, mtimeMs: number): void {
+	fs.mkdirSync(path.dirname(filePath), { recursive: true });
+	fs.writeFileSync(filePath, content);
+	const mtime = new Date(mtimeMs);
+	fs.utimesSync(filePath, mtime, mtime);
 }
 
 function createFifoOrSkip(fifoPath: string): boolean {
@@ -219,7 +225,7 @@ describe("Coding Agent Tools", () => {
 	let writeTool: WriteTool;
 	let editTool: EditTool;
 	let bashTool: BashTool;
-	let grepTool: GrepTool;
+	let searchTool: SearchTool;
 	let findTool: FindTool;
 	let originalEditVariant: string | undefined;
 
@@ -238,7 +244,7 @@ describe("Coding Agent Tools", () => {
 		writeTool = wrapToolWithMetaNotice(new WriteTool(session));
 		editTool = wrapToolWithMetaNotice(new EditTool(session));
 		bashTool = wrapToolWithMetaNotice(new BashTool(session));
-		grepTool = wrapToolWithMetaNotice(new GrepTool(session));
+		searchTool = wrapToolWithMetaNotice(new SearchTool(session));
 		findTool = wrapToolWithMetaNotice(new FindTool(session));
 	});
 
@@ -254,6 +260,7 @@ describe("Coding Agent Tools", () => {
 		} else {
 			Bun.env.PI_EDIT_VARIANT = originalEditVariant;
 		}
+		AsyncJobManager.resetForTests();
 	});
 
 	describe("read tool", () => {
@@ -269,18 +276,52 @@ describe("Coding Agent Tools", () => {
 			expect(output).toContain("Line 2");
 			expect(output).toContain("Line 3");
 			// No truncation message since file fits within limits
-			expect(getTextOutput(result)).not.toContain("Use sel=");
+			expect(getTextOutput(result)).not.toContain("Use :");
 			expect(result.details?.truncation).toBeUndefined();
 		});
 
-		it("should convert ipynb files through markit for raw reads", async () => {
+		it("truncates lines wider than the read column cap, leaving narrow lines untouched", async () => {
+			const wideLine = "x".repeat(1500);
+			const testFile = path.join(testDir, "wide.txt");
+			fs.writeFileSync(testFile, `header\n${wideLine}\nfooter`);
+
+			const result = await readTool.execute("test-call-column-truncate", { path: testFile });
+			const output = getTextOutput(result);
+
+			expect(output).toContain("header");
+			expect(output).toContain("footer");
+			expect(output).not.toContain(wideLine); // verbatim wide line is gone
+			expect(output).toContain("…"); // ellipsis marker
+			expect(output).toContain("Some lines truncated to 768 chars");
+		});
+
+		it("returns wide lines verbatim with the :raw selector", async () => {
+			const wideLine = "y".repeat(1500);
+			const testFile = path.join(testDir, "wide-raw.txt");
+			fs.writeFileSync(testFile, `head\n${wideLine}\ntail`);
+
+			const result = await readTool.execute("test-call-column-raw", { path: `${testFile}:raw` });
+			const output = getTextOutput(result);
+
+			expect(output).toContain(wideLine);
+			expect(output).not.toContain("Some lines truncated to 768 chars");
+		});
+
+		it("should read ipynb files as editable cell text", async () => {
 			const notebookPath = path.join(testDir, "notebook.ipynb");
 			const notebook = {
 				cells: [
 					{
 						cell_type: "markdown",
-						metadata: {},
+						metadata: { keep: true },
 						source: ["# Notebook Title\n", "\n", "Notebook body\n"],
+					},
+					{
+						cell_type: "code",
+						metadata: {},
+						source: ["print('hello')\n"],
+						execution_count: 7,
+						outputs: [{ output_type: "stream", name: "stdout", text: "hello\n" }],
 					},
 				],
 				metadata: {},
@@ -289,18 +330,53 @@ describe("Coding Agent Tools", () => {
 			};
 			fs.writeFileSync(notebookPath, JSON.stringify(notebook));
 
-			const convertSpy = vi.spyOn(markitUtils, "convertFileWithMarkit").mockResolvedValue({
-				ok: true,
-				content: "# Notebook Title\n\nNotebook body\n",
-			});
-
-			const result = await readTool.execute("test-call-ipynb", { path: notebookPath, sel: "raw" });
+			const result = await readTool.execute("test-call-ipynb", { path: notebookPath });
 			const output = getTextOutput(result);
 
-			expect(convertSpy).toHaveBeenCalledTimes(1);
+			expect(output).toContain("# %% [markdown] cell:0");
 			expect(output).toContain("# Notebook Title");
 			expect(output).toContain("Notebook body");
+			expect(output).toContain("# %% [code] cell:1");
+			expect(output).toContain("print('hello')");
 			expect(output).not.toContain('"cell_type"');
+		});
+
+		it("should apply edits to the ipynb editable representation", async () => {
+			const notebookPath = path.join(testDir, "editable.ipynb");
+			const notebook = {
+				cells: [
+					{
+						cell_type: "markdown",
+						metadata: { keep: true },
+						source: ["Original title\n"],
+					},
+					{
+						cell_type: "code",
+						metadata: { trusted: true },
+						source: ["print('old')\n"],
+						execution_count: 3,
+						outputs: [{ output_type: "stream", name: "stdout", text: "old\n" }],
+					},
+				],
+				metadata: { kernelspec: { name: "python3" } },
+				nbformat: 4,
+				nbformat_minor: 5,
+			};
+			fs.writeFileSync(notebookPath, JSON.stringify(notebook));
+			const noLspEditTool = wrapToolWithMetaNotice(new EditTool({ ...session, enableLsp: false }));
+
+			await noLspEditTool.execute("test-edit-ipynb", {
+				path: notebookPath,
+				edits: [{ old_text: "print('old')", new_text: "print('new')" }],
+			});
+
+			const updated = JSON.parse(fs.readFileSync(notebookPath, "utf-8"));
+			expect(updated.cells).toHaveLength(2);
+			expect(updated.cells[1].source).toEqual(["print('new')\n"]);
+			expect(updated.cells[1].metadata).toEqual({ trusted: true });
+			expect(updated.cells[1].execution_count).toBe(3);
+			expect(updated.cells[1].outputs).toEqual([{ output_type: "stream", name: "stdout", text: "old\n" }]);
+			expect(updated.metadata).toEqual({ kernelspec: { name: "python3" } });
 		});
 
 		it("should handle non-existent files", async () => {
@@ -331,13 +407,13 @@ describe("Coding Agent Tools", () => {
 			expect(output).toContain("Line 1");
 			expect(output).toContain(`Line ${defaultLimit}`);
 			expect(output).not.toContain(`Line ${defaultLimit + 1}`);
-			expect(output).toContain(`[Showing lines 1-${defaultLimit} of 3500. Use sel=${defaultLimit + 1} to continue]`);
+			expect(output).toContain(`[Showing lines 1-${defaultLimit} of 3500. Use :${defaultLimit + 1} to continue]`);
 		});
 
 		it("should truncate when byte limit exceeded", async () => {
 			const testFile = path.join(testDir, "large-bytes.txt");
-			// Create file that exceeds 50KB byte limit but has fewer than 3000 lines
-			const lines = Array.from({ length: 1000 }, (_, i) => `Line ${i + 1}: ${"x".repeat(200)}`);
+			// Create file with long lines so the byte budget triggers before the line limit.
+			const lines = Array.from({ length: 1000 }, (_, i) => `Line ${i + 1}: ${"x".repeat(600)}`);
 			fs.writeFileSync(testFile, lines.join("\n"));
 
 			const result = await readTool.execute("test-call-4", { path: testFile });
@@ -345,65 +421,111 @@ describe("Coding Agent Tools", () => {
 
 			expect(output).toContain("Line 1:");
 			// Should show byte limit message
-			expect(output).toMatch(/\[Showing lines 1-\d+ of 1000 \(\d+(\.\d+)?\s*KB limit\)\. Use sel=\d+ to continue\]/);
+			expect(output).toMatch(/\[Showing lines 1-\d+ of 1000 \(\d+(\.\d+)?\s*KB limit\)\. Use :\d+ to continue\]/);
 		});
 
-		it("should handle offset parameter", async () => {
+		it("should handle offset parameter (with leading context expansion)", async () => {
 			const testFile = path.join(testDir, "offset-test.txt");
 			const lines = Array.from({ length: 100 }, (_, i) => `Line ${i + 1}`);
 			fs.writeFileSync(testFile, lines.join("\n"));
 
-			const result = await readTool.execute("test-call-5", { path: testFile, sel: "L51" });
+			const result = await readTool.execute("test-call-5", { path: `${testFile}:L51` });
 			const output = getTextOutput(result);
 
-			expect(output).not.toContain("Line 50");
+			// Read tool widens by 1 leading + 3 trailing unanchored context lines
+			// so anchors at the boundary stay fresh. Line 50 is the single leading
+			// context line; lines 47..49 are NOT included.
+			expect(output).not.toContain("Line 49");
+			expect(output).toContain("Line 50");
 			expect(output).toContain("Line 51");
 			expect(output).toContain("Line 100");
 			// No truncation message since file fits within limits
-			expect(output).not.toContain("Use sel=");
+			expect(output).not.toContain("Use :");
 		});
 
-		it("should handle limit parameter", async () => {
+		it("should handle limit parameter (with trailing context expansion)", async () => {
 			const testFile = path.join(testDir, "limit-test.txt");
 			const lines = Array.from({ length: 100 }, (_, i) => `Line ${i + 1}`);
 			fs.writeFileSync(testFile, lines.join("\n"));
 
-			const result = await readTool.execute("test-call-6", { path: testFile, sel: "L1-L10" });
+			const result = await readTool.execute("test-call-6", { path: `${testFile}:L1-L10` });
+			const output = getTextOutput(result);
+
+			// Trailing context: lines 11..13 included so an edit anchored at
+			// the boundary stays fresh.
+			expect(output).toContain("Line 1");
+			expect(output).toContain("Line 10");
+			expect(output).toContain("Line 13");
+			expect(output).not.toContain("Line 14");
+			expect(output).toContain("[Showing lines 1-13 of 100. Use :14 to continue]");
+		});
+
+		it("does not expand on the leading side when offset is 1 or unspecified", async () => {
+			const testFile = path.join(testDir, "no-leading.txt");
+			const lines = Array.from({ length: 50 }, (_, i) => `Line ${i + 1}`);
+			fs.writeFileSync(testFile, lines.join("\n"));
+
+			// :L1-L5 has offset=1 → no leading context (already at the top).
+			// Trailing context still applies.
+			const result = await readTool.execute("test-no-leading", {
+				path: `${testFile}:L1-L5`,
+			});
 			const output = getTextOutput(result);
 
 			expect(output).toContain("Line 1");
-			expect(output).toContain("Line 10");
-			expect(output).not.toContain("Line 11");
-			expect(output).toContain("[Showing lines 1-10 of 100. Use sel=11 to continue]");
+			expect(output).toContain("Line 5");
+			expect(output).toContain("Line 8");
+			expect(output).not.toContain("Line 9");
+			expect(output).toContain("[Showing lines 1-8 of 50. Use :9 to continue]");
 		});
 
-		it("should handle offset + limit together", async () => {
+		it("clamps leading context at file start without errors", async () => {
+			const testFile = path.join(testDir, "leading-clamp.txt");
+			const lines = Array.from({ length: 50 }, (_, i) => `Line ${i + 1}`);
+			fs.writeFileSync(testFile, lines.join("\n"));
+
+			// :L2-L5: offset=2 → expand by min(1, 1) = 1 leading line.
+			const result = await readTool.execute("test-leading-clamp", {
+				path: `${testFile}:L2-L5`,
+			});
+			const output = getTextOutput(result);
+
+			expect(output).toContain("Line 1");
+			expect(output).toContain("Line 2");
+			expect(output).toContain("Line 5");
+			expect(output).toContain("Line 8");
+			expect(output).not.toContain("Line 9");
+		});
+
+		it("should handle offset + limit together (1 leading + 3 trailing)", async () => {
 			const testFile = path.join(testDir, "offset-limit-test.txt");
 			const lines = Array.from({ length: 100 }, (_, i) => `Line ${i + 1}`);
 			fs.writeFileSync(testFile, lines.join("\n"));
 
 			const result = await readTool.execute("test-call-7", {
-				path: testFile,
-				sel: "L41-L60",
+				path: `${testFile}:L41-L60`,
 			});
 			const output = getTextOutput(result);
 
-			expect(output).not.toContain("Line 40");
+			// Both endpoints are user-constrained: 1 leading + 3 trailing.
+			expect(output).not.toContain("Line 39");
+			expect(output).toContain("Line 40");
 			expect(output).toContain("Line 41");
 			expect(output).toContain("Line 60");
-			expect(output).not.toContain("Line 61");
-			expect(output).toContain("[Showing lines 41-60 of 100. Use sel=61 to continue]");
+			expect(output).toContain("Line 63");
+			expect(output).not.toContain("Line 64");
+			expect(output).toContain("[Showing lines 40-63 of 100. Use :64 to continue]");
 		});
 
 		it("should show error when offset is beyond file length", async () => {
 			const testFile = path.join(testDir, "short.txt");
 			fs.writeFileSync(testFile, "Line 1\nLine 2\nLine 3");
 
-			const result = await readTool.execute("test-call-8", { path: testFile, sel: "L100" });
+			const result = await readTool.execute("test-call-8", { path: `${testFile}:L100` });
 			const output = getTextOutput(result);
 
 			expect(output).toContain("Line 100 is beyond end of file (3 lines total)");
-			expect(output).toContain("Use sel=1 to read from the start, or sel=3 to read the last line.");
+			expect(output).toContain("Use :1 to read from the start, or :3 to read the last line.");
 		});
 
 		it("should include truncation details when truncated", async () => {
@@ -420,6 +542,42 @@ describe("Coding Agent Tools", () => {
 			expect(result.details?.truncation?.truncatedBy).toBe("lines");
 			expect(result.details?.truncation?.totalLines).toBe(3500);
 			expect(result.details?.truncation?.outputLines).toBe(defaultLimit);
+		});
+
+		it("should render directories as a two-level tree without capping root entries", async () => {
+			const childDir = path.join(testDir, "child");
+			const base = Date.now() - 60_000;
+			fs.mkdirSync(childDir, { recursive: true });
+			writeFileWithMtime(path.join(testDir, ".hidden-root"), "hidden", base + 20_000);
+			writeFileWithMtime(path.join(testDir, ".DS_Store"), "mac metadata", base + 25_000);
+			writeFileWithMtime(path.join(testDir, "node_modules", "pkg", "index.js"), "ignored", base + 24_000);
+			for (let i = 0; i < 13; i += 1) {
+				const fileName = `root-${String(i).padStart(2, "0")}.txt`;
+				writeFileWithMtime(path.join(testDir, fileName), fileName, base + i);
+			}
+			for (let i = 0; i < 13; i += 1) {
+				const fileName = `child-${String(i).padStart(2, "0")}.txt`;
+				writeFileWithMtime(path.join(childDir, fileName), fileName, base + i);
+			}
+			writeFileWithMtime(path.join(childDir, "nested", "deep.txt"), "deep", base + 30_000);
+
+			const result = await readTool.execute("test-call-directory-tree", { path: testDir });
+			const output = getTextOutput(result);
+
+			expect(result.details?.isDirectory).toBe(true);
+			expect(output).toContain(".");
+			expect(output).toContain(".hidden-root");
+			expect(output).not.toContain(".DS_Store");
+			expect(output).not.toContain("node_modules");
+			expect(output).toContain("root-00.txt");
+			expect(output).toContain("root-01.txt");
+			expect(output).toContain("root-12.txt");
+			expect(output).toContain("child/");
+			expect(output).toContain("nested/");
+			expect(output).toContain("… 2 more");
+			expect(output).not.toContain("child-01.txt");
+			expect(output).toContain("child-00.txt");
+			expect(output).not.toContain("deep.txt");
 		});
 
 		it("should treat .tar archives like directories", async () => {
@@ -493,15 +651,14 @@ describe("Coding Agent Tools", () => {
 				);
 
 				const result = await readTool.execute("test-call-archive-subpath", {
-					path: `${archivePath}:pkg/README.md`,
-					sel: "L1-L2",
+					path: `${archivePath}:pkg/README.md:L1-L2`,
 				});
 				const output = getTextOutput(result);
 
 				expect(output).toContain("# Archive README");
 				expect(output).toContain("Line 2");
-				expect(output).not.toContain("Line 3");
-				expect(output).toContain("Use sel=3");
+				// Trailing context (±3) keeps Line 3 visible when present.
+				expect(output).toContain("Line 3");
 			});
 		}
 
@@ -548,7 +705,7 @@ describe("Coding Agent Tools", () => {
 			expect(output).toContain("Bytes:");
 			expect(output).toContain("Dimensions:");
 			expect(output).toContain("inspect_image");
-			expect(output).toContain(`path="${testFile}"`);
+			expect(output).toContain(`path="${path.basename(testFile)}"`);
 			expect(output).toContain("question");
 			expect(output).not.toContain("optional context");
 			expect(result.content.some(c => c.type === "image")).toBe(false);
@@ -574,7 +731,7 @@ describe("Coding Agent Tools", () => {
 			const result = await writeTool.execute("test-call-3", { path: testFile, content });
 
 			expect(getTextOutput(result)).toContain("Successfully wrote");
-			expect(getTextOutput(result)).toContain(testFile);
+			expect(getTextOutput(result)).toContain(path.basename(testFile));
 		});
 
 		it("should create parent directories", async () => {
@@ -592,7 +749,9 @@ describe("Coding Agent Tools", () => {
 
 			const result = await writeTool.execute("test-call-4-local", { path: localPath, content });
 
-			expect(getTextOutput(result)).toContain(`Successfully wrote ${content.length} bytes to ${localPath}`);
+			expect(getTextOutput(result)).toContain(
+				`Successfully wrote ${content.length} bytes to session/local/handoffs/new-output.json`,
+			);
 			expect(fs.existsSync(expectedPath)).toBe(true);
 			expect(fs.readFileSync(expectedPath, "utf-8")).toBe(content);
 		});
@@ -614,7 +773,7 @@ describe("Coding Agent Tools", () => {
 			});
 
 			expect(getTextOutput(result)).toContain(
-				`Successfully wrote ${content.length} bytes to ${archivePath}:pkg/README.md`,
+				`Successfully wrote ${content.length} bytes to ${path.basename(archivePath)}:pkg/README.md`,
 			);
 
 			const unzipped = unzipSync(new Uint8Array(fs.readFileSync(archivePath)));
@@ -632,7 +791,7 @@ describe("Coding Agent Tools", () => {
 			});
 
 			expect(getTextOutput(result)).toContain(
-				`Successfully wrote ${content.length} bytes to ${archivePath}:pkg/new.txt`,
+				`Successfully wrote ${content.length} bytes to nested/${path.basename(archivePath)}:pkg/new.txt`,
 			);
 			expect(fs.existsSync(archivePath)).toBe(true);
 
@@ -650,7 +809,9 @@ describe("Coding Agent Tools", () => {
 				content,
 			});
 
-			expect(getTextOutput(result)).toContain(`Successfully wrote ${content.length} bytes to ${archivePath}`);
+			expect(getTextOutput(result)).toContain(
+				`Successfully wrote ${content.length} bytes to ${path.basename(archivePath)}`,
+			);
 			expect(fs.readFileSync(archivePath, "utf-8")).toBe(content);
 		});
 	});
@@ -662,7 +823,8 @@ describe("Coding Agent Tools", () => {
 			fs.writeFileSync(testFile, originalContent);
 
 			const result = await editTool.execute("test-call-5", {
-				edits: [{ path: testFile, old_text: "world", new_text: "testing" }],
+				path: testFile,
+				edits: [{ old_text: "world", new_text: "testing" }],
 			});
 			const details = result.details as { diff?: string } | undefined;
 
@@ -680,7 +842,8 @@ describe("Coding Agent Tools", () => {
 
 			await expect(
 				editTool.execute("test-call-6", {
-					edits: [{ path: testFile, old_text: "nonexistent", new_text: "testing" }],
+					path: testFile,
+					edits: [{ old_text: "nonexistent", new_text: "testing" }],
 				}),
 			).rejects.toThrow(/Could not find/);
 		});
@@ -692,7 +855,8 @@ describe("Coding Agent Tools", () => {
 
 			await expect(
 				editTool.execute("test-call-7", {
-					edits: [{ path: testFile, old_text: "foo", new_text: "bar" }],
+					path: testFile,
+					edits: [{ old_text: "foo", new_text: "bar" }],
 				}),
 			).rejects.toThrow(/Found 3 occurrences/);
 		});
@@ -702,7 +866,8 @@ describe("Coding Agent Tools", () => {
 			fs.writeFileSync(testFile, "foo bar foo baz foo");
 
 			const result = await editTool.execute("test-all-1", {
-				edits: [{ path: testFile, old_text: "foo", new_text: "qux", all: true }],
+				path: testFile,
+				edits: [{ old_text: "foo", new_text: "qux", all: true }],
 			});
 
 			expect(getTextOutput(result)).toContain("Successfully replaced 3 occurrences");
@@ -731,9 +896,9 @@ function b() {
 			// With multiple fuzzy matches, the tool rejects for safety to avoid ambiguous replacements
 			await expect(
 				editTool.execute("test-all-fuzzy", {
+					path: testFile,
 					edits: [
 						{
-							path: testFile,
 							old_text: "if (x) {\n  doThing();\n}",
 							new_text: "if (y) {\n  doOther();\n}",
 							all: true,
@@ -749,7 +914,8 @@ function b() {
 
 			await expect(
 				editTool.execute("test-all-nomatch", {
-					edits: [{ path: testFile, old_text: "nonexistent", new_text: "bar", all: true }],
+					path: testFile,
+					edits: [{ old_text: "nonexistent", new_text: "bar", all: true }],
 				}),
 			).rejects.toThrow(/Could not find/);
 		});
@@ -759,7 +925,8 @@ function b() {
 			fs.writeFileSync(testFile, "start\nfoo\nbar\nend\nstart\nfoo\nbar\nend");
 
 			const result = await editTool.execute("test-all-multiline", {
-				edits: [{ path: testFile, old_text: "foo\nbar", new_text: "replaced", all: true }],
+				path: testFile,
+				edits: [{ old_text: "foo\nbar", new_text: "replaced", all: true }],
 			});
 
 			expect(getTextOutput(result)).toContain("Successfully replaced 2 occurrences");
@@ -772,7 +939,8 @@ function b() {
 			fs.writeFileSync(testFile, "hello world");
 
 			const result = await editTool.execute("test-all-single", {
-				edits: [{ path: testFile, old_text: "world", new_text: "universe", all: true }],
+				path: testFile,
+				edits: [{ old_text: "world", new_text: "universe", all: true }],
 			});
 
 			expect(getTextOutput(result)).toContain("Successfully replaced text");
@@ -917,7 +1085,7 @@ function b() {
 			const updates: string[] = [];
 			const result = await bashTool.execute(
 				"test-call-8-stream",
-				{ command: "for i in 1 2 3; do echo $i; sleep 0.2; done" },
+				{ command: "for i in 1 2 3; do echo $i; sleep 0.05; done" },
 				undefined,
 				update => {
 					const text = update.content?.find(c => c.type === "text")?.text ?? "";
@@ -966,6 +1134,7 @@ function b() {
 					deliveries.push(text);
 				},
 			});
+			AsyncJobManager.setInstance(asyncJobManager);
 			const autoBackgroundBashTool = wrapToolWithMetaNotice(
 				new BashTool(
 					createTestToolSession(
@@ -975,7 +1144,6 @@ function b() {
 							"bash.autoBackground.thresholdMs": 50,
 						}),
 						{
-							asyncJobManager,
 							getSessionId: () => "test-session",
 						},
 					),
@@ -987,7 +1155,7 @@ function b() {
 			expect(getTextOutput(result)).toContain("short");
 			expect(result.details?.timeoutSeconds).toBe(300);
 			expect(result.details?.async).toBeUndefined();
-			await Bun.sleep(150);
+			await asyncJobManager.drainDeliveries({ timeoutMs: 1 });
 			expect(deliveries).toEqual([]);
 			await asyncJobManager.dispose();
 		});
@@ -999,16 +1167,16 @@ function b() {
 					deliveries.push({ jobId, text });
 				},
 			});
+			AsyncJobManager.setInstance(asyncJobManager);
 			const autoBackgroundBashTool = wrapToolWithMetaNotice(
 				new BashTool(
 					createTestToolSession(
 						testDir,
 						Settings.isolated({
 							"bash.autoBackground.enabled": true,
-							"bash.autoBackground.thresholdMs": 50,
+							"bash.autoBackground.thresholdMs": 10,
 						}),
 						{
-							asyncJobManager,
 							getSessionId: () => "test-session",
 						},
 					),
@@ -1016,7 +1184,7 @@ function b() {
 			);
 
 			const result = await autoBackgroundBashTool.execute("test-call-9-auto-running", {
-				command: "printf 'start\\n'; sleep 0.2; printf 'done\\n'",
+				command: "printf 'start\\n'; sleep 0.05; printf 'done\\n'",
 			});
 
 			expect(result.details?.async?.state).toBe("running");
@@ -1031,7 +1199,7 @@ function b() {
 			const runningJob = asyncJobManager.getJob(jobId);
 			expect(runningJob?.status).toBe("running");
 			await runningJob?.promise;
-			await Bun.sleep(50);
+			await asyncJobManager.drainDeliveries({ timeoutMs: 1 });
 			expect(deliveries).toHaveLength(1);
 			expect(deliveries[0]?.jobId).toBe(jobId);
 			expect(deliveries[0]?.text).toContain("done");
@@ -1045,6 +1213,7 @@ function b() {
 					deliveries.push({ jobId, text });
 				},
 			});
+			AsyncJobManager.setInstance(asyncJobManager);
 			const autoBackgroundBashTool = wrapToolWithMetaNotice(
 				new BashTool(
 					createTestToolSession(
@@ -1054,7 +1223,6 @@ function b() {
 							"bash.autoBackground.thresholdMs": 60_000,
 						}),
 						{
-							asyncJobManager,
 							getSessionId: () => "test-session",
 						},
 					),
@@ -1076,7 +1244,7 @@ function b() {
 			const runningJob = asyncJobManager.getJob(jobId);
 			expect(runningJob?.status).toBe("running");
 			await runningJob?.promise;
-			await Bun.sleep(50);
+			await asyncJobManager.drainDeliveries({ timeoutMs: 1 });
 			expect(deliveries).toHaveLength(1);
 			expect(deliveries[0]?.jobId).toBe(jobId);
 			expect(deliveries[0]?.text).toContain("Command timed out after 1 seconds");
@@ -1101,9 +1269,16 @@ function b() {
 
 		it("should abort and recover for subsequent commands", async () => {
 			const controller = new AbortController();
-			const promise = bashTool.execute("test-call-10-abort", { command: "sleep 5" }, controller.signal);
-			await Bun.sleep(200);
-			controller.abort("test abort");
+			const promise = bashTool.execute(
+				"test-call-10-abort",
+				{ command: "printf 'started\\n'; sleep 5" },
+				controller.signal,
+				update => {
+					if (update.content?.some(content => content.type === "text" && content.text.includes("started"))) {
+						controller.abort("test abort");
+					}
+				},
+			);
 			await expect(promise).rejects.toThrow(/abort|cancel|timed out/i);
 
 			const result = await bashTool.execute("test-call-10-after-abort", { command: "echo ok" });
@@ -1118,6 +1293,23 @@ function b() {
 			await expect(bashToolWithBadCwd.execute("test-call-11", { command: "echo test" })).rejects.toThrow(
 				/Working directory does not exist/,
 			);
+		});
+
+		it("should not pull cwd from a later-line `&&` when the command is multiline", async () => {
+			// Regression for #?: the `^cd ... && ...` extractor used `\s` and `[^&\\]`,
+			// which let the lazy match cross newlines and capture the whole script as the
+			// "cwd" when any later line contained `&&`. The model intended `cd` to run as
+			// part of a multiline script, not to relocate the entire command.
+			const command = [
+				"cd /this/directory/definitely/does/not/exist/12345",
+				"echo first-line",
+				"echo second && echo third",
+			].join("\n");
+			const result = await bashTool.execute("test-call-multiline-cd", { command });
+			const output = getTextOutput(result);
+			expect(output).toContain("first-line");
+			expect(output).toContain("second");
+			expect(output).toContain("third");
 		});
 
 		it("should expose background-job tools when bash auto-background is enabled", () => {
@@ -1135,9 +1327,8 @@ function b() {
 			const manager = new AsyncJobManager({
 				onJobComplete: async () => {},
 			});
-			const session = createTestToolSession(testDir, Settings.isolated({ "bash.autoBackground.enabled": true }), {
-				asyncJobManager: manager,
-			});
+			const session = createTestToolSession(testDir, Settings.isolated({ "bash.autoBackground.enabled": true }), {});
+			AsyncJobManager.setInstance(manager);
 			const jobTool = JobTool.createIf(session)!;
 
 			const jobId = manager.register("bash", "test job", async () => "success");
@@ -1157,14 +1348,14 @@ function b() {
 		});
 	});
 
-	describe("grep tool", () => {
+	describe("search tool", () => {
 		it("should include filename when searching a single file", async () => {
 			const testFile = path.join(testDir, "example.txt");
 			fs.writeFileSync(testFile, "first line\nmatch line\nlast line");
 
-			const result = await grepTool.execute("test-call-11", {
+			const result = await searchTool.execute("test-call-11", {
 				pattern: "match",
-				path: testFile,
+				paths: [testFile],
 			});
 
 			const output = getTextOutput(result);
@@ -1173,14 +1364,14 @@ function b() {
 			expect(output).toMatch(/\*2\|match line/);
 		});
 
-		it("should accept wildcard patterns in the path parameter", async () => {
+		it("should accept wildcard patterns in paths", async () => {
 			fs.writeFileSync(path.join(testDir, "schema-review-alpha.test.ts"), "review target\n");
 			fs.writeFileSync(path.join(testDir, "schema-review-beta.test.ts"), "review target\n");
 			fs.writeFileSync(path.join(testDir, "schema-other.test.ts"), "review target\n");
 
-			const result = await grepTool.execute("test-call-11-path-glob", {
+			const result = await searchTool.execute("test-call-11-path-glob", {
 				pattern: "review target",
-				path: `${testDir}/schema-review-*.test.ts`,
+				paths: [`${testDir}/schema-review-*.test.ts`],
 			});
 
 			const output = getTextOutput(result);
@@ -1189,7 +1380,7 @@ function b() {
 			expect(output).not.toContain("schema-other.test.ts");
 			expect(result.details?.fileCount).toBe(2);
 		});
-		it("should accept nested wildcard filters in the path parameter", async () => {
+		it("should accept nested wildcard filters in paths", async () => {
 			const packageDir = path.join(testDir, "node_modules", ".bun");
 			const aiDir = path.join(packageDir, "ai@6.0.119+build123", "node_modules", "ai");
 			const nestedDir = path.join(aiDir, "nested");
@@ -1199,9 +1390,9 @@ function b() {
 			fs.writeFileSync(path.join(aiDir, "ignore.js"), "providerOptions\n");
 			fs.writeFileSync(path.join(testDir, "outside.ts"), "providerOptions\n");
 
-			const result = await grepTool.execute("test-call-11-path-and-glob", {
+			const result = await searchTool.execute("test-call-11-path-and-glob", {
 				pattern: "providerOptions",
-				path: `${packageDir}/ai@6.0.119+*/node_modules/ai/**/*.{d.ts,ts}`,
+				paths: [`${packageDir}/ai@6.0.119+*/node_modules/ai/**/*.{d.ts,ts}`],
 				gitignore: false,
 			});
 
@@ -1218,11 +1409,13 @@ function b() {
 			const content = ["before", "match one", "after", "middle", "match two", "after two"].join("\n");
 			fs.writeFileSync(testFile, content);
 
-			const contextSettings = Settings.isolated({ "grep.contextBefore": 1, "grep.contextAfter": 1 });
-			const contextGrepTool = wrapToolWithMetaNotice(new GrepTool(createTestToolSession(testDir, contextSettings)));
-			const result = await contextGrepTool.execute("test-call-12", {
+			const contextSettings = Settings.isolated({ "search.contextBefore": 1, "search.contextAfter": 1 });
+			const contextSearchTool = wrapToolWithMetaNotice(
+				new SearchTool(createTestToolSession(testDir, contextSettings)),
+			);
+			const result = await contextSearchTool.execute("test-call-12", {
 				pattern: "match",
-				path: testFile,
+				paths: [testFile],
 			});
 
 			const output = getTextOutput(result);
@@ -1233,20 +1426,48 @@ function b() {
 			expect(output).toMatch(/\*5\|match two/);
 		});
 
-		it("should skip matches with the skip parameter", async () => {
-			const testFile = path.join(testDir, "skip.txt");
-			fs.writeFileSync(testFile, ["needle one", "needle two", "needle three"].join("\n"));
+		it("inserts a gap separator between non-contiguous match blocks", async () => {
+			const testFile = path.join(testDir, "gaps.txt");
+			const lines = Array.from({ length: 10 }, (_, idx) => (idx === 0 || idx === 5 ? "match" : `filler ${idx}`));
+			fs.writeFileSync(testFile, lines.join("\n"));
 
-			const result = await grepTool.execute("test-call-12-skip", {
-				pattern: "needle",
-				path: testFile,
-				skip: 1,
+			const noContextSettings = Settings.isolated({ "search.contextBefore": 0, "search.contextAfter": 0 });
+			const noContextSearchTool = wrapToolWithMetaNotice(
+				new SearchTool(createTestToolSession(testDir, noContextSettings)),
+			);
+			const result = await noContextSearchTool.execute("test-call-12-gap", {
+				pattern: "match",
+				paths: [testFile],
 			});
 
 			const output = getTextOutput(result);
-			expect(output).not.toContain("needle one");
-			expect(output).toContain("needle two");
-			expect(output).toContain("needle three");
+			expect(output).toMatch(/\*1\|match\n\.\.\.\n\*6\|match/);
+		});
+
+		it("should paginate files via the skip parameter", async () => {
+			const skipDir = path.join(testDir, "skip-dir");
+			fs.mkdirSync(skipDir, { recursive: true });
+			for (let i = 1; i <= 4; i++) {
+				fs.writeFileSync(path.join(skipDir, `file-${i}.txt`), `needle ${i}`);
+			}
+
+			const first = await searchTool.execute("test-call-12-skip-first", {
+				pattern: "needle",
+				paths: [skipDir],
+			});
+			expect(first.details?.fileCount).toBe(4);
+
+			const second = await searchTool.execute("test-call-12-skip-page", {
+				pattern: "needle",
+				paths: [skipDir],
+				skip: 2,
+			});
+			const secondOutput = getTextOutput(second);
+			expect(second.details?.fileCount).toBe(2);
+			expect(secondOutput).not.toContain("# file-1.txt");
+			expect(secondOutput).not.toContain("# file-2.txt");
+			expect(secondOutput).toContain("# file-3.txt");
+			expect(secondOutput).toContain("# file-4.txt");
 		});
 
 		it("should group multi-file matches", async () => {
@@ -1255,9 +1476,9 @@ function b() {
 			}
 			fs.writeFileSync(path.join(testDir, "dominant.txt"), "needle a\nneedle b\nneedle c\nneedle d");
 
-			const result = await grepTool.execute("test-call-13-round-robin", {
+			const result = await searchTool.execute("test-call-13-round-robin", {
 				pattern: "needle",
-				path: testDir,
+				paths: [testDir],
 			});
 
 			const output = getTextOutput(result);
@@ -1275,9 +1496,9 @@ function b() {
 			fs.writeFileSync(path.join(testDir, "alpha.txt"), "needle a1\nneedle a2\nneedle a3");
 			fs.writeFileSync(path.join(testDir, "beta.txt"), "needle b1\nneedle b2\nneedle b3");
 
-			const result = await grepTool.execute("test-call-14-grouped-headings", {
+			const result = await searchTool.execute("test-call-14-grouped-headings", {
 				pattern: "needle",
-				path: testDir,
+				paths: [testDir],
 			});
 
 			const output = getTextOutput(result);
@@ -1299,9 +1520,9 @@ function b() {
 			fs.writeFileSync(path.join(nestedDir, "CHANGELOG.md"), "Claude Opus\n");
 			fs.writeFileSync(path.join(nestedDir, "models.json"), '{ "name": "Claude Opus" }\n');
 
-			const result = await grepTool.execute("test-call-15-directory-headings", {
+			const result = await searchTool.execute("test-call-15-directory-headings", {
 				pattern: "Claude Opus",
-				path: testDir,
+				paths: [testDir],
 			});
 
 			const output = getTextOutput(result);
@@ -1318,9 +1539,9 @@ function b() {
 			fs.writeFileSync(path.join(scenarioDir, "ignored.txt"), "needle ignored\n");
 			fs.writeFileSync(path.join(scenarioDir, "kept.txt"), "needle kept\n");
 
-			const result = await grepTool.execute("test-call-15-gitignore-default", {
+			const result = await searchTool.execute("test-call-15-gitignore-default", {
 				pattern: "needle",
-				path: scenarioDir,
+				paths: [scenarioDir],
 			});
 
 			const output = getTextOutput(result);
@@ -1336,9 +1557,9 @@ function b() {
 			fs.writeFileSync(path.join(scenarioDir, ".gitignore"), "ignored.txt\n");
 			fs.writeFileSync(path.join(scenarioDir, "ignored.txt"), "needle ignored\n");
 
-			const result = await grepTool.execute("test-call-16-gitignore-off", {
+			const result = await searchTool.execute("test-call-16-gitignore-off", {
 				pattern: "needle",
-				path: scenarioDir,
+				paths: [scenarioDir],
 				gitignore: false,
 			});
 
@@ -1358,9 +1579,9 @@ function b() {
 				return;
 			}
 
-			const result = await grepTool.execute("test-call-16-fifo-dir", {
+			const result = await searchTool.execute("test-call-16-fifo-dir", {
 				pattern: "needle",
-				path: scenarioDir,
+				paths: [scenarioDir],
 				gitignore: false,
 			});
 
@@ -1372,19 +1593,60 @@ function b() {
 			expect(result.details?.fileCount).toBe(1);
 			expect(result.details?.matchCount).toBe(1);
 		});
-		it("should apply the fixed default match cap", async () => {
-			const lines = Array.from({ length: 60 }, (_, i) => `needle ${i + 1}`);
-			fs.writeFileSync(path.join(testDir, "default-limit.txt"), lines.join("\n"));
+		it("should cap distinct files and surface pagination", async () => {
+			const limitDir = path.join(testDir, "file-limit-dir");
+			fs.mkdirSync(limitDir, { recursive: true });
+			const totalFiles = DEFAULT_FILE_LIMIT + 4;
+			for (let i = 1; i <= totalFiles; i++) {
+				fs.writeFileSync(path.join(limitDir, `f-${String(i).padStart(2, "0")}.txt`), `needle ${i}`);
+			}
 
-			const result = await grepTool.execute("test-call-14-default-limit", {
+			const result = await searchTool.execute("test-call-14-file-limit", {
 				pattern: "needle",
-				path: testDir,
+				paths: [limitDir],
 			});
 
 			const output = getTextOutput(result);
-			expect(output).toContain("Result limit reached; narrow path or use skip=20.");
-			expect(result.details?.matchCount).toBe(20);
-			expect(result.details?.matchLimitReached).toBe(20);
+			expect(result.details?.fileCount).toBe(DEFAULT_FILE_LIMIT);
+			expect(result.details?.matchCount).toBe(DEFAULT_FILE_LIMIT);
+			expect(result.details?.fileLimitReached).toBe(DEFAULT_FILE_LIMIT);
+			expect(output).toContain(`Showing files 1-${DEFAULT_FILE_LIMIT} of ${totalFiles}`);
+			expect(output).toContain(`Use skip=${DEFAULT_FILE_LIMIT}`);
+		});
+
+		it("should cap matches per file in multi-file scopes", async () => {
+			const concDir = path.join(testDir, "concentration-dir");
+			fs.mkdirSync(concDir, { recursive: true });
+			const hotMatches = MULTI_FILE_PER_FILE_MATCHES + 30;
+			fs.writeFileSync(
+				path.join(concDir, "hot.txt"),
+				Array.from({ length: hotMatches }, (_, i) => `needle ${i + 1}`).join("\n"),
+			);
+			fs.writeFileSync(path.join(concDir, "cool.txt"), "needle cool");
+
+			const result = await searchTool.execute("test-call-14-per-file-cap", {
+				pattern: "needle",
+				paths: [concDir],
+			});
+
+			const hotCount = result.details?.fileMatches?.find(entry => entry.path.endsWith("hot.txt"))?.count ?? 0;
+			expect(hotCount).toBe(MULTI_FILE_PER_FILE_MATCHES);
+			expect(result.details?.perFileLimitReached).toBe(MULTI_FILE_PER_FILE_MATCHES);
+		});
+
+		it("should let a single-file scope exceed the multi-file per-file cap", async () => {
+			const single = path.join(testDir, "single-file.txt");
+			const count = MULTI_FILE_PER_FILE_MATCHES + 30;
+			fs.writeFileSync(single, Array.from({ length: count }, (_, i) => `needle ${i + 1}`).join("\n"));
+
+			const result = await searchTool.execute("test-call-14-single-file-cap", {
+				pattern: "needle",
+				paths: [single],
+			});
+
+			expect(result.details?.matchCount).toBe(count);
+			expect(result.details?.fileLimitReached).toBeUndefined();
+			expect(result.details?.perFileLimitReached).toBeUndefined();
 		});
 	});
 
@@ -1394,7 +1656,7 @@ function b() {
 			fs.writeFileSync(testFile, "single");
 
 			const result = await findTool.execute("test-call-13a", {
-				pattern: testFile,
+				paths: [testFile],
 			});
 
 			const outputLines = getTextOutput(result)
@@ -1412,7 +1674,7 @@ function b() {
 			fs.writeFileSync(path.join(testDir, "visible.txt"), "visible");
 
 			const result = await findTool.execute("test-call-13", {
-				pattern: `${testDir}/**/*.txt`,
+				paths: [`${testDir}/**/*.txt`],
 				hidden: true,
 			});
 
@@ -1432,7 +1694,7 @@ function b() {
 			fs.writeFileSync(path.join(testDir, "kept.txt"), "kept");
 
 			const result = await findTool.execute("test-call-14", {
-				pattern: `${testDir}/**/*.txt`,
+				paths: [`${testDir}/**/*.txt`],
 			});
 
 			const output = getTextOutput(result);
@@ -1457,7 +1719,7 @@ function b() {
 			fs.utimesSync(newerFile, newerTime, newerTime);
 
 			const result = await findTool.execute("test-call-14b", {
-				pattern: `${testDir}/**/auth-actions.spec.ts`,
+				paths: [`${testDir}/**/auth-actions.spec.ts`],
 			});
 
 			const outputLines = getTextOutput(result)
@@ -1474,7 +1736,7 @@ function b() {
 			fs.writeFileSync(path.join(nestedDir, "daemon-telemetry.ts"), "telemetry\n");
 
 			const result = await findTool.execute("test-call-14c", {
-				pattern: "apps/daemon/src/**/daemon-telemetry.ts",
+				paths: ["apps/daemon/src/**/daemon-telemetry.ts"],
 			});
 
 			const outputLines = getTextOutput(result)
@@ -1494,7 +1756,7 @@ function b() {
 			fs.writeFileSync(path.join(clientDir, "client.ts"), "client\n");
 
 			const result = await findTool.execute("test-call-14e", {
-				pattern: "apps/daemon/src/**/*.ts,apps/client/src/**/*.ts",
+				paths: ["apps/daemon/src/**/*.ts", "apps/client/src/**/*.ts"],
 			});
 
 			const outputLines = getTextOutput(result)
@@ -1515,7 +1777,7 @@ function b() {
 
 			const startedAt = performance.now();
 			const result = await findTool.execute("test-call-14d", {
-				pattern: "**/.env*",
+				paths: ["**/.env*"],
 			});
 			const elapsedMs = performance.now() - startedAt;
 
@@ -1560,7 +1822,8 @@ describe("edit tool CRLF handling", () => {
 		fs.writeFileSync(testFile, "line one\r\nline two\r\nline three\r\n");
 
 		const result = await editTool.execute("test-crlf-1", {
-			edits: [{ path: testFile, old_text: "line two\n", new_text: "replaced line\n" }],
+			path: testFile,
+			edits: [{ old_text: "line two\n", new_text: "replaced line\n" }],
 		});
 
 		expect(getTextOutput(result)).toContain("Successfully replaced");
@@ -1571,7 +1834,8 @@ describe("edit tool CRLF handling", () => {
 		fs.writeFileSync(testFile, "first\r\nsecond\r\nthird\r\n");
 
 		await editTool.execute("test-crlf-2", {
-			edits: [{ path: testFile, old_text: "second\n", new_text: "REPLACED\n" }],
+			path: testFile,
+			edits: [{ old_text: "second\n", new_text: "REPLACED\n" }],
 		});
 
 		const content = await Bun.file(testFile).text();
@@ -1583,7 +1847,8 @@ describe("edit tool CRLF handling", () => {
 		fs.writeFileSync(testFile, "first\nsecond\nthird\n");
 
 		await editTool.execute("test-lf-1", {
-			edits: [{ path: testFile, old_text: "second\n", new_text: "REPLACED\n" }],
+			path: testFile,
+			edits: [{ old_text: "second\n", new_text: "REPLACED\n" }],
 		});
 
 		const content = await Bun.file(testFile).text();
@@ -1597,7 +1862,8 @@ describe("edit tool CRLF handling", () => {
 
 		await expect(
 			editTool.execute("test-crlf-dup", {
-				edits: [{ path: testFile, old_text: "hello\nworld\n", new_text: "replaced\n" }],
+				path: testFile,
+				edits: [{ old_text: "hello\nworld\n", new_text: "replaced\n" }],
 			}),
 		).rejects.toThrow(/Found 2 occurrences/);
 	});
@@ -1608,7 +1874,8 @@ describe("edit tool CRLF handling", () => {
 		fs.writeFileSync(testFile, "\uFEFFfirst\r\nsecond\r\nthird\r\n");
 
 		await editTool.execute("test-bom", {
-			edits: [{ path: testFile, old_text: "second\n", new_text: "REPLACED\n" }],
+			path: testFile,
+			edits: [{ old_text: "second\n", new_text: "REPLACED\n" }],
 		});
 
 		const content = await Bun.file(testFile).text();

@@ -103,9 +103,12 @@ async function generateHtml(sessionData: SessionData, themeName?: string): Promi
 	const themeVars = await generateThemeVars(themeName);
 	const sessionDataBase64 = Buffer.from(JSON.stringify(sessionData)).toBase64();
 
-	return TEMPLATE.replace("<theme-vars/>", `<style>:root { ${themeVars} }</style>`).replace(
+	// Use function replacements so `$'`, `$&`, `$$`, `$n`, etc. in the
+	// substituted CSS/base64 are not interpreted as substitution patterns
+	// (see https://mdn.io/String.replace).
+	return TEMPLATE.replace("<theme-vars/>", () => `<style>:root { ${themeVars} }</style>`).replace(
 		"{{SESSION_DATA}}",
-		sessionDataBase64,
+		() => sessionDataBase64,
 	);
 }
 
@@ -124,7 +127,7 @@ export async function exportSessionToHtml(
 		header: sm.getHeader(),
 		entries: sm.getEntries(),
 		leafId: sm.getLeafId(),
-		systemPrompt: state?.systemPrompt,
+		systemPrompt: state?.systemPrompt.join("\n\n"),
 		tools: state?.tools?.map(t => ({ name: t.name, description: t.description })),
 	};
 

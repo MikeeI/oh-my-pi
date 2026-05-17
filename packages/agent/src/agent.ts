@@ -21,6 +21,7 @@ import {
 	type ToolResultMessage,
 } from "@oh-my-pi/pi-ai";
 import { agentLoop, agentLoopContinue } from "./agent-loop";
+import type { HarmonyAuditEvent } from "./harmony-leak";
 import type {
 	AgentContext,
 	AgentEvent,
@@ -37,7 +38,7 @@ import type {
  * Default convertToLlm: Keep only LLM-compatible messages, convert attachments.
  */
 function defaultConvertToLlm(messages: AgentMessage[]): Message[] {
-	return messages.filter(m => m.role === "user" || m.role === "assistant" || m.role === "toolResult");
+	return messages.filter((m): m is Message => m.role === "user" || m.role === "assistant" || m.role === "toolResult");
 }
 
 function refreshToolChoiceForActiveTools(
@@ -132,10 +133,23 @@ export interface AgentOptions {
 	 */
 	onPayload?: SimpleStreamOptions["onPayload"];
 	/**
+	 * Inspect provider response metadata after headers arrive and before streaming body consumption.
+	 */
+	onResponse?: SimpleStreamOptions["onResponse"];
+	/**
+	 * Inspect raw Server-Sent Events from HTTP streaming providers.
+	 */
+	onSseEvent?: SimpleStreamOptions["onSseEvent"];
+	/**
 	 * Inspect assistant streaming events before they are emitted to subscribers.
 	 * Use this when abort decisions must happen before buffered events continue flowing.
 	 */
 	onAssistantMessageEvent?: (message: AssistantMessage, event: AssistantMessageEvent) => void;
+
+	/**
+	 * Called when GPT-5 Harmony protocol leakage is detected and mitigated.
+	 */
+	onHarmonyLeak?: (event: HarmonyAuditEvent) => void | Promise<void>;
 	/**
 	 * Custom token budgets for thinking levels (token-based providers only).
 	 */
@@ -153,6 +167,12 @@ export interface AgentOptions {
 	presencePenalty?: number;
 	repetitionPenalty?: number;
 	serviceTier?: ServiceTier;
+	/**
+	 * If true, request that the underlying provider omit reasoning/thinking summaries
+	 * from the response. The model still reasons internally; only the human-readable
+	 * summary stream is suppressed. Useful when the UI hides thinking blocks anyway.
+	 */
+	hideThinkingSummary?: boolean;
 
 	/**
 	 * Maximum delay in milliseconds to wait for a retry when the server requests a long wait.
@@ -188,6 +208,25 @@ export interface AgentOptions {
 	 * Cursor tool result callback for exec tool responses.
 	 */
 	cursorOnToolResult?: CursorToolResultHandler;
+
+	/**
+	 * Called after a tool call has been validated and is about to execute.
+	 * See {@link AgentLoopConfig.beforeToolCall} for full semantics.
+	 */
+	beforeToolCall?: AgentLoopConfig["beforeToolCall"];
+
+	/**
+	 * Called after a tool finishes executing, before `tool_execution_end` and the tool-result
+	 * message are emitted. See {@link AgentLoopConfig.afterToolCall} for full semantics.
+	 */
+	afterToolCall?: AgentLoopConfig["afterToolCall"];
+
+	/**
+	 * Opt-in OpenTelemetry instrumentation. Passing `{}` enables the loop's
+	 * GenAI-semantic-convention spans using the global tracer provider. See
+	 * {@link AgentLoopConfig.telemetry} for the full surface.
+	 */
+	telemetry?: AgentLoopConfig["telemetry"];
 }
 
 export interface AgentPromptOptions {
@@ -202,7 +241,7 @@ interface CursorToolResultEntry {
 
 export class Agent {
 	#state: AgentState = {
-		systemPrompt: "",
+		systemPrompt: [],
 		model: getBundledModel("google", "gemini-2.5-flash-lite-preview-06-17"),
 		thinkingLevel: undefined,
 		tools: [],
@@ -223,6 +262,8 @@ export class Agent {
 	#followUpMode: "all" | "one-at-a-time";
 	#interruptMode: "immediate" | "wait";
 	#sessionId?: string;
+	#metadata?: Record<string, unknown>;
+	#metadataResolver?: (provider: string) => Record<string, unknown> | undefined;
 	#providerSessionState?: Map<string, ProviderSessionState>;
 	#thinkingBudgets?: ThinkingBudgets;
 	#temperature?: number;
@@ -232,6 +273,7 @@ export class Agent {
 	#presencePenalty?: number;
 	#repetitionPenalty?: number;
 	#serviceTier?: ServiceTier;
+	#hideThinkingSummary?: boolean;
 	#maxRetryDelayMs?: number;
 	#getToolContext?: (toolCall?: ToolCallContext) => AgentToolContext | undefined;
 	#cursorExecHandlers?: CursorExecHandlers;
@@ -244,13 +286,27 @@ export class Agent {
 	#intentTracing: boolean;
 	#getToolChoice?: () => ToolChoice | undefined;
 	#onPayload?: SimpleStreamOptions["onPayload"];
+	#onResponse?: SimpleStreamOptions["onResponse"];
+	#onSseEvent?: SimpleStreamOptions["onSseEvent"];
 	#onAssistantMessageEvent?: (message: AssistantMessage, event: AssistantMessageEvent) => void;
+	#onHarmonyLeak?: (event: HarmonyAuditEvent) => void | Promise<void>;
+	#telemetry?: AgentLoopConfig["telemetry"];
 
 	/** Buffered Cursor tool results with text length at time of call (for correct ordering) */
 	#cursorToolResultBuffer: CursorToolResultEntry[] = [];
 
 	streamFn: StreamFn;
 	getApiKey?: (provider: string) => Promise<string | undefined> | string | undefined;
+	/**
+	 * Hook invoked after tool arguments are validated and before execution.
+	 * Reassign at any time to swap the implementation (e.g. on extension reload).
+	 */
+	beforeToolCall?: AgentLoopConfig["beforeToolCall"];
+	/**
+	 * Hook invoked after tool execution and before `tool_execution_end` / tool-result
+	 * message emission. Reassign at any time to swap the implementation.
+	 */
+	afterToolCall?: AgentLoopConfig["afterToolCall"];
 
 	constructor(opts: AgentOptions = {}) {
 		this.#state = { ...this.#state, ...opts.initialState };
@@ -270,9 +326,12 @@ export class Agent {
 		this.#presencePenalty = opts.presencePenalty;
 		this.#repetitionPenalty = opts.repetitionPenalty;
 		this.#serviceTier = opts.serviceTier;
+		this.#hideThinkingSummary = opts.hideThinkingSummary;
 		this.#maxRetryDelayMs = opts.maxRetryDelayMs;
 		this.getApiKey = opts.getApiKey;
 		this.#onPayload = opts.onPayload;
+		this.#onResponse = opts.onResponse;
+		this.#onSseEvent = opts.onSseEvent;
 		this.#getToolContext = opts.getToolContext;
 		this.#cursorExecHandlers = opts.cursorExecHandlers;
 		this.#cursorOnToolResult = opts.cursorOnToolResult;
@@ -282,6 +341,10 @@ export class Agent {
 		this.#intentTracing = opts.intentTracing === true;
 		this.#getToolChoice = opts.getToolChoice;
 		this.#onAssistantMessageEvent = opts.onAssistantMessageEvent;
+		this.#onHarmonyLeak = opts.onHarmonyLeak;
+		this.beforeToolCall = opts.beforeToolCall;
+		this.afterToolCall = opts.afterToolCall;
+		this.#telemetry = opts.telemetry;
 	}
 
 	/**
@@ -297,6 +360,67 @@ export class Agent {
 	 */
 	set sessionId(value: string | undefined) {
 		this.#sessionId = value;
+	}
+
+	/**
+	 * Static metadata forwarded to every API request when no resolver is installed
+	 * (e.g. `metadata.user_id` for Anthropic session attribution). Setting this
+	 * clears any installed resolver.
+	 *
+	 * For live/provider-aware metadata (e.g. Anthropic OAuth `account_uuid` that
+	 * must reflect the credential selected per-request), use
+	 * {@link setMetadataResolver} and read via {@link metadataForProvider}.
+	 */
+	get metadata(): Record<string, unknown> | undefined {
+		return this.#metadata;
+	}
+
+	set metadata(value: Record<string, unknown> | undefined) {
+		this.#metadata = value;
+		this.#metadataResolver = undefined;
+	}
+
+	/**
+	 * Resolve request metadata for the given provider at call time. When a
+	 * resolver is installed via {@link setMetadataResolver}, it is invoked with
+	 * the provider string so the result can be scoped (e.g. `account_uuid` is
+	 * only included for `"anthropic"` requests). Falls back to the static
+	 * {@link metadata} value when no resolver is set.
+	 */
+	metadataForProvider(provider: string): Record<string, unknown> | undefined {
+		if (this.#metadataResolver) return this.#metadataResolver(provider);
+		return this.#metadata;
+	}
+
+	/**
+	 * Install a function that resolves request metadata at call time. The
+	 * resolver receives the target provider string and can gate provider-specific
+	 * fields (e.g. `account_uuid` only for `"anthropic"`). Invoked per LLM
+	 * request by `agent-loop` after `getApiKey` selects the session-sticky
+	 * credential. Pass `undefined` to clear and revert to the static
+	 * {@link metadata} value.
+	 */
+	setMetadataResolver(resolver: ((provider: string) => Record<string, unknown> | undefined) | undefined): void {
+		this.#metadataResolver = resolver;
+	}
+
+	/**
+	 * Read the active OpenTelemetry configuration. Returns `undefined` when
+	 * instrumentation is disabled. Callers spawning child runs (e.g. subagent
+	 * dispatch) forward this to the child's loop so its spans appear under the
+	 * parent's active context with the subagent's own identity stamped.
+	 */
+	get telemetry(): AgentLoopConfig["telemetry"] | undefined {
+		return this.#telemetry;
+	}
+
+	/**
+	 * Replace the active OpenTelemetry configuration. Pass `undefined` to
+	 * disable instrumentation. Applies to the *next* `agentLoop` invocation —
+	 * in-flight loops keep the configuration they started with.
+	 */
+	setTelemetry(telemetry: AgentLoopConfig["telemetry"] | undefined): void {
+		this.#telemetry = telemetry;
 	}
 
 	/**
@@ -389,6 +513,14 @@ export class Agent {
 		this.#serviceTier = value;
 	}
 
+	get hideThinkingSummary(): boolean | undefined {
+		return this.#hideThinkingSummary;
+	}
+
+	set hideThinkingSummary(value: boolean | undefined) {
+		this.#hideThinkingSummary = value;
+	}
+
 	/**
 	 * Get the current max retry delay in milliseconds.
 	 */
@@ -411,6 +543,14 @@ export class Agent {
 	subscribe(fn: (e: AgentEvent) => void): () => void {
 		this.#listeners.add(fn);
 		return () => this.#listeners.delete(fn);
+	}
+
+	setProviderResponseInterceptor(fn: SimpleStreamOptions["onResponse"] | undefined): void {
+		this.#onResponse = fn;
+	}
+
+	setRawSseEventInterceptor(fn: SimpleStreamOptions["onSseEvent"] | undefined): void {
+		this.#onSseEvent = fn;
 	}
 
 	setAssistantMessageEventInterceptor(
@@ -447,7 +587,7 @@ export class Agent {
 	}
 
 	// State mutators
-	setSystemPrompt(v: string) {
+	setSystemPrompt(v: string[]) {
 		this.#state.systemPrompt = v;
 	}
 
@@ -752,8 +892,11 @@ export class Agent {
 			presencePenalty: this.#presencePenalty,
 			repetitionPenalty: this.#repetitionPenalty,
 			serviceTier: this.#serviceTier,
+			hideThinkingSummary: this.#hideThinkingSummary,
 			interruptMode: this.#interruptMode,
 			sessionId: this.#sessionId,
+			metadata: this.#metadataResolver ? undefined : this.#metadata,
+			metadataResolver: this.#metadataResolver,
 			providerSessionState: this.#providerSessionState,
 			thinkingBudgets: this.#thinkingBudgets,
 			maxRetryDelayMs: this.#maxRetryDelayMs,
@@ -762,6 +905,8 @@ export class Agent {
 			convertToLlm: this.#convertToLlm,
 			transformContext: this.#transformContext,
 			onPayload: this.#onPayload,
+			onResponse: this.#onResponse,
+			onSseEvent: this.#onSseEvent,
 			getApiKey: this.getApiKey,
 			getToolContext: this.#getToolContext,
 			syncContextBeforeModelCall: async context => {
@@ -775,8 +920,12 @@ export class Agent {
 			cursorOnToolResult,
 			transformToolCallArguments: this.#transformToolCallArguments,
 			intentTracing: this.#intentTracing,
+			beforeToolCall: this.beforeToolCall ? (ctx, signal) => this.beforeToolCall?.(ctx, signal) : undefined,
+			afterToolCall: this.afterToolCall ? (ctx, signal) => this.afterToolCall?.(ctx, signal) : undefined,
 			onAssistantMessageEvent: this.#onAssistantMessageEvent,
+			onHarmonyLeak: this.#onHarmonyLeak,
 			getToolChoice,
+			getReasoning: () => this.#state.thinkingLevel,
 			getSteeringMessages: async () => {
 				if (skipInitialSteeringPoll) {
 					skipInitialSteeringPoll = false;
@@ -785,6 +934,7 @@ export class Agent {
 				return this.#dequeueSteeringMessages();
 			},
 			getFollowUpMessages: async () => this.#dequeueFollowUpMessages(),
+			telemetry: this.#telemetry,
 		};
 
 		let partial: AgentMessage | null = null;
@@ -850,7 +1000,7 @@ export class Agent {
 			}
 
 			// Handle any remaining partial message
-			if (partial && partial.role === "assistant" && partial.content.length > 0) {
+			if (partial && partial.role === "assistant" && Array.isArray(partial.content) && partial.content.length > 0) {
 				const onlyEmpty = !partial.content.some(
 					c =>
 						(c.type === "thinking" && c.thinking.trim().length > 0) ||

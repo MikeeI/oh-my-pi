@@ -9,8 +9,6 @@ import {
 	buildAnthropicClientOptions,
 	buildAnthropicHeaders,
 	buildAnthropicSystemBlocks,
-	claudeCodeHeaders,
-	claudeCodeSystemInstruction,
 	claudeCodeVersion,
 	generateClaudeCloakingUserId,
 	isClaudeCloakingUserId,
@@ -20,8 +18,8 @@ import {
 	stripClaudeToolPrefix,
 } from "@oh-my-pi/pi-ai/providers/anthropic";
 import { getEnvApiKey } from "@oh-my-pi/pi-ai/stream";
-import type { Context, Model, Tool } from "@oh-my-pi/pi-ai/types";
-import type { TSchema } from "@sinclair/typebox";
+import type { Context, Model, TJsonSchema, Tool } from "@oh-my-pi/pi-ai/types";
+import * as z from "zod/v4";
 import { withEnv } from "./helpers";
 
 const ANTHROPIC_MODEL: Model<"anthropic-messages"> = {
@@ -35,6 +33,14 @@ const ANTHROPIC_MODEL: Model<"anthropic-messages"> = {
 	cost: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0 },
 	contextWindow: 200_000,
 	maxTokens: 8_192,
+};
+
+const CLOUDFLARE_ANTHROPIC_MODEL: Model<"anthropic-messages"> = {
+	...ANTHROPIC_MODEL,
+	id: "anthropic/claude-sonnet-4-5",
+	name: "Claude Sonnet 4.5 via Cloudflare",
+	provider: "cloudflare-ai-gateway",
+	baseUrl: "https://gateway.ai.cloudflare.com/v1/account/gateway/anthropic",
 };
 
 function createAbortedSignal(): AbortSignal {
@@ -75,21 +81,6 @@ function captureAnthropicPayload(
 }
 
 describe("Anthropic request fingerprint alignment", () => {
-	it("uses updated Claude Code header defaults", () => {
-		const headers = buildAnthropicHeaders({
-			apiKey: "sk-ant-oat-test",
-			isOAuth: true,
-			stream: true,
-		});
-
-		expect(headers["Anthropic-Beta"]).toContain("context-management-2025-06-27");
-		expect(headers["Anthropic-Beta"]).toContain("prompt-caching-scope-2026-01-05");
-		expect(headers["Anthropic-Beta"]).not.toContain("fine-grained-tool-streaming-2025-05-14");
-		expect(headers["User-Agent"]).toBe(`claude-cli/${claudeCodeVersion} (external, cli)`);
-		expect(claudeCodeHeaders["X-Stainless-Package-Version"]).toBe("0.74.0");
-		expect("X-Stainless-Helper-Method" in claudeCodeHeaders).toBe(false);
-	});
-
 	it("maps Stainless OS and arch values from explicit inputs", () => {
 		expect(mapStainlessOs("darwin")).toBe("MacOS");
 		expect(mapStainlessOs("windows")).toBe("Windows");
@@ -116,47 +107,40 @@ describe("Anthropic request fingerprint alignment", () => {
 		expect(headers["X-Stainless-Arch"]).toBe(mapStainlessArch(process.arch));
 	});
 
-	it("injects billing header and Claude Agent SDK identity block", () => {
-		const blocks = buildAnthropicSystemBlocks("Stay concise.", {
-			includeClaudeCodeInstruction: true,
-			extraInstructions: ["Use citations when possible"],
-		});
-
-		expect(blocks).toBeDefined();
-		expect(blocks?.[0]?.text.startsWith(`x-anthropic-billing-header: cc_version=${claudeCodeVersion}.`)).toBe(true);
-		expect(blocks?.[0]?.text).toMatch(/cc_entrypoint=cli; cch=[0-9a-f]{5};$/);
-		expect(blocks?.[1]).toEqual({
-			type: "text",
-			text: claudeCodeSystemInstruction,
-		});
-		expect(blocks?.[2]).toEqual({
-			type: "text",
-			text: "Use citations when possible",
-		});
-		expect(blocks?.[3]).toEqual({
-			type: "text",
-			text: "Stay concise.",
-		});
-	});
-
-	it("applies cache_control to system blocks when cacheControl option is set", () => {
-		const blocks = buildAnthropicSystemBlocks("Stay concise.", {
+	it("attaches cache_control only to the last emitted system block when cacheControl is set", () => {
+		const blocks = buildAnthropicSystemBlocks(["Stay concise."], {
 			includeClaudeCodeInstruction: true,
 			extraInstructions: ["Use citations when possible"],
 			cacheControl: { type: "ephemeral" },
 		});
 
 		expect(blocks).toBeDefined();
+		// Earlier blocks must NOT carry cache_control; a single trailing breakpoint covers them all.
 		expect(blocks?.[2]).toEqual({
 			type: "text",
 			text: "Use citations when possible",
-			cache_control: { type: "ephemeral" },
 		});
 		expect(blocks?.[3]).toEqual({
 			type: "text",
 			text: "Stay concise.",
 			cache_control: { type: "ephemeral" },
 		});
+	});
+
+	it("places the automatic Anthropic cache breakpoint on the last ordered system prompt", async () => {
+		const payload = (await captureAnthropicPayload(
+			ANTHROPIC_MODEL,
+			{
+				systemPrompt: ["stable system", "stable durable context"],
+				messages: [{ role: "user", content: "variable context", timestamp: Date.now() }],
+			},
+			{ isOAuth: false },
+		)) as { system?: Array<{ type: string; text?: string; cache_control?: unknown }> };
+
+		expect(payload.system).toEqual([
+			{ type: "text", text: "stable system" },
+			{ type: "text", text: "stable durable context", cache_control: { type: "ephemeral" } },
+		]);
 	});
 
 	it("uses Bearer auth for non-Anthropic API bases with api-key credentials", () => {
@@ -209,7 +193,7 @@ describe("Anthropic request fingerprint alignment", () => {
 		const payload = (await captureAnthropicPayload(
 			{ ...ANTHROPIC_MODEL, id: "claude-3-5-haiku", name: "Claude 3.5 Haiku" },
 			{
-				systemPrompt: "Stay concise.",
+				systemPrompt: ["Stay concise."],
 				messages: [{ role: "user", content: "Hi", timestamp: Date.now() }],
 			},
 		)) as { system?: Array<{ type: string; text?: string }> };
@@ -233,7 +217,7 @@ describe("Anthropic request fingerprint alignment", () => {
 
 	it("injects generated metadata.user_id for OAuth requests when missing", async () => {
 		const payload = (await captureAnthropicPayload(ANTHROPIC_MODEL, {
-			systemPrompt: "Stay concise.",
+			systemPrompt: ["Stay concise."],
 			messages: [{ role: "user", content: "Hi", timestamp: Date.now() }],
 		})) as { metadata?: { user_id?: string } };
 		const userId = payload.metadata?.user_id;
@@ -245,7 +229,7 @@ describe("Anthropic request fingerprint alignment", () => {
 		const payload = (await captureAnthropicPayload(
 			ANTHROPIC_MODEL,
 			{
-				systemPrompt: "Stay concise.",
+				systemPrompt: ["Stay concise."],
 				messages: [{ role: "user", content: "Hi", timestamp: Date.now() }],
 			},
 			{ isOAuth: false },
@@ -258,7 +242,7 @@ describe("Anthropic request fingerprint alignment", () => {
 		const payload = (await captureAnthropicPayload(
 			ANTHROPIC_MODEL,
 			{
-				systemPrompt: "Stay concise.",
+				systemPrompt: ["Stay concise."],
 				messages: [{ role: "user", content: "Hi", timestamp: Date.now() }],
 			},
 			{ metadata: { user_id: userId } },
@@ -267,11 +251,60 @@ describe("Anthropic request fingerprint alignment", () => {
 		expect(payload.metadata?.user_id).toBe(userId);
 	});
 
+	it("preserves real Claude Code JSON-format metadata.user_id for OAuth requests", async () => {
+		// Matches the shape produced by services/api/claude.ts → getAPIMetadata in
+		// the Claude Code source: { device_id, account_uuid, session_id, ...extra }.
+		const userId = JSON.stringify({
+			device_id: "a".repeat(64),
+			account_uuid: "12345678-1234-1234-1234-1234567890ab",
+			session_id: "abcdefab-cdef-abcd-efab-cdefabcdef12",
+		});
+		const payload = (await captureAnthropicPayload(
+			ANTHROPIC_MODEL,
+			{
+				systemPrompt: ["Stay concise."],
+				messages: [{ role: "user", content: "Hi", timestamp: Date.now() }],
+			},
+			{ metadata: { user_id: userId } },
+		)) as { metadata?: { user_id?: string } };
+
+		expect(payload.metadata?.user_id).toBe(userId);
+	});
+
+	it("preserves a minimal { session_id } JSON metadata.user_id for OAuth requests", async () => {
+		const userId = JSON.stringify({ session_id: "0190fb1e-0000-7000-8000-000000000001" });
+		const payload = (await captureAnthropicPayload(
+			ANTHROPIC_MODEL,
+			{
+				systemPrompt: ["Stay concise."],
+				messages: [{ role: "user", content: "Hi", timestamp: Date.now() }],
+			},
+			{ metadata: { user_id: userId } },
+		)) as { metadata?: { user_id?: string } };
+
+		expect(payload.metadata?.user_id).toBe(userId);
+	});
+
+	it("replaces JSON metadata.user_id missing session_id for OAuth requests", async () => {
+		const userId = JSON.stringify({ device_id: "x".repeat(64) });
+		const payload = (await captureAnthropicPayload(
+			ANTHROPIC_MODEL,
+			{
+				systemPrompt: ["Stay concise."],
+				messages: [{ role: "user", content: "Hi", timestamp: Date.now() }],
+			},
+			{ metadata: { user_id: userId } },
+		)) as { metadata?: { user_id?: string } };
+
+		expect(payload.metadata?.user_id).not.toBe(userId);
+		expect(isClaudeCloakingUserId(payload.metadata?.user_id ?? "")).toBe(true);
+	});
+
 	it("replaces invalid caller metadata.user_id for OAuth requests", async () => {
 		const payload = (await captureAnthropicPayload(
 			ANTHROPIC_MODEL,
 			{
-				systemPrompt: "Stay concise.",
+				systemPrompt: ["Stay concise."],
 				messages: [{ role: "user", content: "Hi", timestamp: Date.now() }],
 			},
 			{ metadata: { user_id: "invalid-user-id" } },
@@ -312,15 +345,19 @@ describe("Anthropic request fingerprint alignment", () => {
 							patternProperties: {
 								"^[A-Za-z_][A-Za-z0-9_]*$": { type: "string" },
 							},
+							propertyNames: {
+								type: "string",
+								pattern: "^[A-Za-z_][A-Za-z0-9_]*$",
+							},
 						},
 					},
 					required: ["target"],
-				} as unknown as TSchema,
+				} as TJsonSchema,
 			},
 		];
 
 		const payload = (await captureAnthropicPayload(ANTHROPIC_MODEL, {
-			systemPrompt: "Stay concise.",
+			systemPrompt: ["Stay concise."],
 			messages: [{ role: "user", content: "Hi", timestamp: Date.now() }],
 			tools,
 		})) as {
@@ -340,7 +377,11 @@ describe("Anthropic request fingerprint alignment", () => {
 			type?: string;
 			items?: { additionalProperties?: boolean; required?: string[] };
 		};
-		const env = properties.env as { additionalProperties?: boolean; patternProperties?: unknown };
+		const env = properties.env as {
+			additionalProperties?: boolean;
+			patternProperties?: unknown;
+			propertyNames?: unknown;
+		};
 
 		expect(inputSchema?.additionalProperties).toBe(false);
 		expect(inputSchema?.required).toEqual(["target"]);
@@ -351,9 +392,72 @@ describe("Anthropic request fingerprint alignment", () => {
 		expect(target).not.toHaveProperty("patternProperties");
 		expect(env.additionalProperties).toBe(false);
 		expect(env).not.toHaveProperty("patternProperties");
+		expect(env).not.toHaveProperty("propertyNames");
 		expect(inputSchema?.properties).toHaveProperty("target");
 		expect(originalNestedSchema).not.toHaveProperty("additionalProperties");
 		expect(originalNestedSchema).toHaveProperty("patternProperties");
+	});
+
+	it("preserves explicit additionalProperties schemas and true for open record fields", async () => {
+		// Mirrors open record-style shapes: Zod's `z.record(z.string(), z.unknown())`
+		// emits `additionalProperties: {}`, typed maps use a schema, and the yield
+		// fallback uses `additionalProperties: true`. Each must remain open after
+		// unsupported key-schema keywords are stripped.
+		const tools: Tool[] = [
+			{
+				name: "resolve",
+				description: "resolve a pending action",
+				parameters: {
+					type: "object",
+					properties: {
+						action: { type: "string" },
+						extra: {
+							type: "object",
+							propertyNames: { type: "string" },
+							additionalProperties: {},
+						},
+						extraTyped: {
+							type: "object",
+							additionalProperties: { type: "string" },
+						},
+						extraLoose: {
+							type: "object",
+							additionalProperties: true,
+						},
+					},
+					required: ["action"],
+				} as TJsonSchema,
+			},
+		];
+
+		const payload = (await captureAnthropicPayload(ANTHROPIC_MODEL, {
+			systemPrompt: ["Stay concise."],
+			messages: [{ role: "user", content: "Hi", timestamp: Date.now() }],
+			tools,
+		})) as {
+			tools?: Array<{
+				input_schema?: {
+					additionalProperties?: boolean;
+					properties?: Record<string, unknown>;
+				};
+			}>;
+		};
+
+		const inputSchema = payload.tools?.[0]?.input_schema;
+		const properties = inputSchema?.properties as Record<string, Record<string, unknown>>;
+		const extra = properties.extra as { additionalProperties?: unknown; propertyNames?: unknown };
+		const extraTyped = properties.extraTyped as { additionalProperties?: unknown };
+		const extraLoose = properties.extraLoose as { additionalProperties?: unknown };
+
+		expect(inputSchema?.additionalProperties).toBe(false);
+		// The unsupported `propertyNames` keyword is still stripped …
+		expect(extra).not.toHaveProperty("propertyNames");
+		// … but the explicit open-map schema survives.
+		expect(extra.additionalProperties).toEqual({});
+		// A typed value schema is preserved verbatim (and would be recursed into
+		// if it were an object — covered separately).
+		expect(extraTyped.additionalProperties).toEqual({ type: "string" });
+		expect(extraLoose.additionalProperties).toBe(true);
 	});
 
 	it("removes Anthropic-unsupported array item count constraints", async () => {
@@ -377,12 +481,12 @@ describe("Anthropic request fingerprint alignment", () => {
 						},
 					},
 					required: ["sub"],
-				} as unknown as TSchema,
+				} as TJsonSchema,
 			},
 		];
 
 		const payload = (await captureAnthropicPayload(ANTHROPIC_MODEL, {
-			systemPrompt: "Stay concise.",
+			systemPrompt: ["Stay concise."],
 			messages: [{ role: "user", content: "Hi", timestamp: Date.now() }],
 			tools,
 		})) as {
@@ -416,12 +520,12 @@ describe("Anthropic request fingerprint alignment", () => {
 						},
 					},
 					required: ["block"],
-				} as unknown as TSchema,
+				} as TJsonSchema,
 			},
 		];
 
 		const payload = (await captureAnthropicPayload(ANTHROPIC_MODEL, {
-			systemPrompt: "Stay concise.",
+			systemPrompt: ["Stay concise."],
 			messages: [{ role: "user", content: "Hi", timestamp: Date.now() }],
 			tools,
 		})) as {
@@ -445,7 +549,7 @@ describe("Anthropic request fingerprint alignment", () => {
 					type: "object",
 					properties: { requiredValue: { type: "string" } },
 					required: ["requiredValue"],
-				} as unknown as TSchema,
+				} as TJsonSchema,
 			})),
 			...(["write", "grep", "read", "task", "todo_write", "web_search", "ast_grep"] as const).map(name => ({
 				name,
@@ -455,14 +559,14 @@ describe("Anthropic request fingerprint alignment", () => {
 					type: "object",
 					properties: { requiredValue: { type: "string" } },
 					required: ["requiredValue"],
-				} as unknown as TSchema,
+				} as TJsonSchema,
 			})),
 		];
 
 		const payload = (await captureAnthropicPayload(
 			ANTHROPIC_MODEL,
 			{
-				systemPrompt: "Stay concise.",
+				systemPrompt: ["Stay concise."],
 				messages: [{ role: "user", content: "Hi", timestamp: Date.now() }],
 				tools,
 			},
@@ -477,6 +581,98 @@ describe("Anthropic request fingerprint alignment", () => {
 		expect(payload.tools?.find(tool => tool.name === "bash")?.input_schema?.required).toEqual(["requiredValue"]);
 	});
 
+	it("marks regular two-field Zod object tools strict", async () => {
+		const tools: Tool[] = [
+			{
+				name: "bash",
+				description: "bash tool",
+				strict: true,
+				parameters: z.object({
+					command: z.string(),
+					cwd: z.string(),
+				}),
+			},
+		];
+
+		const payload = (await captureAnthropicPayload(
+			ANTHROPIC_MODEL,
+			{
+				systemPrompt: ["Stay concise."],
+				messages: [{ role: "user", content: "Hi", timestamp: Date.now() }],
+				tools,
+			},
+			{ isOAuth: false },
+		)) as {
+			tools?: Array<{
+				name?: string;
+				strict?: boolean;
+				input_schema?: { properties?: Record<string, unknown>; required?: string[] };
+			}>;
+		};
+
+		const bashTool = payload.tools?.find(tool => tool.name === "bash");
+
+		expect(bashTool?.strict).toBe(true);
+		expect(Object.keys(bashTool?.input_schema?.properties ?? {})).toEqual(["command", "cwd"]);
+		expect(bashTool?.input_schema?.required).toEqual(["command", "cwd"]);
+	});
+
+	it("does not mark allowlisted Anthropic tools strict when schemas contain open object maps", async () => {
+		const tools: Tool[] = [
+			{
+				name: "bash",
+				description: "bash tool",
+				strict: true,
+				parameters: {
+					type: "object",
+					properties: {
+						command: { type: "string" },
+						env: {
+							type: "object",
+							additionalProperties: { type: "string" },
+						},
+					},
+					required: ["command"],
+				} as TJsonSchema,
+			},
+			{
+				name: "python",
+				description: "python tool",
+				strict: true,
+				parameters: {
+					type: "object",
+					properties: { requiredValue: { type: "string" } },
+					required: ["requiredValue"],
+				} as TJsonSchema,
+			},
+		];
+
+		const payload = (await captureAnthropicPayload(
+			ANTHROPIC_MODEL,
+			{
+				systemPrompt: ["Stay concise."],
+				messages: [{ role: "user", content: "Hi", timestamp: Date.now() }],
+				tools,
+			},
+			{ isOAuth: false },
+		)) as {
+			tools?: Array<{
+				name?: string;
+				strict?: boolean;
+				input_schema?: { properties?: Record<string, unknown>; required?: string[] };
+			}>;
+		};
+
+		const bashTool = payload.tools?.find(tool => tool.name === "bash");
+		const pythonTool = payload.tools?.find(tool => tool.name === "python");
+		const env = bashTool?.input_schema?.properties?.env as { additionalProperties?: unknown } | undefined;
+
+		expect(bashTool?.strict).toBeUndefined();
+		expect(env?.additionalProperties).toEqual({ type: "string" });
+		expect(pythonTool?.strict).toBe(true);
+		expect(pythonTool?.input_schema?.required).toEqual(["requiredValue"]);
+	});
+
 	it("honors strict=false and skips non-allowlisted Anthropic tools", async () => {
 		const tools: Tool[] = [
 			{
@@ -487,7 +683,7 @@ describe("Anthropic request fingerprint alignment", () => {
 					type: "object",
 					properties: { requiredValue: { type: "string" } },
 					required: ["requiredValue"],
-				} as unknown as TSchema,
+				} as TJsonSchema,
 			},
 			{
 				name: "python",
@@ -497,7 +693,7 @@ describe("Anthropic request fingerprint alignment", () => {
 					type: "object",
 					properties: { requiredValue: { type: "string" } },
 					required: ["requiredValue"],
-				} as unknown as TSchema,
+				} as TJsonSchema,
 			},
 			{
 				name: "write",
@@ -506,7 +702,7 @@ describe("Anthropic request fingerprint alignment", () => {
 					type: "object",
 					properties: { requiredValue: { type: "string" } },
 					required: ["requiredValue"],
-				} as unknown as TSchema,
+				} as TJsonSchema,
 			},
 			{
 				name: "grep",
@@ -516,14 +712,14 @@ describe("Anthropic request fingerprint alignment", () => {
 					type: "object",
 					properties: { requiredValue: { type: "string" } },
 					required: ["requiredValue"],
-				} as unknown as TSchema,
+				} as TJsonSchema,
 			},
 		];
 
 		const payload = (await captureAnthropicPayload(
 			ANTHROPIC_MODEL,
 			{
-				systemPrompt: "Stay concise.",
+				systemPrompt: ["Stay concise."],
 				messages: [{ role: "user", content: "Hi", timestamp: Date.now() }],
 				tools,
 			},
@@ -534,19 +730,84 @@ describe("Anthropic request fingerprint alignment", () => {
 		expect(strictNames).toEqual(["python"]);
 	});
 
-	it("drops fine-grained tool-streaming beta from default Anthropic client options", () => {
-		const options = buildAnthropicClientOptions({
+	it("adds legacy fine-grained tool-streaming beta only for tool requests on incompatible models", () => {
+		const incompatibleModel: Model<"anthropic-messages"> = {
+			...ANTHROPIC_MODEL,
+			compat: { supportsEagerToolInputStreaming: false },
+		};
+
+		const withoutTools = buildAnthropicClientOptions({
+			model: incompatibleModel,
+			apiKey: "sk-ant-api-test",
+			extraBetas: [],
+			stream: true,
+			interleavedThinking: false,
+			hasTools: false,
+		});
+		const withCompatibleTools = buildAnthropicClientOptions({
 			model: ANTHROPIC_MODEL,
-			apiKey: "sk-ant-oat-test",
+			apiKey: "sk-ant-api-test",
+			extraBetas: [],
+			stream: true,
+			interleavedThinking: false,
+			hasTools: true,
+		});
+		const withIncompatibleTools = buildAnthropicClientOptions({
+			model: incompatibleModel,
+			apiKey: "sk-ant-api-test",
+			extraBetas: [],
+			stream: true,
+			interleavedThinking: false,
+			hasTools: true,
+		});
+
+		expect(withoutTools.defaultHeaders["Anthropic-Beta"]).not.toContain("fine-grained-tool-streaming-2025-05-14");
+		expect(withCompatibleTools.defaultHeaders["Anthropic-Beta"]).not.toContain(
+			"fine-grained-tool-streaming-2025-05-14",
+		);
+		expect(withIncompatibleTools.defaultHeaders["Anthropic-Beta"]).toContain(
+			"fine-grained-tool-streaming-2025-05-14",
+		);
+	});
+
+	it("uses Cloudflare AI Gateway authorization without Anthropic credential headers", () => {
+		const options = buildAnthropicClientOptions({
+			model: CLOUDFLARE_ANTHROPIC_MODEL,
+			apiKey: "cf-gateway-token",
 			extraBetas: [],
 			stream: true,
 			interleavedThinking: false,
 			dynamicHeaders: {},
 		});
 
-		const beta = options.defaultHeaders["Anthropic-Beta"];
-		expect(beta).toContain("context-management-2025-06-27");
-		expect(beta).not.toContain("fine-grained-tool-streaming-2025-05-14");
+		expect(options.baseURL).toBe("https://gateway.ai.cloudflare.com/v1/account/gateway/anthropic");
+		expect(options.apiKey).toBeNull();
+		expect(options.authToken).toBeNull();
+		expect(options.defaultHeaders["cf-aig-authorization"]).toBe("Bearer cf-gateway-token");
+		expect(options.defaultHeaders.Authorization).toBeUndefined();
+		expect(options.defaultHeaders["X-Api-Key"]).toBeUndefined();
+	});
+
+	it("keeps Cloudflare gateway auth authoritative over caller-supplied auth headers", () => {
+		const options = buildAnthropicClientOptions({
+			model: {
+				...CLOUDFLARE_ANTHROPIC_MODEL,
+				headers: {
+					Authorization: "Bearer anthropic-oauth",
+					"X-Api-Key": "sk-ant-api-leak",
+					"cf-aig-authorization": "Bearer stale-token",
+				},
+			},
+			apiKey: "cf-gateway-token",
+			extraBetas: [],
+			stream: true,
+			interleavedThinking: false,
+			dynamicHeaders: {},
+		});
+
+		expect(options.defaultHeaders["cf-aig-authorization"]).toBe("Bearer cf-gateway-token");
+		expect(options.defaultHeaders.Authorization).toBeUndefined();
+		expect(options.defaultHeaders["X-Api-Key"]).toBeUndefined();
 	});
 
 	it("applies Claude Code TLS profile for direct Anthropic transport", () => {
@@ -695,6 +956,58 @@ describe("Anthropic request fingerprint alignment", () => {
 		);
 	});
 
+	it("sends temperature for Anthropic requests without enabled thinking", async () => {
+		const payload = (await captureAnthropicPayload(
+			ANTHROPIC_MODEL,
+			{
+				systemPrompt: ["Stay concise."],
+				messages: [{ role: "user", content: "Hi", timestamp: Date.now() }],
+			},
+			{ temperature: 0.2 },
+		)) as { temperature?: number; thinking?: { type?: string } };
+
+		expect(payload.temperature).toBe(0.2);
+		expect(payload.thinking).toBeUndefined();
+	});
+
+	it("sends disabled thinking for reasoning models when thinking is explicitly disabled", async () => {
+		const payload = (await captureAnthropicPayload(
+			ANTHROPIC_MODEL,
+			{
+				systemPrompt: ["Stay concise."],
+				messages: [{ role: "user", content: "Hi", timestamp: Date.now() }],
+			},
+			{ thinkingEnabled: false },
+		)) as { thinking?: { type?: string } };
+
+		expect(payload.thinking).toEqual({ type: "disabled" });
+	});
+
+	it("drops temperature and sampling params for Opus 4.7 without enabled thinking", async () => {
+		const payload = (await captureAnthropicPayload(
+			{ ...ANTHROPIC_MODEL, id: "claude-opus-4-7", name: "Claude Opus 4.7" },
+			{
+				systemPrompt: ["Stay concise."],
+				messages: [{ role: "user", content: "Hi", timestamp: Date.now() }],
+			},
+			{
+				temperature: 0.2,
+				topP: 0.3,
+				topK: 4,
+			},
+		)) as {
+			temperature?: number;
+			top_p?: number;
+			top_k?: number;
+			thinking?: { type?: string };
+		};
+
+		expect(payload.temperature).toBeUndefined();
+		expect(payload.top_p).toBeUndefined();
+		expect(payload.top_k).toBeUndefined();
+		expect(payload.thinking).toBeUndefined();
+	});
+
 	it("drops sampling params and requests summarized adaptive thinking for Opus 4.7", async () => {
 		const payload = (await captureAnthropicPayload(
 			{
@@ -708,7 +1021,7 @@ describe("Anthropic request fingerprint alignment", () => {
 				},
 			},
 			{
-				systemPrompt: "Stay concise.",
+				systemPrompt: ["Stay concise."],
 				messages: [{ role: "user", content: "Hi", timestamp: Date.now() }],
 			},
 			{

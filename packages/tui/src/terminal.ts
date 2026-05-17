@@ -4,6 +4,10 @@ import { $env, logger } from "@oh-my-pi/pi-utils";
 import { setKittyProtocolActive } from "./keys";
 import { StdinBuffer } from "./stdin-buffer";
 
+const TERMINAL_PROGRESS_KEEPALIVE_MS = 1000;
+const TERMINAL_PROGRESS_ACTIVE_SEQUENCE = "\x1b]9;4;3\x07";
+const TERMINAL_PROGRESS_CLEAR_SEQUENCE = "\x1b]9;4;0;\x07";
+
 /**
  * Minimal terminal interface for TUI
  */
@@ -85,6 +89,9 @@ export interface Terminal {
 	// Title operations
 	setTitle(title: string): void; // Set terminal window title
 
+	// Progress indicator (OSC 9;4)
+	setProgress(active: boolean): void;
+
 	/**
 	 * Register a callback for terminal appearance (dark/light) changes.
 	 * Detection uses OSC 11 background color query with Mode 2031 as a change trigger.
@@ -96,6 +103,10 @@ export interface Terminal {
 	get appearance(): TerminalAppearance | undefined;
 }
 
+function isWindowsSubsystemForLinux(): boolean {
+	return process.platform === "linux" && (!!$env.WSL_DISTRO_NAME || !!$env.WSL_INTEROP);
+}
+
 /**
  * Real terminal using process.stdin/stdout
  */
@@ -105,7 +116,7 @@ export class ProcessTerminal implements Terminal {
 	#resizeHandler?: () => void;
 	#kittyProtocolActive = false;
 	#modifyOtherKeysActive = false;
-	#modifyOtherKeysTimeout?: ReturnType<typeof setTimeout>;
+	#modifyOtherKeysTimeout?: Timer;
 	#stdinBuffer?: StdinBuffer;
 	#stdinDataHandler?: (data: string) => void;
 	#dead = false;
@@ -118,8 +129,8 @@ export class ProcessTerminal implements Terminal {
 	#osc11ResponseBuffer = "";
 	#pendingDa1Sentinels = 0;
 	#osc11PollTimer?: Timer;
-	#mode2031Active = false;
 	#mode2031DebounceTimer?: Timer;
+	#progressTimer?: ReturnType<typeof setInterval>;
 
 	get kittyProtocolActive(): boolean {
 		return this.#kittyProtocolActive;
@@ -185,7 +196,12 @@ export class ProcessTerminal implements Terminal {
 
 		// Start periodic OSC 11 re-query for terminals without Mode 2031
 		// (Warp, Alacritty, WezTerm, iTerm2). Self-disables once Mode 2031 fires.
-		this.#startOsc11Poll();
+		// Windows Terminal under WSL has been observed to close the hosting tab
+		// after repeated OSC 11/DA1 probes. Keep the initial/event-driven probes,
+		// but avoid background polling there.
+		if (!isWindowsSubsystemForLinux()) {
+			this.#startOsc11Poll();
+		}
 	}
 
 	/**
@@ -328,10 +344,7 @@ export class ProcessTerminal implements Terminal {
 			// (Neovim convention — coalesces rapid notifications during transitions)
 			const appearanceMatch = sequence.match(appearanceDsrPattern);
 			if (appearanceMatch) {
-				if (!this.#mode2031Active) {
-					this.#mode2031Active = true;
-					this.#stopOsc11Poll();
-				}
+				this.#stopOsc11Poll();
 				if (this.#mode2031DebounceTimer) clearTimeout(this.#mode2031DebounceTimer);
 				this.#mode2031DebounceTimer = setTimeout(() => {
 					this.#mode2031DebounceTimer = undefined;
@@ -500,6 +513,10 @@ export class ProcessTerminal implements Terminal {
 			activeTerminal = null;
 		}
 
+		if (this.#clearProgressTimer()) {
+			this.#safeWrite(TERMINAL_PROGRESS_CLEAR_SEQUENCE);
+		}
+
 		// Disable bracketed paste mode
 		this.#safeWrite("\x1b[?2004l");
 
@@ -515,7 +532,6 @@ export class ProcessTerminal implements Terminal {
 		this.#osc11QueryQueued = false;
 		this.#osc11ResponseBuffer = "";
 		this.#pendingDa1Sentinels = 0;
-		this.#mode2031Active = false;
 
 		// Disable Kitty keyboard protocol if not already done by drainInput()
 		if (this.#kittyProtocolActive) {
@@ -585,11 +601,11 @@ export class ProcessTerminal implements Terminal {
 	}
 
 	get columns(): number {
-		return process.stdout.columns || 80;
+		return process.stdout.columns || Number(Bun.env.COLUMNS) || 80;
 	}
 
 	get rows(): number {
-		return process.stdout.rows || 24;
+		return process.stdout.rows || Number(Bun.env.LINES) || 24;
 	}
 
 	moveBy(lines: number): void {
@@ -626,5 +642,27 @@ export class ProcessTerminal implements Terminal {
 	setTitle(title: string): void {
 		// OSC 0;title BEL - set terminal window title
 		this.#safeWrite(`\x1b]0;${title}\x07`);
+	}
+
+	setProgress(active: boolean): void {
+		if (active) {
+			this.#safeWrite(TERMINAL_PROGRESS_ACTIVE_SEQUENCE);
+			if (!this.#progressTimer) {
+				this.#progressTimer = setInterval(() => {
+					this.#safeWrite(TERMINAL_PROGRESS_ACTIVE_SEQUENCE);
+				}, TERMINAL_PROGRESS_KEEPALIVE_MS);
+				this.#progressTimer.unref?.();
+			}
+		} else {
+			this.#clearProgressTimer();
+			this.#safeWrite(TERMINAL_PROGRESS_CLEAR_SEQUENCE);
+		}
+	}
+
+	#clearProgressTimer(): boolean {
+		if (!this.#progressTimer) return false;
+		clearInterval(this.#progressTimer);
+		this.#progressTimer = undefined;
+		return true;
 	}
 }

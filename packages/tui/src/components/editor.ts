@@ -25,10 +25,8 @@ const SLASH_COMMAND_SELECT_LIST_LAYOUT: SelectListLayoutOptions = {
 };
 
 function sanitizeLoadedText(text: string): string {
-	return replaceTabs(text.replace(/\r\n/g, "\n").replace(/\r/g, "\n"))
-		.split("")
-		.filter(char => char === "\n" || char.charCodeAt(0) >= 32)
-		.join("");
+	// Normalize CRLF/CR → LF, then strip C0 control chars except \n.
+	return replaceTabs(text.replace(/\r\n?/g, "\n")).replace(/[\x00-\x09\x0b-\x1f]/g, "");
 }
 
 const segmenter = getSegmenter();
@@ -987,6 +985,7 @@ export class Editor implements Component, Focusable {
 						this.#setCursorCol(result.cursorCol);
 
 						this.#cancelAutocomplete();
+						this.onAutocompleteUpdate?.();
 
 						if (this.onChange) {
 							this.onChange(this.getText());
@@ -1046,6 +1045,7 @@ export class Editor implements Component, Focusable {
 						this.#setCursorCol(result.cursorCol);
 
 						this.#cancelAutocomplete();
+						this.onAutocompleteUpdate?.();
 
 						if (this.onChange) {
 							this.onChange(this.getText());
@@ -1114,8 +1114,7 @@ export class Editor implements Component, Focusable {
 		// New line
 		else if (
 			(data.charCodeAt(0) === 10 && data.length > 1) || // Ctrl+Enter with modifiers
-			data === "\x1b[13;5u" || // Ctrl+Enter (Kitty protocol)
-			data === "\x1b[27;5;13~" || // Ctrl+Enter (legacy format)
+			matchesKey(data, "ctrl+enter") || // Ctrl+Enter (Kitty/modifyOtherKeys, including lock bits/keypad Enter)
 			data === "\x1b\r" || // Option+Enter in some terminals (legacy)
 			data === "\x1b[13;2~" || // Shift+Enter in some terminals (legacy format)
 			kb.matches(data, "tui.input.newLine") || // Shift+Enter (Kitty protocol, handles lock bits)
@@ -1134,6 +1133,38 @@ export class Editor implements Component, Focusable {
 			// If submit is disabled, do nothing
 			if (this.disableSubmit) {
 				return;
+			}
+
+			// Synchronous slash command completion for the race condition where
+			// async autocomplete hasn't resolved yet (user types /q quickly + Enter).
+			// Match the existing selected-item behavior when autocomplete IS showing.
+			if (!this.#autocompleteState) {
+				const currentLine = this.#state.lines[this.#state.cursorLine] ?? "";
+				const textBeforeCursor = currentLine.slice(0, this.#state.cursorCol);
+				if (
+					textBeforeCursor.startsWith("/") &&
+					this.#isInSubmittedSlashCommandContext() &&
+					this.#autocompleteProvider?.trySyncSlashCompletion
+				) {
+					const syncResult = this.#autocompleteProvider.trySyncSlashCompletion(textBeforeCursor);
+					if (syncResult && syncResult.items.length > 0) {
+						// Invalidate any pending async autocomplete so its stale results are discarded
+						this.#autocompleteRequestId += 1;
+						// Apply the best match and submit the completed command
+						const selected = syncResult.items[0]!;
+						const result = this.#autocompleteProvider.applyCompletion(
+							this.#state.lines,
+							this.#state.cursorLine,
+							this.#state.cursorCol,
+							selected,
+							syncResult.prefix,
+						);
+						this.#state.lines = result.lines;
+						this.#state.cursorLine = result.cursorLine;
+						this.#setCursorCol(result.cursorCol);
+						result.onApplied?.();
+					}
+				}
 			}
 
 			this.#submitValue();
@@ -1464,10 +1495,33 @@ export class Editor implements Component, Focusable {
 			this.onChange(this.getText());
 		}
 
+		// Synchronous inline replacement (e.g. emoji shortcodes `:joy:` → 😂).
+		// Runs before autocomplete trigger so the popup doesn't briefly chase a
+		// prefix that's about to be rewritten.
+		if (char.length === 1 && this.#autocompleteProvider?.trySyncInlineReplace) {
+			const replaceLine = this.#state.lines[this.#state.cursorLine] || "";
+			const textBeforeCursor = replaceLine.slice(0, this.#state.cursorCol);
+			const replacement = this.#autocompleteProvider.trySyncInlineReplace(textBeforeCursor);
+			if (replacement) {
+				const before = replaceLine.slice(0, this.#state.cursorCol - replacement.replaceLen);
+				const after = replaceLine.slice(this.#state.cursorCol);
+				this.#state.lines[this.#state.cursorLine] = before + replacement.insert + after;
+				this.#setCursorCol(before.length + replacement.insert.length);
+				if (this.onChange) {
+					this.onChange(this.getText());
+				}
+				if (this.#autocompleteState) {
+					this.#cancelAutocomplete();
+					this.onAutocompleteUpdate?.();
+				}
+				return;
+			}
+		}
+
 		// Check if we should trigger or update autocomplete
 		if (!this.#autocompleteState) {
 			// Auto-trigger for "/" at the start of a line (slash commands)
-			if (char === "/" && this.#isAtStartOfMessage()) {
+			if (char === "/" && this.#isAtStartOfSubmittedMessage()) {
 				this.#tryTriggerAutocomplete();
 			}
 			// Auto-trigger for "@" file reference (fuzzy search)
@@ -1489,7 +1543,7 @@ export class Editor implements Component, Focusable {
 				const currentLine = this.#state.lines[this.#state.cursorLine] || "";
 				const textBeforeCursor = currentLine.slice(0, this.#state.cursorCol);
 				// Check if we're in a slash command (with or without space for arguments)
-				if (textBeforeCursor.trimStart().startsWith("/")) {
+				if (this.#isInSubmittedSlashCommandContext()) {
 					this.#tryTriggerAutocomplete();
 				}
 				// Check if we're in an @ file reference context
@@ -1498,6 +1552,10 @@ export class Editor implements Component, Focusable {
 				}
 				// Check if we're in a # prompt action context
 				else if (textBeforeCursor.match(/#[^\s#]*$/)) {
+					this.#tryTriggerAutocomplete();
+				}
+				// Check if we're in a :emoji shortcode context
+				else if (textBeforeCursor.match(/(?:^|[\s([{>]):[a-zA-Z0-9_+-]*$/)) {
 					this.#tryTriggerAutocomplete();
 				}
 			}
@@ -1512,8 +1570,20 @@ export class Editor implements Component, Focusable {
 		this.#recordUndoState();
 
 		this.#withUndoSuspended(() => {
+			// Some terminals (e.g. tmux popups with extended-keys-format=csi-u) re-encode
+			// control bytes inside bracketed paste as CSI-u Ctrl+<letter> sequences
+			// (ESC [ <codepoint> ; 5 u). Decode those back to their literal byte so the
+			// per-char filter below preserves newlines instead of stripping ESC and
+			// leaking the printable tail (e.g. "[106;5u") into the editor.
+			const decodedText = pastedText.replace(/\x1b\[(\d+);5u/g, (match, code) => {
+				const cp = Number(code);
+				if (cp >= 97 && cp <= 122) return String.fromCharCode(cp - 96);
+				if (cp >= 65 && cp <= 90) return String.fromCharCode(cp - 64);
+				return match;
+			});
+
 			// Clean the pasted text
-			const cleanText = pastedText.replace(/\r\n/g, "\n").replace(/\r/g, "\n");
+			const cleanText = decodedText.replace(/\r\n?/g, "\n");
 
 			// Convert tabs to spaces (4 spaces per tab)
 			const tabExpandedText = cleanText.replace(/\t/g, "    ");
@@ -1662,7 +1732,7 @@ export class Editor implements Component, Focusable {
 			const currentLine = this.#state.lines[this.#state.cursorLine] || "";
 			const textBeforeCursor = currentLine.slice(0, this.#state.cursorCol);
 			// Slash command context
-			if (textBeforeCursor.trimStart().startsWith("/")) {
+			if (this.#isInSubmittedSlashCommandContext()) {
 				this.#tryTriggerAutocomplete();
 			}
 			// @ file reference context
@@ -1818,7 +1888,7 @@ export class Editor implements Component, Focusable {
 		} else {
 			const currentLine = this.#state.lines[this.#state.cursorLine] || "";
 			const textBeforeCursor = currentLine.slice(0, this.#state.cursorCol);
-			if (textBeforeCursor.trimStart().startsWith("/")) {
+			if (this.#isInSubmittedSlashCommandContext()) {
 				this.#tryTriggerAutocomplete();
 			} else if (textBeforeCursor.match(/(?:^|[\s])@[^\s]*$/)) {
 				this.#tryTriggerAutocomplete();
@@ -1863,7 +1933,7 @@ export class Editor implements Component, Focusable {
 		this.#resetKillSequence();
 		this.#recordUndoState();
 
-		const normalized = text.replace(/\r\n/g, "\n").replace(/\r/g, "\n");
+		const normalized = text.replace(/\r\n?/g, "\n");
 		const lines = normalized.split("\n");
 
 		if (lines.length === 1) {
@@ -2132,7 +2202,7 @@ export class Editor implements Component, Focusable {
 			const currentLine = this.#state.lines[this.#state.cursorLine] || "";
 			const textBeforeCursor = currentLine.slice(0, this.#state.cursorCol);
 			// Slash command context
-			if (textBeforeCursor.trimStart().startsWith("/")) {
+			if (this.#isInSubmittedSlashCommandContext()) {
 				this.#tryTriggerAutocomplete();
 			}
 			// @ file reference context
@@ -2328,13 +2398,27 @@ export class Editor implements Component, Focusable {
 		this.#setCursorCol(moveWordRight(currentLine, this.#state.cursorCol));
 	}
 
-	// Helper method to check if cursor is at start of message (for slash command detection)
-	#isAtStartOfMessage(): boolean {
+	#hasOnlyWhitespaceBeforeCursorLine(): boolean {
+		for (let i = 0; i < this.#state.cursorLine; i++) {
+			if ((this.#state.lines[i] || "").trim() !== "") {
+				return false;
+			}
+		}
+		return true;
+	}
+
+	// Slash commands execute only when the submitted prompt starts with the command.
+	#isAtStartOfSubmittedMessage(): boolean {
 		const currentLine = this.#state.lines[this.#state.cursorLine] || "";
 		const beforeCursor = currentLine.slice(0, this.#state.cursorCol);
 
-		// At start if line is empty, only contains whitespace, or is just "/"
-		return beforeCursor.trim() === "" || beforeCursor.trim() === "/";
+		return this.#hasOnlyWhitespaceBeforeCursorLine() && (beforeCursor.trim() === "" || beforeCursor.trim() === "/");
+	}
+
+	#isInSubmittedSlashCommandContext(): boolean {
+		const currentLine = this.#state.lines[this.#state.cursorLine] || "";
+		const beforeCursor = currentLine.slice(0, this.#state.cursorCol);
+		return this.#hasOnlyWhitespaceBeforeCursorLine() && beforeCursor.trimStart().startsWith("/");
 	}
 
 	#isSlashCommandNameAutocompleteSelection(): boolean {
@@ -2344,7 +2428,9 @@ export class Editor implements Component, Focusable {
 
 		const currentLine = this.#state.lines[this.#state.cursorLine] || "";
 		const textBeforeCursor = currentLine.slice(0, this.#state.cursorCol).trimStart();
-		return textBeforeCursor.startsWith("/") && !textBeforeCursor.includes(" ");
+		return (
+			this.#isInSubmittedSlashCommandContext() && textBeforeCursor.startsWith("/") && !textBeforeCursor.includes(" ")
+		);
 	}
 
 	#isCompletedSlashCommandAtCursor(): boolean {
@@ -2354,7 +2440,7 @@ export class Editor implements Component, Focusable {
 		}
 
 		const textBeforeCursor = currentLine.slice(0, this.#state.cursorCol).trimStart();
-		return /^\/\S+ $/.test(textBeforeCursor);
+		return this.#isInSubmittedSlashCommandContext() && /^\/\S+ $/.test(textBeforeCursor);
 	}
 
 	// Autocomplete methods
@@ -2380,7 +2466,7 @@ export class Editor implements Component, Focusable {
 		);
 		if (requestId !== this.#autocompleteRequestId) return;
 
-		if (suggestions && suggestions.items.length > 0) {
+		if (suggestions && Array.isArray(suggestions.items) && suggestions.items.length > 0) {
 			this.#autocompletePrefix = suggestions.prefix;
 			this.#autocompleteList = this.#createAutocompleteList(suggestions.prefix, suggestions.items);
 			this.#autocompleteState = "regular";
@@ -2408,7 +2494,7 @@ export class Editor implements Component, Focusable {
 		const beforeCursor = currentLine.slice(0, this.#state.cursorCol);
 
 		// Check if we're in a slash command context
-		if (beforeCursor.trimStart().startsWith("/") && !beforeCursor.trimStart().includes(" ")) {
+		if (this.#isInSubmittedSlashCommandContext() && !beforeCursor.trimStart().includes(" ")) {
 			this.#handleSlashCommandCompletion();
 		} else {
 			this.#forceFileAutocomplete(true);
@@ -2444,7 +2530,7 @@ https://github.com/EsotericSoftware/spine-runtimes/actions/runs/19536643416/job/
 		);
 		if (requestId !== this.#autocompleteRequestId) return;
 
-		if (suggestions && suggestions.items.length > 0) {
+		if (suggestions && Array.isArray(suggestions.items) && suggestions.items.length > 0) {
 			// If there's exactly one suggestion and this was an explicit Tab press, apply it immediately
 			if (explicitTab && suggestions.items.length === 1) {
 				const item = suggestions.items[0]!;
@@ -2510,7 +2596,7 @@ https://github.com/EsotericSoftware/spine-runtimes/actions/runs/19536643416/job/
 		);
 		if (requestId !== this.#autocompleteRequestId) return;
 
-		if (suggestions && suggestions.items.length > 0) {
+		if (suggestions && Array.isArray(suggestions.items) && suggestions.items.length > 0) {
 			this.#autocompletePrefix = suggestions.prefix;
 			// Always create new SelectList to ensure update
 			this.#autocompleteList = this.#createAutocompleteList(suggestions.prefix, suggestions.items);

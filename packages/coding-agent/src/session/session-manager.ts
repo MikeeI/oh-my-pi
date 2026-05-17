@@ -31,7 +31,9 @@ import {
 	type BlobPutResult,
 	BlobStore,
 	externalizeImageData,
+	externalizeImageDataSync,
 	externalizeImageDataUrl,
+	externalizeImageDataUrlSync,
 	isBlobRef,
 	isImageDataUrl,
 	resolveImageData,
@@ -47,6 +49,7 @@ import {
 	type HookMessage,
 	type PythonExecutionMessage,
 	sanitizeRehydratedOpenAIResponsesAssistantMessage,
+	stripInternalDetailsFields,
 } from "./messages";
 import type { SessionStorage, SessionStorageWriter } from "./session-storage";
 import { FileSessionStorage, MemorySessionStorage } from "./session-storage";
@@ -275,6 +278,7 @@ export type ReadonlySessionManager = Pick<
 	| "getSessionFile"
 	| "getSessionName"
 	| "getArtifactsDir"
+	| "getArtifactManager"
 	| "allocateArtifactPath"
 	| "saveArtifact"
 	| "getArtifactPath"
@@ -566,6 +570,14 @@ export function buildSessionContext(
 	let hasPersistedMCPToolSelection = false;
 	let mode = "none";
 	let modeData: Record<string, unknown> | undefined;
+	// Track whether an explicit `model_change` with role="default" has been
+	// seen on this path. Once a user (or the agent itself) records an
+	// explicit default, later assistant-message inference must NOT overwrite
+	// it: temporary fallbacks (retry fallback, context promotion) and
+	// server-side model downgrades both produce assistant messages tagged
+	// with the wrong model id, which previously clobbered the user's pick on
+	// resume (issue #849).
+	let hasExplicitDefaultModel = false;
 
 	for (const entry of path) {
 		if (entry.type === "thinking_level_change") {
@@ -575,12 +587,21 @@ export function buildSessionContext(
 			if (entry.model) {
 				const role = entry.role ?? "default";
 				models[role] = entry.model;
+				if (role === "default") {
+					hasExplicitDefaultModel = true;
+				}
 			}
 		} else if (entry.type === "service_tier_change") {
 			serviceTier = entry.serviceTier ?? undefined;
 		} else if (entry.type === "message" && entry.message.role === "assistant") {
-			// Infer default model from assistant messages
-			models.default = `${entry.message.provider}/${entry.message.model}`;
+			// Legacy fallback: infer default model from assistant messages only
+			// when no explicit `model_change` (role=default) entry has been
+			// recorded yet. Newer sessions always record an explicit default
+			// model_change at the start of the conversation, so this branch is
+			// only used to keep pre-model_change sessions working.
+			if (!hasExplicitDefaultModel) {
+				models.default = `${entry.message.provider}/${entry.message.model}`;
+			}
 		} else if (entry.type === "compaction") {
 			compaction = entry;
 		} else if (entry.type === "ttsr_injection") {
@@ -853,8 +874,8 @@ function sanitizeSessionName(value: string | undefined): string | undefined {
 
 class RecentSessionInfo {
 	#fullName: string | undefined;
-	#name: string | undefined;
 	#timeAgo: string | undefined;
+	readonly #headerTimestamp: string | undefined;
 
 	constructor(
 		readonly path: string,
@@ -862,27 +883,31 @@ class RecentSessionInfo {
 		header: Record<string, unknown>,
 		firstPrompt?: string,
 	) {
-		// Extract title from session header, falling back to first user prompt, then id
+		// Prefer an explicit title, then the first user prompt. The raw UUID `id` is
+		// intentionally not used as a fallback: showing it as a "name" is unfriendly and
+		// indistinguishable from neighboring sessions in the UI. The friendly fallback is
+		// derived lazily in `fullName` from the session timestamp.
 		const trystr = (v: unknown) => (typeof v === "string" ? v : undefined);
-		this.#fullName =
-			sanitizeSessionName(trystr(header.title)) ??
-			sanitizeSessionName(firstPrompt) ??
-			sanitizeSessionName(trystr(header.id));
+		this.#fullName = sanitizeSessionName(trystr(header.title)) ?? sanitizeSessionName(firstPrompt);
+		this.#headerTimestamp = trystr(header.timestamp);
 	}
 
-	/** Full session name from header, or filename without extension as fallback */
+	/** Display name. Falls back to a timestamp-based label, never the raw UUID. */
 	get fullName(): string {
 		if (this.#fullName) return this.#fullName;
-		this.#fullName = this.path.split("/").pop()?.replace(".jsonl", "") ?? "Unknown";
+		const ts = this.#headerTimestamp ? Date.parse(this.#headerTimestamp) : Number.NaN;
+		const date = new Date(Number.isFinite(ts) ? ts : this.mtime);
+		const time = date.toLocaleTimeString(undefined, { hour: "2-digit", minute: "2-digit" });
+		this.#fullName = `Untitled · ${time}`;
 		return this.#fullName;
 	}
 
-	/** Truncated name for display (max 40 chars) */
+	/**
+	 * Display name without an arbitrary length cap. The renderer is responsible for
+	 * width-aware truncation so adjacent fields (e.g. the relative time) stay visible.
+	 */
 	get name(): string {
-		if (this.#name) return this.#name;
-		const fullName = this.fullName;
-		this.#name = fullName.length <= 40 ? fullName : `${fullName.slice(0, 39)}…`;
-		return this.#name;
+		return this.fullName;
 	}
 
 	/** Human-readable relative time (e.g., "2 hours ago") */
@@ -1105,6 +1130,92 @@ async function prepareEntryForPersistence(entry: FileEntry, blobStore: BlobStore
 	return truncateForPersistence(entry, blobStore);
 }
 
+/**
+ * Synchronous variant of {@link truncateForPersistence}.
+ *
+ * The async version's overhead — `Promise.all` over `Object.entries`/`Array.prototype.map`,
+ * one microtask hop per nested node — is pure waste for entries without image blobs
+ * (the vast majority). The fast path runs in one synchronous tick so an OOM/SIGKILL
+ * landing right after `_persist` returns cannot lose the entry. Image externalization
+ * still happens, but via the synchronous blob-store path (`fs.writeFileSync`), so the
+ * blob bytes are in the kernel page cache before the JSONL line referencing them is
+ * written.
+ */
+function truncateForPersistenceSync(obj: unknown, blobStore: BlobStore, key?: string): unknown {
+	if (obj === null || obj === undefined) return obj;
+
+	if (typeof obj === "string") {
+		if (key === "image_url" && isImageDataUrl(obj)) {
+			return externalizeImageDataUrlSync(blobStore, obj);
+		}
+		if (obj.length > MAX_PERSIST_CHARS) {
+			if (key === "thinkingSignature" || key === "thoughtSignature" || key === "textSignature") {
+				return "";
+			}
+			const limit = Math.max(0, MAX_PERSIST_CHARS - TRUNCATION_NOTICE.length);
+			return `${truncateString(obj, limit)}${TRUNCATION_NOTICE}`;
+		}
+		return obj;
+	}
+
+	if (Array.isArray(obj)) {
+		let changed = false;
+		const result: unknown[] = new Array(obj.length);
+		for (let i = 0; i < obj.length; i++) {
+			const item = obj[i];
+			if (key === TEXT_CONTENT_KEY && isImageBlock(item)) {
+				if (!isBlobRef(item.data) && item.data.length >= BLOB_EXTERNALIZE_THRESHOLD) {
+					changed = true;
+					const blobRef = externalizeImageDataSync(blobStore, item.data);
+					result[i] = { ...item, data: blobRef };
+					continue;
+				}
+			}
+			const newItem = truncateForPersistenceSync(item, blobStore, key);
+			if (newItem !== item) changed = true;
+			result[i] = newItem;
+		}
+		return changed ? result : obj;
+	}
+
+	if (typeof obj === "object") {
+		let changed = false;
+		const entries: Array<readonly [string, unknown]> = [];
+		for (const [childKey, value] of Object.entries(obj)) {
+			if (childKey === "partialJson" || childKey === "jsonlEvents") {
+				changed = true;
+				continue;
+			}
+			const newValue = truncateForPersistenceSync(value, blobStore, childKey);
+			if (newValue !== value) changed = true;
+			entries.push([childKey, newValue]);
+		}
+		if (!changed) return obj;
+
+		const contentEntry = entries.find(([childKey]) => childKey === "content");
+		const lineCountEntry = entries.find(([childKey]) => childKey === "lineCount");
+		if (
+			contentEntry &&
+			typeof contentEntry[1] === "string" &&
+			lineCountEntry &&
+			typeof lineCountEntry[1] === "number"
+		) {
+			const content = contentEntry[1];
+			const updatedEntries = entries.map(([childKey, value]) =>
+				childKey === "lineCount" ? ([childKey, content.split("\n").length] as const) : ([childKey, value] as const),
+			);
+			return Object.fromEntries(updatedEntries);
+		}
+		return Object.fromEntries(entries);
+	}
+
+	return obj;
+}
+
+function prepareEntryForPersistenceSync(entry: FileEntry, blobStore: BlobStore): FileEntry {
+	return truncateForPersistenceSync(entry, blobStore) as FileEntry;
+}
+
 class NdjsonFileWriter {
 	#writer: SessionStorageWriter;
 	#closed = false;
@@ -1156,6 +1267,26 @@ class NdjsonFileWriter {
 		if (this.#error) throw this.#error;
 		const line = `${JSON.stringify(entry)}\n`;
 		return this.#enqueue(() => this.#writeLine(line));
+	}
+
+	/**
+	 * Synchronously serialize and append the entry. Returns once `fs.writeSync` has handed
+	 * the bytes to the kernel page cache — durable across OOM/SIGKILL even before fsync.
+	 *
+	 * Callers MUST NOT mix this with pending async `write()` calls on the same writer:
+	 * the async path is queued through `#pendingWrites`, but this method bypasses the
+	 * queue. Use only when no concurrent async write is in flight (the session-manager
+	 * persist path enforces this via `#flushed`/`#needsFullRewriteOnNextPersist`).
+	 */
+	writeSync(entry: FileEntry): void {
+		if (this.#closed || this.#closing) throw new Error("Writer closed");
+		if (this.#error) throw this.#error;
+		const line = `${JSON.stringify(entry)}\n`;
+		try {
+			this.#writer.writeLineSync(line);
+		} catch (err) {
+			throw this.#recordError(err);
+		}
 	}
 
 	/** Flush all buffered data to disk. Waits for all queued writes. */
@@ -1219,6 +1350,11 @@ class NdjsonFileWriter {
 	/** Check if there's a stored error. */
 	getError(): Error | undefined {
 		return this.#error;
+	}
+
+	/** True while the writer accepts new writes (not closing or closed). */
+	isOpen(): boolean {
+		return !this.#closed && !this.#closing;
 	}
 }
 
@@ -1601,6 +1737,10 @@ export class SessionManager {
 	#persistErrorReported = false;
 	#artifactManager: ArtifactManager | null = null;
 	#artifactManagerSessionFile: string | null = null;
+	// When set, take precedence over the lazily-derived per-session manager.
+	// Subagents adopt the parent's manager so artifact IDs are unique across the
+	// whole agent tree and all files land in the parent's artifacts dir.
+	#adoptedArtifactManager: ArtifactManager | null = null;
 	// In-memory artifact fallback for non-persistent sessions (persist=false).
 	// Keyed by sequential numeric ID string; mirrors the file-based ArtifactManager ID scheme.
 	#inMemoryArtifacts: Map<string, string> | null = null;
@@ -1654,6 +1794,7 @@ export class SessionManager {
 		this.#persistErrorReported = false;
 		this.#artifactManager = null;
 		this.#artifactManagerSessionFile = null;
+		this.#adoptedArtifactManager = null;
 		this.#buildIndex();
 		if (this.#sessionFile) {
 			writeTerminalBreadcrumb(this.cwd, this.#sessionFile);
@@ -1970,7 +2111,15 @@ export class SessionManager {
 	#ensurePersistWriter(): NdjsonFileWriter | undefined {
 		if (!this.persist || !this.#sessionFile) return undefined;
 		if (this.#persistError) throw this.#persistError;
-		if (this.#persistWriter && this.#persistWriterPath === this.#sessionFile) return this.#persistWriter;
+		if (this.#persistWriter && this.#persistWriterPath === this.#sessionFile) {
+			if (this.#persistWriter.isOpen()) return this.#persistWriter;
+			// Cached writer for the current file is mid-close (queued
+			// `#closePersistWriterInternal` has flipped `#closing` but not yet
+			// cleared `#persistWriter`). Returning it would make `writeSync`
+			// throw "Writer closed". Defer to the caller — `_persist` routes
+			// the entry through the async rewrite path so it still lands on disk.
+			return undefined;
+		}
 		// Note: caller must await _closePersistWriter() before calling this if switching files
 		this.#persistWriter = new NdjsonFileWriter(this.storage, this.#sessionFile, {
 			onError: err => {
@@ -2099,10 +2248,32 @@ export class SessionManager {
 	/**
 	 * Returns the session artifacts directory path (session file path without .jsonl).
 	 * Returns null when the session is not persisted to a file.
+	 * When this session has adopted an external ArtifactManager (subagent case),
+	 * returns that manager's directory so reads/writes land in the shared parent
+	 * dir instead of a private (non-existent) subdir.
 	 */
 	getArtifactsDir(): string | null {
+		if (this.#adoptedArtifactManager) return this.#adoptedArtifactManager.dir;
 		const sessionFile = this.#sessionFile;
 		return sessionFile ? sessionFile.slice(0, -6) : null;
+	}
+
+	/**
+	 * Adopt an externally-owned ArtifactManager. Used by subagents to share
+	 * the parent session's artifact directory and ID counter.
+	 */
+	adoptArtifactManager(manager: ArtifactManager): void {
+		this.#adoptedArtifactManager = manager;
+	}
+
+	/**
+	 * Returns the ArtifactManager this session writes through. Lazily creates
+	 * one bound to the current session file unless an external manager was
+	 * adopted via `adoptArtifactManager`. Returns null only for non-persistent
+	 * sessions with no adopted manager.
+	 */
+	getArtifactManager(): ArtifactManager | null {
+		return this.#getOrCreateArtifactManager();
 	}
 
 	/**
@@ -2110,6 +2281,7 @@ export class SessionManager {
 	 * Recreates the manager when the active session file changes.
 	 */
 	#getOrCreateArtifactManager(): ArtifactManager | null {
+		if (this.#adoptedArtifactManager) return this.#adoptedArtifactManager;
 		const sessionFile = this.#sessionFile;
 		if (!sessionFile) {
 			this.#artifactManager = null;
@@ -2121,7 +2293,7 @@ export class SessionManager {
 			return this.#artifactManager;
 		}
 
-		const manager = new ArtifactManager(sessionFile);
+		const manager = new ArtifactManager(sessionFile.slice(0, -6));
 		this.#artifactManager = manager;
 		this.#artifactManagerSessionFile = sessionFile;
 		return manager;
@@ -2159,6 +2331,63 @@ export class SessionManager {
 		const manager = this.#getOrCreateArtifactManager();
 		if (!manager) return null;
 		return manager.getPath(id);
+	}
+
+	/**
+	 * Path to the unsent-input draft sidecar for the current session. Lives inside
+	 * the artifacts directory so it is removed together with the session on
+	 * `dropSession`. Returns null when the session has no on-disk identity.
+	 */
+	#getDraftPath(): string | null {
+		const dir = this.getArtifactsDir();
+		return dir ? path.join(dir, "draft.txt") : null;
+	}
+
+	/**
+	 * Persist (or clear) the current editor draft so the next resume of this
+	 * session can restore it. Empty text deletes any stale draft. No-op when the
+	 * session is not persisted.
+	 */
+	async saveDraft(text: string): Promise<void> {
+		const draftPath = this.#getDraftPath();
+		if (!draftPath || !this.persist) return;
+		if (text.length === 0) {
+			try {
+				await this.storage.unlink(draftPath);
+			} catch (err) {
+				if (!isEnoent(err)) throw err;
+			}
+			return;
+		}
+		// Force the session header onto disk so resume can find the file we are
+		// attaching this draft to. Without this, a session whose first message
+		// never produced an assistant reply would persist a draft next to a
+		// session file that does not exist on disk.
+		await this.ensureOnDisk();
+		await this.storage.writeText(draftPath, text);
+	}
+
+	/**
+	 * Read and remove the saved draft. Returns the previously-saved text, or
+	 * null when no draft is pending. Single-shot: a successful read removes the
+	 * sidecar so a subsequent resume does not re-restore the same text.
+	 */
+	async consumeDraft(): Promise<string | null> {
+		const draftPath = this.#getDraftPath();
+		if (!draftPath) return null;
+		let text: string;
+		try {
+			text = await this.storage.readText(draftPath);
+		} catch (err) {
+			if (isEnoent(err)) return null;
+			throw err;
+		}
+		try {
+			await this.storage.unlink(draftPath);
+		} catch (err) {
+			if (!isEnoent(err)) throw err;
+		}
+		return text;
 	}
 
 	/** The source that set the session name: "user" (manual /rename or RPC) or "auto" (generated title). */
@@ -2225,20 +2454,34 @@ export class SessionManager {
 		}
 
 		if (this.#needsFullRewriteOnNextPersist || !this.#flushed) {
-			// Full flush: rewrite the entire file atomically to avoid
-			// duplicating entries if the file already exists (e.g. from ensureOnDisk).
-			// Errors are already surfaced through #persistChain/#persistError; the
-			// caller intentionally fires-and-forgets, so swallow the awaited rejection
+			// Cold path: rewrite the whole file atomically. Async — the writer is
+			// closed/reopened and every entry is re-prepared. Errors flow through
+			// `#persistChain` → `#recordPersistError`; we swallow the rejection
 			// here to avoid an unhandled rejection when the persist dir races with
 			// test-level tempDir cleanup.
 			this.#rewriteFile().catch(() => {});
-		} else {
-			this.#queuePersistTask(async () => {
-				const writer = this.#ensurePersistWriter();
-				if (!writer) return;
-				const persistedEntry = await prepareEntryForPersistence(entry, this.#blobStore);
-				await writer.write(persistedEntry);
-			}).catch(() => {});
+			return;
+		}
+
+		// Hot path: synchronously truncate + append. `fs.writeSync` returns once the
+		// bytes are in the kernel page cache, so the entry survives an OOM/SIGKILL
+		// landing immediately after this call. Image externalization (rare) runs via
+		// the synchronous blob-store path so blob bytes are durable before the JSONL
+		// line referencing them is written.
+		try {
+			const writer = this.#ensurePersistWriter();
+			if (!writer) {
+				// `#ensurePersistWriter` returns undefined here only when the cached
+				// writer is mid-close (the `!persist`/`!sessionFile` cases are
+				// rejected above). Route through `#rewriteFile` so the entry — which
+				// is already in `#fileEntries` — persists once the close drains.
+				this.#rewriteFile().catch(() => {});
+				return;
+			}
+			const persistedEntry = prepareEntryForPersistenceSync(entry, this.#blobStore);
+			writer.writeSync(persistedEntry);
+		} catch (err) {
+			this.#recordPersistError(err);
 		}
 	}
 
@@ -2437,7 +2680,10 @@ export class SessionManager {
 			customType,
 			content,
 			display,
-			details,
+			// Drop AgentSession-internal transient fields (allowlist in
+			// `INTERNAL_DETAILS_FIELDS`) before disk persistence. Single
+			// chokepoint covers every CustomMessage write path.
+			details: stripInternalDetailsFields(details),
 			attribution,
 			id: generateId(this.#byId),
 			parentId: this.#leafId,

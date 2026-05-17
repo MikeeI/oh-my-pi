@@ -1,7 +1,7 @@
 import { afterEach, describe, expect, it, vi } from "bun:test";
 import { getBundledModel } from "../src/models";
 import { type OpenAIResponsesOptions, streamOpenAIResponses } from "../src/providers/openai-responses";
-import type { Model } from "../src/types";
+import type { Context, Model } from "../src/types";
 
 const originalFetch = global.fetch;
 const model = getBundledModel("openai", "gpt-5-mini") as Model<"openai-responses">;
@@ -20,11 +20,16 @@ function getHeader(headers: RequestInit["headers"], name: string): string | null
 
 async function captureOpenAIResponseHeaders(
 	options: OpenAIResponsesOptions,
-): Promise<{ sessionId: string | null; clientRequestId: string | null }> {
-	const captured = { sessionId: null as string | null, clientRequestId: null as string | null };
+): Promise<{ sessionId: string | null; clientRequestId: string | null; body: Record<string, unknown> | null }> {
+	const captured = {
+		sessionId: null as string | null,
+		clientRequestId: null as string | null,
+		body: null as Record<string, unknown> | null,
+	};
 	const fetchMock = vi.fn(async (_input: string | URL | Request, init?: RequestInit) => {
 		captured.sessionId = getHeader(init?.headers, "session_id");
 		captured.clientRequestId = getHeader(init?.headers, "x-client-request-id");
+		captured.body = typeof init?.body === "string" ? (JSON.parse(init.body) as Record<string, unknown>) : null;
 		return createSseResponse([
 			{
 				type: "response.output_item.added",
@@ -58,14 +63,11 @@ async function captureOpenAIResponseHeaders(
 	});
 	global.fetch = Object.assign(fetchMock, { preconnect: originalFetch.preconnect }) as typeof fetch;
 
-	const stream = streamOpenAIResponses(
-		model,
-		{
-			systemPrompt: "sys",
-			messages: [{ role: "user", content: "hi", timestamp: Date.now() }],
-		},
-		{ apiKey: "test-key", ...options },
-	);
+	const context: Context = {
+		systemPrompt: ["stable system", "stable durable context"],
+		messages: [{ role: "user", content: "hi", timestamp: Date.now() }],
+	};
+	const stream = streamOpenAIResponses(model, context, { apiKey: "test-key", ...options });
 
 	for await (const event of stream) {
 		if (event.type === "done" || event.type === "error") break;
@@ -83,7 +85,9 @@ describe("openai-responses cache affinity", () => {
 	it("sets session routing headers for official OpenAI Responses requests with a sessionId", async () => {
 		const captured = await captureOpenAIResponseHeaders({ sessionId: "session-123" });
 
-		expect(captured).toEqual({ sessionId: "session-123", clientRequestId: "session-123" });
+		expect(captured.sessionId).toBe("session-123");
+		expect(captured.clientRequestId).toBe("session-123");
+		expect(captured.body?.prompt_cache_key).toBe("session-123");
 	});
 
 	it("lets explicit headers override the default OpenAI session routing headers", async () => {
@@ -95,12 +99,16 @@ describe("openai-responses cache affinity", () => {
 			},
 		});
 
-		expect(captured).toEqual({ sessionId: "override-session", clientRequestId: "override-request" });
+		expect(captured.sessionId).toBe("override-session");
+		expect(captured.clientRequestId).toBe("override-request");
+		expect(captured.body?.prompt_cache_key).toBe("session-123");
 	});
 
 	it("omits OpenAI session routing headers when cache retention is disabled", async () => {
 		const captured = await captureOpenAIResponseHeaders({ cacheRetention: "none", sessionId: "session-123" });
 
-		expect(captured).toEqual({ sessionId: null, clientRequestId: null });
+		expect(captured.sessionId).toBeNull();
+		expect(captured.clientRequestId).toBeNull();
+		expect(captured.body?.prompt_cache_key).toBeUndefined();
 	});
 });

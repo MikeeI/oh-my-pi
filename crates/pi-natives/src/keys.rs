@@ -255,6 +255,35 @@ static CTRL_ALT_LETTERS: [&str; 26] = [
 	"ctrl+alt+z",
 ];
 
+static ALT_SHIFT_LETTERS: [&str; 26] = [
+	"alt+shift+a",
+	"alt+shift+b",
+	"alt+shift+c",
+	"alt+shift+d",
+	"alt+shift+e",
+	"alt+shift+f",
+	"alt+shift+g",
+	"alt+shift+h",
+	"alt+shift+i",
+	"alt+shift+j",
+	"alt+shift+k",
+	"alt+shift+l",
+	"alt+shift+m",
+	"alt+shift+n",
+	"alt+shift+o",
+	"alt+shift+p",
+	"alt+shift+q",
+	"alt+shift+r",
+	"alt+shift+s",
+	"alt+shift+t",
+	"alt+shift+u",
+	"alt+shift+v",
+	"alt+shift+w",
+	"alt+shift+x",
+	"alt+shift+y",
+	"alt+shift+z",
+];
+
 static LETTERS: [&str; 26] = [
 	"a", "b", "c", "d", "e", "f", "g", "h", "i", "j", "k", "l", "m", "n", "o", "p", "q", "r", "s",
 	"t", "u", "v", "w", "x", "y", "z",
@@ -812,14 +841,24 @@ fn matches_key_inner(bytes: &[u8], key_id: &str, kitty_protocol_active: bool) ->
 		let is_letter = ch.is_ascii_lowercase();
 
 		// ctrl+alt+letter in legacy mode
+		// Legacy: ctrl+alt+letter is ESC followed by the control character.
+		// If that legacy form does not match, continue so CSI-u and
+		// modifyOtherKeys sequences from tmux can still be recognized.
 		if modifier == (MOD_CTRL | MOD_ALT) && !kitty_protocol_active && is_letter {
 			let ctrl_char = raw_ctrl_char(ch);
-			return bytes.len() == 2 && bytes[0] == 0x1b && bytes[1] == ctrl_char;
+			if bytes.len() == 2 && bytes[0] == 0x1b && bytes[1] == ctrl_char {
+				return true;
+			}
 		}
 
 		// alt+letter in legacy mode
 		if modifier == MOD_ALT && !kitty_protocol_active && is_letter {
 			return bytes.len() == 2 && bytes[0] == 0x1b && bytes[1] == ch;
+		}
+
+		// alt+shift+letter in legacy mode (ESC + UPPERCASE letter)
+		if modifier == (MOD_ALT | MOD_SHIFT) && !kitty_protocol_active && is_letter {
+			return bytes.len() == 2 && bytes[0] == 0x1b && bytes[1] == ch.to_ascii_uppercase();
 		}
 
 		// ctrl+key
@@ -1012,6 +1051,7 @@ fn parse_esc_pair(code: u8, kitty_protocol_active: bool) -> Option<Cow<'static, 
 			b'F' => return Some(Cow::Borrowed("alt+right")),
 			1..=26 => return Some(Cow::Borrowed(CTRL_ALT_LETTERS[(code - 1) as usize])),
 			b'a'..=b'z' => return Some(Cow::Borrowed(ALT_LETTERS[(code - b'a') as usize])),
+			b'A'..=b'Z' => return Some(Cow::Borrowed(ALT_SHIFT_LETTERS[(code - b'A') as usize])),
 			_ => {},
 		}
 	}
@@ -1434,5 +1474,17 @@ mod tests {
 		assert_eq!(parse_key_inner(b"\x1b[57400;133u", true).as_deref(), Some("ctrl+end"));
 		assert!(matches_key_inner(b"\x1b[57400;133u", "ctrl+end", true));
 		assert!(!matches_key_inner(b"\x1b[57400;133u", "1", true));
+	}
+
+	#[test]
+	fn ctrl_alt_letter_falls_through_to_csi_u_and_mok() {
+		// Legacy ESC+ctrl-char form (tmux without modifyOtherKeys) keeps matching.
+		assert!(matches_key_inner(b"\x1b\x01", "ctrl+alt+a", false));
+		// CSI-u form: \x1b[<codepoint>;<mod>u, mod = (ctrl|alt)+1 = 7.
+		assert!(matches_key_inner(b"\x1b[97;7u", "ctrl+alt+a", false));
+		// modifyOtherKeys form: \x1b[27;<mod>;<codepoint>~, mod = 7.
+		assert!(matches_key_inner(b"\x1b[27;7;97~", "ctrl+alt+a", false));
+		// Unrelated bytes still do not match.
+		assert!(!matches_key_inner(b"\x1b[97;7u", "ctrl+alt+b", false));
 	}
 }

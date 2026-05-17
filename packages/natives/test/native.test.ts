@@ -12,13 +12,14 @@ import {
 	grep,
 	htmlToMarkdown,
 	invalidateFsScanCache,
+	listWorkspace,
 	MacOSPowerAssertion,
 	PtySession,
-	sanitizeText,
+	summarizeCode,
 	truncateToWidth,
 	visibleWidth,
 	wrapTextWithAnsi,
-} from "../native/index";
+} from "../native/index.js";
 
 let testDir: string;
 
@@ -83,6 +84,70 @@ describe("pi-natives", () => {
 		};
 	});
 
+	describe("summarize", () => {
+		it("summarizes TypeScript function bodies", () => {
+			const result = summarizeCode({
+				path: "fixture.ts",
+				code: "export function greet(name: string): string {\n\tconst clean = name.trim();\n\tconst label = clean || 'world';\n\treturn label.toUpperCase();\n}\n",
+			});
+
+			expect(result.parsed).toBe(true);
+			expect(result.elided).toBe(true);
+			expect(result.segments.map(segment => segment.kind)).toEqual(["kept", "elided", "kept"]);
+			expect(result.segments[0].text).toBe("export function greet(name: string): string {");
+			expect(result.segments[1].startLine).toBe(2);
+			expect(result.segments[1].endLine).toBe(4);
+			expect(result.segments[2].text).toBe("}");
+		});
+
+		it("summarizes Rust and Python bodies while preserving boundary lines", () => {
+			const rust = summarizeCode({
+				path: "fixture.rs",
+				code: 'impl Greeter {\n\tfn greet(&self) -> String {\n\t\tlet name = "world";\n\t\tlet label = name.to_uppercase();\n\t\tformat!("hello {label}")\n\t}\n}\n',
+			});
+			const python = summarizeCode({
+				path: "fixture.py",
+				code: "class Greeter:\n    def greet(self, name: str) -> str:\n        clean = name.strip()\n        label = clean or 'world'\n        return f'hello {label}'\n",
+			});
+
+			expect(rust.elided).toBe(true);
+			expect(rust.segments.map(segment => segment.text ?? "...").join("\n")).toContain("impl Greeter {\n...\n}");
+			expect(python.elided).toBe(true);
+			expect(python.segments[0].text).toContain("def greet");
+			expect(python.segments.at(-1)?.text).toContain("return");
+		});
+
+		it("summarizes multiline literals and block comments", () => {
+			const result = summarizeCode({
+				path: "fixture.ts",
+				code: "/*\n * line 1\n * line 2\n * line 3\n * line 4\n */\nexport const config = {\n\ta: 1,\n\tb: 2,\n\tc: 3,\n};\n",
+			});
+
+			expect(result.elided).toBe(true);
+			expect(result.segments.filter(segment => segment.kind === "elided")).toHaveLength(2);
+			expect(result.segments.map(segment => segment.text ?? "...").join("\n")).toContain("...\n */");
+			expect(result.segments.map(segment => segment.text ?? "...").join("\n")).toContain(
+				"export const config = {\n...\n};",
+			);
+		});
+
+		it("falls back for unsupported or empty input", () => {
+			const unsupported = summarizeCode({ path: "fixture.txt", code: "plain text\nwith lines\n" });
+			const empty = summarizeCode({ path: "fixture.ts", code: "" });
+
+			expect(unsupported.parsed).toBe(false);
+			expect(unsupported.segments).toHaveLength(1);
+			expect(unsupported.segments[0].text).toBe("plain text\nwith lines\n");
+			expect(empty.parsed).toBe(false);
+			expect(empty.segments).toHaveLength(0);
+		});
+
+		it("respects minBodyLines", () => {
+			const code = "function small() {\n\treturn 1;\n}\n";
+			expect(summarizeCode({ path: "fixture.ts", code }).elided).toBe(false);
+			expect(summarizeCode({ path: "fixture.ts", code, minBodyLines: 3 }).elided).toBe(true);
+		});
+	});
 	describe("grep", () => {
 		it("should find patterns in files", async () => {
 			const result = await grep({
@@ -125,6 +190,26 @@ describe("pi-natives", () => {
 			});
 
 			expect(result.filesWithMatches).toBeGreaterThan(0);
+		});
+
+		it("counts files instead of line matches in filesWithMatches mode", async () => {
+			const scopedDir = await fs.mkdtemp(path.join(os.tmpdir(), "natives-grep-files-"));
+			try {
+				await fs.writeFile(path.join(scopedDir, "one.ts"), "return 1;\nreturn 2;\n");
+				await fs.writeFile(path.join(scopedDir, "two.ts"), "return 3;\n");
+
+				const result = await grep({
+					pattern: "return",
+					path: scopedDir,
+					mode: GrepOutputMode.FilesWithMatches,
+				});
+
+				expect(result.totalMatches).toBe(2);
+				expect(result.filesWithMatches).toBe(2);
+				expect(result.matches.map(match => path.basename(match.path)).sort()).toEqual(["one.ts", "two.ts"]);
+			} finally {
+				await fs.rm(scopedDir, { recursive: true, force: true });
+			}
 		});
 
 		it("should treat unknown grep type filter as a strict extension filter", async () => {
@@ -336,6 +421,43 @@ describe("pi-natives", () => {
 		});
 	});
 
+	describe("listWorkspace", () => {
+		it("returns tree entries and gitignored AGENTS.md files outside ignored directories", async () => {
+			const workspaceDir = await fs.mkdtemp(path.join(os.tmpdir(), "natives-workspace-"));
+			try {
+				await fs.writeFile(path.join(workspaceDir, ".gitignore"), "ignored.txt\nsrc/AGENTS.md\nignored-dir/\n");
+				await fs.writeFile(path.join(workspaceDir, "kept.ts"), "export const kept = true;\n");
+				await fs.writeFile(path.join(workspaceDir, "ignored.txt"), "ignored\n");
+				await fs.mkdir(path.join(workspaceDir, "src"), { recursive: true });
+				await fs.writeFile(path.join(workspaceDir, "src", "AGENTS.md"), "src rules\n");
+				await fs.writeFile(path.join(workspaceDir, "src", "main.ts"), "export const main = true;\n");
+				await fs.mkdir(path.join(workspaceDir, "ignored-dir"), { recursive: true });
+				await fs.writeFile(path.join(workspaceDir, "ignored-dir", "AGENTS.md"), "ignored rules\n");
+
+				const result = await listWorkspace({
+					path: workspaceDir,
+					maxDepth: 3,
+					gitignore: true,
+					hidden: false,
+					collectAgentsMd: true,
+				});
+				const entryPaths = result.entries.map(entry => entry.path);
+
+				expect(result.truncated).toBe(false);
+				expect(entryPaths).toContain("kept.ts");
+				expect(entryPaths).toContain("src");
+				expect(entryPaths).toContain("src/AGENTS.md");
+				expect(entryPaths).toContain("src/main.ts");
+				expect(entryPaths).not.toContain("ignored.txt");
+				expect(entryPaths).not.toContain("ignored-dir");
+				expect(entryPaths).not.toContain("ignored-dir/AGENTS.md");
+				expect(result.agentsMdFiles).toEqual(["src/AGENTS.md"]);
+			} finally {
+				await fs.rm(workspaceDir, { recursive: true, force: true });
+			}
+		});
+	});
+
 	describe("text tab width", () => {
 		it("uses default tab width and supports explicit overrides", () => {
 			expect(visibleWidth("a\tb", 3)).toBe(5);
@@ -400,14 +522,14 @@ describe("pi-natives", () => {
 			await fs.rm(markerPath, { force: true });
 
 			const result = await executeShell({
-				command: `{ sleep 2; echo done > '${markerEscaped}'; } & sleep 10`,
+				command: `{ sleep 0.15; echo done > '${markerEscaped}'; } & sleep 10`,
 				cwd: testDir,
-				timeoutMs: 100,
+				timeoutMs: 50,
 			});
 
 			expect(result.timedOut).toBe(true);
 
-			await Bun.sleep(3000);
+			await Bun.sleep(500);
 			expect(await Bun.file(markerPath).exists()).toBe(false);
 		});
 	});
@@ -461,28 +583,11 @@ describe("pi-natives", () => {
 		});
 	});
 
-	describe("sanitizeText", () => {
-		it("should strip ANSI, remove control chars and normalize CR", () => {
-			const input = "\x1b[31mred\x1b[0m\ra\u0000b\tline\ncarriage\r\u0001\u0085";
-			expect(sanitizeText(input)).toBe("redab\tline\ncarriage");
-		});
-
-		it("should remove lone surrogates but keep valid pairs", () => {
-			expect(sanitizeText(`a\ud800b\udc00c`)).toBe("abc");
-			const validPair = "a\u{1f600}b";
-			expect(sanitizeText(validPair)).toBe(validPair);
-		});
-
-		it("should strip OSC sequences", () => {
-			const input = "\x1b]0;title\x07hello";
-			expect(sanitizeText(input)).toBe("hello");
-		});
-		describe("MacOSPowerAssertion", () => {
-			it("should create a stoppable power assertion handle", () => {
-				const assertion = MacOSPowerAssertion.start({ reason: "pi-natives test" });
-				assertion.stop();
-				assertion.stop();
-			});
+	describe("MacOSPowerAssertion", () => {
+		it("should create a stoppable power assertion handle", () => {
+			const assertion = MacOSPowerAssertion.start({ reason: "pi-natives test" });
+			assertion.stop();
+			assertion.stop();
 		});
 	});
 });

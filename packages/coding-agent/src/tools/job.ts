@@ -2,8 +2,8 @@ import type { AgentTool, AgentToolContext, AgentToolResult, AgentToolUpdateCallb
 import type { Component } from "@oh-my-pi/pi-tui";
 import { Text } from "@oh-my-pi/pi-tui";
 import { prompt } from "@oh-my-pi/pi-utils";
-import { type Static, Type } from "@sinclair/typebox";
-import { isBackgroundJobSupportEnabled } from "../async";
+import * as z from "zod/v4";
+import { type AsyncJob, AsyncJobManager, isBackgroundJobSupportEnabled } from "../async";
 import type { RenderResultOptions } from "../extensibility/custom-tools/types";
 import type { Theme } from "../modes/theme/theme";
 import jobDescription from "../prompts/tools/job.md" with { type: "text" };
@@ -20,23 +20,15 @@ import {
 	type ToolUIColor,
 	type ToolUIStatus,
 } from "./render-utils";
+import { ToolError } from "./tool-errors";
 
-const jobSchema = Type.Object({
-	poll: Type.Optional(
-		Type.Array(Type.String(), {
-			description: "background job ids to wait for; omit (with no `cancel`) to wait on all running jobs",
-			examples: [["job-1234"]],
-		}),
-	),
-	cancel: Type.Optional(
-		Type.Array(Type.String(), {
-			description: "background job ids to cancel",
-			examples: [["job-1234"]],
-		}),
-	),
+const jobSchema = z.object({
+	poll: z.array(z.string()).optional().describe("job ids to wait for"),
+	cancel: z.array(z.string()).optional().describe("job ids to cancel"),
+	list: z.boolean().optional().describe("snapshot all jobs"),
 });
 
-type JobParams = Static<typeof jobSchema>;
+type JobParams = z.infer<typeof jobSchema>;
 
 const WAIT_DURATION_MS: Record<string, number> = {
 	"5s": 5_000,
@@ -76,10 +68,11 @@ export interface JobToolDetails {
 export class JobTool implements AgentTool<typeof jobSchema, JobToolDetails> {
 	readonly name = "job";
 	readonly label = "Job";
+	readonly summary = "Manage long-running background jobs (async bash/python)";
 	readonly description: string;
 	readonly parameters = jobSchema;
 	readonly strict = true;
-
+	readonly loadMode = "discoverable";
 	constructor(private readonly session: ToolSession) {
 		this.description = prompt.render(jobDescription);
 	}
@@ -96,7 +89,7 @@ export class JobTool implements AgentTool<typeof jobSchema, JobToolDetails> {
 		onUpdate?: AgentToolUpdateCallback<JobToolDetails>,
 		_context?: AgentToolContext,
 	): Promise<AgentToolResult<JobToolDetails>> {
-		const manager = this.session.asyncJobManager;
+		const manager = AsyncJobManager.instance();
 		if (!manager) {
 			return {
 				content: [{ type: "text", text: "Async execution is disabled; no background jobs are available." }],
@@ -104,11 +97,24 @@ export class JobTool implements AgentTool<typeof jobSchema, JobToolDetails> {
 			};
 		}
 
+		// Scope every visible operation to the calling agent. Tests / SDK
+		// consumers without an agent id see everything (legacy behavior).
+		const ownerId = this.session.getAgentId?.() ?? undefined;
+		const ownerFilter = ownerId ? { ownerId } : undefined;
+
+		// `list` is a read-only snapshot mode. Replaces the legacy `jobs://` URL.
+		if (params.list) {
+			if (params.cancel?.length || params.poll?.length) {
+				throw new ToolError("`list` cannot be combined with `poll` or `cancel`.");
+			}
+			return this.#buildResult(manager, manager.getAllJobs(ownerFilter), []);
+		}
+
 		const cancelIds = params.cancel ?? [];
 		const cancelOutcomes: CancelOutcome[] = [];
 		for (const id of cancelIds) {
 			const existing = manager.getJob(id);
-			if (!existing) {
+			if (!existing || (ownerId && existing.ownerId !== ownerId)) {
 				cancelOutcomes.push({ id, status: "not_found", message: `Background job not found: ${id}` });
 				continue;
 			}
@@ -120,7 +126,7 @@ export class JobTool implements AgentTool<typeof jobSchema, JobToolDetails> {
 				});
 				continue;
 			}
-			const cancelled = manager.cancel(id);
+			const cancelled = manager.cancel(id, ownerFilter);
 			cancelOutcomes.push(
 				cancelled
 					? { id, status: "cancelled", message: `Cancelled background job ${id}.` }
@@ -129,11 +135,11 @@ export class JobTool implements AgentTool<typeof jobSchema, JobToolDetails> {
 		}
 
 		const requestedPollIds = params.poll;
-		// If only `cancel` was provided (no `poll`), don't wait — return immediately.
+		// If only `cancel` was provided (no `poll`), don't wait \u2014 return immediately.
 		const shouldPoll = requestedPollIds !== undefined || cancelIds.length === 0;
 
 		if (!shouldPoll) {
-			const cancelledJobs = cancelIds.map(id => manager.getJob(id)).filter(j => j != null);
+			const cancelledJobs = this.#visibleJobs(manager, cancelIds, ownerId);
 			return this.#buildResult(manager, cancelledJobs, cancelOutcomes);
 		}
 
@@ -141,12 +147,12 @@ export class JobTool implements AgentTool<typeof jobSchema, JobToolDetails> {
 		// - If `poll` was passed explicitly, watch exactly those (filtered to existing).
 		// - If `poll` was omitted (and so was `cancel`), default to all running jobs.
 		const jobsToWatch = requestedPollIds
-			? requestedPollIds.map(id => manager.getJob(id)).filter(j => j != null)
-			: manager.getRunningJobs();
+			? this.#visibleJobs(manager, requestedPollIds, ownerId)
+			: manager.getRunningJobs(ownerFilter);
 
 		if (jobsToWatch.length === 0) {
 			if (cancelOutcomes.length > 0) {
-				const cancelledJobs = cancelIds.map(id => manager.getJob(id)).filter(j => j != null);
+				const cancelledJobs = this.#visibleJobs(manager, cancelIds, ownerId);
 				return this.#buildResult(manager, cancelledJobs, cancelOutcomes);
 			}
 			const message = requestedPollIds?.length
@@ -175,7 +181,7 @@ export class JobTool implements AgentTool<typeof jobSchema, JobToolDetails> {
 		const watchedJobIds = runningJobs.map(job => job.id);
 		manager.watchJobs(watchedJobIds);
 
-		const cancelledJobs = cancelIds.map(id => manager.getJob(id)).filter(j => j != null);
+		const cancelledJobs = this.#visibleJobs(manager, cancelIds, ownerId);
 		const allTrackedJobs = [...cancelledJobs, ...jobsToWatch];
 
 		const PROGRESS_INTERVAL_MS = 500;
@@ -218,6 +224,22 @@ export class JobTool implements AgentTool<typeof jobSchema, JobToolDetails> {
 		return this.#buildResult(manager, allTrackedJobs, cancelOutcomes);
 	}
 
+	/**
+	 * Resolve a list of job ids to job records visible to the calling agent.
+	 * Drops missing ids and ids owned by other agents, so cross-agent inspection
+	 * via the `job` tool is impossible.
+	 */
+	#visibleJobs(manager: AsyncJobManager, ids: string[], ownerId: string | undefined): AsyncJob[] {
+		const out: AsyncJob[] = [];
+		for (const id of ids) {
+			const job = manager.getJob(id);
+			if (!job) continue;
+			if (ownerId && job.ownerId !== ownerId) continue;
+			out.push(job);
+		}
+		return out;
+	}
+
 	#snapshotJobs(
 		jobs: {
 			id: string;
@@ -231,7 +253,7 @@ export class JobTool implements AgentTool<typeof jobSchema, JobToolDetails> {
 	): JobSnapshot[] {
 		const now = Date.now();
 		return jobs.map(j => {
-			const current = this.session.asyncJobManager?.getJob(j.id);
+			const current = AsyncJobManager.instance()?.getJob(j.id);
 			const latest = current ?? j;
 			return {
 				id: latest.id,
@@ -246,7 +268,7 @@ export class JobTool implements AgentTool<typeof jobSchema, JobToolDetails> {
 	}
 
 	#buildResult(
-		manager: NonNullable<ToolSession["asyncJobManager"]>,
+		manager: AsyncJobManager,
 		jobs: {
 			id: string;
 			type: "bash" | "task";
@@ -325,6 +347,8 @@ const COLLAPSED_LIST_LIMIT = PREVIEW_LIMITS.COLLAPSED_ITEMS;
 const LABEL_MAX_WIDTH = 60;
 const PREVIEW_LINES_COLLAPSED = 1;
 const PREVIEW_LINES_EXPANDED = 4;
+const LABEL_LINES_COLLAPSED = 1;
+const LABEL_LINES_EXPANDED = 3;
 const PREVIEW_LINE_WIDTH = 80;
 
 function statusToIcon(status: JobSnapshot["status"]): ToolUIStatus {
@@ -451,14 +475,21 @@ export const jobToolRenderer = {
 							);
 							const typeBadge = formatBadge(job.type, statusToColor(job.status), uiTheme);
 							const idText = uiTheme.fg("muted", job.id);
-							const label = truncateToWidth(
-								replaceTabs(job.label || "(no label)"),
-								LABEL_MAX_WIDTH,
-								Ellipsis.Unicode,
-							);
-							const labelText = uiTheme.fg("toolOutput", label);
+							const rawLabelLines = (job.label || "(no label)").split(/\r?\n/);
+							const maxLabelLines = expanded ? LABEL_LINES_EXPANDED : LABEL_LINES_COLLAPSED;
+							const visibleLabelLines = rawLabelLines
+								.slice(0, maxLabelLines)
+								.map(l => truncateToWidth(replaceTabs(l), LABEL_MAX_WIDTH, Ellipsis.Unicode));
+							if (rawLabelLines.length > maxLabelLines && visibleLabelLines.length > 0) {
+								const last = visibleLabelLines[visibleLabelLines.length - 1]!;
+								visibleLabelLines[visibleLabelLines.length - 1] = `${last} …`;
+							}
 							const durationText = uiTheme.fg("dim", formatDuration(job.durationMs));
-							lines.push(`${icon} ${idText} ${typeBadge} ${labelText} ${durationText}`);
+							const headLabel = uiTheme.fg("toolOutput", visibleLabelLines[0] ?? "");
+							lines.push(`${icon} ${idText} ${typeBadge} ${headLabel} ${durationText}`);
+							for (let i = 1; i < visibleLabelLines.length; i++) {
+								lines.push(`  ${uiTheme.fg("toolOutput", visibleLabelLines[i]!)}`);
+							}
 
 							const preview = job.errorText?.trim() || job.resultText?.trim();
 							if (preview) {

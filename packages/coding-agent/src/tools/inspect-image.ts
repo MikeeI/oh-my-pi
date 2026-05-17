@@ -1,7 +1,9 @@
 import type { AgentTool, AgentToolContext, AgentToolResult, AgentToolUpdateCallback } from "@oh-my-pi/pi-agent-core";
-import { type Api, type AssistantMessage, completeSimple, type Model } from "@oh-my-pi/pi-ai";
+import { instrumentedCompleteSimple, resolveTelemetry } from "@oh-my-pi/pi-agent-core";
+import { type Api, completeSimple, type Model } from "@oh-my-pi/pi-ai";
 import { prompt } from "@oh-my-pi/pi-utils";
-import { type Static, Type } from "@sinclair/typebox";
+import * as z from "zod/v4";
+import { extractTextContent } from "../commit/utils";
 import { expandRoleAlias, resolveModelFromString } from "../config/model-resolver";
 import inspectImageDescription from "../prompts/tools/inspect-image.md" with { type: "text" };
 import inspectImageSystemPromptTemplate from "../prompts/tools/inspect-image-system.md" with { type: "text" };
@@ -14,15 +16,14 @@ import {
 import type { ToolSession } from "./index";
 import { ToolError } from "./tool-errors";
 
-const inspectImageSchema = Type.Object(
-	{
-		path: Type.String({ description: "image path", examples: ["image.png"] }),
-		question: Type.String({ description: "question about image", examples: ["What is in this image?"] }),
-	},
-	{ additionalProperties: false },
-);
+const inspectImageSchema = z
+	.object({
+		path: z.string().describe("image path"),
+		question: z.string().describe("question about image"),
+	})
+	.strict();
 
-export type InspectImageParams = Static<typeof inspectImageSchema>;
+export type InspectImageParams = z.infer<typeof inspectImageSchema>;
 
 export interface InspectImageToolDetails {
 	model: string;
@@ -30,17 +31,11 @@ export interface InspectImageToolDetails {
 	mimeType: string;
 }
 
-function extractResponseText(message: AssistantMessage): string {
-	return message.content
-		.filter(content => content.type === "text")
-		.map(content => content.text)
-		.join("")
-		.trim();
-}
-
 export class InspectImageTool implements AgentTool<typeof inspectImageSchema, InspectImageToolDetails> {
 	readonly name = "inspect_image";
 	readonly label = "InspectImage";
+	readonly loadMode = "discoverable";
+	readonly summary = "Describe or analyze an image file";
 	readonly description: string;
 	readonly parameters = inspectImageSchema;
 	readonly strict = false;
@@ -124,10 +119,11 @@ export class InspectImageTool implements AgentTool<typeof inspectImageSchema, In
 			throw new ToolError("inspect_image only supports PNG, JPEG, GIF, and WEBP files detected by file content.");
 		}
 
-		const response = await this.completeImageRequest(
+		const telemetry = resolveTelemetry(this.session.getTelemetry?.(), this.session.getSessionId?.() ?? undefined);
+		const response = await instrumentedCompleteSimple(
 			model,
 			{
-				systemPrompt: prompt.render(inspectImageSystemPromptTemplate),
+				systemPrompt: [prompt.render(inspectImageSystemPromptTemplate)],
 				messages: [
 					{
 						role: "user",
@@ -140,6 +136,7 @@ export class InspectImageTool implements AgentTool<typeof inspectImageSchema, In
 				],
 			},
 			{ apiKey, signal },
+			{ telemetry, oneshotKind: "inspect_image", completeImpl: this.completeImageRequest },
 		);
 
 		if (response.stopReason === "error") {
@@ -149,7 +146,7 @@ export class InspectImageTool implements AgentTool<typeof inspectImageSchema, In
 			throw new ToolError("inspect_image request aborted.");
 		}
 
-		const text = extractResponseText(response);
+		const text = extractTextContent(response);
 		if (!text) {
 			throw new ToolError("inspect_image model returned no text output.");
 		}

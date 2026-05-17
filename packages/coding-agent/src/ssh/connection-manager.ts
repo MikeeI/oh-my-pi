@@ -15,6 +15,11 @@ export interface SSHConnectionTarget {
 
 export type SSHHostOs = "windows" | "linux" | "macos" | "unknown";
 export type SSHHostShell = "cmd" | "powershell" | "bash" | "zsh" | "sh" | "unknown";
+export type SshPlatform = typeof process.platform;
+
+export function supportsSshControlMaster(platform: SshPlatform = process.platform): boolean {
+	return platform !== "win32";
+}
 
 export interface SSHHostInfo {
 	version: number;
@@ -25,13 +30,17 @@ export interface SSHHostInfo {
 }
 
 const CONTROL_DIR = getSshControlDir();
-const CONTROL_PATH = path.join(CONTROL_DIR, "%h.sock");
+const CONTROL_PATH = path.join(CONTROL_DIR, "%C.sock");
 const HOST_INFO_DIR = getRemoteHostDir();
 const HOST_INFO_VERSION = 2;
 
 const activeHosts = new Map<string, SSHConnectionTarget>();
 const pendingConnections = new Map<string, Promise<void>>();
 const hostInfoCache = new Map<string, SSHHostInfo>();
+
+interface SSHArgsOptions {
+	platform?: SshPlatform;
+}
 
 function ensureControlDir() {
 	fs.mkdirSync(CONTROL_DIR, { recursive: true, mode: 0o700 });
@@ -44,6 +53,16 @@ function ensureControlDir() {
 
 function getHostInfoPath(name: string): string {
 	return path.join(HOST_INFO_DIR, `${sanitizeHostName(name)}.json`);
+}
+
+async function deleteHostInfoFromDisk(hostName: string): Promise<void> {
+	const path = getHostInfoPath(hostName);
+	try {
+		await fs.promises.unlink(path);
+	} catch (err) {
+		if (isEnoent(err)) return;
+		logger.warn("Failed to delete SSH host info", { host: hostName, error: String(err) });
+	}
 }
 
 async function validateKeyPermissions(keyPath?: string): Promise<void> {
@@ -66,20 +85,14 @@ async function validateKeyPermissions(keyPath?: string): Promise<void> {
 	}
 }
 
-function buildCommonArgs(host: SSHConnectionTarget): string[] {
-	const args = [
-		"-n",
-		"-o",
-		"ControlMaster=auto",
-		"-o",
-		`ControlPath=${CONTROL_PATH}`,
-		"-o",
-		"ControlPersist=3600",
-		"-o",
-		"BatchMode=yes",
-		"-o",
-		"StrictHostKeyChecking=accept-new",
-	];
+function buildCommonArgs(host: SSHConnectionTarget, options?: SSHArgsOptions): string[] {
+	const args = ["-n"];
+
+	if (supportsSshControlMaster(options?.platform)) {
+		args.push("-o", "ControlMaster=auto", "-o", `ControlPath=${CONTROL_PATH}`, "-o", "ControlPersist=3600");
+	}
+
+	args.push("-o", "BatchMode=yes", "-o", "StrictHostKeyChecking=accept-new");
 
 	if (host.port) {
 		args.push("-p", String(host.port));
@@ -357,9 +370,13 @@ export async function ensureHostInfo(host: SSHConnectionTarget): Promise<SSHHost
 	return probeHostInfo(host);
 }
 
-export async function buildRemoteCommand(host: SSHConnectionTarget, command: string): Promise<string[]> {
+export async function buildRemoteCommand(
+	host: SSHConnectionTarget,
+	command: string,
+	options?: SSHArgsOptions,
+): Promise<string[]> {
 	await validateKeyPermissions(host.keyPath);
-	return [...buildCommonArgs(host), buildSshTarget(host.username, host.host), command];
+	return [...buildCommonArgs(host, options), buildSshTarget(host.username, host.host), command];
 }
 
 let registered = false;
@@ -385,6 +402,14 @@ export async function ensureConnection(host: SSHConnectionTarget): Promise<void>
 		}
 
 		const target = buildSshTarget(host.username, host.host);
+		if (!supportsSshControlMaster()) {
+			activeHosts.set(key, host);
+			if (!hostInfoCache.has(key) && !(await loadHostInfoFromDisk(host))) {
+				await probeHostInfo(host);
+			}
+			return;
+		}
+
 		const check = await runSshSync(["-O", "check", ...buildCommonArgs(host), target]);
 		if (check.exitCode === 0) {
 			activeHosts.set(key, host);
@@ -414,19 +439,31 @@ export async function ensureConnection(host: SSHConnectionTarget): Promise<void>
 	}
 }
 
+export async function invalidateHostMetadata(hostNames: Iterable<string>): Promise<void> {
+	const names = [...hostNames];
+	for (const hostName of names) {
+		hostInfoCache.delete(hostName);
+		await deleteHostInfoFromDisk(hostName);
+	}
+	for (const hostName of names) {
+		const activeHost = activeHosts.get(hostName);
+		if (activeHost) {
+			await closeConnectionInternal(activeHost);
+			activeHosts.delete(hostName);
+			continue;
+		}
+		await closeConnectionInternal({ name: hostName, host: hostName });
+	}
+}
+
 async function closeConnectionInternal(host: SSHConnectionTarget): Promise<void> {
+	if (!supportsSshControlMaster()) return;
 	const target = buildSshTarget(host.username, host.host);
 	await runSshSync(["-O", "exit", ...buildCommonArgs(host), target]);
 }
 
 export async function closeConnection(hostName: string): Promise<void> {
-	const host = activeHosts.get(hostName);
-	if (!host) {
-		await closeConnectionInternal({ name: hostName, host: hostName });
-		return;
-	}
-	await closeConnectionInternal(host);
-	activeHosts.delete(hostName);
+	await invalidateHostMetadata([hostName]);
 }
 
 export async function closeAllConnections(): Promise<void> {

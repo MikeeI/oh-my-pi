@@ -4,9 +4,9 @@
  * Converts MCP tool definitions to CustomTool format for the agent.
  */
 import type { AgentToolUpdateCallback } from "@oh-my-pi/pi-agent-core";
-import { sanitizeSchemaForMCP } from "@oh-my-pi/pi-ai/utils/schema";
+import type { TSchema } from "@oh-my-pi/pi-ai";
+import { normalizeSchemaForMCP } from "@oh-my-pi/pi-ai/utils/schema";
 import { untilAborted } from "@oh-my-pi/pi-utils";
-import type { TSchema } from "@sinclair/typebox";
 import type { SourceMeta } from "../capability/types";
 import type {
 	CustomTool,
@@ -159,7 +159,7 @@ async function reconnectWithAbort(reconnect: MCPReconnect, signal?: AbortSignal)
  * Prefixes with server name to avoid conflicts. If the tool name already
  * starts with the server name (e.g., server "puppeteer" with tool
  * "puppeteer_screenshot"), strips the redundant prefix to produce
- * "mcp_puppeteer_screenshot" instead of "mcp_puppeteer_puppeteer_screenshot".
+ * "mcp__puppeteer_screenshot" instead of "mcp__puppeteer_puppeteer_screenshot".
  */
 function sanitizeMCPToolNamePart(value: string, fallback: string): string {
 	const sanitized = value
@@ -183,7 +183,7 @@ export function createMCPToolName(serverName: string, toolName: string): string 
 		normalizedToolName = sanitizedToolName.slice(prefixWithUnderscore.length);
 	}
 
-	return `mcp_${sanitizedServerName}_${normalizedToolName}`;
+	return `mcp__${sanitizedServerName}_${normalizedToolName}`;
 }
 
 /**
@@ -193,9 +193,9 @@ export function createMCPToolName(serverName: string, toolName: string): string 
  * The original MCP tool name may have had the server name as a prefix.
  */
 export function parseMCPToolName(name: string): { serverName: string; toolName: string } | null {
-	if (!name.startsWith("mcp_")) return null;
+	if (!name.startsWith("mcp__")) return null;
 
-	const rest = name.slice(4);
+	const rest = name.slice(5);
 	const underscoreIdx = rest.indexOf("_");
 	if (underscoreIdx === -1) return null;
 
@@ -231,7 +231,7 @@ export class MCPTool implements CustomTool<TSchema, MCPToolDetails> {
 		this.name = createMCPToolName(connection.name, tool.name);
 		this.label = `${connection.name}/${tool.name}`;
 		this.description = tool.description ?? `MCP tool from ${connection.name}`;
-		this.parameters = sanitizeSchemaForMCP(tool.inputSchema) as TSchema;
+		this.parameters = normalizeSchemaForMCP(tool.inputSchema) as TSchema;
 		this.mcpToolName = tool.name;
 		this.mcpServerName = connection.name;
 	}
@@ -324,7 +324,7 @@ export class DeferredMCPTool implements CustomTool<TSchema, MCPToolDetails> {
 		this.name = createMCPToolName(serverName, tool.name);
 		this.label = `${serverName}/${tool.name}`;
 		this.description = tool.description ?? `MCP tool from ${serverName}`;
-		this.parameters = sanitizeSchemaForMCP(tool.inputSchema) as TSchema;
+		this.parameters = normalizeSchemaForMCP(tool.inputSchema) as TSchema;
 		this.mcpToolName = tool.name;
 		this.mcpServerName = serverName;
 		this.#fallbackProvider = source?.provider;

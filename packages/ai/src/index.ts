@@ -1,6 +1,8 @@
-export type { Static, TSchema } from "@sinclair/typebox";
-export { Type } from "@sinclair/typebox";
+export { type ZodType, z } from "zod/v4";
 export * from "./api-registry";
+export * from "./auth-broker";
+export { type AuthGatewayBootOptions, type ModelResolver, startAuthGateway } from "./auth-gateway/server";
+export * from "./auth-gateway/types";
 export * from "./auth-storage";
 export * from "./model-cache";
 export * from "./model-manager";
@@ -10,14 +12,16 @@ export * from "./provider-details";
 export * from "./provider-models";
 export * from "./providers/anthropic";
 export * from "./providers/azure-openai-responses";
-export * from "./providers/cursor";
+export type * from "./providers/cursor";
 export * from "./providers/gitlab-duo";
-export * from "./providers/google";
-export * from "./providers/google-gemini-cli";
-export * from "./providers/google-vertex";
+export type * from "./providers/google";
+export type * from "./providers/google-gemini-cli";
+export * from "./providers/google-gemini-headers";
+export type * from "./providers/google-vertex";
 export * from "./providers/kimi";
+export * from "./providers/mock";
 export * from "./providers/ollama";
-export type { OpenAICodexResponsesOptions } from "./providers/openai-codex-responses";
+export * from "./providers/openai-codex-responses";
 export * from "./providers/openai-completions";
 export * from "./providers/openai-responses";
 export * from "./providers/synthetic";
@@ -36,7 +40,14 @@ export * from "./usage/zai";
 export * from "./utils/anthropic-auth";
 export * from "./utils/discovery";
 export * from "./utils/event-stream";
+export * from "./utils/h2-fetch";
 export * from "./utils/oauth";
+export type {
+	OAuthCredentials,
+	OAuthProvider,
+	OAuthProviderId,
+	OAuthProviderInfo,
+} from "./utils/oauth/types";
 export * from "./utils/overflow";
 export * from "./utils/retry";
 export * from "./utils/schema";

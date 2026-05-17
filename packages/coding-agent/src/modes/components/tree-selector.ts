@@ -539,6 +539,10 @@ class TreeList implements Component {
 					const msgWithContent = msg as { content?: unknown };
 					const content = normalize(this.#extractContent(msgWithContent.content));
 					result = theme.fg("accent", "user: ") + content;
+				} else if (role === "developer") {
+					const msgWithContent = msg as { content?: unknown };
+					const content = normalize(this.#extractContent(msgWithContent.content));
+					result = theme.fg("dim", "developer: ") + theme.fg("muted", content);
 				} else if (role === "assistant") {
 					const msgWithContent = msg as { content?: unknown; stopReason?: string; errorMessage?: string };
 					const textContent = normalize(this.#extractContent(msgWithContent.content));
@@ -665,15 +669,14 @@ class TreeList implements Component {
 					.slice(0, 50);
 				return `[bash: ${cmd}${rawCmd.length > 50 ? "..." : ""}]`;
 			}
-			case "grep": {
+			case "search": {
 				const pattern = String(args.pattern || "");
-				const path = shortenPath(String(args.path || "."));
-				return `[grep: /${pattern}/ in ${path}]`;
+				const paths = Array.isArray(args.paths) ? args.paths.join(", ") : String(args.path || ".");
+				return `[search: /${pattern}/ in ${shortenPath(paths)}]`;
 			}
 			case "find": {
-				const pattern = String(args.pattern || "");
-				const path = shortenPath(String(args.path || "."));
-				return `[find: ${pattern} in ${path}]`;
+				const paths = Array.isArray(args.paths) ? args.paths.join(", ") : String(args.pattern || ".");
+				return `[find: ${shortenPath(paths)}]`;
 			}
 			case "ls": {
 				const path = shortenPath(String(args.path || "."));

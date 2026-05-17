@@ -98,7 +98,7 @@ describe("AgentSession auto-compaction queue resume", () => {
 		const agent = new Agent({
 			initialState: {
 				model,
-				systemPrompt: "Test",
+				systemPrompt: ["Test"],
 				tools: [],
 				messages: [],
 			},
@@ -202,9 +202,8 @@ describe("AgentSession auto-compaction queue resume", () => {
 
 		session.setTodoPhases([
 			{
-				id: "phase-1",
 				name: "Execution",
-				tasks: [{ id: "task-1", content: "Finish pending task", status: "in_progress" }],
+				tasks: [{ content: "Finish pending task", status: "in_progress" }],
 			},
 		]);
 

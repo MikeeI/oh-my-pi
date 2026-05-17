@@ -7,6 +7,7 @@ import { APP_NAME } from "@oh-my-pi/pi-utils";
 import { Args, Command, Flags } from "@oh-my-pi/pi-utils/cli";
 import { parseArgs } from "../cli/args";
 import { runRootCommand } from "../main";
+import { prepareAcpTerminalAuthArgs } from "../modes/acp/terminal-auth";
 
 export default class Index extends Command {
 	static description = "AI coding assistant";
@@ -22,7 +23,7 @@ export default class Index extends Command {
 
 	static flags = {
 		model: Flags.string({
-			description: 'Model to use (fuzzy match: "opus", "gpt-5.2", or "p-openai/gpt-5.2")',
+			description: 'Model to use (fuzzy match: "opus", "gpt-5.2", or "openai/gpt-5.2")',
 		}),
 		smol: Flags.string({
 			description: "Smol/fast model for lightweight tasks (or PI_SMOL_MODEL env)",
@@ -49,8 +50,8 @@ export default class Index extends Command {
 			description: "Allow starting in ~ without auto-switching to a temp dir",
 		}),
 		mode: Flags.string({
-			description: "Output mode: text (default), json, or rpc",
-			options: ["text", "json", "rpc"],
+			description: "Output mode: text (default), json, rpc, or rpc-ui",
+			options: ["text", "json", "rpc", "acp", "rpc-ui"],
 		}),
 		print: Flags.boolean({
 			char: "p",
@@ -135,7 +136,8 @@ export default class Index extends Command {
 	static strict = false;
 
 	async run(): Promise<void> {
-		const parsed = parseArgs(this.argv);
-		await runRootCommand(parsed, this.argv);
+		const { args } = prepareAcpTerminalAuthArgs(this.argv);
+		const parsed = parseArgs(args);
+		await runRootCommand(parsed, args);
 	}
 }

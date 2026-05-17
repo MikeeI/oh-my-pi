@@ -192,6 +192,12 @@ class DirResolver {
 
 let dirs = new DirResolver(process.env.PI_CODING_AGENT_DIR);
 
+// Anchor home for the resolver. Captured at module load to stay stable across
+// test mocks of `os.homedir()`. `getPluginsDir(home)` compares against this so
+// production callers (`home === RESOLVER_HOME`) hit the XDG-aware resolver while
+// tests passing a temp HOME short-circuit to a deterministic path.
+const RESOLVER_HOME = os.homedir();
+
 // =============================================================================
 // Root directories
 // =============================================================================
@@ -236,8 +242,20 @@ export function getLogPath(date = new Date()): string {
 	return path.join(getLogsDir(), `${APP_NAME}.${date.toISOString().slice(0, 10)}.log`);
 }
 
-/** Get the plugins directory (~/.omp/plugins). */
-export function getPluginsDir(): string {
+/**
+ * Get the plugins directory (~/.omp/plugins or its XDG equivalent).
+ *
+ * No-arg form (production callers) goes through the XDG-aware DirResolver so
+ * reads and writes always agree. The optional `home` parameter is for test
+ * isolation: when it differs from `os.homedir()` it short-circuits the resolver
+ * and returns `<home>/<configDir>/plugins` so tests with a temp HOME get a
+ * deterministic path. Passing `os.homedir()` explicitly is identical to the
+ * no-arg form — XDG semantics are preserved.
+ */
+export function getPluginsDir(home?: string): string {
+	if (home !== undefined && home !== RESOLVER_HOME) {
+		return path.join(home, getConfigDirName(), "plugins");
+	}
 	return dirs.rootSubdir("plugins", "data");
 }
 
@@ -261,6 +279,11 @@ export function getRemoteDir(): string {
 	return dirs.rootSubdir("remote", "data");
 }
 
+/** Get the PR worktrees directory (~/.omp/wt). */
+export function getWorktreesDir(): string {
+	return dirs.rootSubdir("wt", "data");
+}
+
 /** Get the SSH control socket directory (~/.omp/ssh-control). */
 export function getSshControlDir(): string {
 	return dirs.rootSubdir("ssh-control", "state");
@@ -274,6 +297,11 @@ export function getRemoteHostDir(): string {
 /** Get the managed Python venv directory (~/.omp/python-env). */
 export function getPythonEnvDir(): string {
 	return dirs.rootSubdir("python-env", "data");
+}
+
+/** Get the shared Python gateway state directory (~/.omp/agent/python-gateway; XDG default: $XDG_STATE_HOME/omp/python-gateway). */
+export function getPythonGatewayDir(): string {
+	return dirs.agentSubdir(undefined, "python-gateway", "state");
 }
 
 /** Get the puppeteer sandbox directory (~/.omp/puppeteer). */
@@ -296,6 +324,17 @@ export function getGpuCachePath(): string {
 	return dirs.rootSubdir("gpu_cache.json", "cache");
 }
 
+/**
+ * Get the GitHub view cache database path (~/.omp/cache/github-cache.db).
+ * Honors the `OMP_GITHUB_CACHE_DB` env var when set so tests can isolate the
+ * cache file without touching the rest of the config root.
+ */
+export function getGithubCacheDbPath(): string {
+	const override = process.env.OMP_GITHUB_CACHE_DB;
+	if (override) return override;
+	return dirs.rootSubdir(path.join("cache", "github-cache.db"), "cache");
+}
+
 /** Get the natives directory (~/.omp/natives). */
 export function getNativesDir(): string {
 	return dirs.rootSubdir("natives", "cache");
@@ -304,6 +343,26 @@ export function getNativesDir(): string {
 /** Get the stats database path (~/.omp/stats.db). */
 export function getStatsDbPath(): string {
 	return dirs.rootSubdir("stats.db", "data");
+}
+
+/** Get the autoresearch state directory (~/.omp/autoresearch). */
+export function getAutoresearchDir(): string {
+	return dirs.rootSubdir("autoresearch", "state");
+}
+
+/** Get the per-project autoresearch state directory (~/.omp/autoresearch/<encoded-project>). */
+export function getAutoresearchProjectDir(encodedProject: string): string {
+	return path.join(getAutoresearchDir(), encodedProject);
+}
+
+/** Get the per-project autoresearch SQLite database path (~/.omp/autoresearch/<encoded-project>.db). */
+export function getAutoresearchDbPath(encodedProject: string): string {
+	return path.join(getAutoresearchDir(), `${encodedProject}.db`);
+}
+
+/** Get the per-run artifact directory (~/.omp/autoresearch/<encoded-project>/runs/<runId>). */
+export function getAutoresearchRunDir(encodedProject: string, runId: number): string {
+	return path.join(getAutoresearchProjectDir(encodedProject), "runs", String(runId).padStart(4, "0"));
 }
 
 // =============================================================================
@@ -417,4 +476,77 @@ export function getSSHConfigPath(scope: "user" | "project", cwd: string = getPro
 		return path.join(getAgentDir(), "ssh.json");
 	}
 	return path.join(getProjectAgentDir(cwd), "ssh.json");
+}
+
+// =============================================================================
+// Install identity
+// =============================================================================
+
+let cachedInstallId: string | null = null;
+
+const INSTALL_ID_FILE = "install-id";
+const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+
+/**
+ * Persistent per-install UUID stored at `~/.omp/install-id`.
+ *
+ * Generated lazily on first call and persisted with `O_CREAT|O_EXCL` so
+ * concurrent first-call races don't clobber each other (loser re-reads the
+ * winner's id). Survives independently of agent state: deleting
+ * `~/.omp/agent/` does not regenerate it. Server-side dedup for grievance
+ * pushes (and similar telemetry) keys on this id.
+ */
+export function getInstallId(): string {
+	if (cachedInstallId) return cachedInstallId;
+	const filePath = path.join(getConfigRootDir(), INSTALL_ID_FILE);
+
+	let observedInvalid = false;
+	try {
+		const existing = fs.readFileSync(filePath, "utf8").trim();
+		if (UUID_RE.test(existing)) {
+			cachedInstallId = existing;
+			return existing;
+		}
+		// File present but unparseable — fall through and overwrite below.
+		observedInvalid = existing.length > 0;
+	} catch {}
+
+	const next = crypto.randomUUID();
+	try {
+		fs.mkdirSync(path.dirname(filePath), { recursive: true });
+		// If we already saw garbage in the file, unlink first so O_EXCL doesn't
+		// trip on it. Ignored if the unlink races against another writer.
+		if (observedInvalid) {
+			try {
+				fs.unlinkSync(filePath);
+			} catch {}
+		}
+		const fd = fs.openSync(filePath, fs.constants.O_WRONLY | fs.constants.O_CREAT | fs.constants.O_EXCL, 0o600);
+		try {
+			fs.writeSync(fd, `${next}\n`);
+		} finally {
+			fs.closeSync(fd);
+		}
+	} catch (err) {
+		// Lost the create race — re-read whatever the winner wrote.
+		if ((err as NodeJS.ErrnoException).code === "EEXIST") {
+			try {
+				const existing = fs.readFileSync(filePath, "utf8").trim();
+				if (UUID_RE.test(existing)) {
+					cachedInstallId = existing;
+					return existing;
+				}
+			} catch {}
+		}
+		// Any other failure: keep the generated id in-memory so the rest of
+		// this process has a stable value; future processes will retry.
+	}
+
+	cachedInstallId = next;
+	return next;
+}
+
+/** Test-only: clear cached install id. Never call from production code. */
+export function __resetInstallIdCacheForTests(): void {
+	cachedInstallId = null;
 }

@@ -7,11 +7,15 @@ import * as fs from "node:fs";
 import * as path from "node:path";
 import { ModelRegistry } from "@oh-my-pi/pi-coding-agent/config/model-registry";
 import { discoverAndLoadExtensions } from "@oh-my-pi/pi-coding-agent/extensibility/extensions/loader";
-import { ExtensionRunner } from "@oh-my-pi/pi-coding-agent/extensibility/extensions/runner";
+import {
+	EXTENSION_HANDLER_TIMEOUT_MS,
+	ExtensionRunner,
+	testSetExtensionHandlerTimeoutMs,
+} from "@oh-my-pi/pi-coding-agent/extensibility/extensions/runner";
 import { AuthStorage } from "@oh-my-pi/pi-coding-agent/session/auth-storage";
 import { SessionManager } from "@oh-my-pi/pi-coding-agent/session/session-manager";
 import { getProjectAgentDir, logger, TempDir } from "@oh-my-pi/pi-utils";
-import { filterUserExtensionErrors, filterUserExtensions } from "./utils/filter-user-extensions";
+import { filterUserScoped } from "./utils/filter-user-extensions";
 
 describe("ExtensionRunner", () => {
 	let tempDir: TempDir;
@@ -30,6 +34,7 @@ describe("ExtensionRunner", () => {
 	});
 
 	afterEach(() => {
+		testSetExtensionHandlerTimeoutMs(EXTENSION_HANDLER_TIMEOUT_MS);
 		authStorage.close();
 		tempDir.removeSync();
 	});
@@ -38,8 +43,8 @@ describe("ExtensionRunner", () => {
 		const result = await discoverAndLoadExtensions(configuredPaths, tempDir.path());
 		return {
 			...result,
-			extensions: filterUserExtensions(result.extensions),
-			errors: filterUserExtensionErrors(result.errors),
+			extensions: filterUserScoped(result.extensions),
+			errors: filterUserScoped(result.errors),
 		};
 	};
 
@@ -421,6 +426,79 @@ describe("ExtensionRunner", () => {
 		});
 	});
 
+	describe("after_provider_response", () => {
+		it("calls handlers with response metadata and reports handler errors without throwing", async () => {
+			const eventsPath = path.join(tempDir.path(), "after-provider-response-events.jsonl");
+			const extCode = `
+			import * as fs from "node:fs";
+
+			export default function(pi) {
+				pi.on("after_provider_response", async (event) => {
+					fs.appendFileSync(
+						${JSON.stringify(eventsPath)},
+						JSON.stringify({
+							status: event.status,
+							headers: event.headers,
+							requestId: event.requestId,
+							metadata: event.metadata,
+						}) + "\\n",
+					);
+				});
+
+				pi.on("after_provider_response", async () => {
+					throw new Error("response failed");
+				});
+
+				pi.on("after_provider_response", async (event) => {
+					fs.appendFileSync(
+						${JSON.stringify(eventsPath)},
+						JSON.stringify({ afterError: event.status }) + "\\n",
+					);
+				});
+			}
+		`;
+			fs.writeFileSync(path.join(extensionsDir, "after-provider-response.ts"), extCode);
+
+			const result = await loadTestExtensions();
+			const runner = new ExtensionRunner(
+				result.extensions,
+				result.runtime,
+				tempDir.path(),
+				sessionManager,
+				modelRegistry,
+			);
+			const errors: Array<{ extensionPath: string; event: string; error: string }> = [];
+			runner.onError(err => {
+				errors.push(err);
+			});
+
+			await runner.emitAfterProviderResponse({
+				status: 202,
+				headers: { "x-request-id": "req_123", "content-type": "text/event-stream" },
+				requestId: "req_123",
+				metadata: { provider: "test" },
+			});
+
+			const events = fs
+				.readFileSync(eventsPath, "utf8")
+				.trim()
+				.split("\n")
+				.map(line => JSON.parse(line));
+			expect(events).toEqual([
+				{
+					status: 202,
+					headers: { "x-request-id": "req_123", "content-type": "text/event-stream" },
+					requestId: "req_123",
+					metadata: { provider: "test" },
+				},
+				{ afterError: 202 },
+			]);
+			expect(errors).toHaveLength(1);
+			expect(errors[0]?.event).toBe("after_provider_response");
+			expect(errors[0]?.error).toContain("response failed");
+		});
+	});
+
 	describe("tool_result chaining", () => {
 		it("chains content modifications across handlers", async () => {
 			const extCode1 = `
@@ -525,6 +603,73 @@ describe("ExtensionRunner", () => {
 		});
 	});
 
+	describe("handler timeouts", () => {
+		it("times out session_start handlers, emits an error, and continues to sibling extensions", async () => {
+			const hangExtensionPath = path.join(tempDir.path(), "hang-session-start.ts");
+			const fastExtensionPath = path.join(tempDir.path(), "fast-session-start.ts");
+			const markerPath = path.join(tempDir.path(), "session-start-marker.txt");
+			fs.writeFileSync(
+				hangExtensionPath,
+				`
+					export default function(pi) {
+						pi.on("session_start", async () => {
+							await new Promise(() => {});
+						});
+					}
+				`,
+			);
+			fs.writeFileSync(
+				fastExtensionPath,
+				`
+					import * as fs from "node:fs";
+
+					export default function(pi) {
+						pi.on("session_start", async () => {
+							fs.appendFileSync(${JSON.stringify(markerPath)}, "fast\\n");
+						});
+					}
+				`,
+			);
+
+			const result = await loadTestExtensions([hangExtensionPath, fastExtensionPath]);
+			const runner = new ExtensionRunner(
+				result.extensions,
+				result.runtime,
+				tempDir.path(),
+				sessionManager,
+				modelRegistry,
+			);
+			const warnSpy = vi.spyOn(logger, "warn").mockImplementation(() => {});
+			const errors: Array<{ extensionPath: string; event: string; error: string }> = [];
+			runner.onError(err => {
+				errors.push(err);
+			});
+			testSetExtensionHandlerTimeoutMs(10);
+
+			const startedAt = performance.now();
+			await runner.emit({ type: "session_start" });
+			const elapsedMs = performance.now() - startedAt;
+
+			expect(elapsedMs).toBeGreaterThanOrEqual(8);
+			expect(elapsedMs).toBeLessThan(150);
+			expect(fs.readFileSync(markerPath, "utf8")).toBe("fast\n");
+			expect(warnSpy).toHaveBeenCalledWith("Extension handler timed out", {
+				extensionPath: hangExtensionPath,
+				event: "session_start",
+				timeoutMs: 10,
+			});
+			expect(errors).toEqual([
+				{
+					extensionPath: hangExtensionPath,
+					event: "session_start",
+					error: "handler timed out after 10ms",
+				},
+			]);
+
+			warnSpy.mockRestore();
+		});
+	});
+
 	describe("session name API", () => {
 		it("lets extensions read and set the session name after initialization", async () => {
 			const extCode = `
@@ -574,7 +719,7 @@ describe("ExtensionRunner", () => {
 					shutdown: () => {},
 					getContextUsage: () => undefined,
 					compact: async () => {},
-					getSystemPrompt: () => "",
+					getSystemPrompt: () => [],
 				},
 			);
 
@@ -621,6 +766,186 @@ describe("ExtensionRunner", () => {
 
 			expect(runner.hasHandlers("tool_call")).toBe(true);
 			expect(runner.hasHandlers("agent_end")).toBe(false);
+		});
+	});
+
+	describe("credential_disabled", () => {
+		it("delivers credential_disabled events to subscribed extensions with the typed payload", async () => {
+			const eventsPath = path.join(tempDir.path(), "credential-disabled-events.jsonl");
+			const extCode = `
+				import * as fs from "node:fs";
+
+				export default function(pi) {
+					pi.on("credential_disabled", async (event) => {
+						fs.appendFileSync(
+							${JSON.stringify(eventsPath)},
+							JSON.stringify({
+								type: event.type,
+								provider: event.provider,
+								disabledCause: event.disabledCause,
+							}) + "\\n",
+						);
+					});
+				}
+			`;
+			fs.writeFileSync(path.join(extensionsDir, "credential-disabled.ts"), extCode);
+
+			const result = await loadTestExtensions();
+			const runner = new ExtensionRunner(
+				result.extensions,
+				result.runtime,
+				tempDir.path(),
+				sessionManager,
+				modelRegistry,
+			);
+
+			await runner.emit({ type: "credential_disabled", provider: "anthropic", disabledCause: "invalid_grant" });
+
+			const events = fs
+				.readFileSync(eventsPath, "utf8")
+				.trim()
+				.split("\n")
+				.map(line => JSON.parse(line));
+			expect(events).toEqual([
+				{ type: "credential_disabled", provider: "anthropic", disabledCause: "invalid_grant" },
+			]);
+		});
+
+		it("isolates subscriber failures so other handlers still receive the event", async () => {
+			const eventsPath = path.join(tempDir.path(), "credential-disabled-isolated.jsonl");
+			const ext1Code = `
+				export default function(pi) {
+					pi.on("credential_disabled", async () => {
+						throw new Error("subscriber exploded");
+					});
+				}
+			`;
+			const ext2Code = `
+				import * as fs from "node:fs";
+
+				export default function(pi) {
+					pi.on("credential_disabled", async (event) => {
+						fs.appendFileSync(
+							${JSON.stringify(eventsPath)},
+							JSON.stringify({ provider: event.provider }) + "\\n",
+						);
+					});
+				}
+			`;
+			fs.writeFileSync(path.join(extensionsDir, "ext1-credential-disabled-throws.ts"), ext1Code);
+			fs.writeFileSync(path.join(extensionsDir, "ext2-credential-disabled-records.ts"), ext2Code);
+
+			const result = await loadTestExtensions();
+			const runner = new ExtensionRunner(
+				result.extensions,
+				result.runtime,
+				tempDir.path(),
+				sessionManager,
+				modelRegistry,
+			);
+			const errors: Array<{ extensionPath: string; event: string; error: string }> = [];
+			runner.onError(err => {
+				errors.push(err);
+			});
+
+			await runner.emit({ type: "credential_disabled", provider: "anthropic", disabledCause: "invalid_grant" });
+
+			const events = fs
+				.readFileSync(eventsPath, "utf8")
+				.trim()
+				.split("\n")
+				.map(line => JSON.parse(line));
+			expect(events).toEqual([{ provider: "anthropic" }]);
+			expect(errors).toHaveLength(1);
+			expect(errors[0]?.event).toBe("credential_disabled");
+			expect(errors[0]?.error).toContain("subscriber exploded");
+		});
+
+		it("is a no-op when no extension subscribes", async () => {
+			const result = await loadTestExtensions();
+			const runner = new ExtensionRunner(
+				result.extensions,
+				result.runtime,
+				tempDir.path(),
+				sessionManager,
+				modelRegistry,
+			);
+
+			expect(runner.hasHandlers("credential_disabled")).toBe(false);
+			await expect(
+				runner.emit({ type: "credential_disabled", provider: "anthropic", disabledCause: "invalid_grant" }),
+			).resolves.toBeUndefined();
+		});
+
+		it("caps the pre-initialize buffer and drops oldest events under pressure", async () => {
+			const eventsPath = path.join(tempDir.path(), "credential-disabled-cap.jsonl");
+			const extCode = `
+				import * as fs from "node:fs";
+
+				export default function(pi) {
+					pi.on("credential_disabled", async (event) => {
+						fs.appendFileSync(
+							${JSON.stringify(eventsPath)},
+							JSON.stringify({ provider: event.provider }) + "\\n",
+						);
+					});
+				}
+			`;
+			fs.writeFileSync(path.join(extensionsDir, "credential-disabled-cap.ts"), extCode);
+
+			const result = await loadTestExtensions();
+			const runner = new ExtensionRunner(
+				result.extensions,
+				result.runtime,
+				tempDir.path(),
+				sessionManager,
+				modelRegistry,
+			);
+
+			// Push 33 events while uninitialized — the 1st should be dropped.
+			for (let i = 0; i < 33; i++) {
+				await runner.emitCredentialDisabled({ provider: `provider-${i}`, disabledCause: "invalid_grant" });
+			}
+
+			runner.initialize(
+				{
+					sendMessage: () => {},
+					sendUserMessage: () => {},
+					appendEntry: () => {},
+					setLabel: () => {},
+					getActiveTools: () => [],
+					getAllTools: () => [],
+					setActiveTools: async () => {},
+					getCommands: () => [],
+					setModel: async () => false,
+					getThinkingLevel: () => undefined,
+					setThinkingLevel: () => {},
+					getSessionName: () => sessionManager.getSessionName(),
+					setSessionName: async () => {},
+				},
+				{
+					getModel: () => undefined,
+					isIdle: () => true,
+					abort: () => {},
+					hasPendingMessages: () => false,
+					shutdown: () => {},
+					getContextUsage: () => undefined,
+					compact: async () => {},
+					getSystemPrompt: () => [],
+				},
+			);
+
+			// Drain microtasks so the fire-and-forget emit() calls inside initialize() complete.
+			for (let i = 0; i < 5; i++) await Promise.resolve();
+
+			const events = fs
+				.readFileSync(eventsPath, "utf8")
+				.trim()
+				.split("\n")
+				.map(line => JSON.parse(line));
+			expect(events).toHaveLength(32);
+			// Drop-oldest policy: provider-0 was evicted, provider-1 survived as the head.
+			expect(events[0]?.provider).toBe("provider-1");
 		});
 	});
 });

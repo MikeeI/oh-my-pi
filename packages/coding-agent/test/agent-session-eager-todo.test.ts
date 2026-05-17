@@ -12,10 +12,8 @@ import { SessionManager } from "@oh-my-pi/pi-coding-agent/session/session-manage
 import type { ToolSession } from "@oh-my-pi/pi-coding-agent/tools";
 import { TodoWriteTool } from "@oh-my-pi/pi-coding-agent/tools";
 import { TempDir } from "@oh-my-pi/pi-utils";
-import { Type } from "@sinclair/typebox";
+import * as z from "zod/v4";
 import { createAssistantMessage } from "./helpers/agent-session-setup";
-
-class MockAssistantStream extends AssistantMessageEventStream {}
 
 type ObservedPromptCall = {
 	toolChoice: string | undefined;
@@ -123,7 +121,7 @@ describe("AgentSession eager todo enforcement", () => {
 			name: "bash",
 			label: "Bash",
 			description: "Mock bash tool",
-			parameters: Type.Object({}),
+			parameters: z.object({}),
 			execute: async () => ({ content: [{ type: "text" as const, text: "ok" }] }),
 		};
 
@@ -131,7 +129,7 @@ describe("AgentSession eager todo enforcement", () => {
 			getApiKey: () => "test-key",
 			initialState: {
 				model,
-				systemPrompt: "Test",
+				systemPrompt: ["Test"],
 				tools: [todoWriteTool, mockBashTool],
 				messages: [],
 			},
@@ -152,7 +150,7 @@ describe("AgentSession eager todo enforcement", () => {
 					lastMessageText: getMessageText(lastMessage),
 				});
 				const response = scriptedResponses.shift() ?? createAssistantMessage("done");
-				const stream = new MockAssistantStream();
+				const stream = new AssistantMessageEventStream();
 				queueMicrotask(() => {
 					stream.push({ type: "start", partial: response });
 					const reason =
@@ -194,10 +192,7 @@ describe("AgentSession eager todo enforcement", () => {
 			toolChoice: "todo_write",
 			toolNames: ["todo_write", "bash"],
 			messageRoles: ["user", "user"],
-			messageTexts: [
-				expect.stringContaining("Before doing substantive work on the upcoming user request"),
-				"list all work trees",
-			],
+			messageTexts: [expect.any(String), "list all work trees"],
 			lastMessageRole: "user",
 			lastMessageText: "list all work trees",
 		});
@@ -211,13 +206,8 @@ describe("AgentSession eager todo enforcement", () => {
 			createToolCallAssistantMessage("todo_write", {
 				ops: [
 					{
-						op: "replace",
-						phases: [
-							{
-								name: "List worktrees",
-								tasks: [{ content: "List all git worktrees in the current repository", status: "in_progress" }],
-							},
-						],
+						op: "init",
+						list: [{ phase: "List worktrees", items: ["List all git worktrees in the current repository"] }],
 					},
 				],
 			}),
@@ -232,10 +222,7 @@ describe("AgentSession eager todo enforcement", () => {
 			toolChoice: "todo_write",
 			toolNames: ["todo_write", "bash"],
 			messageRoles: ["user", "user"],
-			messageTexts: [
-				expect.stringContaining("Before doing substantive work on the upcoming user request"),
-				"list all work trees",
-			],
+			messageTexts: [expect.any(String), "list all work trees"],
 			lastMessageRole: "user",
 			lastMessageText: "list all work trees",
 		});

@@ -104,6 +104,9 @@ export const CLOUDFLARE_FALLBACK_MODEL: ApiModel<"anthropic-messages"> = {
 	maxTokens: 64000,
 };
 
+const kEnrichedModel = Symbol("model-thinking.enrichedModel");
+type ModelWithEnriched = ApiModel<Api> & { [kEnrichedModel]?: ApiModel<Api> };
+
 /**
  * Returns a copy of the model with canonical thinking metadata attached.
  *
@@ -111,18 +114,32 @@ export const CLOUDFLARE_FALLBACK_MODEL: ApiModel<"anthropic-messages"> = {
  * trust `model.thinking` and avoid inferring capabilities on demand.
  */
 export function enrichModelThinking<TApi extends Api>(model: ApiModel<TApi>): ApiModel<TApi> {
+	const tagged = model as ModelWithEnriched;
+	const cached = tagged[kEnrichedModel];
+	if (cached !== undefined) {
+		return cached as ApiModel<TApi>;
+	}
 	const normalizedThinking = normalizeThinkingConfig(model.thinking);
+	let result: ApiModel<TApi>;
 	if (!model.reasoning) {
-		return normalizedThinking === undefined && model.thinking === undefined
-			? model
-			: { ...model, thinking: undefined };
+		result =
+			normalizedThinking === undefined && model.thinking === undefined ? model : { ...model, thinking: undefined };
+	} else {
+		const thinking = normalizedThinking ?? inferModelThinking(model);
+		result = thinkingsEqual(normalizedThinking, thinking) ? model : { ...model, thinking };
 	}
-
-	const thinking = normalizedThinking ?? inferModelThinking(model);
-	if (thinkingsEqual(normalizedThinking, thinking)) {
-		return model;
-	}
-	return { ...model, thinking };
+	// Stash the enriched copy on a non-enumerable slot so callers that hand us
+	// the same reference twice skip the work. `enumerable: false` is critical:
+	// many call sites build derived models via `{ ...model, ...overrides }`,
+	// which would otherwise copy this cache slot and trick us into returning
+	// the *original* enriched model — silently discarding the overrides.
+	Object.defineProperty(tagged, kEnrichedModel, {
+		value: result,
+		enumerable: false,
+		configurable: true,
+		writable: true,
+	});
+	return result;
 }
 
 /**
@@ -182,8 +199,11 @@ export function linkOpenAIPromotionTargets(models: ApiModel<Api>[]): void {
 }
 
 /**
- * Returns supported thinking efforts from canonical model rules constrained by
- * explicit model metadata.
+ * Returns the supported thinking efforts declared on the model metadata.
+ *
+ * Catalog enrichment is responsible for normalizing bundled model metadata up front.
+ * Runtime callers must treat explicit `model.thinking` on custom models as authoritative
+ * so proxy-specific overrides from `models.yml` survive request construction.
  *
  * @throws Error when a reasoning-capable model is missing thinking metadata
  */
@@ -194,12 +214,7 @@ export function getSupportedEfforts<TApi extends Api>(model: ApiModel<TApi>): re
 	if (!model.thinking) {
 		throw new Error(`Model ${model.provider}/${model.id} is missing thinking metadata`);
 	}
-	const configuredEfforts = expandEffortRange(model.thinking);
-	const parsedModel = parseKnownModel(model.id);
-	if (parsedModel.family === "unknown") {
-		return configuredEfforts;
-	}
-	return intersectEfforts(configuredEfforts, inferSupportedEfforts(parsedModel, model));
+	return expandEffortRange(model.thinking);
 }
 
 /**
@@ -316,6 +331,31 @@ function applyGeneratedModelPolicy(model: ApiModel<Api>): void {
 		model.maxTokens = copilotLimits.maxTokens;
 	}
 
+	if (
+		model.api === "openai-completions" &&
+		(model.provider === "minimax-code" || model.provider === "minimax-code-cn")
+	) {
+		model.compat = {
+			...(model.compat ?? {}),
+			supportsStore: false,
+			supportsDeveloperRole: false,
+			supportsReasoningEffort: false,
+			reasoningContentField: "reasoning_content",
+		};
+		delete model.compat.thinkingFormat;
+	}
+	if (
+		model.api === "openai-completions" &&
+		model.provider === "opencode-go" &&
+		(model.id === "deepseek-v4-flash" || model.id === "deepseek-v4-pro")
+	) {
+		model.compat = {
+			...(model.compat ?? {}),
+			supportsToolChoice: false,
+			reasoningContentField: "reasoning_content",
+			requiresReasoningContentForToolCalls: true,
+		};
+	}
 	const parsedModel = parseKnownModel(model.id);
 	const applyPatchToolType = inferGeneratedApplyPatchToolType(model, parsedModel);
 	if (applyPatchToolType) {
@@ -392,11 +432,19 @@ function inferModelThinking<TApi extends Api>(model: ApiModel<TApi>): ThinkingCo
 	if (!minLevel || !maxLevel) {
 		throw new Error(`Model ${model.provider}/${model.id} resolved to an empty thinking range`);
 	}
-	return {
+	const config: ThinkingConfig = {
 		mode: inferThinkingControlMode(model, parsedModel),
 		minLevel,
 		maxLevel,
 	};
+	// Encode explicit levels only when the inferred set has gaps the min..max range cannot represent.
+	const minIndex = THINKING_EFFORTS.indexOf(minLevel);
+	const maxIndex = THINKING_EFFORTS.indexOf(maxLevel);
+	const expandedRange = THINKING_EFFORTS.slice(minIndex, maxIndex + 1);
+	if (expandedRange.length !== efforts.length) {
+		config.levels = efforts;
+	}
+	return config;
 }
 
 function normalizeThinkingConfig(thinking: ThinkingConfig | undefined): ThinkingConfig | undefined {
@@ -409,20 +457,25 @@ function normalizeThinkingConfig(thinking: ThinkingConfig | undefined): Thinking
 function thinkingsEqual(left: ThinkingConfig | undefined, right: ThinkingConfig | undefined): boolean {
 	if (left === right) return true;
 	if (!left || !right) return false;
-	return left.mode === right.mode && left.minLevel === right.minLevel && left.maxLevel === right.maxLevel;
+	if (left.mode !== right.mode || left.minLevel !== right.minLevel || left.maxLevel !== right.maxLevel) return false;
+	const leftLevels = left.levels;
+	const rightLevels = right.levels;
+	if (leftLevels === rightLevels) return true;
+	if (!leftLevels || !rightLevels) return false;
+	if (leftLevels.length !== rightLevels.length) return false;
+	return leftLevels.every((level, index) => level === rightLevels[index]);
 }
 
 function expandEffortRange(thinking: ThinkingConfig): readonly Effort[] {
+	if (thinking.levels && thinking.levels.length > 0) {
+		return thinking.levels;
+	}
 	const minIndex = THINKING_EFFORTS.indexOf(thinking.minLevel);
 	const maxIndex = THINKING_EFFORTS.indexOf(thinking.maxLevel);
 	if (minIndex === -1 || maxIndex === -1 || minIndex > maxIndex) {
 		return [];
 	}
 	return THINKING_EFFORTS.slice(minIndex, maxIndex + 1);
-}
-
-function intersectEfforts(left: readonly Effort[], right: readonly Effort[]): readonly Effort[] {
-	return left.filter(effort => right.includes(effort));
 }
 
 function inferSupportedEfforts<TApi extends Api>(parsedModel: ParsedModel, model: ApiModel<TApi>): readonly Effort[] {

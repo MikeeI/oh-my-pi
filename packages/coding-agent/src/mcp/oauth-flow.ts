@@ -5,9 +5,9 @@
  * by providing authorization URL, token URL, and client credentials.
  */
 
-import type { OAuthController, OAuthCredentials } from "@oh-my-pi/pi-ai";
 import type { OAuthCallbackFlowOptions } from "@oh-my-pi/pi-ai/utils/oauth/callback-server";
 import { OAuthCallbackFlow } from "@oh-my-pi/pi-ai/utils/oauth/callback-server";
+import type { OAuthController, OAuthCredentials } from "@oh-my-pi/pi-ai/utils/oauth/types";
 
 const DEFAULT_PORT = 3000;
 const CALLBACK_PATH = "/callback";
@@ -131,6 +131,26 @@ export class MCPOAuthFlow extends OAuthCallbackFlow {
 	) {
 		super(ctrl, resolveCallbackOptions(config));
 		this.#resolvedClientId = this.#resolveClientId(config);
+	}
+
+	/**
+	 * Client id used during the authorization request. Returns the value supplied
+	 * via {@link MCPOAuthConfig.clientId} or, when the server required dynamic
+	 * client registration, the id issued during registration. `undefined` until
+	 * {@link generateAuthUrl} (or {@link login}) has run for a server that needs
+	 * a client id.
+	 */
+	get resolvedClientId(): string | undefined {
+		return this.#resolvedClientId;
+	}
+
+	/**
+	 * Client secret issued by dynamic client registration, if any. Always
+	 * `undefined` for PKCE-only/public clients and when the caller supplies the
+	 * client id via config.
+	 */
+	get registeredClientSecret(): string | undefined {
+		return this.#registeredClientSecret;
 	}
 
 	async generateAuthUrl(state: string, redirectUri: string): Promise<{ url: string; instructions?: string }> {

@@ -51,9 +51,34 @@ export function detectOpenAICompat(model: Model<"openai-completions">, resolvedB
 
 	const isCerebras = provider === "cerebras" || baseUrl.includes("cerebras.ai");
 	const isZai = provider === "zai" || baseUrl.includes("api.z.ai");
+	const isKilo = provider === "kilo" || baseUrl.includes("api.kilo.ai");
 	const isKimiModel = model.id.includes("moonshotai/kimi") || /^kimi[-.]/i.test(model.id);
+	const isMoonshotKimi =
+		isKimiModel &&
+		(provider === "moonshot" ||
+			provider === "kimi-code" ||
+			baseUrl.includes("api.moonshot.ai") ||
+			baseUrl.includes("api.kimi.com"));
+	const isAnthropicModel =
+		provider === "anthropic" ||
+		baseUrl.includes("api.anthropic.com") ||
+		/(^|\/)claude[-.]/i.test(model.id) ||
+		/(^|\/)anthropic\//i.test(model.id);
 	const isAlibaba = provider === "alibaba-coding-plan" || baseUrl.includes("dashscope");
 	const isQwen = model.id.toLowerCase().includes("qwen");
+	// DeepSeek V4 (and other reasoning-capable DeepSeek models) reject follow-up requests in
+	// thinking mode unless prior assistant tool-call turns include `reasoning_content`. The
+	// upstream model is reachable through many OpenAI-compat hosts (api.deepseek.com, Deepinfra,
+	// Kilo, NVIDIA NIM, Zenmux, OpenRouter, …), so we match by model id/name as well as by
+	// provider/baseUrl. The flag is gated by `model.reasoning` because the invariant only
+	// applies when thinking mode is actually engaged.
+	const lowerId = model.id.toLowerCase();
+	const lowerName = (model.name ?? "").toLowerCase();
+	const isDeepseekFamily =
+		provider === "deepseek" ||
+		baseUrl.includes("deepseek.com") ||
+		lowerId.includes("deepseek") ||
+		lowerName.includes("deepseek");
 
 	const isNonStandard =
 		isCerebras ||
@@ -66,10 +91,12 @@ export function detectOpenAICompat(model: Model<"openai-completions">, resolvedB
 		baseUrl.includes("fireworks.ai") ||
 		isAlibaba ||
 		isZai ||
+		isKilo ||
 		isQwen ||
 		provider === "opencode-zen" ||
 		provider === "opencode-go" ||
 		baseUrl.includes("opencode.ai");
+	const isOpenCodeProvider = provider === "opencode-go" || provider === "opencode-zen";
 
 	const useMaxTokens =
 		provider === "mistral" ||
@@ -78,6 +105,52 @@ export function detectOpenAICompat(model: Model<"openai-completions">, resolvedB
 		baseUrl.includes("fireworks.ai");
 	const isGrok = provider === "xai" || baseUrl.includes("api.x.ai");
 	const isMistral = provider === "mistral" || baseUrl.includes("mistral.ai");
+
+	// Hosts whose chat-completions endpoints are known to accept multiple
+	// leading `system`/`developer` messages (preferred for KV-cache reuse).
+	// Anything outside this allowlist defaults to coalescing because
+	// strict chat templates (Qwen 3.5+ via vLLM, MiniMax, etc.) reject
+	// follow-up system messages with a 400.
+	const isOpenAIHost = provider === "openai" || baseUrl.includes("api.openai.com");
+	const isAzureHost =
+		provider === "azure" ||
+		baseUrl.includes(".openai.azure.com") ||
+		baseUrl.includes("models.inference.ai.azure.com") ||
+		baseUrl.includes("azure.com/openai");
+	const isOpenRouter = provider === "openrouter" || baseUrl.includes("openrouter.ai");
+	const isTogether = provider === "together" || baseUrl.includes("api.together.xyz");
+	const isFireworks = baseUrl.includes("fireworks.ai");
+	const isGroqHost = provider === "groq" || baseUrl.includes("api.groq.com");
+	const isCopilotHost = provider === "github-copilot";
+	const isZenmuxHost = provider === "zenmux";
+	// Endpoints that MUST receive a single system block. MiniMax's OpenAI
+	// endpoint returns error 2013 on multiple system messages; Alibaba's
+	// Dashscope and Qwen Portal serve Qwen models whose chat template
+	// raises "System message must be at the beginning" if any system
+	// message appears past index 0.
+	const isMiniMaxHost =
+		provider === "minimax-code" ||
+		provider === "minimax-code-cn" ||
+		baseUrl.includes("api.minimax.io") ||
+		baseUrl.includes("api.minimaxi.com");
+	const isQwenPortal = provider === "qwen-portal" || baseUrl.includes("portal.qwen.ai");
+	const supportsMultipleSystemMessagesDefault =
+		!isMiniMaxHost &&
+		!isAlibaba &&
+		!isQwenPortal &&
+		(isOpenAIHost ||
+			isAzureHost ||
+			isOpenRouter ||
+			isCerebras ||
+			isTogether ||
+			isFireworks ||
+			isGroqHost ||
+			isDeepseekFamily ||
+			isMistral ||
+			isGrok ||
+			isZai ||
+			isCopilotHost ||
+			isZenmuxHost);
 
 	const reasoningEffortMap: NonNullable<OpenAICompat["reasoningEffortMap"]> =
 		provider === "groq" && model.id === "qwen/qwen3-32b"
@@ -88,36 +161,49 @@ export function detectOpenAICompat(model: Model<"openai-completions">, resolvedB
 					high: "default",
 					xhigh: "default",
 				} satisfies Partial<Record<OpenAIReasoningEffort, string>>)
-			: {};
+			: isDeepseekFamily && model.reasoning
+				? { xhigh: "max" }
+				: {};
 
 	return {
 		supportsStore: !isNonStandard,
 		supportsDeveloperRole: !isNonStandard,
+		supportsMultipleSystemMessages: supportsMultipleSystemMessagesDefault,
 		supportsReasoningEffort: !isGrok && !isZai,
 		reasoningEffortMap,
 		supportsUsageInStreaming: !isCerebras,
+		disableReasoningOnForcedToolChoice: isKimiModel || isAnthropicModel,
+		disableReasoningOnToolChoice: isDeepseekFamily && Boolean(model.reasoning),
 		supportsToolChoice: true,
 		maxTokensField: useMaxTokens ? "max_tokens" : "max_completion_tokens",
 		requiresToolResultName: isMistral,
 		requiresAssistantAfterToolResult: false,
 		requiresThinkingAsText: isMistral,
 		requiresMistralToolIds: isMistral,
-		thinkingFormat: isZai
-			? "zai"
-			: provider === "openrouter" || baseUrl.includes("openrouter.ai")
-				? "openrouter"
-				: isAlibaba || isQwen
-					? "qwen"
-					: "openai",
+		thinkingFormat:
+			isZai || isMoonshotKimi
+				? "zai"
+				: provider === "openrouter" || baseUrl.includes("openrouter.ai")
+					? "openrouter"
+					: isAlibaba || isQwen
+						? "qwen"
+						: "openai",
 		reasoningContentField: "reasoning_content",
 		// Backends that 400 follow-up requests when prior assistant tool-call turns lack `reasoning_content`:
-		//   - Kimi: documented invariant on its native API and via OpenCode-Go.
+		//   - Kimi: documented invariant on its native API.
 		//   - Any reasoning-capable model reached through OpenRouter: DeepSeek V4 Pro and similar enforce
 		//     this server-side whenever the request is in thinking mode. We can't translate Anthropic's
 		//     redacted/encrypted reasoning into DeepSeek's plaintext form, so cross-provider continuations
 		//     rely on a placeholder — see `convertMessages` for the placeholder injection.
+		//   - OpenCode-Go and OpenCode-Zen handle reasoning content internally and reject
+		//     `reasoning_content` in client-sent messages — exclude them even for Kimi models.
 		requiresReasoningContentForToolCalls:
-			isKimiModel || ((provider === "openrouter" || baseUrl.includes("openrouter.ai")) && Boolean(model.reasoning)),
+			(isKimiModel && !isOpenCodeProvider) ||
+			(isDeepseekFamily && Boolean(model.reasoning)) ||
+			((provider === "openrouter" || baseUrl.includes("openrouter.ai")) && Boolean(model.reasoning)),
+		// DeepSeek V4 rejects synthetic reasoning_content placeholders (".") on tool-call turns.
+		// Kimi and OpenRouter accept them when actual reasoning is unavailable.
+		allowsSyntheticReasoningContentForToolCalls: !isDeepseekFamily || !model.reasoning,
 		requiresAssistantContentForToolCalls: isKimiModel,
 		openRouterRouting: undefined,
 		vercelGatewayRouting: undefined,
@@ -146,6 +232,8 @@ export function resolveOpenAICompat(
 	return {
 		supportsStore: model.compat.supportsStore ?? detected.supportsStore,
 		supportsDeveloperRole: model.compat.supportsDeveloperRole ?? detected.supportsDeveloperRole,
+		supportsMultipleSystemMessages:
+			model.compat.supportsMultipleSystemMessages ?? detected.supportsMultipleSystemMessages,
 		supportsReasoningEffort: model.compat.supportsReasoningEffort ?? detected.supportsReasoningEffort,
 		reasoningEffortMap: model.compat.reasoningEffortMap ?? detected.reasoningEffortMap,
 		supportsUsageInStreaming: model.compat.supportsUsageInStreaming ?? detected.supportsUsageInStreaming,
@@ -160,8 +248,14 @@ export function resolveOpenAICompat(
 		reasoningContentField: model.compat.reasoningContentField ?? detected.reasoningContentField,
 		requiresReasoningContentForToolCalls:
 			model.compat.requiresReasoningContentForToolCalls ?? detected.requiresReasoningContentForToolCalls,
+		allowsSyntheticReasoningContentForToolCalls:
+			model.compat.allowsSyntheticReasoningContentForToolCalls ??
+			detected.allowsSyntheticReasoningContentForToolCalls,
 		requiresAssistantContentForToolCalls:
 			model.compat.requiresAssistantContentForToolCalls ?? detected.requiresAssistantContentForToolCalls,
+		disableReasoningOnForcedToolChoice:
+			model.compat.disableReasoningOnForcedToolChoice ?? detected.disableReasoningOnForcedToolChoice,
+		disableReasoningOnToolChoice: model.compat.disableReasoningOnToolChoice ?? detected.disableReasoningOnToolChoice,
 		openRouterRouting: model.compat.openRouterRouting ?? detected.openRouterRouting,
 		vercelGatewayRouting: model.compat.vercelGatewayRouting ?? detected.vercelGatewayRouting,
 		supportsStrictMode: model.compat.supportsStrictMode ?? detected.supportsStrictMode,

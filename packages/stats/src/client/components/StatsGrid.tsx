@@ -1,9 +1,24 @@
-import { Activity, AlertCircle, BarChart3, Database, Server, Star, Zap } from "lucide-react";
+import { Activity, AlertCircle, BarChart3, Database, Download, Server, Star, Upload, Zap } from "lucide-react";
 import type { AggregatedStats } from "../types";
 
 interface StatsGridProps {
 	stats: AggregatedStats;
 }
+
+const compactNumberFormatter = new Intl.NumberFormat(undefined, {
+	notation: "compact",
+	maximumFractionDigits: 1,
+});
+
+function formatCompactNumber(value: number): string {
+	return compactNumberFormatter.format(value);
+}
+
+function formatExactNumber(value: number): string {
+	return value.toLocaleString();
+}
+
+const totalPromptCompletionTokens = (stats: AggregatedStats) => stats.totalInputTokens + stats.totalOutputTokens;
 
 const statConfig = [
 	{
@@ -29,7 +44,7 @@ const statConfig = [
 		title: "Premium Reqs",
 		icon: Star,
 		color: "var(--accent-amber)",
-		getValue: (s: AggregatedStats) => s.totalPremiumRequests.toLocaleString(),
+		getValue: (s: AggregatedStats) => formatExactNumber(s.totalPremiumRequests),
 		getDetail: (s: AggregatedStats) =>
 			s.totalRequests > 0 ? `${((s.totalPremiumRequests / s.totalRequests) * 100).toFixed(1)}% of requests` : "-",
 	},
@@ -39,7 +54,29 @@ const statConfig = [
 		icon: Database,
 		color: "var(--accent-cyan)",
 		getValue: (s: AggregatedStats) => `${(s.cacheRate * 100).toFixed(1)}%`,
-		getDetail: (s: AggregatedStats) => `${(s.totalCacheReadTokens / 1000).toFixed(1)}k cached tokens`,
+		getDetail: (s: AggregatedStats) => `${formatCompactNumber(s.totalCacheReadTokens)} cached tokens`,
+	},
+	{
+		key: "inputTokens",
+		title: "Input Tokens",
+		icon: Download,
+		color: "var(--accent-violet)",
+		getValue: (s: AggregatedStats) => formatExactNumber(s.totalInputTokens),
+		getDetail: (s: AggregatedStats) =>
+			totalPromptCompletionTokens(s) > 0
+				? `${((s.totalInputTokens / totalPromptCompletionTokens(s)) * 100).toFixed(1)}% of prompt+completion`
+				: "-",
+	},
+	{
+		key: "outputTokens",
+		title: "Output Tokens",
+		icon: Upload,
+		color: "var(--accent-pink)",
+		getValue: (s: AggregatedStats) => formatExactNumber(s.totalOutputTokens),
+		getDetail: (s: AggregatedStats) =>
+			totalPromptCompletionTokens(s) > 0
+				? `${((s.totalOutputTokens / totalPromptCompletionTokens(s)) * 100).toFixed(1)}% of prompt+completion`
+				: "-",
 	},
 	{
 		key: "errors",
@@ -55,7 +92,8 @@ const statConfig = [
 		icon: BarChart3,
 		color: "var(--accent-green)",
 		getValue: (s: AggregatedStats) => s.avgTokensPerSecond?.toFixed(1) ?? "-",
-		getDetail: (s: AggregatedStats) => `${(s.totalInputTokens + s.totalOutputTokens).toLocaleString()} total tokens`,
+		getDetail: (s: AggregatedStats) =>
+			`${formatCompactNumber(totalPromptCompletionTokens(s))} total prompt+completion`,
 	},
 	{
 		key: "ttft",
@@ -69,7 +107,7 @@ const statConfig = [
 
 export function StatsGrid({ stats }: StatsGridProps) {
 	return (
-		<div className="grid grid-cols-2 lg:grid-cols-3 xl:grid-cols-7 gap-4 mb-8">
+		<div className="grid grid-cols-2 lg:grid-cols-3 xl:grid-cols-9 gap-4 mb-8">
 			{statConfig.map(stat => {
 				const Icon = stat.icon;
 				return (

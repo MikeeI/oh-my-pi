@@ -8,7 +8,10 @@ import * as fs from "node:fs";
 import * as path from "node:path";
 import { getPluginsLockfile, getPluginsNodeModules, getPluginsPackageJson, isEnoent } from "@oh-my-pi/pi-utils";
 import { getConfigDirPaths } from "../../config";
+import { installLegacyPiSpecifierShim } from "./legacy-pi-compat";
 import type { InstalledPlugin, PluginManifest, PluginRuntimeConfig, ProjectPluginOverrides } from "./types";
+
+installLegacyPiSpecifierShim();
 
 // =============================================================================
 // Runtime Config Loading
@@ -41,11 +44,6 @@ async function loadProjectOverrides(cwd: string): Promise<ProjectPluginOverrides
 	}
 	return {};
 }
-
-// =============================================================================
-// Plugin Discovery
-// =============================================================================
-
 /**
  * Get list of enabled plugins with their resolved configurations.
  * Respects both global runtime config and project overrides.
@@ -69,7 +67,6 @@ export async function getEnabledPlugins(cwd: string): Promise<InstalledPlugin[]>
 	const runtimeConfig = await loadRuntimeConfig();
 	const projectOverrides = await loadProjectOverrides(cwd);
 	const plugins: InstalledPlugin[] = [];
-
 	for (const [name] of Object.entries(deps)) {
 		const pluginPkgPath = path.join(nodeModulesPath, name, "package.json");
 		let pluginPkg: { version: string; omp?: PluginManifest; pi?: PluginManifest };
@@ -103,7 +100,6 @@ export async function getEnabledPlugins(cwd: string): Promise<InstalledPlugin[]>
 
 		// Resolve enabled features (project overrides take precedence)
 		const enabledFeatures = projectOverrides.features?.[name] ?? runtimeState?.enabledFeatures ?? null;
-
 		plugins.push({
 			name,
 			version: pluginPkg.version,
@@ -121,6 +117,31 @@ export async function getEnabledPlugins(cwd: string): Promise<InstalledPlugin[]>
 // Path Resolution
 // =============================================================================
 
+const MANIFEST_ENTRY_INDEX_NAMES = ["index.ts", "index.js", "index.mjs", "index.cjs"];
+
+/**
+ * Resolve a plugin manifest entry to a concrete loadable file path. Returns the
+ * file path itself when the entry points at a file, the matching index file when
+ * the entry points at a directory containing index.{ts,js,mjs,cjs}, and null
+ * when no entry exists at the joined path.
+ */
+function resolveManifestEntryFile(joined: string): string | null {
+	let stats: fs.Stats;
+	try {
+		stats = fs.statSync(joined);
+	} catch {
+		return null;
+	}
+	if (stats.isDirectory()) {
+		for (const name of MANIFEST_ENTRY_INDEX_NAMES) {
+			const candidate = path.join(joined, name);
+			if (fs.existsSync(candidate)) return candidate;
+		}
+		return null;
+	}
+	return joined;
+}
+
 /**
  * Generic path resolver for plugin manifest entries (tools, hooks, commands, extensions).
  * Handles both single-string and string[] base entries, plus feature-specific entries.
@@ -134,8 +155,8 @@ function resolvePluginPaths(plugin: InstalledPlugin, key: "tools" | "hooks" | "c
 	if (base) {
 		const entries = Array.isArray(base) ? base : [base];
 		for (const entry of entries) {
-			const resolved = path.join(plugin.path, entry);
-			if (fs.existsSync(resolved)) {
+			const resolved = resolveManifestEntryFile(path.join(plugin.path, entry));
+			if (resolved) {
 				paths.push(resolved);
 			}
 		}
@@ -150,8 +171,8 @@ function resolvePluginPaths(plugin: InstalledPlugin, key: "tools" | "hooks" | "c
 
 			if (feat[key]) {
 				for (const entry of feat[key]) {
-					const resolved = path.join(plugin.path, entry);
-					if (fs.existsSync(resolved)) {
+					const resolved = resolveManifestEntryFile(path.join(plugin.path, entry));
+					if (resolved) {
 						paths.push(resolved);
 					}
 				}
@@ -164,8 +185,8 @@ function resolvePluginPaths(plugin: InstalledPlugin, key: "tools" | "hooks" | "c
 
 			if (feat[key]) {
 				for (const entry of feat[key]) {
-					const resolved = path.join(plugin.path, entry);
-					if (fs.existsSync(resolved)) {
+					const resolved = resolveManifestEntryFile(path.join(plugin.path, entry));
+					if (resolved) {
 						paths.push(resolved);
 					}
 				}

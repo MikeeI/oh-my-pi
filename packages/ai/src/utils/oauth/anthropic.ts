@@ -13,6 +13,84 @@ const CALLBACK_PORT = 54545;
 const CALLBACK_PATH = "/callback";
 const SCOPES = "org:create_api_key user:profile user:inference";
 
+function formatErrorDetails(error: unknown): string {
+	if (error instanceof Error) {
+		const details: string[] = [`${error.name}: ${error.message}`];
+		const errorWithCode = error as Error & { code?: string; errno?: number | string; cause?: unknown };
+		if (errorWithCode.code) details.push(`code=${errorWithCode.code}`);
+		if (typeof errorWithCode.errno !== "undefined") details.push(`errno=${String(errorWithCode.errno)}`);
+		if (typeof error.cause !== "undefined") {
+			details.push(`cause=${formatErrorDetails(error.cause)}`);
+		}
+		if (error.stack) {
+			details.push(`stack=${error.stack}`);
+		}
+		return details.join("; ");
+	}
+	return String(error);
+}
+
+async function postJson(url: string, body: Record<string, string | number>): Promise<string> {
+	const response = await fetch(url, {
+		method: "POST",
+		headers: {
+			"Content-Type": "application/json",
+			Accept: "application/json",
+		},
+		body: JSON.stringify(body),
+		signal: AbortSignal.timeout(30_000),
+	});
+
+	const responseBody = await response.text();
+	if (!response.ok) {
+		throw new Error(`HTTP request failed. status=${response.status}; url=${url}; body=${responseBody}`);
+	}
+	return responseBody;
+}
+
+/**
+ * Decoded shape of Anthropic's `/v1/oauth/token` response (both
+ * `authorization_code` exchange and `refresh_token` refresh return the same
+ * envelope). The `account` block is inlined alongside the tokens, so we can
+ * surface `accountId` / `email` on {@link OAuthCredentials} without a separate
+ * `/api/oauth/profile` round-trip.
+ */
+interface AnthropicTokenResponse {
+	access_token: string;
+	refresh_token: string;
+	expires_in: number;
+	account?: { uuid?: string; email_address?: string };
+}
+
+function parseOAuthTokenResponse(responseBody: string, operation: string): AnthropicTokenResponse {
+	try {
+		return JSON.parse(responseBody) as AnthropicTokenResponse;
+	} catch (error) {
+		throw new Error(
+			`Anthropic ${operation} returned invalid JSON. url=${TOKEN_URL}; body=${responseBody}; details=${formatErrorDetails(error)}`,
+		);
+	}
+}
+
+/**
+ * Lift the OAuth response's `account: { uuid, email_address }` block onto
+ * {@link OAuthCredentials} so downstream identity propagation (e.g.
+ * `metadata.user_id.account_uuid`, usage tracking) works without a separate
+ * `/api/oauth/profile` round-trip. Returns `undefined` for either field when
+ * the response omits it or carries a non-string / empty value.
+ */
+function extractAccountFromTokenResponse(data: AnthropicTokenResponse): {
+	accountId?: string;
+	email?: string;
+} {
+	const accountUuid = data.account?.uuid;
+	const emailAddress = data.account?.email_address;
+	return {
+		accountId: typeof accountUuid === "string" && accountUuid.length > 0 ? accountUuid : undefined,
+		email: typeof emailAddress === "string" && emailAddress.length > 0 ? emailAddress : undefined,
+	};
+}
+
 export class AnthropicOAuthFlow extends OAuthCallbackFlow {
 	#verifier: string = "";
 	#challenge: string = "";
@@ -36,9 +114,13 @@ export class AnthropicOAuthFlow extends OAuthCallbackFlow {
 			code_challenge_method: "S256",
 			state,
 		});
-
 		const url = `${AUTHORIZE_URL}?${authParams.toString()}`;
-		return { url };
+
+		return {
+			url,
+			instructions:
+				"Complete login in your browser. If the browser cannot reach this machine, paste the final redirect URL or authorization code when prompted.",
+		};
 	}
 
 	async exchangeToken(code: string, state: string, redirectUri: string): Promise<OAuthCredentials> {
@@ -53,42 +135,31 @@ export class AnthropicOAuthFlow extends OAuthCallbackFlow {
 			}
 		}
 
-		const tokenResponse = await fetch(TOKEN_URL, {
-			method: "POST",
-			headers: {
-				"Content-Type": "application/json",
-				Accept: "application/json",
-			},
-			body: JSON.stringify({
+		let responseBody: string;
+		try {
+			responseBody = await postJson(TOKEN_URL, {
 				grant_type: "authorization_code",
 				client_id: CLIENT_ID,
 				code: exchangeCode,
 				state: exchangeState,
 				redirect_uri: redirectUri,
 				code_verifier: this.#verifier,
-			}),
-		});
-
-		if (!tokenResponse.ok) {
-			let error: string;
-			try {
-				error = await tokenResponse.text();
-			} catch {
-				error = `HTTP ${tokenResponse.status}`;
-			}
-			throw new Error(`Token exchange failed: ${error}`);
+			});
+		} catch (error) {
+			throw new Error(
+				`Token exchange request failed. url=${TOKEN_URL}; redirect_uri=${redirectUri}; response_type=authorization_code; details=${formatErrorDetails(error)}`,
+			);
 		}
 
-		const tokenData = (await tokenResponse.json()) as {
-			access_token: string;
-			refresh_token: string;
-			expires_in: number;
-		};
+		const tokenData = parseOAuthTokenResponse(responseBody, "token exchange");
+		const { accountId, email } = extractAccountFromTokenResponse(tokenData);
 
 		return {
 			refresh: tokenData.refresh_token,
 			access: tokenData.access_token,
 			expires: Date.now() + tokenData.expires_in * 1000 - 5 * 60 * 1000,
+			accountId,
+			email,
 		};
 	}
 }
@@ -105,30 +176,25 @@ export async function loginAnthropic(ctrl: OAuthController): Promise<OAuthCreden
  * Refresh Anthropic OAuth token
  */
 export async function refreshAnthropicToken(refreshToken: string): Promise<OAuthCredentials> {
-	const response = await fetch(TOKEN_URL, {
-		method: "POST",
-		headers: { "Content-Type": "application/json", Accept: "application/json" },
-		body: JSON.stringify({
+	let responseBody: string;
+	try {
+		responseBody = await postJson(TOKEN_URL, {
 			grant_type: "refresh_token",
 			client_id: CLIENT_ID,
 			refresh_token: refreshToken,
-		}),
-	});
-
-	if (!response.ok) {
-		const error = await response.text();
-		throw new Error(`Anthropic token refresh failed: ${error}`);
+		});
+	} catch (error) {
+		throw new Error(`Anthropic token refresh request failed. url=${TOKEN_URL}; details=${formatErrorDetails(error)}`);
 	}
 
-	const data = (await response.json()) as {
-		access_token: string;
-		refresh_token: string;
-		expires_in: number;
-	};
+	const data = parseOAuthTokenResponse(responseBody, "token refresh");
+	const { accountId, email } = extractAccountFromTokenResponse(data);
 
 	return {
 		refresh: data.refresh_token || refreshToken,
 		access: data.access_token,
 		expires: Date.now() + data.expires_in * 1000 - 5 * 60 * 1000,
+		accountId,
+		email,
 	};
 }

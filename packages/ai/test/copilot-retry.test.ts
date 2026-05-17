@@ -1,5 +1,6 @@
 import { describe, expect, it } from "bun:test";
-import { callWithCopilotModelRetry, isCopilotTransientModelError, isRetryableError } from "@oh-my-pi/pi-ai/utils/retry";
+import { callWithCopilotModelRetry, isCopilotTransientModelError } from "@oh-my-pi/pi-ai/utils/retry";
+import { isRetryableError } from "@oh-my-pi/pi-utils";
 
 type ErrorShape = { status: number; code?: string; error?: { code?: string; message?: string }; message: string };
 
@@ -82,7 +83,7 @@ describe("callWithCopilotModelRetry", () => {
 					calls += 1;
 					throw err;
 				},
-				{ provider: "github-copilot" },
+				{ provider: "github-copilot", retryBaseDelayMs: 0 },
 			),
 		).rejects.toBe(err);
 		expect(calls).toBe(3);
@@ -98,7 +99,7 @@ describe("callWithCopilotModelRetry", () => {
 				}
 				return "ok" as const;
 			},
-			{ provider: "github-copilot" },
+			{ provider: "github-copilot", retryBaseDelayMs: 0 },
 		);
 		expect(result).toBe("ok");
 		expect(calls).toBe(2);
@@ -129,11 +130,23 @@ describe("callWithCopilotModelRetry", () => {
 					calls += 1;
 					throw copilotError({ status: 400, code: "model_not_supported", message: "transient" });
 				},
-				{ provider: "github-copilot", signal: controller.signal },
+				{ provider: "github-copilot", signal: controller.signal, retryBaseDelayMs: 0 },
 			),
 		).rejects.toBeDefined();
-		// fn runs once; abortableSleep rejects before a second attempt.
+		// fn runs once; scheduler.wait rejects before a second attempt.
 		expect(calls).toBe(1);
+	});
+});
+
+describe("isRetryableError transport failures", () => {
+	it("retries Bun socket closure errors", () => {
+		expect(
+			isRetryableError(
+				new Error(
+					"The socket connection was closed unexpectedly. For more information, pass `verbose: true` in the second argument to fetch()",
+				),
+			),
+		).toBe(true);
 	});
 });
 

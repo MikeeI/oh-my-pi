@@ -1,4 +1,4 @@
-import type { TSchema } from "@sinclair/typebox";
+import { fetchWithRetry } from "@oh-my-pi/pi-utils";
 import { getEnvApiKey } from "../stream";
 import type {
 	Api,
@@ -14,9 +14,11 @@ import type {
 	ToolResultMessage,
 	UserMessage,
 } from "../types";
+import { normalizeSystemPrompts } from "../utils";
 import { AssistantMessageEventStream } from "../utils/event-stream";
 import { finalizeErrorMessage, type RawHttpRequestDump } from "../utils/http-inspector";
 import { parseStreamingJson } from "../utils/json-parse";
+import { toolWireSchema } from "../utils/schema/wire";
 import { transformMessages } from "./transform-messages";
 
 export interface OllamaChatOptions extends StreamOptions {
@@ -29,7 +31,7 @@ type OllamaFunctionTool = {
 	function: {
 		name: string;
 		description: string;
-		parameters: TSchema;
+		parameters: Record<string, unknown>;
 	};
 };
 
@@ -186,15 +188,30 @@ function convertMessage(message: Message): OllamaMessage {
 
 function convertMessages(model: Model<"ollama-chat">, context: Context): OllamaMessage[] {
 	const messages: Message[] = [];
-	if (context.systemPrompt) {
+	// Emit one developer message per ordered system prompt. The wire role is mapped to "system"
+	// by `convertMessage`, but keeping the prompts separate preserves prefix-cache stability:
+	// if only the trailing prompt changes between calls, the leading system messages keep
+	// their identical token prefix so KV-cache reuse covers them.
+	for (const systemPrompt of normalizeSystemPrompts(context.systemPrompt)) {
 		messages.push({
 			role: "developer",
-			content: context.systemPrompt,
+			content: systemPrompt,
 			timestamp: Date.now(),
 		});
 	}
 	messages.push(...context.messages);
-	return transformMessages(messages, model).map(convertMessage);
+	const isCloud = model.provider === "ollama-cloud";
+	return transformMessages(messages, model).map(msg => {
+		const converted = convertMessage(msg);
+		// Ollama cloud rejects requests when assistant history messages contain the `thinking`
+		// field — it's valid in model responses but not accepted as a history input. Strip it
+		// to prevent HTTP 400 errors. Local Ollama instances are unaffected.
+		if (isCloud && converted.role === "assistant" && converted.thinking) {
+			const { thinking: _t, ...rest } = converted;
+			return rest;
+		}
+		return converted;
+	});
 }
 
 function convertTools(tools: Tool[] | undefined): OllamaFunctionTool[] | undefined {
@@ -206,7 +223,7 @@ function convertTools(tools: Tool[] | undefined): OllamaFunctionTool[] | undefin
 		function: {
 			name: tool.name,
 			description: tool.description,
-			parameters: tool.parameters,
+			parameters: toolWireSchema(tool),
 		},
 	}));
 }
@@ -315,6 +332,8 @@ function mapDoneReason(doneReason: string | undefined, output: AssistantMessage)
 	return "stop";
 }
 
+const OLLAMA_RETRY_DELAYS_MS = [2_000, 5_000, 10_000];
+
 export const streamOllama: StreamFunction<"ollama-chat"> = (
 	model: Model<"ollama-chat">,
 	context: Context,
@@ -348,7 +367,7 @@ export const streamOllama: StreamFunction<"ollama-chat"> = (
 				url: `${baseUrl}/api/chat`,
 				body,
 			};
-			const response = await fetch(`${baseUrl}/api/chat`, {
+			const response = await fetchWithRetry(`${baseUrl}/api/chat`, {
 				method: "POST",
 				headers: {
 					...model.headers,
@@ -358,6 +377,8 @@ export const streamOllama: StreamFunction<"ollama-chat"> = (
 				},
 				body: JSON.stringify(body),
 				signal: options.signal,
+				defaultDelayMs: OLLAMA_RETRY_DELAYS_MS,
+				fetch: options.fetch,
 			});
 			if (!response.ok) {
 				throw new Error(`HTTP ${response.status} from ${baseUrl}/api/chat`);

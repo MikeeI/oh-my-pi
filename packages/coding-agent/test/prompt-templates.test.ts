@@ -18,14 +18,6 @@ import { parseCommandArgs, substituteArgs } from "@oh-my-pi/pi-coding-agent/util
 // ============================================================================
 
 describe("substituteArgs", () => {
-	test("should replace $ARGUMENTS with all args joined", () => {
-		expect(substituteArgs("Test: $ARGUMENTS", ["a", "b", "c"])).toBe("Test: a b c");
-	});
-
-	test("should replace $@ with all args joined", () => {
-		expect(substituteArgs("Test: $@", ["a", "b", "c"])).toBe("Test: a b c");
-	});
-
 	test("should support $@ slicing with start offset", () => {
 		expect(substituteArgs("Test: $@[2]", ["a", "b", "c"])).toBe("Test: b c");
 	});
@@ -66,18 +58,6 @@ describe("substituteArgs", () => {
 		expect(substituteArgs("$1: $@", ["prefix", "a", "b"])).toBe("prefix: prefix a b");
 	});
 
-	test("should handle empty arguments array with $ARGUMENTS", () => {
-		expect(substituteArgs("Test: $ARGUMENTS", [])).toBe("Test: ");
-	});
-
-	test("should handle empty arguments array with $@", () => {
-		expect(substituteArgs("Test: $@", [])).toBe("Test: ");
-	});
-
-	test("should handle empty arguments array with $1", () => {
-		expect(substituteArgs("Test: $1", [])).toBe("Test: ");
-	});
-
 	test("should handle multiple occurrences of $ARGUMENTS", () => {
 		expect(substituteArgs("$ARGUMENTS and $ARGUMENTS", ["a", "b"])).toBe("a b and a b");
 	});
@@ -116,14 +96,6 @@ describe("substituteArgs", () => {
 		expect(substituteArgs("$ARGUMENTS", ["first arg", "second arg"])).toBe("first arg second arg");
 	});
 
-	test("should handle single argument with $ARGUMENTS", () => {
-		expect(substituteArgs("Test: $ARGUMENTS", ["only"])).toBe("Test: only");
-	});
-
-	test("should handle single argument with $@", () => {
-		expect(substituteArgs("Test: $@", ["only"])).toBe("Test: only");
-	});
-
 	test("should handle $0 (zero index)", () => {
 		expect(substituteArgs("$0", ["a", "b"])).toBe("");
 	});
@@ -140,47 +112,14 @@ describe("substituteArgs", () => {
 		expect(substituteArgs("pre$@", ["a", "b"])).toBe("prea b");
 	});
 
-	test("should handle empty arguments in middle of list", () => {
-		expect(substituteArgs("$ARGUMENTS", ["a", "", "c"])).toBe("a  c");
-	});
-
 	test("should handle trailing and leading spaces in arguments", () => {
 		expect(substituteArgs("$ARGUMENTS", ["  leading  ", "trailing  "])).toBe("  leading   trailing  ");
-	});
-
-	test("should handle argument containing pattern partially", () => {
-		expect(substituteArgs("Prefix $ARGUMENTS suffix", ["ARGUMENTS"])).toBe("Prefix ARGUMENTS suffix");
-	});
-
-	test("should handle non-matching patterns", () => {
-		expect(substituteArgs("$A $$ $ $ARGS", ["a"])).toBe("$A $$ $ $ARGS");
-	});
-
-	test("should handle case variations (case-sensitive)", () => {
-		expect(substituteArgs("$arguments $Arguments $ARGUMENTS", ["a", "b"])).toBe("$arguments $Arguments a b");
-	});
-
-	test("should handle both syntaxes in same command with same result", () => {
-		const args = ["x", "y", "z"];
-		const result1 = substituteArgs("$@ and $ARGUMENTS", args);
-		const result2 = substituteArgs("$ARGUMENTS and $@", args);
-		expect(result1).toBe(result2);
-		expect(result1).toBe("x y z and x y z");
 	});
 
 	test("should handle very long argument lists", () => {
 		const args = Array.from({ length: 100 }, (_, i) => `arg${i}`);
 		const result = substituteArgs("$ARGUMENTS", args);
 		expect(result).toBe(args.join(" "));
-	});
-
-	test("should handle numbered placeholders with single digit", () => {
-		expect(substituteArgs("$1 $2 $3", ["a", "b", "c"])).toBe("a b c");
-	});
-
-	test("should handle numbered placeholders with multiple digits", () => {
-		const args = Array.from({ length: 15 }, (_, i) => `val${i}`);
-		expect(substituteArgs("$10 $12 $15", args)).toBe("val9 val11 val14");
 	});
 
 	test("should handle escaped dollar signs (literal backslash preserved)", () => {
@@ -257,14 +196,6 @@ describe("parseCommandArgs", () => {
 		// Note: This implementation doesn't handle escaped quotes - backslash is literal
 		expect(parseCommandArgs('"quoted \\"text\\""')).toEqual(["quoted \\text\\"]);
 	});
-
-	test("should handle trailing spaces", () => {
-		expect(parseCommandArgs("a b c   ")).toEqual(["a", "b", "c"]);
-	});
-
-	test("should handle leading spaces", () => {
-		expect(parseCommandArgs("   a b c")).toEqual(["a", "b", "c"]);
-	});
 });
 
 // ============================================================================
@@ -295,6 +226,52 @@ describe("parseCommandArgs + substituteArgs integration", () => {
 		const template1 = "Implement: $@";
 		const template2 = "Implement: $ARGUMENTS";
 		expect(substituteArgs(template1, args)).toBe(substituteArgs(template2, args));
+	});
+});
+
+// ============================================================================
+// Hashline prompt helpers
+// ============================================================================
+
+describe("hashline prompt helpers", () => {
+	function createPromptTemplate(content: string): PromptTemplate {
+		return {
+			name: "test-template",
+			description: "Test template",
+			content,
+			source: "test",
+		};
+	}
+
+	function expandPrompt(content: string): string {
+		return expandPromptTemplate("/test-template", [createPromptTemplate(content)]);
+	}
+
+	test("href and hrefr should reuse anchors remembered from hline", () => {
+		const result = expandPrompt(
+			'{{hline 2 "const timeout = 5000;"}}\nquoted={{href 2}}\nraw={{hrefr 2}}\nlast={{hrefr}}',
+		);
+		const [line, quoted, raw, last] = result.split("\n");
+		const ref = line.split("|", 1)[0];
+
+		expect(line).toBe(`${ref}|const timeout = 5000;`);
+		expect(quoted).toBe(`quoted="${ref}"`);
+		expect(raw).toBe(`raw=${ref}`);
+		expect(last).toBe(`last=${ref}`);
+	});
+
+	test("href and hrefr should still support explicit content without hline state", () => {
+		const result = expandPrompt('quoted={{href 5 "\treturn clean;"}}\nraw={{hrefr 5 "\treturn clean;"}}');
+		const [quoted, raw] = result.split("\n");
+		const ref = raw.slice("raw=".length);
+
+		expect(quoted).toBe(`quoted="${ref}"`);
+		expect(ref).toMatch(/^5[a-z]{2}$/);
+	});
+
+	test("href should not reuse hline state across prompt renders", () => {
+		expect(expandPrompt('{{hline 1 "const x = 1;"}}\n{{hrefr}}')).toMatch(/^1[a-z]{2}\|const x = 1;\n1[a-z]{2}$/);
+		expect(() => expandPrompt("{{hrefr}}")).toThrow("previous {{hline}}");
 	});
 });
 

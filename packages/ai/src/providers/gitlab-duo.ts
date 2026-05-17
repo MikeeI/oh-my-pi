@@ -1,12 +1,10 @@
 import { ANTHROPIC_THINKING, mapAnthropicToolChoice } from "../stream";
-import type { Api, Context, Model, SimpleStreamOptions } from "../types";
+import type { Api, Context, FetchImpl, Model, SimpleStreamOptions } from "../types";
 import { AssistantMessageEventStream } from "../utils/event-stream";
-import { streamAnthropic } from "./anthropic";
+import { createProviderErrorMessage } from "./error-message";
 import type { OpenAICompletionsOptions } from "./openai-completions";
-import { streamOpenAICompletions } from "./openai-completions";
 import type { OpenAIResponsesOptions } from "./openai-responses";
-import { streamOpenAIResponses } from "./openai-responses";
-import { createProviderErrorMessage } from "./shared/error-message";
+import { streamAnthropic, streamOpenAICompletions, streamOpenAIResponses } from "./register-builtins";
 
 const GITLAB_COM_URL = "https://gitlab.com";
 const AI_GATEWAY_URL = "https://cloud.gitlab.com";
@@ -174,13 +172,16 @@ interface DirectAccessToken {
 
 const directAccessCache = new Map<string, DirectAccessToken>();
 
-async function getDirectAccessToken(gitlabAccessToken: string): Promise<DirectAccessToken> {
+async function getDirectAccessToken(
+	gitlabAccessToken: string,
+	fetchImpl: FetchImpl = fetch,
+): Promise<DirectAccessToken> {
 	const cached = directAccessCache.get(gitlabAccessToken);
 	if (cached && cached.expiresAt > Date.now()) {
 		return cached;
 	}
 
-	const response = await fetch(`${GITLAB_COM_URL}/api/v4/ai/third_party_agents/direct_access`, {
+	const response = await fetchImpl(`${GITLAB_COM_URL}/api/v4/ai/third_party_agents/direct_access`, {
 		method: "POST",
 		headers: {
 			Authorization: `Bearer ${gitlabAccessToken}`,
@@ -242,7 +243,7 @@ export function streamGitLabDuo(
 				throw new Error(`Unsupported GitLab Duo model: ${model.id}`);
 			}
 
-			const directAccess = await getDirectAccessToken(options.apiKey);
+			const directAccess = await getDirectAccessToken(options.apiKey, options.fetch);
 			const headers = {
 				...directAccess.headers,
 				...options.headers,
@@ -278,6 +279,9 @@ export function streamGitLabDuo(
 								sessionId: options.sessionId,
 								providerSessionState: options.providerSessionState,
 								onPayload: options.onPayload,
+								onResponse: options.onResponse,
+								onSseEvent: options.onSseEvent,
+								fetch: options.fetch,
 								thinkingEnabled: Boolean(reasoningEffort) && model.reasoning,
 								thinkingBudgetTokens: reasoningEffort
 									? (options.thinkingBudgets?.[reasoningEffort] ?? ANTHROPIC_THINKING[reasoningEffort])
@@ -312,6 +316,9 @@ export function streamGitLabDuo(
 									sessionId: options.sessionId,
 									providerSessionState: options.providerSessionState,
 									onPayload: options.onPayload,
+									onResponse: options.onResponse,
+									onSseEvent: options.onSseEvent,
+									fetch: options.fetch,
 									reasoning: reasoningEffort,
 									toolChoice: options.toolChoice,
 								} satisfies OpenAIResponsesOptions,
@@ -341,6 +348,9 @@ export function streamGitLabDuo(
 									sessionId: options.sessionId,
 									providerSessionState: options.providerSessionState,
 									onPayload: options.onPayload,
+									onResponse: options.onResponse,
+									onSseEvent: options.onSseEvent,
+									fetch: options.fetch,
 									reasoning: reasoningEffort,
 									toolChoice: options.toolChoice,
 								} satisfies OpenAICompletionsOptions,

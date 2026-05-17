@@ -2,9 +2,6 @@ import { HookEditorComponent, HookInputComponent, HookSelectorComponent } from "
 
 // Core session management
 
-// TypeBox helper for string enums (convenience for custom tools)
-// Re-export from pi-ai which uses the correct enum-based schema format
-export { StringEnum } from "@oh-my-pi/pi-ai";
 // Re-export TUI components for custom tool rendering
 export { Container, Markdown, Spacer, Text } from "@oh-my-pi/pi-tui";
 // Logging
@@ -16,7 +13,6 @@ export type * from "./config/prompt-templates";
 export * from "./config/prompt-templates";
 export type { RetrySettings, SkillsSettings } from "./config/settings";
 export { Settings, settings } from "./config/settings";
-export * from "./edit/modes/hashline";
 // Custom commands
 export type * from "./extensibility/custom-commands/types";
 export type * from "./extensibility/custom-tools";
@@ -30,6 +26,7 @@ export * from "./extensibility/extensions";
 export * from "./extensibility/skills";
 // Slash commands
 export { type FileSlashCommand, loadSlashCommands as discoverSlashCommands } from "./extensibility/slash-commands";
+export * from "./hashline";
 export type * from "./lsp";
 // Main entry point
 export * from "./main";
@@ -43,8 +40,6 @@ export * from "./sdk";
 export * from "./session/agent-session";
 // Auth and model registry
 export * from "./session/auth-storage";
-// Compaction
-export * from "./session/compaction";
 export * from "./session/messages";
 export * from "./session/session-dump-format";
 export * from "./session/session-manager";

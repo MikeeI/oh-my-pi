@@ -5,19 +5,25 @@
  * createAgentSession() options. The SDK does the heavy lifting.
  */
 
-import { realpathSync } from "node:fs";
 import * as fs from "node:fs/promises";
 import * as os from "node:os";
 import * as path from "node:path";
 import { createInterface } from "node:readline/promises";
 import type { ImageContent } from "@oh-my-pi/pi-ai";
-import { $env, getConfigDirName, getProjectDir, logger, postmortem, setProjectDir, VERSION } from "@oh-my-pi/pi-utils";
+import {
+	$env,
+	getProjectDir,
+	logger,
+	normalizePathForComparison,
+	postmortem,
+	setProjectDir,
+	VERSION,
+} from "@oh-my-pi/pi-utils";
 import chalk from "chalk";
-import { invalidate as invalidateFsCache } from "./capability/fs";
 import type { Args } from "./cli/args";
 import { processFileArguments } from "./cli/file-processor";
 import { buildInitialMessage } from "./cli/initial-message";
-import { listModels } from "./cli/list-models";
+import { runListModelsCommand } from "./cli/list-models";
 import { selectSession } from "./cli/session-picker";
 import { findConfigFile } from "./config";
 import { ModelRegistry, ModelsConfigFile } from "./config/model-registry";
@@ -25,7 +31,7 @@ import { resolveCliModel, resolveModelRoleValue, resolveModelScope, type ScopedM
 import { getDefault, type SettingPath, Settings, settings } from "./config/settings";
 import { initializeWithSettings } from "./discovery";
 import {
-	clearClaudePluginRootsCache,
+	clearPluginRootsAndCaches,
 	injectPluginDirRoots,
 	preloadPluginRoots,
 	resolveActiveProjectRegistryPath,
@@ -90,6 +96,10 @@ const RPC_DEFAULTED_SETTING_PATHS: SettingPath[] = [
 	"task.maxRecursionDepth",
 	"task.disabledAgents",
 	"task.agentModelOverrides",
+	// Memory subsystems are off-by-default for RPC hosts; embedders that want
+	// memory should opt in explicitly through their own settings layer.
+	"memory.backend",
+	"memories.enabled",
 ];
 
 function applyRpcDefaultSettingOverrides(): void {
@@ -115,8 +125,11 @@ export interface InteractiveModeNotify {
 }
 
 export async function submitInteractiveInput(
-	mode: Pick<InteractiveMode, "markPendingSubmissionStarted" | "finishPendingSubmission" | "showError">,
-	session: Pick<AgentSession, "prompt">,
+	mode: Pick<
+		InteractiveMode,
+		"markPendingSubmissionStarted" | "finishPendingSubmission" | "showError" | "checkShutdownRequested"
+	>,
+	session: Pick<AgentSession, "prompt" | "promptCustomMessage">,
 	input: SubmittedUserInput,
 ): Promise<void> {
 	if (input.cancelled) {
@@ -128,12 +141,22 @@ export async function submitInteractiveInput(
 		if (!input.started && !mode.markPendingSubmissionStarted(input)) {
 			return;
 		}
-		await session.prompt(input.text, { images: input.images });
+		if (input.customType) {
+			await session.promptCustomMessage({
+				customType: input.customType,
+				content: input.text,
+				display: input.display ?? false,
+				attribution: "agent",
+			});
+		} else {
+			await session.prompt(input.text, { images: input.images });
+		}
 	} catch (error: unknown) {
 		const errorMessage = error instanceof Error ? error.message : "Unknown error occurred";
 		mode.showError(errorMessage);
 	} finally {
 		mode.finishPendingSubmission(input);
+		await mode.checkShutdownRequested();
 	}
 }
 
@@ -213,15 +236,6 @@ async function runInteractiveMode(
 	}
 }
 
-function normalizePathForComparison(value: string): string {
-	const resolved = path.resolve(value);
-	let realPath = resolved;
-	try {
-		realPath = realpathSync(resolved);
-	} catch {}
-	return process.platform === "win32" ? realPath.toLowerCase() : realPath;
-}
-
 async function promptForkSession(session: SessionInfo): Promise<boolean> {
 	if (!process.stdin.isTTY) {
 		return false;
@@ -242,23 +256,38 @@ async function getChangelogForDisplay(parsed: Args): Promise<string | undefined>
 	}
 
 	const lastVersion = settings.get("lastChangelogVersion");
+	if (lastVersion === VERSION) {
+		// Steady state: user already saw the current version's changelog. Skip the file read + parse.
+		return undefined;
+	}
+
 	const changelogPath = getChangelogPath();
 	const entries = await parseChangelog(changelogPath);
 
 	if (!lastVersion) {
 		if (entries.length > 0) {
 			settings.set("lastChangelogVersion", VERSION);
+			await flushChangelogVersion();
 			return entries.map(e => e.content).join("\n\n");
 		}
 	} else {
 		const newEntries = getNewEntries(entries, lastVersion);
 		if (newEntries.length > 0) {
 			settings.set("lastChangelogVersion", VERSION);
+			await flushChangelogVersion();
 			return newEntries.map(e => e.content).join("\n\n");
 		}
 	}
 
 	return undefined;
+}
+
+async function flushChangelogVersion(): Promise<void> {
+	try {
+		await settings.flush();
+	} catch (error: unknown) {
+		logger.warn("Failed to persist lastChangelogVersion", { error });
+	}
 }
 
 async function createSessionManager(parsed: Args, cwd: string): Promise<SessionManager | undefined> {
@@ -335,10 +364,7 @@ async function maybeAutoChdir(parsed: Args): Promise<void> {
 		return;
 	}
 
-	const normalizePath = (value: string) => {
-		const resolved = realpathSync(path.resolve(value));
-		return process.platform === "win32" ? resolved.toLowerCase() : resolved;
-	};
+	const normalizePath = normalizePathForComparison;
 
 	const cwd = normalizePath(getProjectDir());
 	const normalizedHome = normalizePath(home);
@@ -522,11 +548,11 @@ async function buildSessionOptions(
 
 	// System prompt
 	if (resolvedSystemPrompt && resolvedAppendPrompt) {
-		options.systemPrompt = `${resolvedSystemPrompt}\n\n${resolvedAppendPrompt}`;
+		options.systemPrompt = defaultPrompt => [resolvedSystemPrompt, resolvedAppendPrompt, ...defaultPrompt.slice(1)];
 	} else if (resolvedSystemPrompt) {
-		options.systemPrompt = resolvedSystemPrompt;
+		options.systemPrompt = defaultPrompt => [resolvedSystemPrompt, ...defaultPrompt.slice(1)];
 	} else if (resolvedAppendPrompt) {
-		options.systemPrompt = defaultPrompt => `${defaultPrompt}\n\n${resolvedAppendPrompt}`;
+		options.systemPrompt = defaultPrompt => [...defaultPrompt, resolvedAppendPrompt];
 	}
 
 	// Tools
@@ -589,10 +615,25 @@ export async function runRootCommand(parsed: Args, rawArgs: string[]): Promise<v
 	}
 
 	if (parsedArgs.listModels !== undefined) {
-		await logger.time("settings:init:list-models", Settings.init, { cwd: getProjectDir() });
+		const settingsInstance = await logger.time("settings:init:list-models", Settings.init, {
+			cwd: getProjectDir(),
+		});
 		await modelRegistry.refresh("online");
+		const cliExtensionPaths = parsedArgs.noExtensions
+			? []
+			: [...(parsedArgs.extensions ?? []), ...(parsedArgs.hooks ?? [])];
+		const settingsExtensions = settingsInstance.get("extensions") ?? [];
+		const disabledExtensionIds = settingsInstance.get("disabledExtensions") ?? [];
 		const searchPattern = typeof parsedArgs.listModels === "string" ? parsedArgs.listModels : undefined;
-		await listModels(modelRegistry, searchPattern);
+		await runListModelsCommand({
+			modelRegistry,
+			cwd: getProjectDir(),
+			additionalExtensionPaths: cliExtensionPaths,
+			settingsExtensions,
+			disabledExtensionIds,
+			disableExtensionDiscovery: Boolean(parsedArgs.noExtensions),
+			searchPattern,
+		});
 		process.exit(0);
 	}
 
@@ -610,20 +651,31 @@ export async function runRootCommand(parsed: Args, rawArgs: string[]): Promise<v
 		process.exit(0);
 	}
 
-	if (parsedArgs.mode === "rpc" && parsedArgs.fileArgs.length > 0) {
+	if ((parsedArgs.mode === "rpc" || parsedArgs.mode === "rpc-ui") && parsedArgs.fileArgs.length > 0) {
 		process.stderr.write(`${chalk.red("Error: @file arguments are not supported in RPC mode")}\n`);
 		process.exit(1);
 	}
 
+	// Kick off plugin-root preload in parallel with the remaining startup work.
+	// Awaited later (before extension/skill discovery in createAgentSession needs it).
+	const home = os.homedir();
+	const pluginPreloadPromise =
+		parsedArgs.pluginDirs && parsedArgs.pluginDirs.length > 0
+			? logger.time("injectPluginDirRoots", injectPluginDirRoots, home, parsedArgs.pluginDirs, getProjectDir())
+			: logger.time("preloadPluginRoots", preloadPluginRoots, home, getProjectDir());
+	// Mark the promise as handled so a synchronous failure does not surface as an unhandled-rejection
+	// warning before we reach the await site below.
+	pluginPreloadPromise.catch(() => {});
+
 	const cwd = getProjectDir();
-	await logger.time("settings:init", Settings.init, { cwd });
-	if (parsedArgs.mode === "rpc") {
+	const settingsInstance = await logger.time("settings:init", Settings.init, { cwd });
+	if (parsedArgs.mode === "rpc" || parsedArgs.mode === "rpc-ui" || parsedArgs.mode === "acp") {
 		applyRpcDefaultSettingOverrides();
 	}
-	if (parsedArgs.noPty) {
+	if (parsedArgs.noPty || parsedArgs.mode === "rpc-ui") {
 		Bun.env.PI_NO_PTY = "1";
 	}
-	if (parsedArgs.noTitle || parsedArgs.mode === "rpc") {
+	if (parsedArgs.noTitle || parsedArgs.mode === "rpc" || parsedArgs.mode === "rpc-ui" || parsedArgs.mode === "acp") {
 		Bun.env.PI_NO_TITLE = "1";
 	}
 	const { pipedInput, fileText, fileImages } = await logger.time("prepareInitialMessage", async () => {
@@ -647,9 +699,7 @@ export async function runRootCommand(parsed: Args, rawArgs: string[]): Promise<v
 	const mode = parsedArgs.mode || "text";
 
 	// Initialize discovery system with settings for provider persistence
-	logger.time("initializeWithSettings");
-	initializeWithSettings(settings);
-	modelRegistry.refreshInBackground();
+	logger.time("initializeWithSettings", initializeWithSettings, settings);
 
 	// Apply model role overrides from CLI args or env vars (ephemeral, not persisted)
 	const smolModel = parsedArgs.smol ?? $env.PI_SMOL_MODEL;
@@ -706,13 +756,7 @@ export async function runRootCommand(parsed: Args, rawArgs: string[]): Promise<v
 		sessionManager = await SessionManager.open(selectedPath);
 	}
 
-	// Wire --plugin-dir and preload plugin roots for sync consumers (LSP config)
-	const home = os.homedir();
-	if (parsedArgs.pluginDirs && parsedArgs.pluginDirs.length > 0) {
-		await logger.time("injectPluginDirRoots", injectPluginDirRoots, home, parsedArgs.pluginDirs!, getProjectDir());
-	} else {
-		await logger.time("preloadPluginRoots", preloadPluginRoots, home, getProjectDir());
-	}
+	await pluginPreloadPromise;
 
 	// Background marketplace auto-update — never blocks startup.
 	const autoUpdate = settings.get("marketplace.autoUpdate");
@@ -725,13 +769,7 @@ export async function runRootCommand(parsed: Args, rawArgs: string[]): Promise<v
 					projectInstalledRegistryPath: (await resolveActiveProjectRegistryPath(getProjectDir())) ?? undefined,
 					marketplacesCacheDir: getMarketplacesCacheDir(),
 					pluginsCacheDir: getPluginsCacheDir(),
-					clearPluginRootsCache: (extraPaths?: readonly string[]) => {
-						const h = os.homedir();
-						invalidateFsCache(path.join(h, ".claude", "plugins", "installed_plugins.json"));
-						invalidateFsCache(path.join(h, getConfigDirName(), "plugins", "installed_plugins.json"));
-						for (const p of extraPaths ?? []) invalidateFsCache(p);
-						clearClaudePluginRootsCache();
-					},
+					clearPluginRootsCache: clearPluginRootsAndCaches,
 				});
 				await mgr.refreshStaleMarketplaces();
 				const updates = await mgr.checkForUpdates();
@@ -740,7 +778,7 @@ export async function runRootCommand(parsed: Args, rawArgs: string[]): Promise<v
 					await mgr.upgradeAllPlugins();
 					logger.debug(`Auto-upgraded ${updates.length} marketplace plugin(s)`);
 				} else {
-					logger.debug(`${updates.length} marketplace plugin update(s) available \u2014 /marketplace upgrade`);
+					logger.debug(`${updates.length} marketplace plugin update(s) available — /marketplace upgrade`);
 				}
 			} catch {
 				// Silently ignore — network failure, corrupt data, offline.
@@ -758,7 +796,8 @@ export async function runRootCommand(parsed: Args, rawArgs: string[]): Promise<v
 	);
 	sessionOptions.authStorage = authStorage;
 	sessionOptions.modelRegistry = modelRegistry;
-	sessionOptions.hasUI = isInteractive;
+	sessionOptions.hasUI = isInteractive || mode === "rpc-ui";
+	sessionOptions.settings = settingsInstance;
 
 	// Handle CLI --api-key as runtime override (not persisted)
 	if (parsedArgs.apiKey) {
@@ -778,7 +817,10 @@ export async function runRootCommand(parsed: Args, rawArgs: string[]): Promise<v
 		createAgentSession,
 		sessionOptions,
 	);
-	logger.time("main:afterCreateSession");
+	// Kick off background model discovery only after createAgentSession finishes its parallel
+	// discovery arms; running these concurrently contends for the event loop and stretches
+	// every parallel arm by ~30ms.
+	modelRegistry.refreshInBackground();
 	if (parsedArgs.apiKey && !sessionOptions.model && session.model) {
 		authStorage.setRuntimeApiKey(session.model.provider, parsedArgs.apiKey);
 	}
@@ -817,7 +859,7 @@ export async function runRootCommand(parsed: Args, rawArgs: string[]): Promise<v
 		}
 	}
 
-	if (!isInteractive && !session.model) {
+	if (!isInteractive && parsedArgs.mode !== "acp" && !session.model) {
 		if (modelFallbackMessage) {
 			process.stderr.write(`${chalk.red(modelFallbackMessage)}\n`);
 		} else {
@@ -850,14 +892,13 @@ export async function runRootCommand(parsed: Args, rawArgs: string[]): Promise<v
 		return nextSession;
 	};
 
-	if (mode === "rpc") {
-		await runRpcMode(session);
+	if (mode === "rpc" || mode === "rpc-ui") {
+		await runRpcMode(session, mode === "rpc-ui" ? setToolUIContext : undefined);
 	} else if (mode === "acp") {
 		await runAcpMode(session, createAcpSession);
 	} else if (isInteractive) {
 		const versionCheckPromise = checkForNewVersion(VERSION).catch(() => undefined);
-		logger.time("main:getChangelogForDisplay");
-		const changelogMarkdown = await getChangelogForDisplay(parsedArgs);
+		const changelogMarkdown = await logger.time("main:getChangelogForDisplay", getChangelogForDisplay, parsedArgs);
 
 		const scopedModelsForDisplay = sessionOptions.scopedModels ?? scopedModels;
 		if (scopedModelsForDisplay.length > 0) {
@@ -899,6 +940,9 @@ export async function runRootCommand(parsed: Args, rawArgs: string[]): Promise<v
 			initialMessage,
 			initialImages,
 		});
+		if ($env.PI_TIMING) {
+			logger.printTimings();
+		}
 		await session.dispose();
 		stopThemeWatcher();
 		await postmortem.quit(0);

@@ -3,6 +3,7 @@ import { Container, Image, ImageProtocol, Markdown, Spacer, TERMINAL, Text } fro
 import { formatNumber } from "@oh-my-pi/pi-utils";
 import { settings } from "../../config/settings";
 import { getMarkdownTheme, theme } from "../../modes/theme/theme";
+import { isSilentAbort } from "../../session/messages";
 import { resolveImageOptions } from "../../tools/render-utils";
 
 /**
@@ -13,10 +14,13 @@ export class AssistantMessageComponent extends Container {
 	#lastMessage?: AssistantMessage;
 	#toolImagesByCallId = new Map<string, ImageContent[]>();
 	#usageInfo?: Usage;
+	#convertedKittyImages = new Map<string, ImageContent>();
+	#kittyConversionsInFlight = new Set<string>();
 
 	constructor(
 		message?: AssistantMessage,
 		private hideThinkingBlock = false,
+		private readonly onImageUpdate?: () => void,
 	) {
 		super();
 
@@ -43,13 +47,53 @@ export class AssistantMessageComponent extends Container {
 	setToolResultImages(toolCallId: string, images: ImageContent[]): void {
 		if (!toolCallId) return;
 		const validImages = images.filter(img => img.type === "image" && img.data && img.mimeType);
+		for (const key of Array.from(this.#convertedKittyImages.keys())) {
+			if (key.startsWith(`${toolCallId}:`)) {
+				this.#convertedKittyImages.delete(key);
+			}
+		}
+		for (const key of Array.from(this.#kittyConversionsInFlight)) {
+			if (key.startsWith(`${toolCallId}:`)) {
+				this.#kittyConversionsInFlight.delete(key);
+			}
+		}
 		if (validImages.length === 0) {
 			this.#toolImagesByCallId.delete(toolCallId);
 		} else {
 			this.#toolImagesByCallId.set(toolCallId, validImages);
+			this.#convertToolImagesForKitty(toolCallId, validImages);
 		}
 		if (this.#lastMessage) {
 			this.updateContent(this.#lastMessage);
+		}
+	}
+
+	#convertToolImagesForKitty(toolCallId: string, images: ImageContent[]): void {
+		if (TERMINAL.imageProtocol !== ImageProtocol.Kitty) return;
+		for (let index = 0; index < images.length; index++) {
+			const image = images[index];
+			if (!image || image.mimeType === "image/png") continue;
+			const key = `${toolCallId}:${index}`;
+			if (this.#convertedKittyImages.has(key) || this.#kittyConversionsInFlight.has(key)) continue;
+			this.#kittyConversionsInFlight.add(key);
+			new Bun.Image(Buffer.from(image.data, "base64"))
+				.png()
+				.toBase64()
+				.then(data => {
+					this.#kittyConversionsInFlight.delete(key);
+					this.#convertedKittyImages.set(key, {
+						type: "image",
+						data,
+						mimeType: "image/png",
+					});
+					if (this.#lastMessage) {
+						this.updateContent(this.#lastMessage);
+					}
+					this.onImageUpdate?.();
+				})
+				.catch(() => {
+					this.#kittyConversionsInFlight.delete(key);
+				});
 		}
 	}
 
@@ -61,19 +105,22 @@ export class AssistantMessageComponent extends Container {
 	}
 
 	#renderToolImages(): void {
-		const images = Array.from(this.#toolImagesByCallId.values()).flat();
-		if (images.length === 0) return;
+		const imageEntries = Array.from(this.#toolImagesByCallId.entries()).flatMap(([toolCallId, images]) =>
+			images.map((image, index) => ({ image, key: `${toolCallId}:${index}` })),
+		);
+		if (imageEntries.length === 0) return;
 
 		this.#contentContainer.addChild(new Spacer(1));
-		for (const image of images) {
-			if (
-				TERMINAL.imageProtocol &&
-				(TERMINAL.imageProtocol !== ImageProtocol.Kitty || image.mimeType === "image/png")
-			) {
+		for (const { image, key } of imageEntries) {
+			const displayImage =
+				TERMINAL.imageProtocol === ImageProtocol.Kitty && image.mimeType !== "image/png"
+					? this.#convertedKittyImages.get(key)
+					: image;
+			if (TERMINAL.imageProtocol && displayImage) {
 				this.#contentContainer.addChild(
 					new Image(
-						image.data,
-						image.mimeType,
+						displayImage.data,
+						displayImage.mimeType,
 						{ fallbackColor: (text: string) => theme.fg("toolOutput", text) },
 						resolveImageOptions(),
 					),
@@ -138,7 +185,7 @@ export class AssistantMessageComponent extends Container {
 		// But only if there are no tool calls (tool execution components will show the error)
 		const hasToolCalls = message.content.some(c => c.type === "toolCall");
 		if (!hasToolCalls) {
-			if (message.stopReason === "aborted") {
+			if (message.stopReason === "aborted" && !isSilentAbort(message.errorMessage)) {
 				const abortMessage =
 					message.errorMessage && message.errorMessage !== "Request was aborted"
 						? message.errorMessage
@@ -155,7 +202,12 @@ export class AssistantMessageComponent extends Container {
 				this.#contentContainer.addChild(new Text(theme.fg("error", `Error: ${errorMsg}`), 1, 0));
 			}
 		}
-		if (message.errorMessage && message.stopReason !== "aborted" && message.stopReason !== "error") {
+		if (
+			message.errorMessage &&
+			!isSilentAbort(message.errorMessage) &&
+			message.stopReason !== "aborted" &&
+			message.stopReason !== "error"
+		) {
 			this.#contentContainer.addChild(new Spacer(1));
 			this.#contentContainer.addChild(new Text(theme.fg("error", `Error: ${message.errorMessage}`), 1, 0));
 		}

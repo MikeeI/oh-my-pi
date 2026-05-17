@@ -2,13 +2,17 @@ import { afterEach, describe, expect, it, vi } from "bun:test";
 import * as fs from "node:fs/promises";
 import * as os from "node:os";
 import * as path from "node:path";
-import type { AgentToolContext } from "@oh-my-pi/pi-agent-core";
 import { Settings } from "@oh-my-pi/pi-coding-agent/config/settings";
-import { SessionManager } from "@oh-my-pi/pi-coding-agent/session/session-manager";
 import type { ToolSession } from "@oh-my-pi/pi-coding-agent/tools";
-import { GithubTool } from "@oh-my-pi/pi-coding-agent/tools/gh";
-import { wrapToolWithMetaNotice } from "@oh-my-pi/pi-coding-agent/tools/output-meta";
+import {
+	buildSearchDateQualifier,
+	GithubTool,
+	parsePrUnifiedDiff,
+	parseSearchDateBound,
+} from "@oh-my-pi/pi-coding-agent/tools/gh";
 import * as git from "@oh-my-pi/pi-coding-agent/utils/git";
+import { getAgentDir, setAgentDir } from "@oh-my-pi/pi-utils";
+import * as z from "zod/v4";
 
 function createSession(
 	cwd: string = "/tmp/test",
@@ -33,22 +37,6 @@ function createSession(
 		getSessionSpawns: () => null,
 		settings,
 	};
-}
-
-function createToolContext(settings: Settings): AgentToolContext {
-	return {
-		sessionManager: SessionManager.inMemory(),
-		settings,
-		modelRegistry: {
-			find: () => undefined,
-			getAll: () => [],
-			getApiKey: async () => undefined,
-		} as unknown as AgentToolContext["modelRegistry"],
-		model: undefined,
-		isIdle: () => true,
-		hasQueuedMessages: () => false,
-		abort: () => {},
-	} as AgentToolContext;
 }
 
 function runGit(cwd: string, args: string[]): string {
@@ -115,6 +103,88 @@ async function createPrFixture(): Promise<{
 	};
 }
 
+/**
+ * Stub `os.homedir()` AND rebuild the cached `dirs` resolver in pi-utils so
+ * `getWorktreesDir()` resolves under an isolated temp home instead of the
+ * user's real `~/.omp/wt`. Returns the temp home and a cleanup hook.
+ */
+async function setupTempHome(): Promise<{ home: string; cleanup: () => Promise<void> }> {
+	const home = await fs.mkdtemp(path.join(os.tmpdir(), "gh-pr-tool-home-"));
+	vi.spyOn(os, "homedir").mockReturnValue(home);
+	// `dirs.configRoot` is computed at constructor time from `os.homedir()`, so
+	// we must rebuild the resolver after the spy is in place. `setAgentDir`
+	// recreates it; we point it at the temp home's default agent dir.
+	const originalAgentDir = getAgentDir();
+	setAgentDir(path.join(home, ".omp", "agent"));
+	return {
+		home,
+		cleanup: async () => {
+			setAgentDir(originalAgentDir);
+			await fs.rm(home, { recursive: true, force: true });
+		},
+	};
+}
+
+/**
+ * Compute the auto-derived worktree path for a given primary repo root and
+ * local branch name, mirroring the encoding used by `pr_checkout`. Resolves
+ * symlinks (matches the production `fs.realpath` step) so assertions match
+ * the value rendered into the tool result.
+ */
+async function expectedWorktreePath(home: string, primaryRoot: string, localBranch: string): Promise<string> {
+	const encoded = path
+		.resolve(primaryRoot)
+		.replace(/^[/\\]/, "")
+		.replace(/[/\\:]/g, "-");
+	return fs.realpath(path.join(home, ".omp", "wt", encoded, localBranch));
+}
+
+describe("parsePrUnifiedDiff", () => {
+	it("parses quoted diff headers instead of falling back to unknown paths", () => {
+		const diff = [
+			'diff --git "a/src/file with spaces.ts" "b/src/file with spaces.ts"',
+			"index 0000000..1111111 100644",
+			'--- "a/src/file with spaces.ts"',
+			'+++ "b/src/file with spaces.ts"',
+			"@@ -1 +1 @@",
+			"-old",
+			"+new",
+		].join("\n");
+
+		const parsed = parsePrUnifiedDiff(diff);
+
+		expect(parsed.files).toHaveLength(1);
+		expect(parsed.files[0]).toMatchObject({
+			path: "src/file with spaces.ts",
+			additions: 1,
+			deletions: 1,
+			changeType: "modified",
+		});
+		expect(parsed.files[0]?.oldPath).toBeUndefined();
+	});
+
+	it("counts hunk lines whose content starts with file-header markers", () => {
+		const diff = [
+			"diff --git a/src/headings.md b/src/headings.md",
+			"index 0000000..1111111 100644",
+			"--- a/src/headings.md",
+			"+++ b/src/headings.md",
+			"@@ -1 +1 @@",
+			"---- removed heading marker",
+			"++++ added heading marker",
+		].join("\n");
+
+		const parsed = parsePrUnifiedDiff(diff);
+
+		expect(parsed.files[0]).toMatchObject({
+			path: "src/headings.md",
+			additions: 1,
+			deletions: 1,
+			changeType: "modified",
+		});
+	});
+});
+
 describe("github tool", () => {
 	afterEach(() => {
 		vi.useRealTimers();
@@ -150,144 +220,120 @@ describe("github tool", () => {
 		expect(text).toContain("Topics: cli, github");
 	});
 
-	it("formats issue comments and omits minimized ones", async () => {
-		vi.spyOn(git.github, "json").mockResolvedValue({
-			number: 42,
-			title: "Example issue",
-			state: "OPEN",
-			stateReason: null,
-			author: { login: "octocat" },
-			body: "Issue body",
-			createdAt: "2026-04-01T09:00:00Z",
-			updatedAt: "2026-04-01T10:00:00Z",
-			url: "https://github.com/cli/cli/issues/42",
-			labels: [{ name: "bug" }],
-			comments: [
-				{
-					author: { login: "reviewer" },
-					body: "Visible comment",
-					createdAt: "2026-04-01T11:00:00Z",
-					url: "https://github.com/cli/cli/issues/42#issuecomment-1",
-					isMinimized: false,
-				},
-				{
-					author: { login: "spam" },
-					body: "Hidden comment",
-					createdAt: "2026-04-01T12:00:00Z",
-					url: "https://github.com/cli/cli/issues/42#issuecomment-2",
-					isMinimized: true,
-					minimizedReason: "SPAM",
-				},
-			],
+	it("creates a pull request via gh and renders the resulting summary", async () => {
+		const textCalls: string[][] = [];
+		const textSpy = vi.spyOn(git.github, "text").mockImplementation(async (_cwd, args) => {
+			textCalls.push([...args]);
+			return "https://github.com/owner/repo/pull/77\n";
 		});
-
-		const tool = new GithubTool(createSession());
-		const result = await tool.execute("issue-view", {
-			op: "issue_view",
-			issue: "42",
-			repo: "cli/cli",
-			comments: true,
-		});
-		const text = result.content[0]?.type === "text" ? result.content[0].text : "";
-
-		expect(text).toContain("# Issue #42: Example issue");
-		expect(text).toContain("Labels: bug");
-		expect(text).toContain("### @reviewer · 2026-04-01T11:00:00Z");
-		expect(text).toContain("Visible comment");
-		expect(text).toContain("Minimized comments omitted: 1.");
-		expect(text).not.toContain("Hidden comment");
-	});
-
-	it("includes pull request reviews and inline review comments in the discussion context", async () => {
-		vi.spyOn(git.github, "json").mockImplementation(async (_cwd, args) => {
-			if (args.includes("/repos/cli/cli/pulls/12/comments")) {
-				return [
-					{
-						id: 501,
-						body: "Please rename this helper.",
-						path: "src/file.ts",
-						line: 17,
-						side: "RIGHT",
-						user: { login: "inline-reviewer" },
-						created_at: "2026-04-01T11:30:00Z",
-						html_url: "https://github.com/cli/cli/pull/12#discussion_r1",
-					},
-				] as never;
-			}
-
+		const jsonCalls: string[][] = [];
+		const jsonSpy = vi.spyOn(git.github, "json").mockImplementation(async (_cwd, args) => {
+			jsonCalls.push([...args]);
 			return {
-				number: 12,
-				title: "Improve PR context",
+				number: 77,
+				title: "Add gizmo",
 				state: "OPEN",
-				author: { login: "octocat" },
-				body: "PR body",
+				isDraft: true,
 				baseRefName: "main",
-				headRefName: "feature/pr-reviews",
-				isDraft: false,
-				mergeStateStatus: "CLEAN",
-				reviewDecision: "CHANGES_REQUESTED",
-				createdAt: "2026-04-01T09:00:00Z",
-				updatedAt: "2026-04-01T10:00:00Z",
-				url: "https://github.com/cli/cli/pull/12",
-				labels: [{ name: "bug" }],
-				files: [{ path: "src/file.ts", additions: 3, deletions: 1, changeType: "MODIFIED" }],
-				reviews: [
-					{
-						author: { login: "reviewer" },
-						body: "Please add coverage for this path.",
-						state: "CHANGES_REQUESTED",
-						submittedAt: "2026-04-01T11:00:00Z",
-						commit: { oid: "abcdef1234567890" },
-					},
-				],
-				comments: [],
+				headRefName: "feature/gizmo",
+				author: { login: "octocat" },
+				createdAt: "2026-05-01T09:00:00Z",
+				labels: [{ name: "enhancement" }],
+				body: "Adds a gizmo.",
+				url: "https://github.com/owner/repo/pull/77",
 			} as never;
 		});
 
 		const tool = new GithubTool(createSession());
-		const result = await tool.execute("pr-view", {
-			op: "pr_view",
-			pr: "12",
-			repo: "cli/cli",
-			comments: true,
+		const result = await tool.execute("pr-create", {
+			op: "pr_create",
+			repo: "owner/repo",
+			title: "Add gizmo",
+			body: "Adds a gizmo.",
+			base: "main",
+			head: "feature/gizmo",
+			draft: true,
+			reviewer: ["reviewer1"],
+			label: ["enhancement"],
 		});
 		const text = result.content[0]?.type === "text" ? result.content[0].text : "";
 
-		expect(text).toContain("## Reviews (1)");
-		expect(text).toContain("### @reviewer - 2026-04-01T11:00:00Z [CHANGES_REQUESTED]");
-		expect(text).toContain("Commit: abcdef123456");
-		expect(text).toContain("Please add coverage for this path.");
-		expect(text).toContain("## Review Comments (1)");
-		expect(text).toContain("### @inline-reviewer · 2026-04-01T11:30:00Z");
-		expect(text).toContain("Location: src/file.ts:17");
-		expect(text).toContain("Please rename this helper.");
+		// gh pr create invocation: must pass --repo, --title, --base, --head,
+		// --draft, --reviewer, --label, and route the body through --body-file
+		// (not --body, to keep multi-KB bodies clear of argv-length limits).
+		expect(textSpy).toHaveBeenCalledTimes(1);
+		const createArgs = textCalls[0];
+		expect(createArgs.slice(0, 2)).toEqual(["pr", "create"]);
+		expect(createArgs).toEqual(expect.arrayContaining(["--repo", "owner/repo"]));
+		expect(createArgs).toEqual(expect.arrayContaining(["--title", "Add gizmo"]));
+		expect(createArgs).toEqual(expect.arrayContaining(["--base", "main"]));
+		expect(createArgs).toEqual(expect.arrayContaining(["--head", "feature/gizmo"]));
+		expect(createArgs).toContain("--draft");
+		expect(createArgs).toEqual(expect.arrayContaining(["--reviewer", "reviewer1"]));
+		expect(createArgs).toEqual(expect.arrayContaining(["--label", "enhancement"]));
+		const bodyFlagIndex = createArgs.indexOf("--body-file");
+		expect(bodyFlagIndex).toBeGreaterThanOrEqual(0);
+		const bodyFilePath = createArgs[bodyFlagIndex + 1];
+		expect(bodyFilePath).toMatch(/gh-pr-body-/);
+		expect(createArgs).not.toContain("--body");
+
+		// Follow-up summary fetch must target the parsed PR number/repo.
+		expect(jsonSpy).toHaveBeenCalledTimes(1);
+		const viewArgs = jsonCalls[0];
+		expect(viewArgs.slice(0, 3)).toEqual(["pr", "view", "77"]);
+		expect(viewArgs).toEqual(expect.arrayContaining(["--repo", "owner/repo"]));
+
+		// Output: PR number + summary rendered, URL surfaces, body block included.
+		expect(text).toContain("# Created Pull Request #77: Add gizmo");
+		expect(text).toContain("URL: https://github.com/owner/repo/pull/77");
+		expect(text).toContain("Draft: true");
+		expect(text).toContain("Base: main");
+		expect(text).toContain("Head: feature/gizmo");
+		expect(text).toContain("Labels: enhancement");
+		expect(text).toContain("Adds a gizmo.");
+	});
+
+	it("rejects pr_create when neither title nor fill is supplied", async () => {
+		const textSpy = vi.spyOn(git.github, "text");
+		const jsonSpy = vi.spyOn(git.github, "json");
+		const tool = new GithubTool(createSession());
+
+		await expect(tool.execute("pr-create", { op: "pr_create", repo: "owner/repo" })).rejects.toThrow(
+			"title is required unless fill is true",
+		);
+		expect(textSpy).not.toHaveBeenCalled();
+		expect(jsonSpy).not.toHaveBeenCalled();
 	});
 
 	it("formats pull request search results", async () => {
-		vi.spyOn(git.github, "json").mockResolvedValue([
-			{
-				number: 101,
-				title: "Add feature",
-				state: "OPEN",
-				author: { login: "dev1" },
-				repository: { nameWithOwner: "owner/repo" },
-				labels: [{ name: "feature" }],
-				createdAt: "2026-04-01T08:00:00Z",
-				updatedAt: "2026-04-01T09:00:00Z",
-				url: "https://github.com/owner/repo/pull/101",
-			},
-			{
-				number: 102,
-				title: "Fix regression",
-				state: "CLOSED",
-				author: { login: "dev2" },
-				repository: { nameWithOwner: "owner/repo" },
-				labels: [],
-				createdAt: "2026-03-31T08:00:00Z",
-				updatedAt: "2026-03-31T09:00:00Z",
-				url: "https://github.com/owner/repo/pull/102",
-			},
-		]);
+		vi.spyOn(git.github, "json").mockResolvedValue({
+			items: [
+				{
+					number: 101,
+					title: "Add feature",
+					state: "open",
+					user: { login: "dev1" },
+					repository_url: "https://api.github.com/repos/owner/repo",
+					labels: [{ name: "feature" }],
+					created_at: "2026-04-01T08:00:00Z",
+					updated_at: "2026-04-01T09:00:00Z",
+					html_url: "https://github.com/owner/repo/pull/101",
+					pull_request: { merged_at: null },
+				},
+				{
+					number: 102,
+					title: "Fix regression",
+					state: "closed",
+					user: { login: "dev2" },
+					repository_url: "https://api.github.com/repos/owner/repo",
+					labels: [],
+					created_at: "2026-03-31T08:00:00Z",
+					updated_at: "2026-03-31T09:00:00Z",
+					html_url: "https://github.com/owner/repo/pull/102",
+					pull_request: { merged_at: "2026-03-31T10:00:00Z" },
+				},
+			],
+		});
 
 		const tool = new GithubTool(createSession());
 		const result = await tool.execute("search-prs", {
@@ -302,12 +348,15 @@ describe("github tool", () => {
 		expect(text).toContain("Query: feature");
 		expect(text).toContain("Repository: owner/repo");
 		expect(text).toContain("- #101 Add feature");
+		expect(text).toContain("  State: open");
 		expect(text).toContain("  Labels: feature");
 		expect(text).toContain("- #102 Fix regression");
+		// merged_at present → state surfaces as "merged" even though the API says "closed".
+		expect(text).toContain("  State: merged");
 	});
 
-	it("passes leading-dash search queries after -- so gh does not parse them as flags", async () => {
-		const runGhJsonSpy = vi.spyOn(git.github, "json").mockResolvedValue([]);
+	it("calls /search/issues via gh api with the full query verbatim (including leading-dash terms)", async () => {
+		const runGhJsonSpy = vi.spyOn(git.github, "json").mockResolvedValue({ items: [] });
 
 		const tool = new GithubTool(createSession());
 		await tool.execute("search-issues", {
@@ -326,58 +375,313 @@ describe("github tool", () => {
 		const issueArgs = runGhJsonSpy.mock.calls[0]?.[1];
 		const prArgs = runGhJsonSpy.mock.calls[1]?.[1];
 
-		expect(issueArgs?.slice(0, 2)).toEqual(["search", "issues"]);
-		expect(issueArgs?.at(2)).toBe("--limit");
-		expect(issueArgs?.at(-2)).toBe("--");
-		expect(issueArgs?.at(-1)).toBe("-label:bug");
-		expect(prArgs?.slice(0, 2)).toEqual(["search", "prs"]);
-		expect(prArgs?.at(2)).toBe("--limit");
-		expect(prArgs?.at(-2)).toBe("--");
-		expect(prArgs?.at(-1)).toBe("-label:bug");
+		// `gh api` carries each form field separately, so leading dashes inside `q=` are not
+		// parsed as flags — replaces the historical `--` positional workaround.
+		expect(issueArgs?.slice(0, 4)).toEqual(["api", "-X", "GET", "/search/issues"]);
+		expect(issueArgs).toContain("q=-label:bug repo:owner/repo is:issue");
+		expect(issueArgs).toContain("per_page=1");
+		expect(prArgs?.slice(0, 4)).toEqual(["api", "-X", "GET", "/search/issues"]);
+		expect(prArgs).toContain("q=-label:bug repo:owner/repo is:pr");
+		expect(prArgs).toContain("per_page=1");
 	});
 
-	it("returns diff output under a stable heading without rewriting patch content", async () => {
-		vi.spyOn(git.github, "text").mockResolvedValue("diff --git a/Makefile b/Makefile\n+\tgo test ./... \n");
+	it("parseSearchDateBound: relative duration walks back from `now` and returns YYYY-MM-DD", () => {
+		const now = new Date("2026-05-12T15:00:00Z");
+		expect(parseSearchDateBound("3d", now)).toBe("2026-05-09");
+		expect(parseSearchDateBound("2w", now)).toBe("2026-04-28");
+		expect(parseSearchDateBound("12h", now)).toBe("2026-05-12");
+		expect(parseSearchDateBound("1mo", now)).toBe("2026-04-12");
+		expect(parseSearchDateBound("1y", now)).toBe("2025-05-12");
+	});
+
+	it("parseSearchDateBound: passes ISO dates through and normalizes ISO datetimes", () => {
+		expect(parseSearchDateBound("2026-05-01")).toBe("2026-05-01");
+		expect(parseSearchDateBound("2026-05-01T08:30:00Z")).toBe("2026-05-01T08:30:00.000Z");
+	});
+
+	it("parseSearchDateBound: rejects unparseable input", () => {
+		expect(() => parseSearchDateBound("yesterday")).toThrow(/invalid date bound/);
+		expect(() => parseSearchDateBound(" ")).toThrow(/must not be empty/);
+	});
+
+	it("buildSearchDateQualifier: emits >=, <=, or range depending on which bounds are set", () => {
+		const now = new Date("2026-05-12T00:00:00Z");
+		expect(buildSearchDateQualifier("created", "3d", undefined, now)).toBe("created:>=2026-05-09");
+		expect(buildSearchDateQualifier("created", undefined, "2026-05-01", now)).toBe("created:<=2026-05-01");
+		expect(buildSearchDateQualifier("committer-date", "7d", "1d", now)).toBe("committer-date:2026-05-05..2026-05-11");
+		expect(buildSearchDateQualifier("created", undefined, undefined)).toBeUndefined();
+	});
+
+	it("search_issues: appends a created:>= qualifier built from `since` and tags `is:issue`", async () => {
+		const spy = vi.spyOn(git.github, "json").mockResolvedValue({ items: [] });
+		const tool = new GithubTool(createSession());
+		await tool.execute("search-issues", {
+			op: "search_issues",
+			query: "is:open",
+			repo: "owner/repo",
+			since: "2026-05-01",
+			limit: 5,
+		});
+
+		const args = spy.mock.calls[0]?.[1];
+		expect(args).toContain("q=is:open created:>=2026-05-01 repo:owner/repo is:issue");
+	});
+
+	it("search_prs: builds a qualifier-only query when `query` is omitted and tags `is:pr`", async () => {
+		const spy = vi.spyOn(git.github, "json").mockResolvedValue({ items: [] });
+		const tool = new GithubTool(createSession());
+		await tool.execute("search-prs", {
+			op: "search_prs",
+			repo: "owner/repo",
+			since: "2026-05-01",
+			until: "2026-05-09",
+			dateField: "updated",
+			limit: 5,
+		});
+
+		const args = spy.mock.calls[0]?.[1];
+		expect(args).toContain("q=updated:2026-05-01..2026-05-09 repo:owner/repo is:pr");
+	});
+
+	it("search_prs: errors when neither `query` nor a date bound is provided", async () => {
+		vi.spyOn(git.github, "json").mockResolvedValue({ items: [] });
+		const tool = new GithubTool(createSession());
+		await expect(tool.execute("search-prs", { op: "search_prs", repo: "owner/repo" })).rejects.toThrow(
+			/query is required/,
+		);
+	});
+
+	it("search_commits: forces `committer-date` regardless of `dateField`", async () => {
+		const spy = vi.spyOn(git.github, "json").mockResolvedValue({ items: [] });
+		const tool = new GithubTool(createSession());
+		await tool.execute("search-commits", {
+			op: "search_commits",
+			query: "refactor",
+			repo: "owner/repo",
+			since: "2026-05-01",
+			dateField: "updated",
+			limit: 5,
+		});
+
+		const args = spy.mock.calls[0]?.[1];
+		expect(args?.slice(0, 4)).toEqual(["api", "-X", "GET", "/search/commits"]);
+		expect(args).toContain("q=refactor committer-date:>=2026-05-01 repo:owner/repo");
+	});
+
+	it("search_repos: maps dateField=updated to the `pushed:` qualifier", async () => {
+		const spy = vi.spyOn(git.github, "json").mockResolvedValue({ items: [] });
+		const tool = new GithubTool(createSession());
+		await tool.execute("search-repos", {
+			op: "search_repos",
+			query: "language:rust",
+			since: "2026-05-01",
+			dateField: "updated",
+			limit: 1,
+		});
+
+		const args = spy.mock.calls[0]?.[1];
+		expect(args?.slice(0, 4)).toEqual(["api", "-X", "GET", "/search/repositories"]);
+		expect(args).toContain("q=language:rust pushed:>=2026-05-01");
+	});
+
+	it("search_code: rejects since/until since GitHub code search has no date qualifier", async () => {
+		const spy = vi.spyOn(git.github, "json").mockResolvedValue({ items: [] });
+		const tool = new GithubTool(createSession());
+		await expect(tool.execute("search-code", { op: "search_code", query: "foo", since: "3d" })).rejects.toThrow(
+			/search_code does not support since\/until/,
+		);
+		expect(spy).not.toHaveBeenCalled();
+	});
+
+	it("formats code search results with paths, repo, sha, and match fragment", async () => {
+		const spy = vi.spyOn(git.github, "json").mockResolvedValue({
+			items: [
+				{
+					path: "src/lib.ts",
+					repository: { full_name: "owner/repo" },
+					sha: "abcdef1234567890",
+					html_url: "https://github.com/owner/repo/blob/abcdef1234567890/src/lib.ts",
+					text_matches: [{ fragment: "function findThing(): void {\n  ...\n}", property: "content" }],
+				},
+			],
+		});
 
 		const tool = new GithubTool(createSession());
-		const result = await tool.execute("pr-diff", { op: "pr_diff", pr: "7", repo: "owner/repo" });
+		const result = await tool.execute("search-code", {
+			op: "search_code",
+			query: "findThing",
+			repo: "owner/repo",
+			limit: 1,
+		});
 		const text = result.content[0]?.type === "text" ? result.content[0].text : "";
 
-		expect(text).toContain("# Pull Request Diff");
-		expect(text).toContain("diff --git a/Makefile b/Makefile");
-		expect(text).toContain("+\tgo test ./... ");
-		expect(text).not.toContain("+    go test ./... ");
+		expect(text).toContain("# GitHub code search");
+		expect(text).toContain("Query: findThing");
+		expect(text).toContain("Repository: owner/repo");
+		expect(text).toContain("- src/lib.ts");
+		expect(text).toContain("  Repo: owner/repo");
+		expect(text).toContain("  Commit: abcdef123456");
+		expect(text).toContain("  Match: function findThing(): void {");
+
+		// Code search needs the text-match accept header to populate `text_matches`.
+		const args = spy.mock.calls[0]?.[1] ?? [];
+		const acceptIndex = args.indexOf("Accept: application/vnd.github.text-match+json");
+		expect(acceptIndex).toBeGreaterThan(-1);
+		expect(args[acceptIndex - 1]).toBe("-H");
+		expect(args).toContain("q=findThing repo:owner/repo");
 	});
 
-	it("lets wrapped GitHub diff output spill to an artifact tail instead of head-truncating", async () => {
-		const diffOutput = Array.from({ length: 400 }, (_, index) => `diff line ${index + 1}`).join("\n");
-		vi.spyOn(git.github, "text").mockResolvedValue(diffOutput);
-
-		const settings = Settings.isolated({
-			"github.enabled": true,
-			"tools.artifactSpillThreshold": 1,
-			"tools.artifactTailBytes": 1,
-			"tools.artifactTailLines": 20,
+	it("formats commit search results with short sha and message subject", async () => {
+		vi.spyOn(git.github, "json").mockResolvedValue({
+			items: [
+				{
+					sha: "0123456789abcdef",
+					author: { login: "octocat" },
+					commit: {
+						message: "Fix flaky test\n\nMore detail in the body.",
+						author: { name: "Mona Lisa", email: "mona@example.com", date: "2026-04-01T12:00:00Z" },
+					},
+					repository: { full_name: "owner/repo" },
+					html_url: "https://github.com/owner/repo/commit/0123456789abcdef",
+				},
+			],
 		});
-		const tool = wrapToolWithMetaNotice(new GithubTool(createSession("/tmp/test", settings)));
-		const result = await tool.execute(
-			"pr-diff",
-			{ op: "pr_diff", pr: "7", repo: "owner/repo" },
-			undefined,
-			undefined,
-			createToolContext(settings),
-		);
+
+		const tool = new GithubTool(createSession());
+		const result = await tool.execute("search-commits", {
+			op: "search_commits",
+			query: "fix flaky",
+			repo: "owner/repo",
+			limit: 1,
+		});
 		const text = result.content[0]?.type === "text" ? result.content[0].text : "";
 
-		expect(text).toContain("diff line 400");
-		expect(text).not.toContain("diff line 1");
-		expect(text).toContain("Read artifact://");
-		expect(text).not.toContain("Use offset=");
-		expect(result.details?.meta?.truncation?.direction).toBe("tail");
+		expect(text).toContain("# GitHub commits search");
+		expect(text).toContain("- 0123456789ab Fix flaky test");
+		expect(text).not.toContain("More detail in the body.");
+		expect(text).toContain("  Author: @octocat");
+		expect(text).toContain("  Date: 2026-04-01T12:00:00Z");
+	});
+
+	it("formats repository search results and never injects the repo qualifier", async () => {
+		const runGhJsonSpy = vi.spyOn(git.github, "json").mockResolvedValue({
+			items: [
+				{
+					full_name: "octocat/hello-world",
+					description: "First line.\nSecond line should not surface.",
+					language: "TypeScript",
+					stargazers_count: 42,
+					forks_count: 7,
+					open_issues_count: 3,
+					visibility: "public",
+					archived: false,
+					fork: false,
+					updated_at: "2026-04-01T09:00:00Z",
+					html_url: "https://github.com/octocat/hello-world",
+				},
+			],
+		});
+
+		const tool = new GithubTool(createSession());
+		const result = await tool.execute("search-repos", {
+			op: "search_repos",
+			query: "language:typescript stars:>100",
+			repo: "ignored/value",
+			limit: 1,
+		});
+		const text = result.content[0]?.type === "text" ? result.content[0].text : "";
+
+		expect(text).toContain("# GitHub repositories search");
+		expect(text).toContain("- octocat/hello-world");
+		expect(text).toContain("  Description: First line.");
+		expect(text).not.toContain("Second line should not surface.");
+		expect(text).toContain("  Language: TypeScript");
+		expect(text).toContain("  Stars: 42");
+
+		const reposArgs = runGhJsonSpy.mock.calls[0]?.[1] ?? [];
+		expect(reposArgs.slice(0, 4)).toEqual(["api", "-X", "GET", "/search/repositories"]);
+		// `repo:` is ignored for repository searches even when supplied — query is forwarded as-is.
+		expect(reposArgs).toContain("q=language:typescript stars:>100");
+		expect(reposArgs.some(arg => typeof arg === "string" && arg.includes("repo:ignored/value"))).toBe(false);
+	});
+
+	it("search_prs: defaults `repo:` to the current checkout when `repo` is omitted", async () => {
+		const textSpy = vi.spyOn(git.github, "text").mockResolvedValue("acme/widgets\n");
+		const jsonSpy = vi.spyOn(git.github, "json").mockResolvedValue({ items: [] });
+		const tool = new GithubTool(createSession("/tmp/gh-default-prs"));
+		await tool.execute("search-prs", {
+			op: "search_prs",
+			query: "is:open",
+			limit: 1,
+		});
+
+		// `gh repo view --json nameWithOwner` runs against the session cwd to fetch the
+		// default scope; the resolved owner/repo gets layered onto the API query.
+		expect(textSpy).toHaveBeenCalled();
+		const repoViewArgs = textSpy.mock.calls[0]?.[1] ?? [];
+		expect(repoViewArgs.slice(0, 2)).toEqual(["repo", "view"]);
+		expect(repoViewArgs).toContain("nameWithOwner");
+
+		const apiArgs = jsonSpy.mock.calls[0]?.[1] ?? [];
+		expect(apiArgs).toContain("q=is:open repo:acme/widgets is:pr");
+	});
+
+	it("search_issues: skips the current-repo default when the query already carries a scope qualifier", async () => {
+		const textSpy = vi.spyOn(git.github, "text").mockResolvedValue("acme/widgets\n");
+		const jsonSpy = vi.spyOn(git.github, "json").mockResolvedValue({ items: [] });
+		const tool = new GithubTool(createSession("/tmp/gh-default-skip-qualifier"));
+		await tool.execute("search-issues", {
+			op: "search_issues",
+			query: "is:open org:torvalds",
+			limit: 1,
+		});
+
+		// Explicit `org:` qualifier suppresses the auto-resolved `repo:` injection.
+		expect(textSpy).not.toHaveBeenCalled();
+		const apiArgs = jsonSpy.mock.calls[0]?.[1] ?? [];
+		expect(apiArgs).toContain("q=is:open org:torvalds is:issue");
+		expect(apiArgs.some(a => typeof a === "string" && a.startsWith("q=") && a.includes("repo:acme/widgets"))).toBe(
+			false,
+		);
+	});
+
+	it("search_code: falls back to global search when `gh repo view` cannot resolve the current checkout", async () => {
+		const textSpy = vi.spyOn(git.github, "text").mockRejectedValue(new Error("not a git repository"));
+		const jsonSpy = vi.spyOn(git.github, "json").mockResolvedValue({ items: [] });
+		const tool = new GithubTool(createSession("/tmp/gh-default-no-remote"));
+		await tool.execute("search-code", {
+			op: "search_code",
+			query: "findThing",
+			limit: 1,
+		});
+
+		expect(textSpy).toHaveBeenCalled();
+		const apiArgs = jsonSpy.mock.calls[0]?.[1] ?? [];
+		// No `repo:` should be injected — resolution failed, so the search proceeds globally.
+		expect(apiArgs).toContain("q=findThing");
+		expect(apiArgs.some(a => typeof a === "string" && a.startsWith("q=") && a.includes("repo:"))).toBe(false);
+	});
+
+	it("search_commits: honors an explicit `repo` override over the current-checkout default", async () => {
+		const textSpy = vi.spyOn(git.github, "text").mockResolvedValue("acme/widgets\n");
+		const jsonSpy = vi.spyOn(git.github, "json").mockResolvedValue({ items: [] });
+		const tool = new GithubTool(createSession("/tmp/gh-default-explicit-override"));
+		await tool.execute("search-commits", {
+			op: "search_commits",
+			query: "fix",
+			repo: "other/project",
+			limit: 1,
+		});
+
+		// Explicit `repo` short-circuits resolution — no `gh repo view` invocation.
+		expect(textSpy).not.toHaveBeenCalled();
+		const apiArgs = jsonSpy.mock.calls[0]?.[1] ?? [];
+		expect(apiArgs).toContain("q=fix repo:other/project");
 	});
 
 	it("checks out a pull request into a worktree and configures contributor push metadata", async () => {
 		const fixture = await createPrFixture();
+		const tempHome = await setupTempHome();
 		try {
 			vi.spyOn(git.github, "json")
 				.mockResolvedValueOnce({
@@ -401,7 +705,8 @@ describe("github tool", () => {
 			const tool = new GithubTool(createSession(fixture.repoRoot));
 			const result = await tool.execute("pr-checkout", { op: "pr_checkout", pr: "123" });
 			const text = result.content[0]?.type === "text" ? result.content[0].text : "";
-			const worktreePath = await fs.realpath(path.join(fixture.repoRoot, ".worktrees", "pr-123"));
+			const primaryRoot = (await git.repo.primaryRoot(fixture.repoRoot)) ?? fixture.repoRoot;
+			const worktreePath = await expectedWorktreePath(tempHome.home, primaryRoot, "pr-123");
 
 			expect(text).toContain("Checked Out Pull Request #123");
 			expect(text).toContain(`Worktree: ${worktreePath}`);
@@ -412,6 +717,123 @@ describe("github tool", () => {
 			expect(runGit(fixture.repoRoot, ["worktree", "list", "--porcelain"])).toContain(`worktree ${worktreePath}`);
 			expect(runGit(worktreePath, ["branch", "--show-current"])).toBe("pr-123");
 		} finally {
+			await tempHome.cleanup();
+			await fs.rm(fixture.baseDir, { recursive: true, force: true });
+		}
+	});
+
+	it("treats git.remote.add as a no-op when the remote already exists with the same URL", async () => {
+		const fixture = await createPrFixture();
+		try {
+			await git.remote.add(fixture.repoRoot, "forksrc", fixture.forkBare);
+			expect(runGit(fixture.repoRoot, ["remote", "get-url", "forksrc"])).toBe(fixture.forkBare);
+		} finally {
+			await fs.rm(fixture.baseDir, { recursive: true, force: true });
+		}
+	});
+
+	it("rejects git.remote.add when the remote already exists with a different URL", async () => {
+		const fixture = await createPrFixture();
+		try {
+			await expect(git.remote.add(fixture.repoRoot, "forksrc", fixture.originBare)).rejects.toThrow(
+				/already exists with URL/,
+			);
+			// Existing URL is preserved — we never overwrote it.
+			expect(runGit(fixture.repoRoot, ["remote", "get-url", "forksrc"])).toBe(fixture.forkBare);
+		} finally {
+			await fs.rm(fixture.baseDir, { recursive: true, force: true });
+		}
+	});
+
+	it("serializes concurrent git mutations through withRepoLock so callers don't race git's internal locks", async () => {
+		const fixture = await createPrFixture();
+		try {
+			// Without serialization, concurrent `git config` invocations against the
+			// same `.git/config` produce "could not lock config file" failures (the
+			// lock is O_EXCL with no waiter). Wrapping each write in `withRepoLock`
+			// makes the queue per-repo so all writes succeed.
+			const writeCount = 8;
+			const writes = Array.from({ length: writeCount }, (_, idx) =>
+				git.withRepoLock(fixture.repoRoot, () =>
+					git.config.set(fixture.repoRoot, `branch.race-test.key${idx}`, `value-${idx}`),
+				),
+			);
+			await Promise.all(writes);
+			for (let idx = 0; idx < writeCount; idx += 1) {
+				expect(runGit(fixture.repoRoot, ["config", "--get", `branch.race-test.key${idx}`])).toBe(`value-${idx}`);
+			}
+		} finally {
+			await fs.rm(fixture.baseDir, { recursive: true, force: true });
+		}
+	});
+
+	it("checks out multiple pull requests in a single call when pr is an array", async () => {
+		const fixture = await createPrFixture();
+		const tempHome = await setupTempHome();
+		try {
+			// PR #100 reuses the fixture's contributor branch; push it to origin so
+			// the non-cross-repo path (which fetches from origin) finds it.
+			runGit(fixture.repoRoot, ["push", "origin", `${fixture.headRefName}:${fixture.headRefName}`]);
+
+			// Add a second feature branch on origin so PR #200 has somewhere to come
+			// from. Branch names differ to avoid worktree collisions.
+			runGit(fixture.repoRoot, ["checkout", "-b", "feature/another", "main"]);
+			await Bun.write(path.join(fixture.repoRoot, "OTHER.md"), "other\n");
+			runGit(fixture.repoRoot, ["add", "OTHER.md"]);
+			runGit(fixture.repoRoot, ["commit", "-m", "another"]);
+			const otherOid = runGit(fixture.repoRoot, ["rev-parse", "HEAD"]);
+			runGit(fixture.repoRoot, ["push", "-u", "origin", "feature/another"]);
+			runGit(fixture.repoRoot, ["checkout", "main"]);
+
+			vi.spyOn(git.github, "json")
+				.mockResolvedValueOnce({
+					number: 100,
+					title: "Same-repo PR 100",
+					url: "https://github.com/owner/repo/pull/100",
+					baseRefName: "main",
+					headRefName: fixture.headRefName,
+					headRefOid: fixture.headRefOid,
+					isCrossRepository: false,
+					maintainerCanModify: true,
+				})
+				.mockResolvedValueOnce({
+					number: 200,
+					title: "Same-repo PR 200",
+					url: "https://github.com/owner/repo/pull/200",
+					baseRefName: "main",
+					headRefName: "feature/another",
+					headRefOid: otherOid,
+					isCrossRepository: false,
+					maintainerCanModify: true,
+				});
+
+			const tool = new GithubTool(createSession(fixture.repoRoot));
+			const result = await tool.execute("pr-checkout", { op: "pr_checkout", pr: ["100", "200"] });
+			const text = result.content[0]?.type === "text" ? result.content[0].text : "";
+			const primaryRoot = (await git.repo.primaryRoot(fixture.repoRoot)) ?? fixture.repoRoot;
+			const wt100 = await expectedWorktreePath(tempHome.home, primaryRoot, "pr-100");
+			const wt200 = await expectedWorktreePath(tempHome.home, primaryRoot, "pr-200");
+
+			expect(text).toContain("# 2 Pull Request Worktrees");
+			expect(text).toContain("Checked Out Pull Request #100");
+			expect(text).toContain("Checked Out Pull Request #200");
+			expect(text).toContain(`Worktree: ${wt100}`);
+			expect(text).toContain(`Worktree: ${wt200}`);
+			expect(runGit(wt100, ["branch", "--show-current"])).toBe("pr-100");
+			expect(runGit(wt200, ["branch", "--show-current"])).toBe("pr-200");
+			expect(runGit(fixture.repoRoot, ["config", "--get", "branch.pr-100.ompPrUrl"])).toBe(
+				"https://github.com/owner/repo/pull/100",
+			);
+			expect(runGit(fixture.repoRoot, ["config", "--get", "branch.pr-200.ompPrUrl"])).toBe(
+				"https://github.com/owner/repo/pull/200",
+			);
+
+			const summaries = result.details?.checkouts;
+			expect(summaries?.length).toBe(2);
+			expect(summaries?.map(s => s.prNumber)).toEqual([100, 200]);
+			expect(summaries?.every(s => s.reused === false)).toBe(true);
+		} finally {
+			await tempHome.cleanup();
 			await fs.rm(fixture.baseDir, { recursive: true, force: true });
 		}
 	});
@@ -445,7 +867,8 @@ describe("github tool", () => {
 
 	it("exposes a flat op-based schema without legacy run_watch parameters", () => {
 		const tool = new GithubTool(createSession());
-		const properties = tool.parameters.properties as Record<string, unknown>;
+		const wire = z.toJSONSchema(tool.parameters, { target: "draft-2020-12" }) as Record<string, unknown>;
+		const properties = wire.properties as Record<string, unknown>;
 		expect(properties.op).toBeDefined();
 		expect(properties.interval).toBeUndefined();
 		expect(properties.grace).toBeUndefined();

@@ -13,7 +13,7 @@ set -e
 REPO="can1357/oh-my-pi"
 PACKAGE="@oh-my-pi/pi-coding-agent"
 INSTALL_DIR="${PI_INSTALL_DIR:-$HOME/.local/bin}"
-MIN_BUN_VERSION="1.3.7"
+MIN_BUN_VERSION="1.3.14"
 
 # Parse arguments
 MODE=""
@@ -230,28 +230,8 @@ install_binary() {
     echo "Downloading ${BINARY}..."
     curl -fsSL "$BINARY_URL" -o "${INSTALL_DIR}/omp"
     chmod +x "${INSTALL_DIR}/omp"
-    downloaded_native=0
-    if [ "$ARCH" = "x64" ]; then
-        for variant in modern baseline; do
-            NATIVE_ADDON="pi_natives.${PLATFORM}-${ARCH}-${variant}.node"
-            NATIVE_URL="https://github.com/${REPO}/releases/download/${LATEST}/${NATIVE_ADDON}"
-            echo "Downloading ${NATIVE_ADDON}..."
-            curl -fsSL "$NATIVE_URL" -o "${INSTALL_DIR}/${NATIVE_ADDON}" || {
-                echo "Failed to download ${NATIVE_ADDON}"
-                exit 1
-            }
-            downloaded_native=$((downloaded_native + 1))
-        done
-    else
-        NATIVE_ADDON="pi_natives.${PLATFORM}-${ARCH}.node"
-        NATIVE_URL="https://github.com/${REPO}/releases/download/${LATEST}/${NATIVE_ADDON}"
-        echo "Downloading ${NATIVE_ADDON}..."
-        curl -fsSL "$NATIVE_URL" -o "${INSTALL_DIR}/${NATIVE_ADDON}"
-        downloaded_native=1
-    fi
     echo ""
     echo "✓ Installed omp to ${INSTALL_DIR}/omp"
-    echo "✓ Installed ${downloaded_native} native addon file(s) to ${INSTALL_DIR}"
 
     # Check if in PATH
     case ":$PATH:" in

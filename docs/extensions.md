@@ -20,7 +20,7 @@ An extension is a TS/JS module exporting a default factory:
 import type { ExtensionAPI } from "@oh-my-pi/pi-coding-agent";
 
 export default function myExtension(pi: ExtensionAPI) {
-	// register handlers/tools/commands/renderers
+  // register handlers/tools/commands/renderers
 }
 ```
 
@@ -66,40 +66,41 @@ Important constraint from `loader.ts`:
 
 ```ts
 import type { ExtensionAPI } from "@oh-my-pi/pi-coding-agent";
-import { Type } from "@sinclair/typebox";
 
 export default function (pi: ExtensionAPI) {
-	pi.setLabel("Safety + Utilities");
+  const { z } = pi.zod;
 
-	pi.on("session_start", async (_event, ctx) => {
-		ctx.ui.notify(`Extension loaded in ${ctx.cwd}`, "info");
-	});
+  pi.setLabel("Safety + Utilities");
 
-	pi.on("tool_call", async (event) => {
-		if (event.toolName === "bash" && event.input.command?.includes("rm -rf")) {
-			return { block: true, reason: "Blocked by extension policy" };
-		}
-	});
+  pi.on("session_start", async (_event, ctx) => {
+    ctx.ui.notify(`Extension loaded in ${ctx.cwd}`, "info");
+  });
 
-	pi.registerTool({
-		name: "hello_extension",
-		label: "Hello Extension",
-		description: "Return a greeting",
-		parameters: Type.Object({ name: Type.String() }),
-		async execute(_toolCallId, params, _signal, _onUpdate, _ctx) {
-			return {
-				content: [{ type: "text", text: `Hello, ${params.name}` }],
-				details: { greeted: params.name },
-			};
-		},
-	});
+  pi.on("tool_call", async (event) => {
+    if (event.toolName === "bash" && event.input.command?.includes("rm -rf")) {
+      return { block: true, reason: "Blocked by extension policy" };
+    }
+  });
 
-	pi.registerCommand("hello-ext", {
-		description: "Show queue state",
-		handler: async (_args, ctx) => {
-			ctx.ui.notify(`pending=${ctx.hasPendingMessages()}`, "info");
-		},
-	});
+  pi.registerTool({
+    name: "hello_extension",
+    label: "Hello Extension",
+    description: "Return a greeting",
+    parameters: z.object({ name: z.string() }),
+    async execute(_toolCallId, params, _signal, _onUpdate, _ctx) {
+      return {
+        content: [{ type: "text", text: `Hello, ${params.name}` }],
+        details: { greeted: params.name },
+      };
+    },
+  });
+
+  pi.registerCommand("hello-ext", {
+    description: "Show queue state",
+    handler: async (_args, ctx) => {
+      ctx.ui.notify(`pending=${ctx.hasPendingMessages()}`, "info");
+    },
+  });
 }
 ```
 
@@ -124,7 +125,7 @@ In interactive mode, `input` handlers run before the built-in first-message auto
 Also exposed:
 
 - `pi.logger`
-- `pi.typebox`
+- `pi.zod` (injected `zod` module — use for tool parameter schemas)
 - `pi.pi` (package exports)
 
 ### Message delivery semantics
@@ -239,27 +240,29 @@ execute(
 Template:
 
 ```ts
+const { z } = pi.zod;
+
 pi.registerTool({
-	name: "my_tool",
-	label: "My Tool",
-	description: "...",
-	parameters: Type.Object({}),
-	async execute(_id, _params, signal, onUpdate, ctx) {
-		if (signal?.aborted) {
-			return { content: [{ type: "text", text: "Cancelled" }] };
-		}
-		onUpdate?.({ content: [{ type: "text", text: "Working..." }] });
-		return { content: [{ type: "text", text: "Done" }], details: {} };
-	},
-	onSession(event, ctx) {
-		// reason: start|switch|branch|tree|shutdown
-	},
-	renderCall(args, theme) {
-		// optional TUI render
-	},
-	renderResult(result, options, theme, args) {
-		// optional TUI render
-	},
+  name: "my_tool",
+  label: "My Tool",
+  description: "...",
+  parameters: z.object({}),
+  async execute(_id, _params, signal, onUpdate, ctx) {
+    if (signal?.aborted) {
+      return { content: [{ type: "text", text: "Cancelled" }] };
+    }
+    onUpdate?.({ content: [{ type: "text", text: "Working..." }] });
+    return { content: [{ type: "text", text: "Done" }], details: {} };
+  },
+  onSession(event, ctx) {
+    // reason: start|switch|branch|tree|shutdown
+  },
+  renderCall(args, options, theme) {
+    // optional TUI render
+  },
+  renderResult(result, options, theme, args) {
+    // optional TUI render
+  },
 });
 ```
 
@@ -322,13 +325,13 @@ Example reconstruction pattern:
 
 ```ts
 pi.on("session_start", async (_event, ctx) => {
-	let latest;
-	for (const entry of ctx.sessionManager.getBranch()) {
-		if (entry.type === "custom" && entry.customType === "my-state") {
-			latest = entry.data;
-		}
-	}
-	// restore from latest
+  let latest;
+  for (const entry of ctx.sessionManager.getBranch()) {
+    if (entry.type === "custom" && entry.customType === "my-state") {
+      latest = entry.data;
+    }
+  }
+  // restore from latest
 });
 ```
 
@@ -338,7 +341,7 @@ pi.on("session_start", async (_event, ctx) => {
 
 ```ts
 pi.registerMessageRenderer("my-type", (message, { expanded }, theme) => {
-	// return pi-tui Component
+  // return pi-tui Component
 });
 ```
 

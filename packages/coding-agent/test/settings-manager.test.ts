@@ -3,7 +3,7 @@ import * as fs from "node:fs";
 import * as os from "node:os";
 import * as path from "node:path";
 import { Effort } from "@oh-my-pi/pi-ai";
-import { _resetSettingsForTest, Settings } from "@oh-my-pi/pi-coding-agent/config/settings";
+import { resetSettingsForTest, Settings } from "@oh-my-pi/pi-coding-agent/config/settings";
 import { getProjectAgentDir, Snowflake } from "@oh-my-pi/pi-utils";
 import { YAML } from "bun";
 
@@ -14,7 +14,7 @@ describe("Settings", () => {
 
 	beforeEach(() => {
 		// Reset global singleton so each test gets a fresh instance
-		_resetSettingsForTest();
+		resetSettingsForTest();
 
 		// Use snowflake to isolate parallel test runs (SQLite files can't be shared)
 		testDir = path.join(os.tmpdir(), "test-settings-tmp", Snowflake.next());
@@ -80,6 +80,35 @@ describe("Settings", () => {
 			expect((savedSettings.modelRoles as { default?: string } | undefined)?.default).toBe("claude-sonnet");
 		});
 
+		it("filters model allow-list and disabled providers by current path prefix", async () => {
+			const workDir = path.join(projectDir, "work", "service");
+			const privateDir = path.join(projectDir, "private", "app");
+			fs.mkdirSync(workDir, { recursive: true });
+			fs.mkdirSync(privateDir, { recursive: true });
+
+			await writeSettings({
+				enabledModels: [
+					"claude-sonnet-4-5",
+					{ path: path.join(projectDir, "work"), values: ["anthropic/claude-opus-4-5"] },
+					{ path: path.join(projectDir, "private"), values: ["openai/gpt-5.2-codex"] },
+				],
+				disabledProviders: [
+					"ollama",
+					{ path: path.join(projectDir, "work"), values: ["openai"] },
+					{ path: path.join(projectDir, "private"), values: ["anthropic"] },
+				],
+			});
+
+			const workSettings = await Settings.init({ cwd: workDir, agentDir });
+			expect(workSettings.get("enabledModels")).toEqual(["claude-sonnet-4-5", "anthropic/claude-opus-4-5"]);
+			expect(workSettings.get("disabledProviders")).toEqual(["ollama", "openai"]);
+
+			resetSettingsForTest();
+			const privateSettings = await Settings.init({ cwd: privateDir, agentDir });
+			expect(privateSettings.get("enabledModels")).toEqual(["claude-sonnet-4-5", "openai/gpt-5.2-codex"]);
+			expect(privateSettings.get("disabledProviders")).toEqual(["ollama", "anthropic"]);
+		});
+
 		it("should preserve custom settings when changing theme", async () => {
 			await writeSettings({
 				modelRoles: { default: "claude-sonnet" },
@@ -119,6 +148,56 @@ describe("Settings", () => {
 
 			const savedSettings = await readSettings();
 			expect(savedSettings.defaultThinkingLevel).toBe(Effort.High);
+		});
+	});
+
+	describe("migrations", () => {
+		it("maps removed atom edit mode settings to hashline", async () => {
+			await writeSettings({
+				edit: {
+					mode: "atom",
+					modelVariants: {
+						"claude-opus": "atom",
+						"gpt-5": "apply_patch",
+					},
+				},
+			});
+
+			const settings = await Settings.init({ cwd: projectDir, agentDir });
+
+			expect(settings.get("edit.mode")).toBe("hashline");
+			expect(settings.getEditVariantForModel("claude-opus-4-5")).toBe("hashline");
+			expect(settings.getEditVariantForModel("gpt-5.2")).toBe("apply_patch");
+		});
+
+		it("maps legacy hindsight.dynamicBankId=true onto hindsight.scoping=per-project", async () => {
+			await writeSettings({
+				hindsight: { dynamicBankId: true },
+			});
+
+			const settings = await Settings.init({ cwd: projectDir, agentDir });
+
+			expect(settings.get("hindsight.scoping")).toBe("per-project");
+		});
+
+		it("does not override an explicit hindsight.scoping when migrating", async () => {
+			await writeSettings({
+				hindsight: { dynamicBankId: true, scoping: "global" },
+			});
+
+			const settings = await Settings.init({ cwd: projectDir, agentDir });
+
+			expect(settings.get("hindsight.scoping")).toBe("global");
+		});
+
+		it("promotes legacy hindsight.agentName onto hindsight.bankId when bankId is unset", async () => {
+			await writeSettings({
+				hindsight: { agentName: "ada-cli" },
+			});
+
+			const settings = await Settings.init({ cwd: projectDir, agentDir });
+
+			expect(settings.get("hindsight.bankId")).toBe("ada-cli");
 		});
 	});
 });

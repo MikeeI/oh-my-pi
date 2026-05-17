@@ -6,9 +6,8 @@ import { Effort } from "@oh-my-pi/pi-ai";
 import { getBundledModel } from "@oh-my-pi/pi-ai/models";
 import { complete, getEnvApiKey, stream } from "@oh-my-pi/pi-ai/stream";
 import type { Api, Context, ImageContent, Model, OptionsForApi, Tool, ToolResultMessage } from "@oh-my-pi/pi-ai/types";
-import { StringEnum } from "@oh-my-pi/pi-ai/utils/schema";
 import { $which } from "@oh-my-pi/pi-utils";
-import { Type } from "@sinclair/typebox";
+import * as z from "zod/v4";
 import { e2eApiKey, resolveApiKey } from "./oauth";
 
 // Resolve OAuth tokens at module level (async, runs before tests)
@@ -34,14 +33,12 @@ function hasBedrockCredentials(): boolean {
 }
 
 // Calculator tool definition (same as examples)
-// Note: Using StringEnum helper because Google's API doesn't support anyOf/const patterns
-// that Type.Enum generates. Google requires { type: "string", enum: [...] } format.
-const calculatorSchema = Type.Object({
-	a: Type.Number({ description: "First number" }),
-	b: Type.Number({ description: "Second number" }),
-	operation: StringEnum(["add", "subtract", "multiply", "divide"], {
-		description: "The operation to perform. One of 'add', 'subtract', 'multiply', 'divide'.",
-	}),
+const calculatorSchema = z.object({
+	a: z.number().describe("First number"),
+	b: z.number().describe("Second number"),
+	operation: z
+		.enum(["add", "subtract", "multiply", "divide"])
+		.describe("The operation to perform. One of 'add', 'subtract', 'multiply', 'divide'."),
 });
 
 const calculatorTool: Tool<typeof calculatorSchema> = {
@@ -52,7 +49,7 @@ const calculatorTool: Tool<typeof calculatorSchema> = {
 
 async function basicTextGeneration<TApi extends Api>(model: Model<TApi>, options?: OptionsForApi<TApi>) {
 	const context: Context = {
-		systemPrompt: "You are a helpful assistant. Be concise.",
+		systemPrompt: ["You are a helpful assistant. Be concise."],
 		messages: [{ role: "user", content: "Reply with exactly: 'Hello test successful'", timestamp: Date.now() }],
 	};
 	const response = await complete(model, context, options);
@@ -81,7 +78,7 @@ async function basicTextGeneration<TApi extends Api>(model: Model<TApi>, options
 
 async function handleToolCall<TApi extends Api>(model: Model<TApi>, options?: OptionsForApi<TApi>) {
 	const context: Context = {
-		systemPrompt: "You are a helpful assistant that uses tools when asked.",
+		systemPrompt: ["You are a helpful assistant that uses tools when asked."],
 		messages: [
 			{
 				role: "user",
@@ -272,7 +269,7 @@ async function handleImage<TApi extends Api>(model: Model<TApi>, options?: Optio
 
 async function multiTurn<TApi extends Api>(model: Model<TApi>, options?: OptionsForApi<TApi>) {
 	const context: Context = {
-		systemPrompt: "You are a helpful assistant that can use tools to answer questions.",
+		systemPrompt: ["You are a helpful assistant that can use tools to answer questions."],
 		messages: [
 			{
 				role: "user",
@@ -477,6 +474,43 @@ describe("Generate E2E Tests", () => {
 			}
 		});
 
+		it("keeps every system prompt array entry in Vertex systemInstruction", async () => {
+			const llm = getBundledModel("google-vertex", "gemini-3-flash-preview");
+			const controller = new AbortController();
+			const { promise, resolve } = Promise.withResolvers<{
+				config: { systemInstruction?: unknown };
+				contents: unknown[];
+			}>();
+			const events = stream(
+				llm,
+				{
+					systemPrompt: ["Primary instruction.", "Secondary instruction."],
+					messages: [{ role: "user", content: "Hello", timestamp: Date.now() }],
+				},
+				{
+					apiKey: "vertex-test-key",
+					signal: controller.signal,
+					onPayload: payload => {
+						resolve(payload as { config: { systemInstruction?: unknown }; contents: unknown[] });
+						controller.abort();
+					},
+				},
+			);
+
+			const drain = (async () => {
+				for await (const _ of events) {
+				}
+			})();
+
+			const payload = await promise;
+			await drain;
+
+			expect(payload.config.systemInstruction).toEqual({
+				parts: [{ text: "Primary instruction." }, { text: "Secondary instruction." }],
+			});
+			expect(payload.contents).toEqual([{ role: "user", parts: [{ text: "Hello" }] }]);
+		});
+
 		it("allows explicit Vertex API keys without requiring project or location", async () => {
 			const originalApiKey = Bun.env.GOOGLE_CLOUD_API_KEY;
 			const originalProject = Bun.env.GOOGLE_CLOUD_PROJECT;
@@ -588,7 +622,7 @@ describe("Generate E2E Tests", () => {
 
 	describe.skipIf(!e2eApiKey("OPENAI_API_KEY"))("OpenAI Completions Provider (gpt-4o-mini)", () => {
 		const llm: Model<"openai-completions"> = {
-			...getBundledModel("openai", "gpt-4o-mini"),
+			...(getBundledModel("openai", "gpt-4o-mini") as Model<"openai-completions">),
 			api: "openai-completions",
 		};
 
@@ -626,7 +660,7 @@ describe("Generate E2E Tests", () => {
 	});
 
 	describe.skipIf(!e2eApiKey("OPENAI_API_KEY"))("OpenAI Responses Provider (gpt-5-mini)", () => {
-		const llm = getBundledModel("openai", "gpt-5-mini");
+		const llm = getBundledModel("openai", "gpt-5-mini") as Model<"openai-responses">;
 
 		it(
 			"should complete basic text generation",
@@ -714,7 +748,7 @@ describe("Generate E2E Tests", () => {
 	});
 
 	describe.skipIf(!e2eApiKey("OPENAI_API_KEY"))("OpenAI Responses Provider (gpt-5-mini)", () => {
-		const model = getBundledModel("openai", "gpt-5-mini");
+		const model = getBundledModel("openai", "gpt-5-mini") as Model<"openai-responses">;
 
 		it(
 			"should complete basic text generation",
@@ -1471,7 +1505,7 @@ describe("Generate E2E Tests", () => {
 				const response = await complete(
 					llm,
 					{
-						systemPrompt: "You are a helpful assistant that uses tools when asked.",
+						systemPrompt: ["You are a helpful assistant that uses tools when asked."],
 						messages: [
 							{
 								role: "user",

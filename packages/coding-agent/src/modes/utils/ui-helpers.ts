@@ -1,6 +1,6 @@
 import type { AgentMessage } from "@oh-my-pi/pi-agent-core";
 import type { AssistantMessage, ImageContent, Message } from "@oh-my-pi/pi-ai";
-import { Spacer, Text, TruncatedText } from "@oh-my-pi/pi-tui";
+import { type Component, Spacer, Text, TruncatedText } from "@oh-my-pi/pi-tui";
 import { settings } from "../../config/settings";
 import { AssistantMessageComponent } from "../../modes/components/assistant-message";
 import { BashExecutionComponent } from "../../modes/components/bash-execution";
@@ -8,14 +8,23 @@ import { BranchSummaryMessageComponent } from "../../modes/components/branch-sum
 import { CompactionSummaryMessageComponent } from "../../modes/components/compaction-summary-message";
 import { CustomMessageComponent } from "../../modes/components/custom-message";
 import { DynamicBorder } from "../../modes/components/dynamic-border";
-import { PythonExecutionComponent } from "../../modes/components/python-execution";
-import { ReadToolGroupComponent } from "../../modes/components/read-tool-group";
+import { EvalExecutionComponent } from "../../modes/components/eval-execution";
+import {
+	ReadToolGroupComponent,
+	readArgsHaveTarget,
+	readArgsTargetInternalUrl,
+} from "../../modes/components/read-tool-group";
 import { SkillMessageComponent } from "../../modes/components/skill-message";
 import { ToolExecutionComponent } from "../../modes/components/tool-execution";
 import { UserMessageComponent } from "../../modes/components/user-message";
 import { theme } from "../../modes/theme/theme";
 import type { CompactionQueuedMessage, InteractiveModeContext } from "../../modes/types";
-import { type CustomMessage, SKILL_PROMPT_MESSAGE_TYPE, type SkillPromptDetails } from "../../session/messages";
+import {
+	type CustomMessage,
+	isSilentAbort,
+	SKILL_PROMPT_MESSAGE_TYPE,
+	type SkillPromptDetails,
+} from "../../session/messages";
 import type { SessionContext } from "../../session/session-manager";
 import { formatBytes, formatDuration } from "../../tools/render-utils";
 
@@ -70,7 +79,7 @@ export class UiHelpers {
 		this.ctx.ui.requestRender();
 	}
 
-	addMessageToChat(message: AgentMessage, options?: { populateHistory?: boolean }): void {
+	addMessageToChat(message: AgentMessage, options?: { populateHistory?: boolean }): Component[] {
 		switch (message.role) {
 			case "bashExecution": {
 				const component = new BashExecutionComponent(message.command, this.ctx.ui, message.excludeFromContext);
@@ -84,7 +93,7 @@ export class UiHelpers {
 				break;
 			}
 			case "pythonExecution": {
-				const component = new PythonExecutionComponent(message.code, this.ctx.ui, message.excludeFromContext);
+				const component = new EvalExecutionComponent(message.code, this.ctx.ui, message.excludeFromContext);
 				if (message.output) {
 					component.appendOutput(message.output);
 				}
@@ -127,22 +136,50 @@ export class UiHelpers {
 						this.ctx.chatContainer.addChild(component);
 						break;
 					}
-					if (message.customType === "irc:incoming" || message.customType === "irc:autoreply") {
+					if (
+						message.customType === "irc:incoming" ||
+						message.customType === "irc:autoreply" ||
+						message.customType === "irc:relay"
+					) {
 						const details = (
-							message as CustomMessage<{ from?: string; to?: string; message?: string; reply?: string }>
+							message as CustomMessage<{
+								from?: string;
+								to?: string;
+								message?: string;
+								reply?: string;
+								body?: string;
+								kind?: "message" | "reply";
+							}>
 						).details;
-						const isIncoming = message.customType === "irc:incoming";
-						const peer = isIncoming ? (details?.from ?? "?") : (details?.to ?? "?");
-						const body = isIncoming ? (details?.message ?? "") : (details?.reply ?? "");
-						const arrow = isIncoming ? `\u21e6 ${peer}` : `\u21e8 ${peer} (auto)`;
+						let arrow: string;
+						let body: string;
+						if (message.customType === "irc:incoming") {
+							const peer = details?.from ?? "?";
+							body = details?.message ?? "";
+							arrow = `⇦ ${peer}`;
+						} else if (message.customType === "irc:autoreply") {
+							const peer = details?.to ?? "?";
+							body = details?.reply ?? "";
+							arrow = `⇨ ${peer}`;
+						} else {
+							const from = details?.from ?? "?";
+							const to = details?.to ?? "?";
+							body = details?.body ?? "";
+							arrow = `${from} ⇨ ${to}`;
+						}
+						const components: Component[] = [];
 						const header = `${theme.fg("accent", `[IRC] ${arrow}`)}`;
-						this.ctx.chatContainer.addChild(new Text(header, 1, 0));
+						const headerComponent = new Text(header, 1, 0);
+						this.ctx.chatContainer.addChild(headerComponent);
+						components.push(headerComponent);
 						if (body) {
 							for (const line of body.split("\n")) {
-								this.ctx.chatContainer.addChild(new Text(theme.fg("muted", `  ${line}`), 0, 0));
+								const lineComponent = new Text(theme.fg("muted", `  ${line}`), 0, 0);
+								this.ctx.chatContainer.addChild(lineComponent);
+								components.push(lineComponent);
 							}
 						}
-						break;
+						return components;
 					}
 					const renderer = this.ctx.session.extensionRunner?.getMessageRenderer(message.customType);
 					// Both HookMessage and CustomMessage have the same structure, cast for compatibility
@@ -202,7 +239,9 @@ export class UiHelpers {
 				break;
 			}
 			case "assistant": {
-				const assistantComponent = new AssistantMessageComponent(message, this.ctx.hideThinkingBlock);
+				const assistantComponent = new AssistantMessageComponent(message, this.ctx.hideThinkingBlock, () =>
+					this.ctx.ui.requestRender(),
+				);
 				this.ctx.chatContainer.addChild(assistantComponent);
 				break;
 			}
@@ -211,9 +250,10 @@ export class UiHelpers {
 				break;
 			}
 			default: {
-				const _exhaustive: never = message;
+				message satisfies never;
 			}
 		}
+		return [];
 	}
 
 	/**
@@ -226,7 +266,7 @@ export class UiHelpers {
 		sessionContext: SessionContext,
 		options: { updateFooter?: boolean; populateHistory?: boolean } = {},
 	): void {
-		this.ctx.optimisticUserMessageSignature = undefined;
+		// Preserved: message_start handler owns this lifecycle (see #783)
 		this.ctx.pendingTools.clear();
 
 		if (options.updateFooter) {
@@ -253,7 +293,9 @@ export class UiHelpers {
 					assistantComponent.setUsageInfo(message.usage);
 				}
 				readGroup = null;
-				const hasErrorStop = message.stopReason === "aborted" || message.stopReason === "error";
+				const isAbortedSilently = message.stopReason === "aborted" && isSilentAbort(message.errorMessage);
+				const hasErrorStop =
+					!isAbortedSilently && (message.stopReason === "aborted" || message.stopReason === "error");
 				const errorMessage = hasErrorStop
 					? message.stopReason === "aborted"
 						? (() => {
@@ -271,7 +313,11 @@ export class UiHelpers {
 						continue;
 					}
 
-					if (content.name === "read") {
+					if (
+						content.name === "read" &&
+						readArgsHaveTarget(content.arguments) &&
+						!readArgsTargetInternalUrl(content.arguments)
+					) {
 						if (hasErrorStop && errorMessage) {
 							if (!readGroup) {
 								readGroup = new ReadToolGroupComponent({
@@ -312,6 +358,7 @@ export class UiHelpers {
 							showImages: settings.get("terminal.showImages"),
 							editFuzzyThreshold: settings.get("edit.fuzzyThreshold"),
 							editAllowFuzzy: settings.get("edit.fuzzyMatch"),
+							hashlineAutoDropPureInsertDuplicates: settings.get("edit.hashlineAutoDropPureInsertDuplicates"),
 						},
 						tool,
 						this.ctx.ui,
@@ -332,7 +379,11 @@ export class UiHelpers {
 					}
 				}
 			} else if (message.role === "toolResult") {
-				if (message.toolName === "read") {
+				const pendingReadComponent = this.ctx.pendingTools.get(message.toolCallId);
+				const isReadGroupResult =
+					message.toolName === "read" &&
+					(!pendingReadComponent || pendingReadComponent instanceof ReadToolGroupComponent);
+				if (isReadGroupResult) {
 					const assistantComponent = readToolCallAssistantComponents.get(message.toolCallId);
 					const images: ImageContent[] = message.content.filter(
 						(content): content is ImageContent => content.type === "image",
@@ -390,7 +441,7 @@ export class UiHelpers {
 		this.ctx.ui.requestRender();
 	}
 
-	renderInitialMessages(): void {
+	renderInitialMessages(prebuiltContext?: SessionContext): void {
 		// This path is used to rebuild the visible chat transcript (e.g. after custom/debug UI).
 		// Clear existing rendered chat first to avoid duplicating the full session in the container.
 		this.ctx.chatContainer.clear();
@@ -398,8 +449,8 @@ export class UiHelpers {
 		this.ctx.pendingBashComponents = [];
 		this.ctx.pendingPythonComponents = [];
 
-		// Get aligned messages and entries from session context
-		const context = this.ctx.sessionManager.buildSessionContext();
+		// Reuse a pre-built context when available (e.g. from navigateTree) to avoid a second O(N) walk.
+		const context = prebuiltContext ?? this.ctx.sessionManager.buildSessionContext();
 		this.ctx.renderSessionContext(context, {
 			updateFooter: true,
 			populateHistory: true,
@@ -510,6 +561,16 @@ export class UiHelpers {
 		this.ctx.showStatus("Queued message for after compaction");
 	}
 
+	async #deliverQueuedMessage(message: CompactionQueuedMessage): Promise<void> {
+		if (this.ctx.isKnownSlashCommand(message.text)) {
+			await this.ctx.session.prompt(message.text);
+			return;
+		}
+		await this.ctx.withLocalSubmission(message.text, () =>
+			message.mode === "followUp" ? this.ctx.session.followUp(message.text) : this.ctx.session.steer(message.text),
+		);
+	}
+
 	isKnownSlashCommand(text: string): boolean {
 		if (!text.startsWith("/")) return false;
 		const spaceIndex = text.indexOf(" ");
@@ -552,13 +613,7 @@ export class UiHelpers {
 		try {
 			if (options?.willRetry) {
 				for (const message of queuedMessages) {
-					if (this.ctx.isKnownSlashCommand(message.text)) {
-						await this.ctx.session.prompt(message.text);
-					} else if (message.mode === "followUp") {
-						await this.ctx.session.followUp(message.text);
-					} else {
-						await this.ctx.session.steer(message.text);
-					}
+					await this.#deliverQueuedMessage(message);
 				}
 				this.ctx.updatePendingMessagesDisplay();
 				return;
@@ -583,21 +638,37 @@ export class UiHelpers {
 			const rest = queuedMessages.slice(firstPromptIndex + 1);
 
 			for (const message of preCommands) {
-				await this.ctx.session.prompt(message.text);
+				// preCommands are all slash commands; #deliverQueuedMessage handles
+				// that branch (no local-submission marking needed since slash
+				// commands don't generate a matching user message_start).
+				await this.#deliverQueuedMessage(message);
 			}
 
-			const promptPromise = this.ctx.session.prompt(firstPrompt.text).catch((error: unknown) => {
-				restoreQueue(error);
-			});
+			// Pass streamingBehavior so that if the session is still streaming when
+			// compaction-end fires (race window between isStreaming flipping false and
+			// the event landing here), prompt() routes the message into the steer/
+			// follow-up queue instead of throwing AgentBusyError. When the session is
+			// genuinely idle, streamingBehavior is ignored and a fresh prompt runs as
+			// before. This keeps the steer preview honest: if delivery has to be
+			// deferred, the message lands in the same queue every other consumer
+			// (Alt+Up dequeue, post-stream drain) already drains, instead of being
+			// stranded in compactionQueuedMessages with no drainer.
+			//
+			// firstPrompt is fire-and-forget — its rejection is funneled through
+			// `restoreQueue` rather than rethrown, so we use the primitive
+			// recordLocalSubmission and dispose manually in the catch.
+			const disposeFirstPrompt = this.ctx.recordLocalSubmission(firstPrompt.text);
+			const promptPromise = this.ctx.session
+				.prompt(firstPrompt.text, {
+					streamingBehavior: firstPrompt.mode === "followUp" ? "followUp" : "steer",
+				})
+				.catch((error: unknown) => {
+					disposeFirstPrompt();
+					restoreQueue(error);
+				});
 
 			for (const message of rest) {
-				if (this.ctx.isKnownSlashCommand(message.text)) {
-					await this.ctx.session.prompt(message.text);
-				} else if (message.mode === "followUp") {
-					await this.ctx.session.followUp(message.text);
-				} else {
-					await this.ctx.session.steer(message.text);
-				}
+				await this.#deliverQueuedMessage(message);
 			}
 			this.ctx.updatePendingMessagesDisplay();
 			void promptPromise;

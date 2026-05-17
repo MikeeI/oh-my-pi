@@ -1,6 +1,6 @@
 import { afterEach, describe, expect, it, vi } from "bun:test";
-import { streamAzureOpenAIResponses } from "../src/providers/azure-openai-responses";
-import type { Context, Model } from "../src/types";
+import { type AzureOpenAIResponsesOptions, streamAzureOpenAIResponses } from "../src/providers/azure-openai-responses";
+import type { Context, Model, Tool } from "../src/types";
 
 const originalFetch = global.fetch;
 
@@ -58,14 +58,19 @@ function createAssistantMessage(text: string, textSignature?: string) {
 	};
 }
 
-async function captureAzurePayload(context: Context): Promise<{ input?: unknown[] }> {
-	const { promise, resolve } = Promise.withResolvers<{ input?: unknown[] }>();
-	streamAzureOpenAIResponses(azureModel, context, {
+async function captureAzurePayload(
+	context: Context,
+	model: Model<"azure-openai-responses"> = azureModel,
+	options: Partial<AzureOpenAIResponsesOptions> = {},
+): Promise<Record<string, unknown>> {
+	const { promise, resolve } = Promise.withResolvers<Record<string, unknown>>();
+	streamAzureOpenAIResponses(model, context, {
 		apiKey: "test-key",
-		azureBaseUrl: azureModel.baseUrl,
+		azureBaseUrl: model.baseUrl,
 		azureApiVersion: "v1",
+		...options,
 		signal: createAbortedSignal(),
-		onPayload: payload => resolve(payload as { input?: unknown[] }),
+		onPayload: payload => resolve(payload as Record<string, unknown>),
 	});
 	return promise;
 }
@@ -76,6 +81,96 @@ afterEach(() => {
 });
 
 describe("azure openai responses streaming", () => {
+	it("serializes each system prompt as an Azure Responses system input item for non-reasoning models", async () => {
+		const payload = await captureAzurePayload({
+			systemPrompt: ["First instruction", "", "Second instruction"],
+			messages: [{ role: "user", content: "Say hello", timestamp: Date.now() }],
+		});
+
+		expect(payload.input).toEqual([
+			{ role: "system", content: "First instruction" },
+			{ role: "system", content: "Second instruction" },
+			{ role: "user", content: [{ type: "input_text", text: "Say hello" }] },
+		]);
+	});
+
+	it("uses developer role for Azure Responses reasoning model system prompts", async () => {
+		const reasoningModel: Model<"azure-openai-responses"> = {
+			...azureModel,
+			reasoning: true,
+		};
+		const payload = await captureAzurePayload(
+			{
+				systemPrompt: ["Reasoning instruction", "Second instruction"],
+				messages: [{ role: "user", content: "Say hello", timestamp: Date.now() }],
+			},
+			reasoningModel,
+		);
+
+		expect(payload.input).toEqual([
+			{ role: "developer", content: "Reasoning instruction" },
+			{ role: "developer", content: "Second instruction" },
+			{ role: "user", content: [{ type: "input_text", text: "Say hello" }] },
+			{
+				role: "developer",
+				content: [{ type: "input_text", text: "# Juice: 0 !important" }],
+			},
+		]);
+	});
+
+	it("keeps Azure Responses prompt_cache_key separate from Anthropic cache controls", async () => {
+		const payload = await captureAzurePayload(
+			{
+				systemPrompt: ["Cache-stable instruction"],
+				messages: [{ role: "user", content: "Say hello", timestamp: Date.now() }],
+			},
+			azureModel,
+			{ sessionId: "azure-session" },
+		);
+
+		expect(payload.prompt_cache_key).toBe("azure-session");
+		expect(payload.prompt_cache_retention).toBeUndefined();
+		expect(payload.cache_control).toBeUndefined();
+	});
+
+	it("rewrites oneOf tool schemas to anyOf for Azure Responses", async () => {
+		const tool: Tool = {
+			name: "choose",
+			description: "choose a branch",
+			parameters: {
+				type: "object",
+				properties: {
+					item: {
+						oneOf: [
+							{
+								type: "object",
+								properties: { kind: { const: "a" }, value: { type: "string" } },
+								required: ["kind", "value"],
+								additionalProperties: false,
+							},
+							{
+								type: "object",
+								properties: { kind: { const: "b" }, count: { type: "integer" } },
+								required: ["kind", "count"],
+								additionalProperties: false,
+							},
+						],
+					},
+				},
+				required: ["item"],
+			},
+		};
+
+		const payload = await captureAzurePayload({
+			messages: [{ role: "user", content: "Say hello", timestamp: Date.now() }],
+			tools: [tool],
+		});
+
+		const tools = payload.tools as Array<{ parameters: { properties: { item: Record<string, unknown> } } }>;
+		expect(tools[0].parameters.properties.item.oneOf).toBeUndefined();
+		expect(Array.isArray(tools[0].parameters.properties.item.anyOf)).toBe(true);
+	});
+
 	it("surfaces nested response.failed provider errors", async () => {
 		global.fetch = vi.fn(async () =>
 			createSseResponse([
@@ -120,6 +215,30 @@ describe("azure openai responses streaming", () => {
 		expect(result.errorMessage).toContain("incomplete: max_output_tokens");
 	});
 
+	it("surfaces response.completed failed status_details errors", async () => {
+		global.fetch = vi.fn(async () =>
+			createSseResponse([
+				{
+					type: "response.completed",
+					response: {
+						status: "failed",
+						status_details: {
+							error: { code: "server_error", message: "backend exploded late" },
+						},
+					},
+				},
+			]),
+		) as unknown as typeof fetch;
+
+		const result = await streamAzureOpenAIResponses(
+			azureModel,
+			{ messages: [{ role: "user", content: "Say hello", timestamp: Date.now() }] },
+			{ apiKey: "test-key", azureBaseUrl: azureModel.baseUrl, azureApiVersion: "v1" },
+		).result();
+
+		expect(result.stopReason).toBe("error");
+		expect(result.errorMessage).toContain("server_error: backend exploded late");
+	});
 	it("preserves assistant message phase when rebuilding fallback replay history", async () => {
 		const payload = await captureAzurePayload({
 			messages: [

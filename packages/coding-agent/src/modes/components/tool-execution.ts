@@ -1,5 +1,4 @@
 import type { AgentTool } from "@oh-my-pi/pi-agent-core";
-import { sanitizeText } from "@oh-my-pi/pi-natives";
 import {
 	Box,
 	type Component,
@@ -13,11 +12,12 @@ import {
 	Text,
 	type TUI,
 } from "@oh-my-pi/pi-tui";
-import { getProjectDir, logger } from "@oh-my-pi/pi-utils";
+import { getProjectDir, logger, sanitizeText } from "@oh-my-pi/pi-utils";
 import { EDIT_MODE_STRATEGIES, type EditMode, type PerFileDiffPreview } from "../../edit";
 import type { Theme } from "../../modes/theme/theme";
 import { theme } from "../../modes/theme/theme";
 import { BASH_DEFAULT_PREVIEW_LINES } from "../../tools/bash";
+import { EVAL_DEFAULT_PREVIEW_LINES } from "../../tools/eval";
 import {
 	formatArgsInline,
 	JSON_TREE_MAX_DEPTH_COLLAPSED,
@@ -28,11 +28,9 @@ import {
 	JSON_TREE_SCALAR_LEN_EXPANDED,
 	renderJsonTreeLines,
 } from "../../tools/json-tree";
-import { PYTHON_DEFAULT_PREVIEW_LINES } from "../../tools/python";
 import { formatExpandHint, replaceTabs, resolveImageOptions, truncateToWidth } from "../../tools/render-utils";
 import { toolRenderers } from "../../tools/renderers";
 import { renderStatusLine } from "../../tui";
-import { convertToPng } from "../../utils/image-convert";
 import { sanitizeWithOptionalSixelPassthrough } from "../../utils/sixel";
 import { renderDiff } from "./diff";
 
@@ -67,6 +65,7 @@ export interface ToolExecutionOptions {
 	showImages?: boolean; // default: true (only used if terminal supports images)
 	editFuzzyThreshold?: number;
 	editAllowFuzzy?: boolean;
+	hashlineAutoDropPureInsertDuplicates?: boolean;
 }
 
 export interface ToolExecutionHandle {
@@ -100,6 +99,7 @@ export class ToolExecutionComponent extends Container {
 	#showImages: boolean;
 	#editFuzzyThreshold: number | undefined;
 	#editAllowFuzzy: boolean | undefined;
+	#hashlineAutoDropPureInsertDuplicates: boolean | undefined;
 	#isPartial = true;
 	#tool?: AgentTool;
 	#ui: TUI;
@@ -112,7 +112,6 @@ export class ToolExecutionComponent extends Container {
 	// Edit preview state
 	#editMode?: EditMode;
 	#editDiffPreview?: PerFileDiffPreview[];
-	#editDiffScheduleTimer?: NodeJS.Timeout;
 	#editDiffAbort?: AbortController;
 	#editDiffLastArgsKey?: string;
 	// Cached converted images for Kitty protocol (which requires PNG), keyed by index
@@ -147,6 +146,7 @@ export class ToolExecutionComponent extends Container {
 		this.#showImages = options.showImages ?? true;
 		this.#editFuzzyThreshold = options.editFuzzyThreshold;
 		this.#editAllowFuzzy = options.editAllowFuzzy;
+		this.#hashlineAutoDropPureInsertDuplicates = options.hashlineAutoDropPureInsertDuplicates;
 		this.#tool = tool;
 		this.#ui = ui;
 		this.#cwd = cwd;
@@ -170,13 +170,13 @@ export class ToolExecutionComponent extends Container {
 		this.#editMode = resolveEditModeForTool(toolName, tool);
 
 		this.#updateDisplay();
-		this.#schedulePreviewDiff(0);
+		void this.#runPreviewDiff();
 	}
 
 	updateArgs(args: any, _toolCallId?: string): void {
 		this.#args = cloneToolArgs(args);
 		this.#updateSpinnerAnimation();
-		this.#schedulePreviewDiff();
+		void this.#runPreviewDiff();
 		this.#updateDisplay();
 	}
 
@@ -187,28 +187,7 @@ export class ToolExecutionComponent extends Container {
 	setArgsComplete(_toolCallId?: string): void {
 		this.#argsComplete = true;
 		this.#updateSpinnerAnimation();
-		this.#schedulePreviewDiff(0);
-	}
-
-	/**
-	 * Schedule a debounced compute of the streaming edit-diff preview.
-	 * `delayMs === 0` runs immediately (used on construction and on
-	 * `setArgsComplete`). All other calls coalesce to a trailing-edge timer.
-	 */
-	#schedulePreviewDiff(delayMs = 80): void {
-		if (!this.#editMode) return;
-		if (this.#editDiffScheduleTimer) {
-			clearTimeout(this.#editDiffScheduleTimer);
-			this.#editDiffScheduleTimer = undefined;
-		}
-		if (delayMs === 0) {
-			void this.#runPreviewDiff();
-			return;
-		}
-		this.#editDiffScheduleTimer = setTimeout(() => {
-			this.#editDiffScheduleTimer = undefined;
-			void this.#runPreviewDiff();
-		}, delayMs);
+		void this.#runPreviewDiff();
 	}
 
 	async #runPreviewDiff(): Promise<void> {
@@ -248,6 +227,7 @@ export class ToolExecutionComponent extends Container {
 				signal: controller.signal,
 				fuzzyThreshold: this.#editFuzzyThreshold,
 				allowFuzzy: this.#editAllowFuzzy,
+				hashlineAutoDropPureInsertDuplicates: this.#hashlineAutoDropPureInsertDuplicates,
 			});
 			if (controller.signal.aborted) return;
 			if (previews) {
@@ -313,13 +293,13 @@ export class ToolExecutionComponent extends Container {
 
 			// Convert async - catch errors from processing
 			const index = i;
-			convertToPng(img.data, img.mimeType)
-				.then(converted => {
-					if (converted) {
-						this.#convertedImages.set(index, converted);
-						this.#updateDisplay();
-						this.#ui.requestRender();
-					}
+			new Bun.Image(Buffer.from(img.data, "base64"))
+				.png()
+				.toBase64()
+				.then(data => {
+					this.#convertedImages.set(index, { data, mimeType: "image/png" });
+					this.#updateDisplay();
+					this.#ui.requestRender();
 				})
 				.catch(() => {
 					// Ignore conversion failures - display will use original image format
@@ -360,10 +340,6 @@ export class ToolExecutionComponent extends Container {
 			clearInterval(this.#spinnerInterval);
 			this.#spinnerInterval = undefined;
 			this.#spinnerFrame = undefined;
-		}
-		if (this.#editDiffScheduleTimer) {
-			clearTimeout(this.#editDiffScheduleTimer);
-			this.#editDiffScheduleTimer = undefined;
 		}
 		this.#editDiffAbort?.abort();
 		this.#editDiffAbort = undefined;
@@ -668,12 +644,11 @@ export class ToolExecutionComponent extends Container {
 			context.expanded = this.#expanded;
 			context.previewLines = BASH_DEFAULT_PREVIEW_LINES;
 			context.timeout = normalizeTimeoutSeconds(this.#args?.timeout, 3600);
-		} else if (this.#toolName === "python" && this.#result) {
+		} else if (this.#toolName === "eval" && this.#result) {
 			const output = this.#getTextOutput().trimEnd();
 			context.output = output;
 			context.expanded = this.#expanded;
-			context.previewLines = PYTHON_DEFAULT_PREVIEW_LINES;
-			context.timeout = normalizeTimeoutSeconds(this.#args?.timeout, 600);
+			context.previewLines = EVAL_DEFAULT_PREVIEW_LINES;
 		} else if (isEditLikeToolName(this.#toolName)) {
 			context.editMode = this.#editMode;
 			const previews = this.#editDiffPreview;
@@ -687,6 +662,12 @@ export class ToolExecutionComponent extends Container {
 				if (previews.length > 1) {
 					context.perFileDiffPreview = previews;
 				}
+			}
+			if (!previews?.some(preview => preview.diff)) {
+				const editMode = this.#editMode;
+				const strategy = editMode ? EDIT_MODE_STRATEGIES[editMode] : undefined;
+				const fallback = strategy?.renderStreamingFallback(this.#args, theme);
+				if (fallback) context.editStreamingFallback = fallback;
 			}
 			context.renderDiff = renderDiff;
 		}

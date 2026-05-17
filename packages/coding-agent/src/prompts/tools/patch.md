@@ -18,19 +18,19 @@ When editing structured blocks (nested braces, tags, indented regions), include 
 
 <parameters>
 ```ts
-// Input is { edits: Entry[] } where Entry is one of:
+// Input is { path: string, edits: Entry[] }. `path` is required and applies to every entry.
 type Entry =
-   // Diff is one or more hunks in the same file.
+   // Diff is one or more hunks for the top-level path.
    // - Each hunk begins with "@@" (anchor optional).
    // - Each hunk body only has lines starting with ' ' | '+' | '-'.
    // - Each hunk includes at least one change (+ or -).
-   | { path: string, op: "update", diff: string }
+   | { op: "update", diff: string }
    // Diff is full file content, no prefixes.
-   | { path: string, op: "create", diff: string }
+   | { op: "create", diff: string }
    // No diff for delete.
-   | { path: string, op: "delete" }
-   // New path for update+move.
-   | { path: string, op: "update", rename: string, diff: string }
+   | { op: "delete" }
+   // New path for update+move from the top-level path.
+   | { op: "update", rename: string, diff: string }
 ```
 </parameters>
 
@@ -42,25 +42,25 @@ Returns success/failure; on failure, error message indicates:
 </output>
 
 <critical>
-- You **MUST** read the target file before editing
-- You **MUST** copy anchors and context lines verbatim (including whitespace)
-- You **MUST NOT** use anchors as comments (no line numbers, location labels, placeholders like `@@ @@`)
-- You **MUST NOT** place new lines outside the intended block
-- If edit fails or breaks structure, you **MUST** re-read the file and produce a new patch from current content — you **MUST NOT** retry the same diff
-- **NEVER** use edit to fix indentation, whitespace, or reformat code. Formatting is a single command run once at the end (`bun fmt`, `cargo fmt`, `prettier —write`, etc.)—not N individual edits. If you see inconsistent indentation after an edit, leave it; the formatter will fix all of it in one pass.
+- You MUST read the target file before editing
+- You MUST copy anchors and context lines verbatim (including whitespace)
+- You NEVER use anchors as comments (no line numbers, location labels, placeholders like `@@ @@`)
+- You NEVER place new lines outside the intended block
+- If edit fails or breaks structure, you MUST re-read the file and produce a new patch from current content — you NEVER retry the same diff
+- NEVER use edit to fix indentation, whitespace, or reformat code. Formatting is a single command run once at the end (`bun fmt`, `cargo fmt`, `prettier —write`, etc.)—not N individual edits. If you see inconsistent indentation after an edit, leave it; the formatter will fix all of it in one pass.
 </critical>
 
 <examples>
 # Create
-`edit {"edits":[{"path":"hello.txt","op":"create","diff":"Hello\n"}]}`
+`edit {"path":"hello.txt","edits":[{"op":"create","diff":"Hello\n"}]}`
 # Update
-`edit {"edits":[{"path":"src/app.py","op":"update","diff":"@@ def greet():\n def greet():\n-print('Hi')\n+print('Hello')\n"}]}`
+`edit {"path":"src/app.py","edits":[{"op":"update","diff":"@@ def greet():\n def greet():\n-print('Hi')\n+print('Hello')\n"}]}`
 # Rename
-`edit {"edits":[{"path":"src/app.py","op":"update","rename":"src/main.py","diff":"@@\n …\n"}]}`
+`edit {"path":"src/app.py","edits":[{"op":"update","rename":"src/main.py","diff":"@@\n …\n"}]}`
 # Delete
-`edit {"edits":[{"path":"obsolete.txt","op":"delete"}]}`
-# Multi-file
-`edit {"edits":[{"path":"src/types.ts","op":"update","diff":"@@\n-old\n+new\n"},{"path":"src/index.ts","op":"update","diff":"@@\n-old\n+new\n"}]}`
+`edit {"path":"obsolete.txt","edits":[{"op":"delete"}]}`
+# Multiple entries
+All entries in one call apply to the top-level `path`; use separate calls for different files.
 </examples>
 
 <avoid>

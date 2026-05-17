@@ -173,6 +173,12 @@ fn run_glob(
 		include_hidden: config.include_hidden,
 		use_gitignore: config.use_gitignore,
 		skip_node_modules,
+		follow_links: false,
+		detail: if config.sort_by_mtime {
+			fs_cache::ScanDetail::Full
+		} else {
+			fs_cache::ScanDetail::Minimal
+		},
 	};
 	let mut matches = if config.use_cache {
 		let scan = fs_cache::get_or_scan(&config.root, scan_options, &ct)?;

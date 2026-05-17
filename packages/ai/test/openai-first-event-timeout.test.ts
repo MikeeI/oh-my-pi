@@ -10,7 +10,7 @@ const originalFetch = global.fetch;
 
 const openAIResponsesModel = getBundledModel("openai", "gpt-5-mini") as Model<"openai-responses">;
 const openAICompletionsModel = {
-	...getBundledModel("openai", "gpt-4o-mini"),
+	...(getBundledModel("openai", "gpt-4o-mini") as Model<"openai-completions">),
 	api: "openai-completions",
 } satisfies Model<"openai-completions">;
 const azureOpenAIResponsesModel: Model<"azure-openai-responses"> = {
@@ -86,6 +86,58 @@ function createHangingFetch(): typeof fetch {
 function createSseResponse(events: unknown[]): Response {
 	const payload = `${events.map(event => `data: ${typeof event === "string" ? event : JSON.stringify(event)}`).join("\n\n")}\n\n`;
 	return new Response(payload, {
+		status: 200,
+		headers: { "content-type": "text/event-stream" },
+	});
+}
+
+function createNoProgressOpenAIResponsesStream(signal: AbortSignal | undefined): Response {
+	const encoder = new TextEncoder();
+	let interval: NodeJS.Timeout | undefined;
+	let abortListener: (() => void) | undefined;
+	const encode = (event: unknown): Uint8Array => encoder.encode(`data: ${JSON.stringify(event)}\n\n`);
+	const stream = new ReadableStream<Uint8Array>({
+		start(controller) {
+			controller.enqueue(encode({ type: "response.created", response: { id: "resp_stalled" } }));
+			controller.enqueue(
+				encode({
+					type: "response.output_item.added",
+					item: {
+						type: "function_call",
+						id: "fc_stalled",
+						call_id: "call_stalled",
+						name: "todo_write",
+						arguments: "",
+						status: "in_progress",
+					},
+				}),
+			);
+			interval = setInterval(() => {
+				controller.enqueue(
+					encode({
+						type: "response.in_progress",
+						response: { id: "resp_stalled", status: "in_progress" },
+					}),
+				);
+			}, 2);
+			abortListener = () => {
+				if (interval) clearInterval(interval);
+				if (abortListener) signal?.removeEventListener("abort", abortListener);
+				const reason = signal?.reason;
+				controller.error(reason instanceof Error ? reason : new Error("request aborted"));
+			};
+			if (signal?.aborted) {
+				queueMicrotask(() => abortListener?.());
+			} else {
+				signal?.addEventListener("abort", abortListener, { once: true });
+			}
+		},
+		cancel() {
+			if (interval) clearInterval(interval);
+			if (abortListener) signal?.removeEventListener("abort", abortListener);
+		},
+	});
+	return new Response(stream, {
 		status: 200,
 		headers: { "content-type": "text/event-stream" },
 	});
@@ -223,6 +275,29 @@ describe("OpenAI-family first-event timeouts", () => {
 				}).result(),
 			"OpenAI responses stream timed out while waiting for the first event",
 		);
+	});
+
+	it("times out OpenAI responses streams that only emit no-progress status events", async () => {
+		global.fetch = ((input: string | URL | Request, init?: RequestInit) =>
+			Promise.resolve(createNoProgressOpenAIResponsesStream(getRequestSignal(input, init)))) as typeof fetch;
+
+		const result = await streamOpenAIResponses(openAIResponsesModel, baseContext(), {
+			apiKey: "test-key",
+			streamFirstEventTimeoutMs: 1_000,
+			streamIdleTimeoutMs: 20,
+		}).result();
+
+		expect(result.stopReason).toBe("error");
+		expect(result.errorMessage).toBe("OpenAI responses stream stalled while waiting for the next event");
+		expect(result.content as unknown[]).toEqual([
+			{
+				type: "toolCall",
+				id: "call_stalled|fc_stalled",
+				name: "todo_write",
+				arguments: {},
+				partialJson: "",
+			},
+		]);
 	});
 
 	it("surfaces the OpenAI completions first-event timeout message", async () => {

@@ -10,16 +10,18 @@
  * - Events: AgentSessionEvent objects streamed as they occur
  * - Extension UI: Extension UI requests are emitted, client responds with extension_ui_response
  */
+import { getOAuthProviders } from "@oh-my-pi/pi-ai/utils/oauth";
 import { $env, readJsonl, Snowflake } from "@oh-my-pi/pi-utils";
 import type {
 	ExtensionUIContext,
 	ExtensionUIDialogOptions,
 	ExtensionWidgetOptions,
 } from "../../extensibility/extensions";
-import { runExtensionCompact, runExtensionSetModel } from "../../extensibility/extensions/compact-handler";
 import { type Theme, theme } from "../../modes/theme/theme";
 import type { AgentSession } from "../../session/agent-session";
+import { initializeExtensions } from "../runtime-init";
 import { isRpcHostToolResult, isRpcHostToolUpdate, RpcHostToolBridge } from "./host-tools";
+import { isRpcHostUriResult, RpcHostUriBridge } from "./host-uris";
 import type {
 	RpcCommand,
 	RpcExtensionUIRequest,
@@ -27,6 +29,8 @@ import type {
 	RpcHostToolCallRequest,
 	RpcHostToolCancelRequest,
 	RpcHostToolDefinition,
+	RpcHostUriCancelRequest,
+	RpcHostUriRequest,
 	RpcResponse,
 	RpcSessionState,
 } from "./rpc-types";
@@ -40,7 +44,14 @@ export type PendingExtensionRequest = {
 };
 
 type RpcOutput = (
-	obj: RpcResponse | RpcExtensionUIRequest | RpcHostToolCallRequest | RpcHostToolCancelRequest | object,
+	obj:
+		| RpcResponse
+		| RpcExtensionUIRequest
+		| RpcHostToolCallRequest
+		| RpcHostToolCancelRequest
+		| RpcHostUriRequest
+		| RpcHostUriCancelRequest
+		| object,
 ) => void;
 
 function normalizeHostToolDefinitions(tools: RpcHostToolDefinition[]): RpcHostToolDefinition[] {
@@ -149,13 +160,21 @@ export function requestRpcEditor(
 	} as RpcExtensionUIRequest);
 	return promise;
 }
-
 /**
  * Run in RPC mode.
  * Listens for JSON commands on stdin, outputs events and responses on stdout.
  */
-export async function runRpcMode(session: AgentSession): Promise<never> {
+export async function runRpcMode(
+	session: AgentSession,
+	setToolUIContext?: (uiContext: ExtensionUIContext, hasUI: boolean) => void,
+): Promise<never> {
 	// Signal to RPC clients that the server is ready to accept commands
+	// Suppress terminal notifications: they write \x07 (BEL) or OSC sequences directly to
+	// process.stdout with no newline, which the reader merges with the next JSON line and
+	// breaks JSON.parse. In RPC mode stdout is the JSON protocol channel — nothing else
+	// may write there.
+	process.env.PI_NOTIFICATIONS = "off";
+
 	process.stdout.write(`${JSON.stringify({ type: "ready" })}\n`);
 	const output = (obj: RpcResponse | RpcExtensionUIRequest | object) => {
 		process.stdout.write(`${JSON.stringify(obj)}\n`);
@@ -179,6 +198,7 @@ export async function runRpcMode(session: AgentSession): Promise<never> {
 
 	const pendingExtensionRequests = new Map<string, PendingExtensionRequest>();
 	const hostToolBridge = new RpcHostToolBridge(output);
+	const hostUriBridge = new RpcHostUriBridge(output);
 
 	// Shutdown request flag (wrapped in object to allow mutation with const)
 	const shutdownState = { requested: false };
@@ -405,92 +425,25 @@ export async function runRpcMode(session: AgentSession): Promise<never> {
 		}
 	}
 
+	// Wire up UI context for tool execution (ask tool, etc.) and extensions.
+	// A single shared instance routes all responses received on stdin to the
+	// correct waiting promise regardless of which code path created the request.
+	const rpcUiContext = new RpcExtensionUIContext(pendingExtensionRequests, output);
+	setToolUIContext?.(rpcUiContext, true);
+
 	// Set up extensions with RPC-based UI context
-	const extensionRunner = session.extensionRunner;
-	if (extensionRunner) {
-		extensionRunner.initialize(
-			// ExtensionActions
-			{
-				sendMessage: (message, options) => {
-					session.sendCustomMessage(message, options).catch(e => {
-						output(error(undefined, "extension_send", e.message));
-					});
-				},
-				sendUserMessage: (content, options) => {
-					session.sendUserMessage(content, options).catch(e => {
-						output(error(undefined, "extension_send_user", e.message));
-					});
-				},
-				appendEntry: (customType, data) => {
-					session.sessionManager.appendCustomEntry(customType, data);
-				},
-				setLabel: (targetId, label) => {
-					session.sessionManager.appendLabelChange(targetId, label);
-				},
-				getActiveTools: () => session.getActiveToolNames(),
-				getAllTools: () => session.getAllToolNames(),
-				setActiveTools: (toolNames: string[]) => session.setActiveToolsByName(toolNames),
-				getCommands: () => [],
-				setModel: model => runExtensionSetModel(session, model),
-				getThinkingLevel: () => session.thinkingLevel,
-				setThinkingLevel: level => session.setThinkingLevel(level),
-				getSessionName: () => session.sessionManager.getSessionName(),
-				setSessionName: async name => {
-					await session.sessionManager.setSessionName(name, "user");
-				},
-			},
-			// ExtensionContextActions
-			{
-				getModel: () => session.agent.state.model,
-				isIdle: () => !session.isStreaming,
-				abort: () => session.abort(),
-				hasPendingMessages: () => session.queuedMessageCount > 0,
-				shutdown: () => {
-					shutdownState.requested = true;
-				},
-				getContextUsage: () => session.getContextUsage(),
-				getSystemPrompt: () => session.systemPrompt,
-				compact: instructionsOrOptions => runExtensionCompact(session, instructionsOrOptions),
-			},
-			// ExtensionCommandContextActions - commands invokable via prompt("/command")
-			{
-				getContextUsage: () => session.getContextUsage(),
-				waitForIdle: () => session.agent.waitForIdle(),
-				newSession: async options => {
-					const success = await session.newSession({ parentSession: options?.parentSession });
-					// Note: setup callback runs but no UI feedback in RPC mode
-					if (success && options?.setup) {
-						await options.setup(session.sessionManager);
-					}
-					return { cancelled: !success };
-				},
-				branch: async entryId => {
-					const result = await session.branch(entryId);
-					return { cancelled: result.cancelled };
-				},
-				navigateTree: async (targetId, options) => {
-					const result = await session.navigateTree(targetId, { summarize: options?.summarize });
-					return { cancelled: result.cancelled };
-				},
-				switchSession: async sessionPath => {
-					const success = await session.switchSession(sessionPath);
-					return { cancelled: !success };
-				},
-				reload: async () => {
-					await session.reload();
-				},
-				compact: instructionsOrOptions => runExtensionCompact(session, instructionsOrOptions),
-			},
-			new RpcExtensionUIContext(pendingExtensionRequests, output),
-		);
-		extensionRunner.onError(err => {
+	await initializeExtensions(session, {
+		reportSendError: (action, err) => {
+			output(error(undefined, action, err.message));
+		},
+		reportRuntimeError: err => {
 			output({ type: "extension_error", extensionPath: err.extensionPath, event: err.event, error: err.error });
-		});
-		// Emit session_start event
-		await extensionRunner.emit({
-			type: "session_start",
-		});
-	}
+		},
+		onShutdown: () => {
+			shutdownState.requested = true;
+		},
+		uiContext: rpcUiContext,
+	});
 
 	// Output all agent events as JSON
 	session.subscribe(event => {
@@ -574,6 +527,7 @@ export async function runRpcMode(session: AgentSession): Promise<never> {
 						description: tool.description,
 						parameters: tool.parameters,
 					})),
+					contextUsage: session.getContextUsage(),
 				};
 				return success(id, "get_state", state);
 			}
@@ -588,6 +542,15 @@ export async function runRpcMode(session: AgentSession): Promise<never> {
 				const rpcTools = hostToolBridge.setTools(tools);
 				await session.refreshRpcHostTools(rpcTools);
 				return success(id, "set_host_tools", { toolNames: tools.map(tool => tool.name) });
+			}
+
+			case "set_host_uri_schemes": {
+				try {
+					const schemes = hostUriBridge.setSchemes(command.schemes);
+					return success(id, "set_host_uri_schemes", { schemes });
+				} catch (err) {
+					return error(id, "set_host_uri_schemes", err instanceof Error ? err.message : String(err));
+				}
 			}
 
 			// =================================================================
@@ -741,12 +704,83 @@ export async function runRpcMode(session: AgentSession): Promise<never> {
 				return success(id, "set_session_name");
 			}
 
+			case "handoff": {
+				const result = await session.handoff(command.customInstructions);
+				return success(id, "handoff", result ? { savedPath: result.savedPath } : null);
+			}
+
 			// =================================================================
 			// Messages
 			// =================================================================
 
 			case "get_messages": {
 				return success(id, "get_messages", { messages: session.messages });
+			}
+
+			// =================================================================
+			// Login
+			// =================================================================
+
+			case "get_login_providers": {
+				const providers = getOAuthProviders().map(provider => ({
+					id: provider.id,
+					name: provider.name,
+					available: provider.available,
+					authenticated: session.modelRegistry.authStorage.hasAuth(provider.id),
+				}));
+				return success(id, "get_login_providers", { providers });
+			}
+
+			case "login": {
+				const knownProvider = getOAuthProviders().find(p => p.id === command.providerId);
+				if (!knownProvider) {
+					return error(id, "login", `Unknown OAuth provider: ${command.providerId}`);
+				}
+				const uiCtx = new RpcExtensionUIContext(pendingExtensionRequests, output);
+				// Track whether onAuth has fired. Providers that use OAuthCallbackFlow
+				// always call onAuth first (emit browser URL), then onManualCodeInput as
+				// a fallback. Providers that require interactive input (API-key paste,
+				// GitHub Enterprise URL, device-code entry) call onPrompt before onAuth.
+				// We use this ordering to self-classify at runtime — no static allowlist.
+				let authEmitted = false;
+				try {
+					await session.modelRegistry.authStorage.login(command.providerId, {
+						onAuth: info => {
+							authEmitted = true;
+							output({
+								type: "extension_ui_request",
+								id: Snowflake.next() as string,
+								method: "open_url",
+								url: info.url,
+								instructions: info.instructions,
+							} as RpcExtensionUIRequest);
+						},
+						onProgress: message => {
+							uiCtx.notify(message, "info");
+						},
+						onPrompt: () => {
+							if (!authEmitted) {
+								// onPrompt called before any auth URL — provider requires
+								// interactive input that cannot be satisfied headlessly.
+								return Promise.reject(
+									new Error(
+										`Provider '${command.providerId}' requires interactive prompts ` +
+											"which are not supported in RPC mode. Use the terminal UI to log in.",
+									),
+								);
+							}
+							// onAuth has already fired — we are inside OAuthCallbackFlow's
+							// manual-redirect fallback race. Returning a never-settling promise
+							// lets the race block until the callback server wins; a rejection
+							// would be caught as null and spin the while(true) loop.
+							return new Promise<string>(() => {});
+						},
+					});
+					await session.modelRegistry.refresh();
+					return success(id, "login", { providerId: command.providerId });
+				} catch (err: unknown) {
+					return error(id, "login", err instanceof Error ? err.message : String(err));
+				}
 			}
 
 			default: {
@@ -763,8 +797,8 @@ export async function runRpcMode(session: AgentSession): Promise<never> {
 	async function checkShutdownRequested(): Promise<void> {
 		if (!shutdownState.requested) return;
 
-		if (extensionRunner?.hasHandlers("session_shutdown")) {
-			await extensionRunner.emit({ type: "session_shutdown" });
+		if (session.extensionRunner?.hasHandlers("session_shutdown")) {
+			await session.extensionRunner.emit({ type: "session_shutdown" });
 		}
 
 		process.exit(0);
@@ -793,6 +827,11 @@ export async function runRpcMode(session: AgentSession): Promise<never> {
 				continue;
 			}
 
+			if (isRpcHostUriResult(parsed)) {
+				hostUriBridge.handleResult(parsed);
+				continue;
+			}
+
 			// Handle regular commands
 			const command = parsed as RpcCommand;
 			const response = await handleCommand(command);
@@ -807,5 +846,6 @@ export async function runRpcMode(session: AgentSession): Promise<never> {
 
 	// stdin closed — RPC client is gone, exit cleanly
 	hostToolBridge.rejectAllPending("RPC client disconnected before host tool execution completed");
+	hostUriBridge.clear("RPC client disconnected before host URI request completed");
 	process.exit(0);
 }

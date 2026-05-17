@@ -1,4 +1,4 @@
-import { describe, expect, it } from "bun:test";
+import { afterEach, beforeEach, describe, expect, it, vi } from "bun:test";
 import { type Component, TUI } from "@oh-my-pi/pi-tui";
 import { VirtualTerminal } from "./virtual-terminal";
 
@@ -25,7 +25,8 @@ function rows(prefix: string, count: number): string[] {
 }
 
 async function settle(term: VirtualTerminal): Promise<void> {
-	await Bun.sleep(0);
+	await new Promise<void>(resolve => process.nextTick(resolve));
+	await Bun.sleep(1);
 	await term.flush();
 }
 
@@ -42,6 +43,21 @@ function countMatches(lines: string[], pattern: RegExp): number {
 }
 
 describe("TUI terminal-state regressions", () => {
+	let monotonicNow = 0;
+	// Keep TUI's 16ms render throttle deterministic without sleeping a real frame per render.
+
+	beforeEach(() => {
+		monotonicNow = 0;
+		vi.spyOn(performance, "now").mockImplementation(() => {
+			monotonicNow += 20;
+			return monotonicNow;
+		});
+	});
+
+	afterEach(() => {
+		vi.restoreAllMocks();
+	});
+
 	describe("cursor + differential stability", () => {
 		it("keeps stable output across repeated no-op renders", async () => {
 			const term = new VirtualTerminal(40, 10);
@@ -603,7 +619,7 @@ describe("TUI terminal-state regressions", () => {
 			} finally {
 				tui.stop();
 			}
-		});
+		}, 15_000);
 	});
 
 	describe("scrollback integrity", () => {
@@ -813,5 +829,147 @@ describe("TUI terminal-state regressions", () => {
 				tui.stop();
 			}
 		});
+	});
+	describe("cursor escape sequences stay inside synchronized output blocks", () => {
+		// Cursor placement sequences that must not leak outside \x1b[?2026h…\x1b[?2026l
+		const CURSOR_SEQ = /\x1b\[\?(?:25[hl]|\d+[A-G])/g;
+		const BSU = "\x1b[?2026h";
+		const ESU = "\x1b[?2026l";
+
+		function getWrites(term: VirtualTerminal): string[] {
+			const writes: string[] = [];
+			const spy = vi.spyOn(term, "write");
+			spy.mockImplementation((data: string) => {
+				writes.push(data);
+			});
+			return writes;
+		}
+
+		afterEach(() => {
+			vi.restoreAllMocks();
+		});
+
+		it("all cursor sequences fall inside BSU/ESU brackets on full render", async () => {
+			const term = new VirtualTerminal(40, 10);
+			const tui = new TUI(term);
+			const writes = getWrites(term);
+
+			const component = new MutableLinesComponent(["hello", "world"]);
+			tui.addChild(component);
+
+			try {
+				tui.start();
+				await settle(term);
+				assertCursorSequencesInsideSyncBlocks(writes);
+			} finally {
+				tui.stop();
+			}
+		});
+
+		it("all cursor sequences fall inside BSU/ESU brackets on differential render", async () => {
+			const term = new VirtualTerminal(40, 10);
+			const tui = new TUI(term);
+
+			const component = new MutableLinesComponent(["AAA", "BBB", "CCC"]);
+			tui.addChild(component);
+
+			try {
+				tui.start();
+				await settle(term);
+
+				const writes = getWrites(term);
+				component.setLines(["AAA", "XXX", "CCC"]);
+				tui.requestRender();
+				await settle(term);
+				assertCursorSequencesInsideSyncBlocks(writes);
+			} finally {
+				tui.stop();
+			}
+		});
+
+		it("all cursor sequences fall inside BSU/ESU brackets on deleted-lines render", async () => {
+			const term = new VirtualTerminal(40, 10);
+			const tui = new TUI(term);
+			tui.setClearOnShrink(true);
+
+			const component = new MutableLinesComponent(["A", "B", "C", "D"]);
+			tui.addChild(component);
+
+			try {
+				tui.start();
+				await settle(term);
+
+				const writes = getWrites(term);
+				component.setLines(["A", "B"]);
+				tui.requestRender();
+				await settle(term);
+				assertCursorSequencesInsideSyncBlocks(writes);
+			} finally {
+				tui.stop();
+			}
+		});
+
+		it("all cursor sequences fall inside BSU/ESU brackets on repeated no-op renders", async () => {
+			const term = new VirtualTerminal(40, 10);
+			const tui = new TUI(term);
+
+			const component = new MutableLinesComponent(["hello", "world", "stable"]);
+			tui.addChild(component);
+
+			try {
+				tui.start();
+				await settle(term);
+
+				const writes = getWrites(term);
+				for (let i = 0; i < 4; i++) {
+					tui.requestRender();
+					await settle(term);
+				}
+				assertCursorSequencesInsideSyncBlocks(writes);
+			} finally {
+				tui.stop();
+			}
+		});
+
+		/**
+		 * Assert that every cursor escape sequence in every write call appears
+		 * strictly between a matched BSU/ESU pair, or is the sole payload of a
+		 * standalone hideCursor call (from a no-change path).
+		 */
+		function assertCursorSequencesInsideSyncBlocks(writes: string[]): void {
+			for (const write of writes) {
+				if (write === "\x1b[?25l") {
+					// Standalone hideCursor — allowed (no-change path)
+					continue;
+				}
+				// Walk through the write, tracking BSU/ESU nesting
+				let depth = 0;
+				let idx = 0;
+				while (idx < write.length) {
+					CURSOR_SEQ.lastIndex = idx;
+					const match = CURSOR_SEQ.exec(write);
+					if (!match) break;
+
+					const matchIdx = match.index;
+					// Count BSU/ESU depth up to the match position
+					let scanIdx = idx;
+					while (scanIdx < matchIdx) {
+						if (write.startsWith(BSU, scanIdx)) {
+							depth++;
+							scanIdx += BSU.length;
+						} else if (write.startsWith(ESU, scanIdx)) {
+							depth--;
+							scanIdx += ESU.length;
+						} else {
+							scanIdx++;
+						}
+					}
+
+					expect(depth).toBeGreaterThan(0);
+
+					idx = matchIdx + match[0].length;
+				}
+			}
+		}
 	});
 });

@@ -6,45 +6,30 @@
  *
  */
 import type { AgentTool, AgentToolContext, AgentToolResult, AgentToolUpdateCallback } from "@oh-my-pi/pi-agent-core";
-import { StringEnum } from "@oh-my-pi/pi-ai";
 import { prompt } from "@oh-my-pi/pi-utils";
-import { Type } from "@sinclair/typebox";
+import * as z from "zod/v4";
 import type { CustomTool, CustomToolContext, RenderResultOptions } from "../../extensibility/custom-tools/types";
 import type { Theme } from "../../modes/theme/theme";
 import webSearchSystemPrompt from "../../prompts/system/web-search.md" with { type: "text" };
 import webSearchDescription from "../../prompts/tools/web-search.md" with { type: "text" };
 import type { ToolSession } from "../../tools";
 import { formatAge } from "../../tools/render-utils";
-import { getSearchProvider, resolveProviderChain, type SearchProvider } from "./provider";
+import { getSearchProvider, getSearchProviderLabel, resolveProviderChain, type SearchProvider } from "./provider";
 import { renderSearchCall, renderSearchResult, type SearchRenderDetails } from "./render";
 import type { SearchProviderId, SearchResponse } from "./types";
 import { SearchProviderError } from "./types";
 
 /** Web search tool parameters schema */
-export const webSearchSchema = Type.Object({
-	query: Type.String({ description: "Search query" }),
-	recency: Type.Optional(
-		StringEnum(["day", "week", "month", "year"], {
-			description: "Recency filter (Brave, Perplexity)",
-		}),
-	),
-	limit: Type.Optional(Type.Number({ description: "Max results to return" })),
-	max_tokens: Type.Optional(Type.Number({ description: "Maximum output tokens" })),
-	temperature: Type.Optional(Type.Number({ description: "Sampling temperature" })),
-	num_search_results: Type.Optional(Type.Number({ description: "Number of search results to retrieve" })),
+export const webSearchSchema = z.object({
+	query: z.string().describe("search query"),
+	recency: z.enum(["day", "week", "month", "year"]).describe("recency filter").optional(),
+	limit: z.number().describe("max results").optional(),
+	max_tokens: z.number().describe("max output tokens").optional(),
+	temperature: z.number().describe("sampling temperature").optional(),
+	num_search_results: z.number().describe("number of search results").optional(),
 });
 
-export type SearchToolParams = {
-	query: string;
-	recency?: "day" | "week" | "month" | "year";
-	limit?: number;
-	/** Maximum output tokens. Defaults to 4096. */
-	max_tokens?: number;
-	/** Sampling temperature (0–1). Lower = more focused/factual. Defaults to 0.2. */
-	temperature?: number;
-	/** Number of search results to retrieve. Defaults to 10. */
-	num_search_results?: number;
-};
+export type SearchToolParams = z.infer<typeof webSearchSchema>;
 
 export interface SearchQueryParams extends SearchToolParams {
 	provider?: SearchProviderId | "auto";
@@ -63,7 +48,7 @@ function formatProviderError(error: unknown, provider: SearchProvider): string {
 			if (error.provider === "zai") {
 				return error.message;
 			}
-			return `${getSearchProvider(error.provider).label} authorization failed (${error.status}). Check API key or base URL.`;
+			return `${getSearchProviderLabel(error.provider)} authorization failed (${error.status}). Check API key or base URL.`;
 		}
 		return error.message;
 	}
@@ -136,12 +121,13 @@ function formatForLLM(response: SearchResponse): string {
 async function executeSearch(
 	_toolCallId: string,
 	params: SearchQueryParams,
+	signal?: AbortSignal,
 ): Promise<{ content: Array<{ type: "text"; text: string }>; details: SearchRenderDetails }> {
 	const providers =
 		params.provider && params.provider !== "auto"
-			? (await getSearchProvider(params.provider).isAvailable())
-				? [getSearchProvider(params.provider)]
-				: await resolveProviderChain("auto")
+			? await getSearchProvider(params.provider).then(provider =>
+					provider.isAvailable() ? [provider] : resolveProviderChain("auto"),
+				)
 			: await resolveProviderChain();
 	if (providers.length === 0) {
 		const message = "No web search provider configured.";
@@ -165,6 +151,7 @@ async function executeSearch(
 				maxOutputTokens: params.max_tokens,
 				numSearchResults: params.num_search_results,
 				temperature: params.temperature,
+				signal,
 			});
 
 			const text = formatForLLM(response);
@@ -205,12 +192,14 @@ export async function runSearchQuery(
  * Supports Anthropic, Perplexity, Exa, Brave, Jina, Kimi, Gemini, Codex, Z.AI, SearXNG, and Synthetic providers with automatic fallback.
  * Session is accepted for interface consistency but not used.
  */
-export class SearchTool implements AgentTool<typeof webSearchSchema, SearchRenderDetails> {
+export class WebSearchTool implements AgentTool<typeof webSearchSchema, SearchRenderDetails> {
 	readonly name = "web_search";
 	readonly label = "Web Search";
 	readonly description: string;
 	readonly parameters = webSearchSchema;
 	readonly strict = true;
+	readonly loadMode = "discoverable";
+	readonly summary = "Search the web for up-to-date information";
 
 	constructor(_session: ToolSession) {
 		this.description = prompt.render(webSearchDescription);
@@ -219,11 +208,11 @@ export class SearchTool implements AgentTool<typeof webSearchSchema, SearchRende
 	async execute(
 		_toolCallId: string,
 		params: SearchToolParams,
-		_signal?: AbortSignal,
+		signal?: AbortSignal,
 		_onUpdate?: AgentToolUpdateCallback<SearchRenderDetails>,
 		_context?: AgentToolContext,
 	): Promise<AgentToolResult<SearchRenderDetails>> {
-		return executeSearch(_toolCallId, params);
+		return executeSearch(_toolCallId, params, signal);
 	}
 }
 
@@ -239,9 +228,9 @@ export const webSearchCustomTool: CustomTool<typeof webSearchSchema, SearchRende
 		params: SearchToolParams,
 		_onUpdate,
 		_ctx: CustomToolContext,
-		_signal?: AbortSignal,
+		signal?: AbortSignal,
 	) {
-		return executeSearch(toolCallId, params);
+		return executeSearch(toolCallId, params, signal);
 	},
 
 	renderCall(args: SearchToolParams, options: RenderResultOptions, theme: Theme) {

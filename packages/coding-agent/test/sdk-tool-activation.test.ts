@@ -8,14 +8,14 @@ import { createAgentSession, type ExtensionFactory } from "@oh-my-pi/pi-coding-a
 import { AuthStorage } from "@oh-my-pi/pi-coding-agent/session/auth-storage";
 import { SessionManager } from "@oh-my-pi/pi-coding-agent/session/session-manager";
 import { Snowflake } from "@oh-my-pi/pi-utils";
-import { Type } from "@sinclair/typebox";
+import * as z from "zod/v4";
 
 const toolActivationExtension: ExtensionFactory = pi => {
 	pi.registerTool({
 		name: "default_inactive_tool",
 		label: "Default Inactive Tool",
 		description: "Tool hidden from the initial active set unless explicitly requested.",
-		parameters: Type.Object({}),
+		parameters: z.object({}),
 		defaultInactive: true,
 		async execute() {
 			return { content: [{ type: "text", text: "inactive" }] };
@@ -25,7 +25,7 @@ const toolActivationExtension: ExtensionFactory = pi => {
 		name: "default_active_tool",
 		label: "Default Active Tool",
 		description: "Tool included in the initial active set.",
-		parameters: Type.Object({}),
+		parameters: z.object({}),
 		async execute() {
 			return { content: [{ type: "text", text: "active" }] };
 		},
@@ -73,8 +73,8 @@ describe("createAgentSession defaultInactive tool activation", () => {
 			);
 			expect(session.getActiveToolNames()).toContain("default_active_tool");
 			expect(session.getActiveToolNames()).not.toContain("default_inactive_tool");
-			expect(session.systemPrompt).toContain("default_active_tool");
-			expect(session.systemPrompt).not.toContain("default_inactive_tool");
+			expect(session.systemPrompt.join("\n")).toContain("default_active_tool");
+			expect(session.systemPrompt.join("\n")).not.toContain("default_inactive_tool");
 		} finally {
 			await session.dispose();
 		}
@@ -106,7 +106,7 @@ describe("createAgentSession defaultInactive tool activation", () => {
 			expect(session.getActiveToolNames()).toEqual(
 				expect.arrayContaining(["read", "default_active_tool", "default_inactive_tool"]),
 			);
-			expect(session.systemPrompt).toContain("default_inactive_tool");
+			expect(session.systemPrompt.join("\n")).toContain("default_inactive_tool");
 		} finally {
 			await session.dispose();
 		}

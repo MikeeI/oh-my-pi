@@ -8,6 +8,7 @@
  * - Interact with the user via UI primitives
  */
 import type { AgentMessage, AgentToolResult, AgentToolUpdateCallback, ThinkingLevel } from "@oh-my-pi/pi-agent-core";
+import type { CompactionResult } from "@oh-my-pi/pi-agent-core/compaction";
 import type {
 	Api,
 	AssistantMessageEvent,
@@ -15,45 +16,70 @@ import type {
 	Context,
 	ImageContent,
 	Model,
-	OAuthCredentials,
-	OAuthLoginCallbacks,
+	ProviderResponseMetadata,
 	SimpleStreamOptions,
+	Static,
 	TextContent,
-	ToolResultMessage,
+	TSchema,
 } from "@oh-my-pi/pi-ai";
+import type { OAuthCredentials, OAuthLoginCallbacks } from "@oh-my-pi/pi-ai/utils/oauth/types";
 import type * as piCodingAgent from "@oh-my-pi/pi-coding-agent";
-import type { AutocompleteItem, Component, EditorComponent, EditorTheme, KeyId, TUI } from "@oh-my-pi/pi-tui";
-import type { Static, TSchema } from "@sinclair/typebox";
-import type { Rule } from "../../capability/rule";
+import type { AutocompleteItem, Component, EditorTheme, KeyId, TUI } from "@oh-my-pi/pi-tui";
 import type { KeybindingsManager } from "../../config/keybindings";
 import type { ModelRegistry } from "../../config/model-registry";
 import type { EditToolDetails } from "../../edit";
+import type { PythonResult } from "../../eval/py/executor";
 import type { BashResult } from "../../exec/bash-executor";
 import type { ExecOptions, ExecResult } from "../../exec/exec";
-import type { PythonResult } from "../../ipy/executor";
+import type { CustomEditor } from "../../modes/components/custom-editor";
 import type { Theme } from "../../modes/theme/theme";
-import type { CompactionPreparation, CompactionResult } from "../../session/compaction";
 import type { CustomMessage } from "../../session/messages";
-import type {
-	BranchSummaryEntry,
-	CompactionEntry,
-	ReadonlySessionManager,
-	SessionEntry,
-	SessionManager,
-} from "../../session/session-manager";
+import type { ReadonlySessionManager, SessionManager } from "../../session/session-manager";
 import type {
 	BashToolDetails,
 	BashToolInput,
 	FindToolDetails,
 	FindToolInput,
-	GrepToolDetails,
-	GrepToolInput,
 	ReadToolDetails,
 	ReadToolInput,
+	SearchToolDetails,
+	SearchToolInput,
 	WriteToolInput,
 } from "../../tools";
-import type { TodoItem } from "../../tools/todo-write";
 import type { EventBus } from "../../utils/event-bus";
+import type {
+	AgentEndEvent,
+	AgentStartEvent,
+	AutoCompactionEndEvent,
+	AutoCompactionStartEvent,
+	AutoRetryEndEvent,
+	AutoRetryStartEvent,
+	ContextEvent,
+	GoalUpdatedEvent,
+	SessionBeforeBranchEvent,
+	SessionBeforeBranchResult,
+	SessionBeforeCompactEvent,
+	SessionBeforeCompactResult,
+	SessionBeforeSwitchEvent,
+	SessionBeforeSwitchResult,
+	SessionBeforeTreeEvent,
+	SessionBeforeTreeResult,
+	SessionBranchEvent,
+	SessionCompactEvent,
+	SessionCompactingEvent,
+	SessionCompactingResult,
+	SessionEvent,
+	SessionShutdownEvent,
+	SessionStartEvent,
+	SessionSwitchEvent,
+	SessionTreeEvent,
+	TodoReminderEvent,
+	ToolCallEventResult,
+	ToolResultEventResult,
+	TtsrTriggeredEvent,
+	TurnEndEvent,
+	TurnStartEvent,
+} from "../shared-events";
 import type { SlashCommandInfo } from "../slash-commands";
 
 export type { AppKeybinding, KeybindingsManager } from "../../config/keybindings";
@@ -103,6 +129,11 @@ export type ExtensionWidgetContent = string[] | ExtensionUiComponentFactory | un
  * UI context for extensions to request interactive UI.
  * Each mode (interactive, RPC, print) provides its own implementation.
  */
+// fallow-ignore-next-line code-duplication
+// Parallel to HookUIContext: extensions expose a strictly larger UI surface
+// (custom editor component, header/footer, widgets, theming, terminal input)
+// and may be invoked from event handlers that have already taken the agent
+// loop's lock — hooks intentionally cannot.
 export interface ExtensionUIContext {
 	/** Show a selector and return the user's choice. */
 	select(title: string, options: string[], dialogOptions?: ExtensionUIDialogOptions): Promise<string | undefined>;
@@ -170,9 +201,15 @@ export interface ExtensionUIContext {
 		editorOptions?: { promptStyle?: boolean },
 	): Promise<string | undefined>;
 
-	/** Set a custom editor component via factory function, or undefined to restore the default editor. */
+	/**
+	 * Set a custom editor component via factory function, or `undefined` to restore the default editor.
+	 *
+	 * The factory must return a {@link CustomEditor} subclass. Plain `EditorComponent`/`Editor`
+	 * instances do not implement the action-keys, escape callbacks, and custom-key-handler surface
+	 * required by interactive mode.
+	 */
 	setEditorComponent(
-		factory: ((tui: TUI, theme: EditorTheme, keybindings: KeybindingsManager) => EditorComponent) | undefined,
+		factory: ((tui: TUI, theme: EditorTheme, keybindings: KeybindingsManager) => CustomEditor) | undefined,
 	): void;
 
 	/** Get the current theme for styling. */
@@ -214,6 +251,11 @@ export interface CompactOptions {
 /**
  * Context passed to extension event handlers.
  */
+// fallow-ignore-next-line code-duplication
+// Parallel to HookContext: extensions expose a strictly larger runtime
+// surface (model registry, system prompt, shutdown, full session manager
+// access). Field overlap is incidental; merging into a base would require
+// hooks to widen their public contract.
 export interface ExtensionContext {
 	/** UI methods for user interaction */
 	ui: ExtensionUIContext;
@@ -240,7 +282,7 @@ export interface ExtensionContext {
 	/** Gracefully shutdown and exit. */
 	shutdown(): void;
 	/** Get the current effective system prompt. */
-	getSystemPrompt(): string;
+	getSystemPrompt(): string[];
 	/** @deprecated Use hasPendingMessages() instead */
 	hasQueuedMessages(): boolean;
 }
@@ -249,6 +291,10 @@ export interface ExtensionContext {
  * Extended context for command handlers.
  * Includes session control methods only safe in user-initiated commands.
  */
+// fallow-ignore-next-line code-duplication
+// Parallel to HookCommandContext: same method names, different invariants —
+// extension commands additionally permit `switchSession` and `reload`,
+// which hooks must not call to avoid deadlocking the agent loop.
 export interface ExtensionCommandContext extends ExtensionContext {
 	/** Get current context usage for the active model. */
 	getContextUsage(): ContextUsage | undefined;
@@ -310,7 +356,7 @@ export interface ToolDefinition<TParams extends TSchema = TSchema, TDetails = un
 	label: string;
 	/** Description for LLM */
 	description: string;
-	/** Parameter schema (TypeBox) */
+	/** Parameter schema (Zod, or TypeBox for legacy/extension compat). */
 	parameters: TParams;
 	/** If true, tool is excluded unless explicitly listed in --tools or agent's tools field */
 	hidden?: boolean;
@@ -366,115 +412,30 @@ export interface ResourcesDiscoverResult {
 }
 
 // ============================================================================
-// Session Events
+// Session Events (shared with hooks subsystem)
 // ============================================================================
 
-/** Fired on initial session load */
-export interface SessionStartEvent {
-	type: "session_start";
-}
-
-/** Fired before switching to another session (can be cancelled) */
-export interface SessionBeforeSwitchEvent {
-	type: "session_before_switch";
-	reason: "new" | "resume" | "fork";
-	targetSessionFile?: string;
-}
-
-/** Fired after switching to another session */
-export interface SessionSwitchEvent {
-	type: "session_switch";
-	reason: "new" | "resume" | "fork";
-	previousSessionFile: string | undefined;
-}
-
-/** Fired before branching a session (can be cancelled) */
-export interface SessionBeforeBranchEvent {
-	type: "session_before_branch";
-	entryId: string;
-}
-
-/** Fired after branching a session */
-export interface SessionBranchEvent {
-	type: "session_branch";
-	previousSessionFile: string | undefined;
-}
-
-/** Fired before context compaction (can be cancelled or customized) */
-export interface SessionBeforeCompactEvent {
-	type: "session_before_compact";
-	preparation: CompactionPreparation;
-	branchEntries: SessionEntry[];
-	customInstructions?: string;
-	signal: AbortSignal;
-}
-
-/** Fired before compaction summarization to customize prompts/context */
-export interface SessionCompactingEvent {
-	type: "session.compacting";
-	sessionId: string;
-	messages: AgentMessage[];
-}
-
-/** Fired after context compaction */
-export interface SessionCompactEvent {
-	type: "session_compact";
-	compactionEntry: CompactionEntry;
-	fromExtension: boolean;
-}
-
-/** Fired on process exit */
-export interface SessionShutdownEvent {
-	type: "session_shutdown";
-}
-
-/** Preparation data for tree navigation */
-export interface TreePreparation {
-	targetId: string;
-	oldLeafId: string | null;
-	commonAncestorId: string | null;
-	entriesToSummarize: SessionEntry[];
-	userWantsSummary: boolean;
-}
-
-/** Fired before navigating in the session tree (can be cancelled) */
-export interface SessionBeforeTreeEvent {
-	type: "session_before_tree";
-	preparation: TreePreparation;
-	signal: AbortSignal;
-}
-
-/** Fired after navigating in the session tree */
-export interface SessionTreeEvent {
-	type: "session_tree";
-	newLeafId: string | null;
-	oldLeafId: string | null;
-	summaryEntry?: BranchSummaryEntry;
-	fromExtension?: boolean;
-}
-
-export type SessionEvent =
-	| SessionStartEvent
-	| SessionBeforeSwitchEvent
-	| SessionSwitchEvent
-	| SessionBeforeBranchEvent
-	| SessionBranchEvent
-	| SessionBeforeCompactEvent
-	| SessionCompactingEvent
-	| SessionCompactEvent
-	| SessionShutdownEvent
-	| SessionBeforeTreeEvent
-	| SessionTreeEvent;
+export type {
+	SessionBeforeBranchEvent,
+	SessionBeforeCompactEvent,
+	SessionBeforeSwitchEvent,
+	SessionBeforeTreeEvent,
+	SessionBranchEvent,
+	SessionCompactEvent,
+	SessionCompactingEvent,
+	SessionEvent,
+	SessionShutdownEvent,
+	SessionStartEvent,
+	SessionSwitchEvent,
+	SessionTreeEvent,
+	TreePreparation,
+} from "../shared-events";
 
 // ============================================================================
 // Agent Events
 // ============================================================================
 
-/** Fired before each LLM call. Can modify messages. */
-export interface ContextEvent {
-	type: "context";
-	messages: AgentMessage[];
-}
+export type { ContextEvent } from "../shared-events";
 
 /** Fired before a provider request is sent. Can replace the payload. */
 export interface BeforeProviderRequestEvent {
@@ -482,39 +443,20 @@ export interface BeforeProviderRequestEvent {
 	payload: unknown;
 }
 
+/** Fired after a provider response is received, before its stream body is consumed. */
+export interface AfterProviderResponseEvent extends ProviderResponseMetadata {
+	type: "after_provider_response";
+}
+
 /** Fired after user submits prompt but before agent loop. */
 export interface BeforeAgentStartEvent {
 	type: "before_agent_start";
 	prompt: string;
 	images?: ImageContent[];
-	systemPrompt: string;
+	systemPrompt: string[];
 }
 
-/** Fired when an agent loop starts */
-export interface AgentStartEvent {
-	type: "agent_start";
-}
-
-/** Fired when an agent loop ends */
-export interface AgentEndEvent {
-	type: "agent_end";
-	messages: AgentMessage[];
-}
-
-/** Fired at the start of each turn */
-export interface TurnStartEvent {
-	type: "turn_start";
-	turnIndex: number;
-	timestamp: number;
-}
-
-/** Fired at the end of each turn */
-export interface TurnEndEvent {
-	type: "turn_end";
-	turnIndex: number;
-	message: AgentMessage;
-	toolResults: ToolResultMessage[];
-}
+export type { AgentEndEvent, AgentStartEvent, TurnEndEvent, TurnStartEvent } from "../shared-events";
 
 /** Fired when a message starts (user, assistant, or toolResult) */
 export interface MessageStartEvent {
@@ -562,54 +504,22 @@ export interface ToolExecutionEndEvent {
 	isError: boolean;
 }
 
-/** Fired when auto-compaction starts */
-export interface AutoCompactionStartEvent {
-	type: "auto_compaction_start";
-	reason: "threshold" | "overflow" | "idle";
-	action: "context-full" | "handoff";
-}
+export type {
+	AutoCompactionEndEvent,
+	AutoCompactionStartEvent,
+	AutoRetryEndEvent,
+	AutoRetryStartEvent,
+	TodoReminderEvent,
+	TtsrTriggeredEvent,
+} from "../shared-events";
 
-/** Fired when auto-compaction ends */
-export interface AutoCompactionEndEvent {
-	type: "auto_compaction_end";
-	action: "context-full" | "handoff";
-	result: CompactionResult | undefined;
-	aborted: boolean;
-	willRetry: boolean;
-	errorMessage?: string;
-	/** True when compaction was skipped for a benign reason (no model, no candidates, nothing to compact). */
-	skipped?: boolean;
-}
-
-/** Fired when auto-retry starts */
-export interface AutoRetryStartEvent {
-	type: "auto_retry_start";
-	attempt: number;
-	maxAttempts: number;
-	delayMs: number;
-	errorMessage: string;
-}
-
-/** Fired when auto-retry ends */
-export interface AutoRetryEndEvent {
-	type: "auto_retry_end";
-	success: boolean;
-	attempt: number;
-	finalError?: string;
-}
-
-/** Fired when TTSR rule matching interrupts generation */
-export interface TtsrTriggeredEvent {
-	type: "ttsr_triggered";
-	rules: Rule[];
-}
-
-/** Fired when todo reminder logic detects unfinished todos */
-export interface TodoReminderEvent {
-	type: "todo_reminder";
-	todos: TodoItem[];
-	attempt: number;
-	maxAttempts: number;
+/** Fired when AuthStorage automatically soft-disables a credential (e.g. OAuth `invalid_grant`). Not fired for user-initiated `remove()` or duplicate-credential dedup. */
+export interface CredentialDisabledEvent {
+	type: "credential_disabled";
+	/** Provider id whose credential was disabled (e.g. "anthropic"). */
+	provider: string;
+	/** Verbatim error captured for forensics (truncated upstream). */
+	disabledCause: string;
 }
 
 // ============================================================================
@@ -683,9 +593,9 @@ export interface WriteToolCallEvent extends ToolCallEventBase {
 	input: WriteToolInput;
 }
 
-export interface GrepToolCallEvent extends ToolCallEventBase {
-	toolName: "grep";
-	input: GrepToolInput;
+export interface SearchToolCallEvent extends ToolCallEventBase {
+	toolName: "search";
+	input: SearchToolInput;
 }
 
 export interface FindToolCallEvent extends ToolCallEventBase {
@@ -704,7 +614,7 @@ export type ToolCallEvent =
 	| ReadToolCallEvent
 	| EditToolCallEvent
 	| WriteToolCallEvent
-	| GrepToolCallEvent
+	| SearchToolCallEvent
 	| FindToolCallEvent
 	| CustomToolCallEvent;
 
@@ -736,9 +646,9 @@ export interface WriteToolResultEvent extends ToolResultEventBase {
 	details: undefined;
 }
 
-export interface GrepToolResultEvent extends ToolResultEventBase {
-	toolName: "grep";
-	details: GrepToolDetails | undefined;
+export interface SearchToolResultEvent extends ToolResultEventBase {
+	toolName: "search";
+	details: SearchToolDetails | undefined;
 }
 
 export interface FindToolResultEvent extends ToolResultEventBase {
@@ -757,7 +667,7 @@ export type ToolResultEvent =
 	| ReadToolResultEvent
 	| EditToolResultEvent
 	| WriteToolResultEvent
-	| GrepToolResultEvent
+	| SearchToolResultEvent
 	| FindToolResultEvent
 	| CustomToolResultEvent;
 
@@ -785,7 +695,7 @@ export function isToolCallEventType(toolName: "bash", event: ToolCallEvent): eve
 export function isToolCallEventType(toolName: "read", event: ToolCallEvent): event is ReadToolCallEvent;
 export function isToolCallEventType(toolName: "edit", event: ToolCallEvent): event is EditToolCallEvent;
 export function isToolCallEventType(toolName: "write", event: ToolCallEvent): event is WriteToolCallEvent;
-export function isToolCallEventType(toolName: "grep", event: ToolCallEvent): event is GrepToolCallEvent;
+export function isToolCallEventType(toolName: "search", event: ToolCallEvent): event is SearchToolCallEvent;
 export function isToolCallEventType(toolName: "find", event: ToolCallEvent): event is FindToolCallEvent;
 export function isToolCallEventType<TName extends string, TInput extends Record<string, unknown>>(
 	toolName: TName,
@@ -801,6 +711,7 @@ export type ExtensionEvent =
 	| SessionEvent
 	| ContextEvent
 	| BeforeProviderRequestEvent
+	| AfterProviderResponseEvent
 	| BeforeAgentStartEvent
 	| AgentStartEvent
 	| AgentEndEvent
@@ -818,6 +729,8 @@ export type ExtensionEvent =
 	| AutoRetryEndEvent
 	| TtsrTriggeredEvent
 	| TodoReminderEvent
+	| GoalUpdatedEvent
+	| CredentialDisabledEvent
 	| UserBashEvent
 	| UserPythonEvent
 	| InputEvent
@@ -834,10 +747,7 @@ export interface ContextEventResult {
 
 export type BeforeProviderRequestEventResult = unknown;
 
-export interface ToolCallEventResult {
-	block?: boolean;
-	reason?: string;
-}
+export type { ToolCallEventResult } from "../shared-events";
 
 /** Result from input event handler */
 export interface InputEventResult {
@@ -861,45 +771,21 @@ export interface UserPythonEventResult {
 	result?: PythonResult;
 }
 
-export interface ToolResultEventResult {
-	content?: (TextContent | ImageContent)[];
-	details?: unknown;
-	isError?: boolean;
-}
+export type { ToolResultEventResult } from "../shared-events";
 
 export interface BeforeAgentStartEventResult {
 	message?: Pick<CustomMessage, "customType" | "content" | "display" | "details" | "attribution">;
 	/** Replace the system prompt for this turn. If multiple extensions return this, they are chained. */
-	systemPrompt?: string;
+	systemPrompt?: string[];
 }
 
-export interface SessionBeforeSwitchResult {
-	cancel?: boolean;
-}
-
-export interface SessionBeforeBranchResult {
-	cancel?: boolean;
-	skipConversationRestore?: boolean;
-}
-
-export interface SessionBeforeCompactResult {
-	cancel?: boolean;
-	compaction?: CompactionResult;
-}
-
-export interface SessionCompactingResult {
-	context?: string[];
-	prompt?: string;
-	preserveData?: Record<string, unknown>;
-}
-
-export interface SessionBeforeTreeResult {
-	cancel?: boolean;
-	summary?: {
-		summary: string;
-		details?: unknown;
-	};
-}
+export type {
+	SessionBeforeBranchResult,
+	SessionBeforeCompactResult,
+	SessionBeforeSwitchResult,
+	SessionBeforeTreeResult,
+	SessionCompactingResult,
+} from "../shared-events";
 
 // ============================================================================
 // Message Rendering
@@ -919,6 +805,9 @@ export type MessageRenderer<T = unknown> = (
 // Command Registration
 // ============================================================================
 
+// fallow-ignore-next-line code-duplication
+// Parallel to HookAPI's RegisteredCommand: extensions add
+// `getArgumentCompletions` and bind handlers to ExtensionCommandContext.
 export interface RegisteredCommand {
 	name: string;
 	description?: string;
@@ -945,8 +834,11 @@ export interface ExtensionAPI {
 	/** File logger for error/warning/debug messages */
 	logger: typeof import("@oh-my-pi/pi-utils").logger;
 
-	/** Injected @sinclair/typebox module for defining tool parameters */
-	typebox: typeof import("@sinclair/typebox");
+	/** Injected zod-backed typebox shim for legacy `Type.Object(...)` parameter authoring. */
+	typebox: typeof import("../typebox");
+
+	/** Injected zod module for Zod-authored extension tools (canonical going forward). */
+	zod: typeof import("zod/v4");
 
 	/** Injected pi-coding-agent exports for accessing SDK utilities */
 	pi: typeof piCodingAgent;
@@ -981,6 +873,7 @@ export interface ExtensionAPI {
 		event: "before_provider_request",
 		handler: ExtensionHandler<BeforeProviderRequestEvent, BeforeProviderRequestEventResult>,
 	): void;
+	on(event: "after_provider_response", handler: ExtensionHandler<AfterProviderResponseEvent>): void;
 	on(event: "before_agent_start", handler: ExtensionHandler<BeforeAgentStartEvent, BeforeAgentStartEventResult>): void;
 	on(event: "agent_start", handler: ExtensionHandler<AgentStartEvent>): void;
 	on(event: "agent_end", handler: ExtensionHandler<AgentEndEvent>): void;
@@ -998,6 +891,8 @@ export interface ExtensionAPI {
 	on(event: "auto_retry_end", handler: ExtensionHandler<AutoRetryEndEvent>): void;
 	on(event: "ttsr_triggered", handler: ExtensionHandler<TtsrTriggeredEvent>): void;
 	on(event: "todo_reminder", handler: ExtensionHandler<TodoReminderEvent>): void;
+	on(event: "goal_updated", handler: ExtensionHandler<GoalUpdatedEvent>): void;
+	on(event: "credential_disabled", handler: ExtensionHandler<CredentialDisabledEvent>): void;
 	on(event: "input", handler: ExtensionHandler<InputEvent, InputEventResult>): void;
 	on(event: "tool_call", handler: ExtensionHandler<ToolCallEvent, ToolCallEventResult>): void;
 	on(event: "tool_result", handler: ExtensionHandler<ToolResultEvent, ToolResultEventResult>): void;
@@ -1311,7 +1206,7 @@ export interface ExtensionContextActions {
 	shutdown: () => void;
 	getContextUsage: () => ContextUsage | undefined;
 	compact: (instructionsOrOptions?: string | CompactOptions) => Promise<void>;
-	getSystemPrompt: () => string;
+	getSystemPrompt: () => string[];
 }
 
 /** Actions for ExtensionCommandContext (ctx.* in command handlers). */

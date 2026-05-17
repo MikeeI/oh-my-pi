@@ -34,13 +34,16 @@ import { createAgentSession } from "@oh-my-pi/pi-coding-agent";
 const { session, modelFallbackMessage } = await createAgentSession();
 
 if (modelFallbackMessage) {
-	process.stderr.write(`${modelFallbackMessage}\n`);
+  process.stderr.write(`${modelFallbackMessage}\n`);
 }
 
-const unsubscribe = session.subscribe(event => {
-	if (event.type === "message_update" && event.assistantMessageEvent.type === "text_delta") {
-		process.stdout.write(event.assistantMessageEvent.delta);
-	}
+const unsubscribe = session.subscribe((event) => {
+  if (
+    event.type === "message_update" &&
+    event.assistantMessageEvent.type === "text_delta"
+  ) {
+    process.stdout.write(event.assistantMessageEvent.delta);
+  }
 });
 
 await session.prompt("Summarize this repository in 3 bullets.");
@@ -57,13 +60,14 @@ If omitted, it resolves:
 - `cwd`: `getProjectDir()`
 - `agentDir`: `~/.omp/agent` (via `getAgentDir()`)
 - `authStorage`: `discoverAuthStorage(agentDir)`
-- `modelRegistry`: `new ModelRegistry(authStorage)` + `await refresh()`
+- `modelRegistry`: `new ModelRegistry(authStorage)` + background `refreshInBackground()` when the registry is not provided
 - `settings`: `await Settings.init({ cwd, agentDir })`
 - `sessionManager`: `SessionManager.create(cwd)` (file-backed)
 - skills/context files/prompt templates/slash commands/extensions/custom TS commands
 - built-in tools via `createTools(...)`
 - MCP tools (enabled by default)
 - LSP integration (enabled by default)
+- `eventBus`: new `EventBus()` unless supplied
 
 ### Required vs optional inputs
 
@@ -71,10 +75,10 @@ Typically you must provide only what you want to control:
 
 - **Must provide**: nothing for a minimal session
 - **Usually provide explicitly** in embedders:
-	- `sessionManager` (if you need in-memory or custom location)
-	- `authStorage` + `modelRegistry` (if you own credential/model lifecycle)
-	- `model` or `modelPattern` (if deterministic model selection matters)
-	- `settings` (if you need isolated/test config)
+  - `sessionManager` (if you need in-memory or custom location)
+  - `authStorage` + `modelRegistry` (if you own credential/model lifecycle)
+  - `model` or `modelPattern` (if deterministic model selection matters)
+  - `settings` (if you need isolated/test config)
 
 ## Session manager behavior (persistent vs in-memory)
 
@@ -86,7 +90,7 @@ Typically you must provide only what you want to control:
 import { createAgentSession, SessionManager } from "@oh-my-pi/pi-coding-agent";
 
 const { session } = await createAgentSession({
-	sessionManager: SessionManager.create(process.cwd()),
+  sessionManager: SessionManager.create(process.cwd()),
 });
 
 console.log(session.sessionFile); // absolute .jsonl path
@@ -102,7 +106,7 @@ console.log(session.sessionFile); // absolute .jsonl path
 import { createAgentSession, SessionManager } from "@oh-my-pi/pi-coding-agent";
 
 const { session } = await createAgentSession({
-	sessionManager: SessionManager.inMemory(),
+  sessionManager: SessionManager.inMemory(),
 });
 
 console.log(session.sessionFile); // undefined
@@ -130,10 +134,10 @@ const opened = listed[0] ? await SessionManager.open(listed[0].path) : null;
 
 ```ts
 import {
-	createAgentSession,
-	discoverAuthStorage,
-	ModelRegistry,
-	SessionManager,
+  createAgentSession,
+  discoverAuthStorage,
+  ModelRegistry,
+  SessionManager,
 } from "@oh-my-pi/pi-coding-agent";
 
 const authStorage = await discoverAuthStorage();
@@ -141,14 +145,15 @@ const modelRegistry = new ModelRegistry(authStorage);
 await modelRegistry.refresh();
 
 const available = modelRegistry.getAvailable();
-if (available.length === 0) throw new Error("No authenticated models available");
+if (available.length === 0)
+  throw new Error("No authenticated models available");
 
 const { session } = await createAgentSession({
-	authStorage,
-	modelRegistry,
-	model: available[0],
-	thinkingLevel: "medium",
-	sessionManager: SessionManager.inMemory(),
+  authStorage,
+  modelRegistry,
+  model: available[0],
+  thinkingLevel: "medium",
+  sessionManager: SessionManager.inMemory(),
 });
 ```
 
@@ -176,18 +181,18 @@ If restore fails, `modelFallbackMessage` explains fallback.
 Subscribe with `session.subscribe(listener)`; it returns an unsubscribe function.
 
 ```ts
-const unsubscribe = session.subscribe(event => {
-	switch (event.type) {
-		case "agent_start":
-		case "turn_start":
-		case "tool_execution_start":
-			break;
-		case "message_update":
-			if (event.assistantMessageEvent.type === "text_delta") {
-				process.stdout.write(event.assistantMessageEvent.delta);
-			}
-			break;
-	}
+const unsubscribe = session.subscribe((event) => {
+  switch (event.type) {
+    case "agent_start":
+    case "turn_start":
+    case "tool_execution_start":
+      break;
+    case "message_update":
+      if (event.assistantMessageEvent.type === "text_delta") {
+        process.stdout.write(event.assistantMessageEvent.delta);
+      }
+      break;
+  }
 });
 ```
 
@@ -195,8 +200,10 @@ const unsubscribe = session.subscribe(event => {
 
 - `auto_compaction_start` / `auto_compaction_end`
 - `auto_retry_start` / `auto_retry_end`
+- `retry_fallback_applied` / `retry_fallback_succeeded`
 - `ttsr_triggered`
-- `todo_reminder`
+- `todo_reminder` / `todo_auto_clear`
+- `irc_message`
 
 ## Prompt lifecycle
 
@@ -206,12 +213,12 @@ Behavior:
 
 1. optional command/template expansion (`/` commands, custom commands, file slash commands, prompt templates)
 2. if currently streaming:
-	- requires `streamingBehavior: "steer" | "followUp"`
-	- queues instead of throwing work away
+   - requires `streamingBehavior: "steer" | "followUp"`
+   - queues instead of throwing work away
 3. if idle:
-	- validates model + API key
-	- appends user message
-	- starts agent turn
+   - validates model + API key
+   - appends user message
+   - starts agent turn
 
 Related APIs:
 
@@ -232,8 +239,8 @@ Related APIs:
 
 ```ts
 const { session } = await createAgentSession({
-	toolNames: ["read", "grep", "find", "write"],
-	requireYieldTool: true,
+  toolNames: ["read", "grep", "find", "write"],
+  requireYieldTool: true,
 });
 ```
 
@@ -284,26 +291,44 @@ These are optional for normal single-agent embedding.
 
 ```ts
 type CreateAgentSessionResult = {
-	session: AgentSession;
-	extensionsResult: LoadExtensionsResult;
-	setToolUIContext: (uiContext: ExtensionUIContext, hasUI: boolean) => void;
-	mcpManager?: MCPManager;
-	modelFallbackMessage?: string;
-	lspServers?: Array<{ name: string; status: "ready" | "error"; fileTypes: string[]; error?: string }>;
+  session: AgentSession;
+  extensionsResult: LoadExtensionsResult;
+  setToolUIContext: (uiContext: ExtensionUIContext, hasUI: boolean) => void;
+  mcpManager?: MCPManager;
+  modelFallbackMessage?: string;
+  lspServers?: Array<{
+    name: string;
+    status: "ready" | "error";
+    fileTypes: string[];
+    error?: string;
+  }>;
+  eventBus: EventBus;
 };
 ```
 
 Use `setToolUIContext(...)` only if your embedder provides UI capabilities that tools/extensions should call into.
 
+## Startup performance
+
+`createAgentSession()` runs two background optimizations to overlap I/O with the rest of session setup:
+
+- **Model-host preconnect.** As soon as the model is resolved, the SDK fires a best-effort `fetch.preconnect(model.baseUrl)` so DNS + TCP + TLS + HTTP/2 to the provider's host happens in parallel with extension/skill load, tool registry build, and system-prompt assembly. The first real `fetch(...)` then reuses the warm connection, saving 100–300 ms on transcontinental hops (e.g. residential IP → `api.anthropic.com`). Implementation lives in `preconnectModelHost()` in `packages/coding-agent/src/sdk.ts`. If `fetch.preconnect` is unavailable (non-Bun runtime) or the call throws, the optimization is silently skipped — never a hard dependency. Applies to every mode (interactive, print, RPC, ACP).
+- **Conditional LSP warmup.** Startup LSP servers (those returned by `discoverStartupLspServers(cwd)`) are only warmed when **all** of these hold:
+  - `enableLsp !== false` on the session options, **and**
+  - `options.hasUI === true` (interactive TUI), **and**
+  - the `lsp.diagnosticsOnWrite` setting is enabled.
+
+  Print / script / RPC / ACP invocations (`hasUI=false`) skip the warmup entirely: they don't render the warmup status indicator and typically finish before the language servers would stabilize, so warming them just spends CPU parsing big `initialize` responses concurrently with the LLM stream consumer and jitters perceived latency. Tools that actually need an LSP server still spin one up on demand through `getOrCreateClient()` — only the *startup* warmup is skipped. The returned `lspServers` field in `CreateAgentSessionResult` is therefore `undefined` (not an empty array) whenever the warmup branch was bypassed.
+
 ## Minimal controlled embed example
 
 ```ts
 import {
-	createAgentSession,
-	discoverAuthStorage,
-	ModelRegistry,
-	SessionManager,
-	Settings,
+  createAgentSession,
+  discoverAuthStorage,
+  ModelRegistry,
+  SessionManager,
+  Settings,
 } from "@oh-my-pi/pi-coding-agent";
 
 const authStorage = await discoverAuthStorage();
@@ -311,24 +336,27 @@ const modelRegistry = new ModelRegistry(authStorage);
 await modelRegistry.refresh();
 
 const settings = Settings.isolated({
-	"compaction.enabled": true,
-	"retry.enabled": true,
+  "compaction.enabled": true,
+  "retry.enabled": true,
 });
 
 const { session } = await createAgentSession({
-	authStorage,
-	modelRegistry,
-	settings,
-	sessionManager: SessionManager.inMemory(),
-	toolNames: ["read", "grep", "find", "edit", "write"],
-	enableMCP: false,
-	enableLsp: true,
+  authStorage,
+  modelRegistry,
+  settings,
+  sessionManager: SessionManager.inMemory(),
+  toolNames: ["read", "grep", "find", "edit", "write"],
+  enableMCP: false,
+  enableLsp: true,
 });
 
-session.subscribe(event => {
-	if (event.type === "message_update" && event.assistantMessageEvent.type === "text_delta") {
-		process.stdout.write(event.assistantMessageEvent.delta);
-	}
+session.subscribe((event) => {
+  if (
+    event.type === "message_update" &&
+    event.assistantMessageEvent.type === "text_delta"
+  ) {
+    process.stdout.write(event.assistantMessageEvent.delta);
+  }
 });
 
 await session.prompt("Find all TODO comments in this repo and propose fixes.");

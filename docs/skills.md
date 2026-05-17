@@ -3,7 +3,7 @@
 Skills are file-backed capability packs discovered at startup and exposed to the model as:
 
 - lightweight metadata in the system prompt (name + description)
-- on-demand content via `read skill://...`
+- on-demand content via the `read` tool against `skill://...`
 - optional interactive `/skill:<name>` commands
 
 This document covers current runtime behavior in `src/extensibility/skills.ts`, `src/discovery/builtin.ts`, `src/internal-urls/skill-protocol.ts`, and `src/discovery/agents-md.ts`.
@@ -47,7 +47,6 @@ Provider-discovered layout (non-recursive under skills/):
 Custom-directory scanning is also non-recursive, so nested paths are ignored unless you point `customDirectories` at that nested parent.
 ```
 
-
 ### `SKILL.md` frontmatter
 
 Supported frontmatter fields on the skill type:
@@ -87,25 +86,25 @@ Current registered skill providers:
    - `claude-plugins`
    - `agents`
    - `codex`
-
-Dedup key is skill name. First item with a given name wins.
+4. `opencode` (priority 55)
+   Dedup key is skill name. First item with a given name wins.
 
 ### Source toggles and filtering
 
 `discoverSkills()` applies these controls:
 
 - source toggles: `enableCodexUser`, `enableClaudeUser`, `enableClaudeProject`, `enablePiUser`, `enablePiProject`
-- glob filters on skill name:
-  - `ignoredSkills` (exclude)
-  - `includeSkills` (include allowlist; empty means include all)
+- `disabledExtensions` entries with `skill:<name>`
+- `ignoredSkills` (exclude)
+- `includeSkills` (include allowlist; empty means include all)
 
 Filter order is:
 
-1. source enabled
-2. not ignored
-3. included (if include list present)
-
-For providers other than codex/claude/native (for example `agents`, `claude-plugins`), enablement currently falls back to: enabled if **any** built-in source toggle is enabled.
+1. not disabled by `disabledExtensions`
+2. source enabled
+3. not ignored
+4. included (if include list present)
+   For providers other than codex/claude/native (for example `agents`, `claude-plugins`, `opencode`), enablement currently falls back to: enabled if **any** built-in source toggle is enabled.
 
 ### Collision and duplicate handling
 
@@ -137,8 +136,13 @@ If `skills.enableSkillCommands` is true, interactive mode registers one slash co
 
 - reads the skill file directly from `filePath`
 - strips frontmatter
-- injects skill body as a follow-up custom message
+- injects skill body as a custom message
+- delivery mode follows the **submission keybinding**:
+  - **Enter** → invokes the skill on the `steer` queue while streaming (matches free-text Enter, which also steers), or as a normal idle prompt when the agent is not streaming
+  - **Ctrl+Enter** (`app.message.followUp`) → invokes the skill on the `followUp` queue while streaming, or as a normal idle prompt when the agent is not streaming
 - appends metadata (`Skill: <path>`, optional `User: <args>`)
+
+There is no flag, mode-selector, or frontmatter knob to override this — the keybinding *is* the choice, identical to how free text is routed during streaming (`input-controller.ts:243-249` for Enter, `input-controller.ts:462-500` for Ctrl+Enter; both dispatch through `#invokeSkillCommand`).
 
 ## `skill://` URL behavior
 

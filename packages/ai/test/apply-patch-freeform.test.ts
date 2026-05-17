@@ -1,6 +1,6 @@
 import { describe, expect, test } from "bun:test";
 import {
-	convertTools as convertCodexTools,
+	convertOpenAICodexResponsesTools as convertCodexTools,
 	normalizeCodexToolChoice,
 } from "@oh-my-pi/pi-ai/providers/openai-codex-responses";
 import {
@@ -14,10 +14,18 @@ import {
 	processResponsesStream,
 } from "@oh-my-pi/pi-ai/providers/openai-responses-shared";
 import type { AssistantMessage, Model, Tool, ToolResultMessage } from "@oh-my-pi/pi-ai/types";
-import { Type } from "@sinclair/typebox";
 import type { ResponseStreamEvent } from "openai/resources/responses/responses";
+import * as z from "zod/v4";
 
-const GRAMMAR = 'start: "*** Begin Patch" LF';
+const GRAMMAR = [
+	"// top-level comment",
+	"",
+	'start: "*** Begin Patch" LF  // trailing comment',
+	"PATH: /https?:\\/\\/[^\\n]+/",
+	'LITERAL: "//"',
+	"",
+].join("\n");
+const COMPACT_GRAMMAR = 'start: "*** Begin Patch" LF\nPATH: /https?:\\/\\/[^\\n]+/\nLITERAL: "//"';
 
 function makeModel(overrides: Partial<Model<"openai-responses">> = {}): Model<"openai-responses"> {
 	return {
@@ -55,22 +63,50 @@ const editTool: Tool = {
 	name: "edit",
 	customWireName: "apply_patch",
 	description: "edit files",
-	parameters: Type.Object({ input: Type.String() }),
+	parameters: z.object({ input: z.string() }),
 	customFormat: { syntax: "lark", definition: GRAMMAR },
 };
 
 const plainTool: Tool = {
 	name: "read_file",
 	description: "read a file",
-	parameters: Type.Object({ path: Type.String() }),
+	parameters: z.object({ path: z.string() }),
 };
 
-describe("supportsFreeformApplyPatch", () => {
-	test("absent flag returns false", () => {
-		// No runtime auto-detection — requires generated model metadata.
-		expect(supportsFreeformApplyPatch(makeModel())).toBe(false);
-	});
+const unionBranches = [
+	{
+		type: "object",
+		properties: { type: { enum: ["insert"] }, text: { type: "string" } },
+		required: ["type", "text"],
+	},
+	{
+		type: "object",
+		properties: { type: { enum: ["delete"] }, start: { type: "integer" } },
+		required: ["type", "start"],
+	},
+];
 
+function makeUnionTool(strict: boolean): Tool {
+	return {
+		name: "batch_update_doc",
+		description: "batch update",
+		strict,
+		parameters: {
+			type: "object",
+			properties: {
+				operations: {
+					type: "array",
+					items: {
+						oneOf: unionBranches,
+					},
+				},
+			},
+			required: ["operations"],
+		},
+	} as unknown as Tool;
+}
+
+describe("supportsFreeformApplyPatch", () => {
 	test("applyPatchToolType: freeform enables", () => {
 		expect(supportsFreeformApplyPatch(makeModel({ applyPatchToolType: "freeform" }))).toBe(true);
 	});
@@ -96,7 +132,7 @@ describe("convertTools: freeform emission", () => {
 		const [out] = convertTools([editTool], false, freeformModel) as unknown as Array<Record<string, unknown>>;
 		expect(out.type).toBe("custom");
 		expect(out.name).toBe("apply_patch"); // wire name from tool.customWireName
-		expect(out.format).toEqual({ type: "grammar", syntax: "lark", definition: GRAMMAR });
+		expect(out.format).toEqual({ type: "grammar", syntax: "lark", definition: COMPACT_GRAMMAR });
 	});
 
 	test("regular tools remain function-type alongside a custom one", () => {
@@ -119,6 +155,35 @@ describe("convertTools: freeform emission", () => {
 			Record<string, unknown>
 		>;
 		expect(out.type).toBe("function");
+	});
+
+	test("rewrites oneOf to anyOf for non-strict Responses tool schemas", () => {
+		const unionTool = makeUnionTool(false);
+
+		const [out] = convertTools([unionTool], true, makeModel()) as unknown as Array<{
+			parameters: { properties: { operations: { items: Record<string, unknown> } } };
+			strict?: boolean;
+		}>;
+
+		const items = out.parameters.properties.operations.items;
+		expect(out.strict).toBeUndefined();
+		expect(items.oneOf).toBeUndefined();
+		expect(items.anyOf).toEqual(unionBranches);
+	});
+
+	test("rewrites oneOf to anyOf before strict schema enforcement", () => {
+		const unionTool = makeUnionTool(true);
+
+		const [out] = convertTools([unionTool], true, makeModel()) as unknown as Array<{
+			parameters: { properties: { operations: { items: Record<string, unknown> } } };
+			strict?: boolean;
+		}>;
+
+		const items = out.parameters.properties.operations.items;
+		expect(out.strict).toBe(true);
+		expect(items.oneOf).toBeUndefined();
+		expect(items.anyOf).toMatchObject(unionBranches);
+		expect((items.anyOf as Array<Record<string, unknown>>)[0]?.additionalProperties).toBe(false);
 	});
 });
 
@@ -316,7 +381,7 @@ describe("codex-backend convertTools (chatgpt.com/backend-api)", () => {
 		expect(out.type).toBe("custom");
 		expect(out.name).toBe("apply_patch");
 		if (out.type !== "custom") throw new Error("Expected custom tool payload");
-		expect(out.format).toEqual({ type: "grammar", syntax: "lark", definition: GRAMMAR });
+		expect(out.format).toEqual({ type: "grammar", syntax: "lark", definition: COMPACT_GRAMMAR });
 	});
 
 	test("wire shape matches direct-OpenAI convertTools (single serializer contract)", () => {
@@ -339,13 +404,13 @@ describe("dispatcher wire-name matching", () => {
 			name: "edit",
 			customWireName: "apply_patch",
 			description: "edit files",
-			parameters: Type.Object({ input: Type.String() }),
+			parameters: z.object({ input: z.string() }),
 			customFormat: { syntax: "lark", definition: GRAMMAR },
 		};
 		const readTool: Tool = {
 			name: "read_file",
 			description: "read",
-			parameters: Type.Object({ path: Type.String() }),
+			parameters: z.object({ path: z.string() }),
 		};
 		const tools = [editLikeTool, readTool];
 		const toolCall = { name: "apply_patch" };
@@ -366,13 +431,13 @@ describe("dispatcher wire-name matching", () => {
 		const nameMatch: Tool = {
 			name: "foo",
 			description: "",
-			parameters: Type.Object({}),
+			parameters: z.object({}),
 		};
 		const wireMatch: Tool & { customWireName: string } = {
 			name: "bar",
 			customWireName: "foo",
 			description: "",
-			parameters: Type.Object({}),
+			parameters: z.object({}),
 		};
 		const tools = [wireMatch, nameMatch]; // wireMatch listed first
 		const toolCall = { name: "foo" };
@@ -420,10 +485,56 @@ describe("history replay: custom_tool_call round-trip", () => {
 		const items = convertResponsesAssistantMessage(assistantMsg, makeModel(), 0, knownCallIds, true, customCallIds);
 
 		expect(items).toHaveLength(1);
-		const item = items[0] as { type: string; name?: string; input?: string };
+		const item = items[0] as { type: string; id?: string; name?: string; input?: string };
 		expect(item.type).toBe("custom_tool_call");
+		expect(item.id).toBe("ctc_1");
 		expect(item.name).toBe("apply_patch");
 		expect(item.input).toBe("*** Begin Patch\n*** End Patch\n");
+		expect(customCallIds.has("call_1")).toBe(true);
+	});
+
+	test("custom tool call omits item id when replayed across same-provider model switch", () => {
+		const assistantMsg: AssistantMessage = {
+			role: "assistant",
+			content: [
+				{
+					type: "toolCall",
+					id: "call_1|ctc_1",
+					name: "edit",
+					arguments: { input: "*** Begin Patch\n*** End Patch\n" },
+					customWireName: "apply_patch",
+				},
+			],
+			timestamp: Date.now(),
+			provider: "openai",
+			model: "gpt-5",
+			api: "openai-responses",
+			usage: {
+				input: 0,
+				output: 0,
+				cacheRead: 0,
+				cacheWrite: 0,
+				totalTokens: 0,
+				cost: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0, total: 0 },
+			},
+			stopReason: "stop",
+		};
+		const knownCallIds = new Set<string>();
+		const customCallIds = new Set<string>();
+		const items = convertResponsesAssistantMessage(
+			assistantMsg,
+			makeModel({ id: "gpt-5.1" }),
+			0,
+			knownCallIds,
+			true,
+			customCallIds,
+		);
+
+		expect(items).toHaveLength(1);
+		const item = items[0] as { type: string; id?: string; call_id?: string };
+		expect(item.type).toBe("custom_tool_call");
+		expect(item.id).toBeUndefined();
+		expect(item.call_id).toBe("call_1");
 		expect(customCallIds.has("call_1")).toBe(true);
 	});
 

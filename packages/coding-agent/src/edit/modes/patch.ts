@@ -8,9 +8,8 @@
 import * as fs from "node:fs";
 import * as path from "node:path";
 import type { AgentToolResult } from "@oh-my-pi/pi-agent-core";
-import { StringEnum } from "@oh-my-pi/pi-ai";
 import { isEnoent } from "@oh-my-pi/pi-utils";
-import { type Static, Type } from "@sinclair/typebox";
+import * as z from "zod/v4";
 import {
 	type FileDiagnosticsResult,
 	flushLspWritethroughBatch,
@@ -44,6 +43,7 @@ import {
 	restoreLineEndings,
 	stripBom,
 } from "../normalize";
+import { readEditFileText, serializeEditFileText } from "../read-file";
 import type { EditToolDetails, LspBatchRequest } from "../renderer";
 import {
 	type ContextLineResult,
@@ -104,13 +104,13 @@ export const defaultFileSystem: FileSystem = {
 		return Bun.file(path).exists();
 	},
 	async read(path: string): Promise<string> {
-		return Bun.file(path).text();
+		return readEditFileText(path, path);
 	},
 	async readBinary(path: string): Promise<Uint8Array> {
 		return fs.promises.readFile(path);
 	},
 	async write(path: string, content: string): Promise<void> {
-		await Bun.write(path, content);
+		await Bun.write(path, await serializeEditFileText(path, path, content));
 	},
 	async delete(path: string): Promise<void> {
 		await fs.promises.unlink(path);
@@ -999,7 +999,7 @@ async function readExistingPatchFile(fileSystem: FileSystem, absolutePath: strin
 	try {
 		return await fileSystem.read(absolutePath);
 	} catch (error) {
-		if (isEnoent(error)) {
+		if (isEnoent(error) || (error instanceof Error && error.message.startsWith("File not found:"))) {
 			throw new ApplyPatchError(`File not found: ${path}`);
 		}
 		throw error;
@@ -1576,27 +1576,27 @@ export async function computePatchDiff(
 	}
 }
 
-export const patchEditEntrySchema = Type.Object({
-	path: Type.Optional(Type.String({ description: "File path (omit to use top-level `path`)" })),
-	op: Type.Optional(
-		StringEnum(["create", "delete", "update"], {
-			description: "Operation (default: update)",
-		}),
-	),
-	rename: Type.Optional(Type.String({ description: "New path for move" })),
-	diff: Type.Optional(Type.String({ description: "Diff hunks (update) or full content (create)" })),
-});
+export const patchEditEntrySchema = z
+	.object({
+		op: z.enum(["create", "delete", "update"]).optional().describe("operation (default update)"),
+		rename: z.string().describe("new path for move").optional(),
+		diff: z.string().describe("diff hunks or full content for create").optional(),
+	})
+	.strict();
 
-export const patchEditSchema = Type.Object({
-	path: Type.Optional(Type.String({ description: "Default file path used when an edit omits its own `path`" })),
-	edits: Type.Array(patchEditEntrySchema, { description: "Patch operations", minItems: 1 }),
-});
+export const patchEditSchema = z
+	.object({
+		path: z.string().describe("file path"),
+		edits: z.array(patchEditEntrySchema).min(1).describe("patch operations"),
+	})
+	.strict();
 
-export type PatchEditEntry = Static<typeof patchEditEntrySchema>;
-export type PatchParams = Static<typeof patchEditSchema>;
+export type PatchEditEntry = z.infer<typeof patchEditEntrySchema>;
+export type PatchParams = z.infer<typeof patchEditSchema>;
 
 export interface ExecutePatchSingleOptions {
 	session: ToolSession;
+	path: string;
 	params: PatchEditEntry;
 	signal?: AbortSignal;
 	batchRequest?: LspBatchRequest;
@@ -1631,7 +1631,7 @@ class LspFileSystem implements FileSystem {
 	}
 
 	async read(path: string): Promise<string> {
-		return this.#getFile(path).text();
+		return readEditFileText(path, path);
 	}
 
 	async readBinary(path: string): Promise<Uint8Array> {
@@ -1641,10 +1641,11 @@ class LspFileSystem implements FileSystem {
 
 	async write(path: string, content: string): Promise<void> {
 		const file = this.#getFile(path);
+		const finalContent = await serializeEditFileText(path, path, content);
 		const deferredForPath = this.deferredForPath;
 		const result = await this.writethrough(
 			path,
-			content,
+			finalContent,
 			this.signal,
 			file,
 			this.batchRequest,
@@ -1694,6 +1695,7 @@ export async function executePatchSingle(
 ): Promise<AgentToolResult<EditToolDetails, typeof patchEditEntrySchema>> {
 	const {
 		session,
+		path,
 		params,
 		signal,
 		batchRequest,
@@ -1702,23 +1704,13 @@ export async function executePatchSingle(
 		writethrough,
 		beginDeferredDiagnosticsForPath,
 	} = options;
-	const { path, op: rawOp, rename, diff } = params;
-	if (typeof path !== "string" || path.length === 0) {
-		throw new Error("patch edit: missing `path`. Provide `path` on the edit or supply a top-level `path`.");
-	}
+	const { op: rawOp, rename, diff } = params;
 
 	const op: Operation = rawOp === "create" || rawOp === "delete" ? rawOp : "update";
 
 	enforcePlanModeWrite(session, path, { op, move: rename });
 	const resolvedPath = resolvePlanPath(session, path);
 	const resolvedRename = rename ? resolvePlanPath(session, rename) : undefined;
-
-	if (path.endsWith(".ipynb")) {
-		throw new Error("Cannot edit Jupyter notebooks with the Edit tool. Use the NotebookEdit tool instead.");
-	}
-	if (rename?.endsWith(".ipynb")) {
-		throw new Error("Cannot edit Jupyter notebooks with the Edit tool. Use the NotebookEdit tool instead.");
-	}
 
 	await assertEditableFile(resolvedPath, path);
 
@@ -1773,15 +1765,25 @@ export async function executePatchSingle(
 		.diagnostics(mergedDiagnostics?.summary ?? "", mergedDiagnostics?.messages ?? [])
 		.get();
 
+	const oldText = result.change.type !== "create" ? result.change.oldContent : undefined;
+	const newText = result.change.type !== "delete" ? result.change.newContent : undefined;
+
 	return {
 		content: [{ type: "text", text: resultText }],
 		details: {
 			diff: diffResult.diff,
+			// When the patch moves the file, anchor the diff to the destination
+			// path. ACP `ToolCallContent.diff.path` comes from this field, and
+			// clients use it to open or focus the file post-change; pointing at
+			// the (now-deleted) source navigates to nothing.
+			path: result.change.newPath ?? resolvedPath,
 			firstChangedLine: diffResult.firstChangedLine,
 			diagnostics: mergedDiagnostics,
 			op,
 			move: effectiveRename,
 			meta,
+			oldText,
+			newText,
 		},
 	};
 }

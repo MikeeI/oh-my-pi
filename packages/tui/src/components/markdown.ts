@@ -1,8 +1,65 @@
-import { marked, type Token, type Tokens } from "marked";
+import { LRUCache } from "lru-cache/raw";
+import { Marked, marked, type Token, Tokenizer, type Tokens } from "marked";
 import type { SymbolTheme } from "../symbols";
 import { TERMINAL } from "../terminal-capabilities";
 import type { Component } from "../tui";
 import { applyBackgroundToLine, padding, replaceTabs, visibleWidth, wrapTextWithAnsi } from "../utils";
+
+const STRICT_STRIKETHROUGH_REGEX = /^(~~)(?=[^\s~])((?:\\.|[^\\])*?(?:\\.|[^\s~\\]))\1(?=[^~]|$)/;
+
+class StrictStrikethroughTokenizer extends Tokenizer {
+	override del(src: string): Tokens.Del | undefined {
+		const match = STRICT_STRIKETHROUGH_REGEX.exec(src);
+		if (!match) {
+			return undefined;
+		}
+
+		const text = match[2];
+		return {
+			type: "del",
+			raw: match[0],
+			text,
+			tokens: this.lexer.inlineTokens(text),
+		};
+	}
+}
+
+const markdownParser = new Marked();
+markdownParser.setOptions({
+	tokenizer: new StrictStrikethroughTokenizer(),
+});
+
+// ---------------------------------------------------------------------------
+// Module-level LRU render cache
+// ---------------------------------------------------------------------------
+// Each session-tree navigation discards and recreates Markdown component
+// instances, so the per-instance #cachedLines field is always cold on first
+// render of a fresh component. This module-level cache survives across
+// component lifetimes and eliminates redundant marked.lexer + highlightCode
+// (Rust FFI) work for content/layout combinations already seen this session.
+
+const RENDER_CACHE_MAX = 256; // sane cap: ~256 distinct message × width combos
+const renderCache = new LRUCache<string, string[]>({ max: RENDER_CACHE_MAX });
+
+/** Drop all L2 cache entries. Call on theme change to prevent stale styled output. */
+export function clearRenderCache(): void {
+	renderCache.clear();
+}
+
+// Stable numeric IDs for structural theme/style objects (no ID field on type).
+// Symbol-keyed so the id travels with the object and is invisible to consumers.
+const kObjectId = Symbol("markdown.objectId");
+type WithObjectId = object & { [kObjectId]?: number };
+let nextObjectId = 0;
+function objectId(o: object): number {
+	const tagged = o as WithObjectId;
+	let id = tagged[kObjectId];
+	if (id === undefined) {
+		id = nextObjectId++;
+		tagged[kObjectId] = id;
+	}
+	return id;
+}
 
 /**
  * Default text styling for markdown content.
@@ -116,7 +173,8 @@ export class Markdown implements Component {
 	}
 
 	render(width: number): string[] {
-		// Check cache
+		// L1: per-instance cache — fastest path for repeated renders of the same
+		// instance at the same width (e.g. resize debounce, repeated redraws).
 		if (this.#cachedLines && this.#cachedText === this.#text && this.#cachedWidth === width) {
 			return this.#cachedLines;
 		}
@@ -127,7 +185,7 @@ export class Markdown implements Component {
 		// Don't render anything if there's no actual text
 		if (!this.#text || this.#text.trim() === "") {
 			const result: string[] = [];
-			// Update cache
+			// Update per-instance cache
 			this.#cachedText = this.#text;
 			this.#cachedWidth = width;
 			this.#cachedLines = result;
@@ -137,8 +195,32 @@ export class Markdown implements Component {
 		// Replace tabs with 3 spaces for consistent rendering
 		const normalizedText = replaceTabs(this.#text);
 
+		// L2: module-level LRU — survives component disposal/recreation across
+		// session-tree navigations. Key encodes every dimension that affects the
+		// render output so different configurations never collide.
+		// Encode terminal capability state and theme/style function output samples
+		// so that capability shifts (image protocol changes, hyperlink toggle) or
+		// caller-supplied theme/bgColor functions that mutate their output without
+		// changing object identity invalidate the cache entry.
+		// bgColor probe uses \x01 (single non-printable byte): chalk/ANSI wrappers
+		// pass arbitrary bytes through verbatim, so this is safe and minimizes the
+		// risk of clashing with a function that returns text verbatim.
+		// theme.heading is used as the representative theme probe — it's required
+		// by MarkdownTheme and is one of the most styling-sensitive entries.
+		const bgColorProbe = this.#defaultTextStyle?.bgColor ? this.#defaultTextStyle.bgColor("\x01") : "";
+		const headingProbe = this.#theme.heading("");
+		const cacheKey = `${normalizedText}\x00${width}\x00${this.#paddingX}\x00${this.#paddingY}\x00${this.#codeBlockIndent}\x00${objectId(this.#theme)}\x00${this.#defaultTextStyle ? objectId(this.#defaultTextStyle) : -1}\x00${TERMINAL.imageProtocol ?? ""}\x00${TERMINAL.hyperlinks ? 1 : 0}\x00${bgColorProbe}\x00${headingProbe}`;
+		const cached = renderCache.get(cacheKey);
+		if (cached !== undefined) {
+			// Populate L1 so subsequent calls from this instance are O(1) map lookup.
+			this.#cachedText = this.#text;
+			this.#cachedWidth = width;
+			this.#cachedLines = cached;
+			return cached;
+		}
+
 		// Parse markdown to HTML-like tokens
-		const tokens = marked.lexer(normalizedText);
+		const tokens = markdownParser.lexer(normalizedText);
 
 		// Convert tokens to styled terminal output
 		const renderedLines: string[] = [];
@@ -195,14 +277,19 @@ export class Markdown implements Component {
 		}
 
 		// Combine top padding, content, and bottom padding
-		const result = [...emptyLines, ...contentLines, ...emptyLines];
+		const rawResult = [...emptyLines, ...contentLines, ...emptyLines];
+		const result = rawResult.length > 0 ? rawResult : [""];
 
-		// Update cache
+		// Update L1 per-instance cache
 		this.#cachedText = this.#text;
 		this.#cachedWidth = width;
 		this.#cachedLines = result;
 
-		return result.length > 0 ? result : [""];
+		// Update L2 module-level LRU so future instances with the same key skip
+		// the marked.lexer + highlightCode (Rust FFI) work entirely.
+		renderCache.set(cacheKey, result);
+
+		return result;
 	}
 
 	/**
@@ -530,6 +617,14 @@ export class Markdown implements Component {
 						result += applyTextWithNewlines(token.text);
 					}
 			}
+		}
+
+		// Strip dangling re-opened-default SGR prefix left over from the last inline
+		// token (strong/em/codespan/link/del/etc.) so the emitted line self-terminates
+		// at its last styled segment instead of carrying an unmatched SGR open into
+		// the next line. Matches upstream behavior.
+		while (stylePrefix && result.endsWith(stylePrefix)) {
+			result = result.slice(0, -stylePrefix.length);
 		}
 
 		return result;

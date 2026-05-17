@@ -7,6 +7,7 @@ import * as fs from "node:fs/promises";
 import { executeShell, type MinimizerOptions, Shell } from "@oh-my-pi/pi-natives";
 import { Settings, type ShellMinimizerSettings } from "../config/settings";
 import { OutputSink } from "../session/streaming-output";
+import { resolveOutputMaxColumns, resolveOutputSinkHeadBytes } from "../tools/output-meta";
 import { getOrCreateSnapshot } from "../utils/shell-snapshot";
 import { NON_INTERACTIVE_ENV } from "./non-interactive-env";
 
@@ -64,7 +65,8 @@ async function resolveShellCwd(cwd: string | undefined): Promise<string | undefi
 	}
 }
 
-function buildMinimizerOptions(group: ShellMinimizerSettings): MinimizerOptions | undefined {
+/** Translate `ShellMinimizerSettings` into native `MinimizerOptions`, or `undefined` when disabled. */
+export function buildMinimizerOptions(group: ShellMinimizerSettings): MinimizerOptions | undefined {
 	if (!group.enabled) return undefined;
 	return {
 		enabled: true,
@@ -94,6 +96,8 @@ export async function executeBash(command: string, options?: BashExecutorOptions
 		onChunk: options?.onChunk,
 		artifactPath: options?.artifactPath,
 		artifactId: options?.artifactId,
+		headBytes: resolveOutputSinkHeadBytes(settings),
+		maxColumns: resolveOutputMaxColumns(settings),
 		// Throttle the streaming preview callback to avoid saturating the
 		// event loop when commands produce massive output (e.g. seq 1 50M).
 		chunkThrottleMs: options?.onChunk ? 50 : 0,
@@ -248,7 +252,8 @@ export async function executeBash(command: string, options?: BashExecutorOptions
 					outputBytes: minimized.outputBytes,
 				});
 				if (artifactId) {
-					sink.push(`\n[raw output: artifact://${artifactId}]\n`);
+					const sep = minimized.text.endsWith("\n") ? "" : "\n";
+					sink.push(`${sep}[raw output: artifact://${artifactId}]\n`);
 				}
 			}
 		}

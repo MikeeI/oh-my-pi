@@ -5,20 +5,29 @@ import type { AgentTool, AgentToolContext, AgentToolResult, AgentToolUpdateCallb
 import type { Component } from "@oh-my-pi/pi-tui";
 import { Text } from "@oh-my-pi/pi-tui";
 import { isEnoent, isRecord, prompt, untilAborted } from "@oh-my-pi/pi-utils";
-import { type Static, Type } from "@sinclair/typebox";
-import { unzipSync, zipSync } from "fflate";
+import * as z from "zod/v4";
 import { stripHashlinePrefixes } from "../edit";
 import type { RenderResultOptions } from "../extensibility/custom-tools/types";
+import { InternalUrlRouter } from "../internal-urls";
+import { parseInternalUrl } from "../internal-urls/parse";
 import { createLspWritethrough, type FileDiagnosticsResult, type WritethroughCallback, writethroughNoop } from "../lsp";
-import { getLanguageFromPath, type Theme } from "../modes/theme/theme";
+import { getLanguageFromPath, highlightCode, type Theme } from "../modes/theme/theme";
 import writeDescription from "../prompts/tools/write.md" with { type: "text" };
 import type { ToolSession } from "../sdk";
 import { Ellipsis, Hasher, type RenderCache, renderStatusLine, truncateToWidth } from "../tui";
 import { resolveFileDisplayMode } from "../utils/file-display-mode";
 import { parseArchivePathCandidates } from "./archive-reader";
 import { assertEditableFile } from "./auto-generated-guard";
+import {
+	type ConflictEntry,
+	expandContentTokens,
+	getConflictHistory,
+	parseConflictUri,
+	spliceConflict,
+} from "./conflict-detect";
 import { invalidateFsScanAfterWrite } from "./fs-cache-invalidation";
 import { type OutputMeta, outputMeta } from "./output-meta";
+import { formatPathRelativeToCwd } from "./path-utils";
 import { enforcePlanModeWrite, resolvePlanPath } from "./plan-mode-guard";
 import {
 	formatDiagnostics,
@@ -43,12 +52,18 @@ import {
 import { ToolError } from "./tool-errors";
 import { toolResult } from "./tool-result";
 
-const writeSchema = Type.Object({
-	path: Type.String({ description: "file path", examples: ["src/new.ts"] }),
-	content: Type.String({ description: "file content" }),
+let fflateModulePromise: Promise<typeof import("fflate")> | undefined;
+async function loadFflate(): Promise<typeof import("fflate")> {
+	if (!fflateModulePromise) fflateModulePromise = import("fflate");
+	return fflateModulePromise;
+}
+
+const writeSchema = z.object({
+	path: z.string().describe("file path"),
+	content: z.string().describe("file content"),
 });
 
-export type WriteToolInput = Static<typeof writeSchema>;
+export type WriteToolInput = z.infer<typeof writeSchema>;
 
 /** Details returned by the write tool for TUI rendering */
 export interface WriteToolDetails {
@@ -70,6 +85,21 @@ function stripWriteContent(session: ToolSession, content: string): { text: strin
 	const cleaned = stripHashlinePrefixes(lines);
 	if (cleaned === lines) return { text: content, stripped: false };
 	return { text: cleaned.join("\n"), stripped: true };
+}
+
+/**
+ * Append a trailing note line to the first text block of a tool result.
+ * Mutates `result` in place (the result object is owned by this call).
+ */
+function appendNoteToResult(result: AgentToolResult<WriteToolDetails>, note: string): void {
+	const firstText = result.content.find(
+		(block): block is { type: "text"; text: string } => block.type === "text" && typeof block.text === "string",
+	);
+	if (firstText) {
+		firstText.text = firstText.text.length > 0 ? `${firstText.text}\n${note}` : note;
+	} else {
+		result.content.push({ type: "text", text: note });
+	}
 }
 
 // ═══════════════════════════════════════════════════════════════════════════
@@ -160,6 +190,8 @@ export class WriteTool implements AgentTool<typeof writeSchema, WriteToolDetails
 	readonly nonAbortable = true;
 	readonly strict = true;
 	readonly concurrency = "exclusive";
+	readonly loadMode = "discoverable";
+	readonly summary = "Write content to a file (creates or overwrites)";
 
 	readonly #writethrough: WritethroughCallback;
 
@@ -212,7 +244,6 @@ export class WriteTool implements AgentTool<typeof writeSchema, WriteToolDetails
 	}
 
 	async #writeArchiveEntry(
-		displayPath: string,
 		content: string,
 		resolvedArchivePath: ResolvedArchiveWritePath,
 	): Promise<AgentToolResult<WriteToolDetails>> {
@@ -229,6 +260,7 @@ export class WriteTool implements AgentTool<typeof writeSchema, WriteToolDetails
 			if (resolvedArchivePath.exists) {
 				try {
 					const bytes = await Bun.file(resolvedArchivePath.absolutePath).bytes();
+					const { unzipSync } = await loadFflate();
 					const existing = unzipSync(new Uint8Array(bytes));
 					for (const [entryPath, data] of Object.entries(existing)) {
 						zipEntries[entryPath.replace(/\\/g, "/")] = data;
@@ -241,6 +273,7 @@ export class WriteTool implements AgentTool<typeof writeSchema, WriteToolDetails
 			zipEntries[resolvedArchivePath.archiveSubPath] = new TextEncoder().encode(content);
 
 			try {
+				const { zipSync } = await loadFflate();
 				const zipBuffer = zipSync(zipEntries);
 				await Bun.write(resolvedArchivePath.absolutePath, zipBuffer);
 			} catch (error) {
@@ -278,8 +311,11 @@ export class WriteTool implements AgentTool<typeof writeSchema, WriteToolDetails
 		}
 
 		invalidateFsScanAfterWrite(resolvedArchivePath.absolutePath);
+		const outputPath = `${formatPathRelativeToCwd(resolvedArchivePath.absolutePath, this.session.cwd)}:${
+			resolvedArchivePath.archiveSubPath
+		}`;
 		return {
-			content: [{ type: "text", text: `Successfully wrote ${content.length} bytes to ${displayPath}` }],
+			content: [{ type: "text", text: `Successfully wrote ${content.length} bytes to ${outputPath}` }],
 			details: {},
 		};
 	}
@@ -410,6 +446,210 @@ export class WriteTool implements AgentTool<typeof writeSchema, WriteToolDetails
 		}
 	}
 
+	/**
+	 * Resolve a single `conflict://<N>` write by splicing the recorded
+	 * marker region in the registered file with `replacementContent`,
+	 * then routing the new file content through the normal writethrough
+	 * pipeline so LSP format/diagnostics still run.
+	 *
+	 * Entry ids are session-stable: they keep working even after later
+	 * writes resolve other blocks in the same file. The recorded range
+	 * is re-validated on disk before splicing so an out-of-band edit
+	 * surfaces as a clear error instead of corrupting the file.
+	 */
+	async #resolveConflict(
+		entry: ConflictEntry,
+		replacementContent: string,
+		stripped: boolean,
+		signal: AbortSignal | undefined,
+		context: AgentToolContext | undefined,
+	): Promise<AgentToolResult<WriteToolDetails>> {
+		const absolutePath = entry.absolutePath;
+		if (!(await fs.exists(absolutePath))) {
+			throw new ToolError(`Conflict #${entry.id} target '${entry.displayPath}' no longer exists.`);
+		}
+
+		const expanded = expandContentTokens(replacementContent, entry);
+		const originalText = await Bun.file(absolutePath).text();
+		const newContent = spliceConflict(originalText, entry, expanded);
+
+		const batchRequest = getLspBatchRequest(context?.toolCall);
+		const diagnostics = await this.#writethrough(absolutePath, newContent, signal, undefined, batchRequest);
+		invalidateFsScanAfterWrite(absolutePath);
+		this.session.fileReadCache?.invalidate(absolutePath);
+		this.session.conflictHistory?.invalidate(entry.id);
+
+		const range =
+			entry.startLine === entry.endLine
+				? `line ${entry.startLine}`
+				: `lines ${entry.startLine}\u2013${entry.endLine}`;
+		let resultText = `Resolved conflict #${entry.id} at ${range} in ${entry.displayPath}.`;
+		if (stripped) {
+			resultText += `\nNote: auto-stripped hashline display prefixes from content before writing.`;
+		}
+
+		if (!diagnostics) {
+			return {
+				content: [{ type: "text", text: resultText }],
+				details: {},
+			};
+		}
+		return {
+			content: [{ type: "text", text: resultText }],
+			details: {
+				diagnostics,
+				meta: outputMeta()
+					.diagnostics(diagnostics.summary, diagnostics.messages ?? [])
+					.get(),
+			},
+		};
+	}
+
+	/**
+	 * Look up a single conflict entry by id and dispatch to {@link #resolveConflict}.
+	 * Throws a clear `not found` error when the id has been invalidated.
+	 */
+	async #resolveSingleConflictById(
+		id: number,
+		replacementContent: string,
+		stripped: boolean,
+		signal: AbortSignal | undefined,
+		context: AgentToolContext | undefined,
+	): Promise<AgentToolResult<WriteToolDetails>> {
+		const entry = getConflictHistory(this.session).get(id);
+		if (!entry) {
+			throw new ToolError(
+				`Conflict #${id} not found. Conflict ids are registered when \`read\` surfaces a marker block; re-read the file to get a current id.`,
+			);
+		}
+		return this.#resolveConflict(entry, replacementContent, stripped, signal, context);
+	}
+
+	/**
+	 * Bulk-resolve every registered conflict via `conflict://*`.
+	 *
+	 * Entries are grouped by file and applied bottom-up by recorded start
+	 * line so each splice keeps later anchors valid. `content` tokens are
+	 * expanded *per entry*, so `content: "@ours"` keeps each block's own
+	 * ours side rather than collapsing every conflict to the first
+	 * block's ours.
+	 *
+	 * All-or-nothing semantics within a file: if any splice for a file
+	 * fails (stale anchors, missing base for `@base`, etc.), that file is
+	 * left untouched and the error is surfaced. Files that succeed are
+	 * still written. The result text reports per-file counts so the agent
+	 * can re-read the failed files and retry.
+	 */
+	async #resolveAllConflicts(
+		replacementContent: string,
+		stripped: boolean,
+		signal: AbortSignal | undefined,
+		context: AgentToolContext | undefined,
+	): Promise<AgentToolResult<WriteToolDetails>> {
+		const history = getConflictHistory(this.session);
+		const allEntries = history.entries();
+		if (allEntries.length === 0) {
+			throw new ToolError(
+				"`conflict://*` has nothing to resolve — no conflicts are currently registered. Re-read the file(s) with conflicts first.",
+			);
+		}
+
+		const byFile = new Map<string, ConflictEntry[]>();
+		for (const entry of allEntries) {
+			const bucket = byFile.get(entry.absolutePath) ?? [];
+			bucket.push(entry);
+			byFile.set(entry.absolutePath, bucket);
+		}
+
+		const batchRequest = getLspBatchRequest(context?.toolCall);
+		const allDiagnostics: FileDiagnosticsResult[] = [];
+		const succeededFiles: { displayPath: string; count: number }[] = [];
+		const failedFiles: { displayPath: string; count: number; error: string }[] = [];
+		let totalResolvedIds = 0;
+
+		for (const [absolutePath, fileEntries] of byFile) {
+			const sample = fileEntries[0]!;
+			if (!(await fs.exists(absolutePath))) {
+				failedFiles.push({
+					displayPath: sample.displayPath,
+					count: fileEntries.length,
+					error: "file no longer exists",
+				});
+				continue;
+			}
+
+			fileEntries.sort((a, b) => b.startLine - a.startLine);
+
+			let text: string;
+			try {
+				text = await Bun.file(absolutePath).text();
+				for (const entry of fileEntries) {
+					const expanded = expandContentTokens(replacementContent, entry);
+					text = spliceConflict(text, entry, expanded);
+				}
+			} catch (error) {
+				failedFiles.push({
+					displayPath: sample.displayPath,
+					count: fileEntries.length,
+					error: error instanceof Error ? error.message : String(error),
+				});
+				continue;
+			}
+
+			const diagnostics = await this.#writethrough(absolutePath, text, signal, undefined, batchRequest);
+			invalidateFsScanAfterWrite(absolutePath);
+			this.session.fileReadCache?.invalidate(absolutePath);
+			for (const entry of fileEntries) history.invalidate(entry.id);
+			succeededFiles.push({ displayPath: sample.displayPath, count: fileEntries.length });
+			totalResolvedIds += fileEntries.length;
+			if (diagnostics) allDiagnostics.push(diagnostics);
+		}
+
+		const summaryLines: string[] = [];
+		const fileWord = (n: number) => (n === 1 ? "file" : "files");
+		const conflictWord = (n: number) => (n === 1 ? "conflict" : "conflicts");
+		if (succeededFiles.length > 0) {
+			summaryLines.push(
+				`Resolved ${totalResolvedIds} ${conflictWord(totalResolvedIds)} across ${succeededFiles.length} ${fileWord(succeededFiles.length)}:`,
+			);
+			for (const file of succeededFiles) {
+				summaryLines.push(`  ${file.displayPath}: ${file.count} ${conflictWord(file.count)}`);
+			}
+		}
+		if (failedFiles.length > 0) {
+			summaryLines.push(
+				`Failed to resolve ${failedFiles.length} ${fileWord(failedFiles.length)} — registered entries left intact for retry:`,
+			);
+			for (const file of failedFiles) {
+				summaryLines.push(`  ${file.displayPath}: ${file.count} ${conflictWord(file.count)} (${file.error})`);
+			}
+		}
+		if (stripped) {
+			summaryLines.push("Note: auto-stripped hashline display prefixes from content before writing.");
+		}
+		const resultText = summaryLines.join("\n");
+
+		if (allDiagnostics.length === 0) {
+			if (failedFiles.length > 0 && succeededFiles.length === 0) {
+				throw new ToolError(resultText);
+			}
+			return { content: [{ type: "text", text: resultText }], details: {} };
+		}
+		const mergedSummary = allDiagnostics.map(d => d.summary).join("\n");
+		const mergedMessages = allDiagnostics.flatMap(d => d.messages ?? []);
+		return {
+			content: [{ type: "text", text: resultText }],
+			details: {
+				meta: outputMeta().diagnostics(mergedSummary, mergedMessages).get(),
+			},
+		};
+	}
+
+	#routeWriteThroughBridge(absolutePath: string, content: string): Promise<void> | undefined {
+		const bridge = this.session.getClientBridge?.();
+		if (!bridge?.capabilities.writeTextFile || !bridge.writeTextFile) return undefined;
+		return bridge.writeTextFile({ path: absolutePath, content });
+	}
 	async execute(
 		_toolCallId: string,
 		{ path, content }: WriteParams,
@@ -420,13 +660,50 @@ export class WriteTool implements AgentTool<typeof writeSchema, WriteToolDetails
 		return untilAborted(signal, async () => {
 			// Strip hashline display prefixes (LINE+ID|) if the model copied them from read output
 			const { text: cleanContent, stripped } = stripWriteContent(this.session, content);
+			const internalRouter = InternalUrlRouter.instance();
+			if (internalRouter.canHandle(path)) {
+				const parsed = parseInternalUrl(path);
+				const scheme = parsed.protocol.replace(/:$/, "").toLowerCase();
+				const handler = internalRouter.getHandler(scheme);
+				if (handler?.write) {
+					await handler.write(parsed, cleanContent, { cwd: this.session.cwd, signal });
+					let resultText = `Successfully wrote ${cleanContent.length} bytes to ${path}`;
+					if (stripped) {
+						resultText += `\nNote: auto-stripped hashline display prefixes from content before writing.`;
+					}
+					return { content: [{ type: "text", text: resultText }], details: {} };
+				}
+				// Schemes without a `write` hook fall through to existing logic
+				// (local:// resolves to a backing file via plan-mode-guard) or are
+				// rejected downstream when no backing file exists.
+			}
+
+			const conflictUri = parseConflictUri(path);
+			if (conflictUri) {
+				if (conflictUri.scope) {
+					throw new ToolError(
+						`Conflict URI scope '/${conflictUri.scope}' is read-only — read \`conflict://${conflictUri.id}/${conflictUri.scope}\` to inspect that side. To write, drop the scope (\`conflict://${conflictUri.id}\`) and put the chosen content (or shorthand like \`@${conflictUri.scope}\`) in \`content\`.`,
+					);
+				}
+				const result =
+					conflictUri.id === "*"
+						? await this.#resolveAllConflicts(cleanContent, stripped, signal, context)
+						: await this.#resolveSingleConflictById(conflictUri.id, cleanContent, stripped, signal, context);
+				if (conflictUri.recoveredPrefix !== undefined) {
+					appendNoteToResult(
+						result,
+						`Note: stripped erroneous '${conflictUri.recoveredPrefix}:' prefix from path; conflict URIs are global (use \`conflict://${conflictUri.id}\`, not \`<file>:conflict://${conflictUri.id}\`).`,
+					);
+				}
+				return result;
+			}
 			const resolvedArchivePath = await this.#resolveArchiveWritePath(path);
 			if (resolvedArchivePath) {
 				enforcePlanModeWrite(this.session, resolvedArchivePath.archivePath, {
 					op: resolvedArchivePath.exists ? "update" : "create",
 				});
 
-				const archiveResult = await this.#writeArchiveEntry(path, cleanContent, resolvedArchivePath);
+				const archiveResult = await this.#writeArchiveEntry(cleanContent, resolvedArchivePath);
 				if (stripped) {
 					const firstText = archiveResult.content.find(
 						(block): block is { type: "text"; text: string } =>
@@ -465,10 +742,28 @@ export class WriteTool implements AgentTool<typeof writeSchema, WriteToolDetails
 				await assertEditableFile(absolutePath, path);
 			}
 
+			// Try ACP bridge first — no disk write when client handles it
+			const bridgePromise = this.#routeWriteThroughBridge(absolutePath, cleanContent);
+			if (bridgePromise !== undefined) {
+				try {
+					await bridgePromise;
+				} catch (error) {
+					throw new ToolError(error instanceof Error ? error.message : String(error));
+				}
+				invalidateFsScanAfterWrite(absolutePath);
+				const displayPath = formatPathRelativeToCwd(absolutePath, this.session.cwd);
+				let resultText = `Successfully wrote ${cleanContent.length} bytes to ${displayPath}`;
+				if (stripped) {
+					resultText += `\nNote: auto-stripped hashline display prefixes from content before writing.`;
+				}
+				return { content: [{ type: "text", text: resultText }], details: {} };
+			}
+
 			const diagnostics = await this.#writethrough(absolutePath, cleanContent, signal, undefined, batchRequest);
 			invalidateFsScanAfterWrite(absolutePath);
 
-			let resultText = `Successfully wrote ${cleanContent.length} bytes to ${path}`;
+			const displayPath = formatPathRelativeToCwd(absolutePath, this.session.cwd);
+			let resultText = `Successfully wrote ${cleanContent.length} bytes to ${displayPath}`;
 			if (stripped) {
 				resultText += `\nNote: auto-stripped hashline display prefixes from content before writing.`;
 			}
@@ -510,52 +805,67 @@ function countLines(text: string): number {
 	return text.split("\n").length;
 }
 
-function formatMetadataLine(lineCount: number | null, language: string | undefined, uiTheme: Theme): string {
-	const icon = uiTheme.getLangIcon(language);
-	if (lineCount !== null) {
-		return uiTheme.fg("dim", `${icon} ${lineCount} lines`);
-	}
-	return uiTheme.fg("dim", `${icon}`);
+function formatLineCountSuffix(lineCount: number, uiTheme: Theme): string {
+	if (lineCount <= 0) return "";
+	return uiTheme.fg("dim", ` · ${lineCount} line${lineCount === 1 ? "" : "s"}`);
 }
 
 function normalizeDisplayText(text: string): string {
 	return text.replace(/\r/g, "");
 }
 
-function formatStreamingContent(content: string, uiTheme: Theme): string {
+function formatStreamingContent(content: string, language: string | undefined, uiTheme: Theme): string {
 	if (!content) return "";
 	const lines = normalizeDisplayText(content).split("\n");
-	const displayLines = lines.slice(-WRITE_STREAMING_PREVIEW_LINES);
-	const hidden = lines.length - displayLines.length;
+	const totalLines = lines.length;
+	const startIndex = Math.max(0, totalLines - WRITE_STREAMING_PREVIEW_LINES);
+	const visibleLines = lines.slice(startIndex);
+	const hidden = startIndex;
+	const highlighted = highlightCode(visibleLines.join("\n"), language);
+	const lineNumberWidth = String(totalLines).length;
 
 	let text = "\n\n";
 	if (hidden > 0) {
-		text += uiTheme.fg("dim", `… (${hidden} earlier lines)\n`);
+		text += `${uiTheme.fg("dim", `… (${hidden} earlier line${hidden === 1 ? "" : "s"})`)}\n`;
 	}
-	for (const line of displayLines) {
-		text += `${uiTheme.fg("toolOutput", truncateToWidth(replaceTabs(line), 80))}\n`;
+	for (let i = 0; i < highlighted.length; i++) {
+		const lineNum = startIndex + i + 1;
+		const gutter = uiTheme.fg("dim", `${String(lineNum).padStart(lineNumberWidth, " ")}│`);
+		const body = replaceTabs(highlighted[i] ?? "");
+		text += ` ${gutter}${body}\n`;
 	}
 	text += uiTheme.fg("dim", `… (streaming)`);
 	return text;
 }
 
-function renderContentPreview(content: string, expanded: boolean, uiTheme: Theme): string {
+function renderContentPreview(
+	content: string,
+	expanded: boolean,
+	language: string | undefined,
+	uiTheme: Theme,
+): string {
 	if (!content) return "";
-	const lines = normalizeDisplayText(content).split("\n");
-	const maxLines = expanded ? lines.length : Math.min(lines.length, WRITE_PREVIEW_LINES);
-	const displayLines = expanded ? lines : lines.slice(-maxLines);
-	const hidden = lines.length - displayLines.length;
+	const rawLines = normalizeDisplayText(content).split("\n");
+	const totalLines = rawLines.length;
+	const maxLines = expanded ? totalLines : Math.min(totalLines, WRITE_PREVIEW_LINES);
+	const visibleLines = rawLines.slice(0, maxLines);
+	const highlighted = highlightCode(visibleLines.join("\n"), language);
+	const lineNumberWidth = String(maxLines).length;
+	const hidden = totalLines - maxLines;
 
 	let text = "\n\n";
-	for (const line of displayLines) {
-		text += `${uiTheme.fg("toolOutput", truncateToWidth(replaceTabs(line), 80))}\n`;
+	for (let i = 0; i < highlighted.length; i++) {
+		const lineNum = i + 1;
+		const gutter = uiTheme.fg("dim", `${String(lineNum).padStart(lineNumberWidth, " ")}│`);
+		const body = replaceTabs(highlighted[i] ?? "");
+		text += ` ${gutter}${body}\n`;
 	}
 	if (!expanded && hidden > 0) {
 		const hint = formatExpandHint(uiTheme, expanded, hidden > 0);
 		const moreLine = `${formatMoreItems(hidden, "line")}${hint ? ` ${hint}` : ""}`;
 		text += uiTheme.fg("dim", moreLine);
 	}
-	return text;
+	return text.trimEnd();
 }
 
 export const writeToolRenderer = {
@@ -575,7 +885,7 @@ export const writeToolRenderer = {
 		}
 
 		// Show streaming preview of content (tail)
-		text += formatStreamingContent(args.content, uiTheme);
+		text += formatStreamingContent(args.content, lang, uiTheme);
 
 		return new Text(text, 0, 0);
 	},
@@ -593,17 +903,17 @@ export const writeToolRenderer = {
 		const langIcon = uiTheme.fg("muted", uiTheme.getLangIcon(lang));
 		const pathDisplay = filePath ? uiTheme.fg("accent", filePath) : uiTheme.fg("toolOutput", "…");
 		const lineCount = countLines(fileContent);
+		const lineSuffix = formatLineCountSuffix(lineCount, uiTheme);
 
 		// Build header with status icon
 		const header = renderStatusLine(
 			{
 				icon: "success",
 				title: "Write",
-				description: `${langIcon} ${pathDisplay}`,
+				description: `${langIcon} ${pathDisplay}${lineSuffix}`,
 			},
 			uiTheme,
 		);
-		const metadataLine = formatMetadataLine(lineCount, lang ?? "text", uiTheme);
 		const diagnostics = result.details?.diagnostics;
 
 		let cached: RenderCache | undefined;
@@ -615,8 +925,7 @@ export const writeToolRenderer = {
 				if (cached?.key === key) return cached.lines;
 
 				let text = header;
-				text += `\n${metadataLine}`;
-				text += renderContentPreview(fileContent, expanded, uiTheme);
+				text += renderContentPreview(fileContent, expanded, lang, uiTheme);
 
 				if (diagnostics) {
 					const diagText = formatDiagnostics(diagnostics, expanded, uiTheme, fp =>

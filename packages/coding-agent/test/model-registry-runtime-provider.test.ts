@@ -2,15 +2,9 @@ import { afterEach, beforeEach, describe, expect, test } from "bun:test";
 import * as fs from "node:fs";
 import * as os from "node:os";
 import * as path from "node:path";
-import {
-	type AssistantMessageEventStream,
-	clearCustomApis,
-	Effort,
-	getCustomApi,
-	getOAuthProviders,
-	type OAuthCredentials,
-	unregisterOAuthProviders,
-} from "@oh-my-pi/pi-ai";
+import { type AssistantMessageEventStream, clearCustomApis, Effort, getCustomApi } from "@oh-my-pi/pi-ai";
+import { getOAuthProviders, unregisterOAuthProviders } from "@oh-my-pi/pi-ai/utils/oauth";
+import type { OAuthCredentials } from "@oh-my-pi/pi-ai/utils/oauth/types";
 import { ModelRegistry, type ProviderConfigInput } from "@oh-my-pi/pi-coding-agent/config/model-registry";
 import { AuthStorage } from "@oh-my-pi/pi-coding-agent/session/auth-storage";
 import { Snowflake } from "@oh-my-pi/pi-utils";
@@ -101,15 +95,6 @@ describe("ModelRegistry runtime provider registration", () => {
 		expect(registry.find(providerName, modelId)?.headers?.[headerName]).toBe(headerValue);
 	}
 
-	test("loads built-in GitLab Duo models and OAuth provider metadata", () => {
-		const registry = new ModelRegistry(authStorage, modelsJsonPath);
-		const model = registry.find("gitlab-duo", "claude-sonnet-4-5-20250929");
-
-		expect(model).toBeDefined();
-		expect(model?.api).toBe("anthropic-messages");
-		expect(getOAuthProviders().some(provider => provider.id === "gitlab-duo")).toBe(true);
-	});
-
 	test("validates provider config before mutating custom API state", () => {
 		const registry = new ModelRegistry(authStorage, modelsJsonPath);
 		const beforeAnthropicCount = registry.getAll().filter(model => model.provider === "anthropic").length;
@@ -131,27 +116,6 @@ describe("ModelRegistry runtime provider registration", () => {
 		expect(afterAnthropicCount).toBe(beforeAnthropicCount);
 	});
 
-	test("merges provider/model headers and adds Authorization when authHeader is enabled", () => {
-		const registry = new ModelRegistry(authStorage, modelsJsonPath);
-
-		const config: ProviderConfigInput = {
-			baseUrl: "https://runtime.example.com/v1",
-			apiKey: "RUNTIME_KEY",
-			api: "openai-completions",
-			authHeader: true,
-			headers: { "X-Provider": "provider-header" },
-			models: [{ ...baseModel, headers: { "X-Model": "model-header" } }],
-		};
-
-		registry.registerProvider("runtime-provider", config, "ext://runtime");
-		const model = registry.find("runtime-provider", "runtime-model");
-
-		expect(model).toBeDefined();
-		expect(model?.headers?.Authorization).toBe("Bearer RUNTIME_KEY");
-		expect(model?.headers?.["X-Provider"]).toBe("provider-header");
-		expect(model?.headers?.["X-Model"]).toBe("model-header");
-	});
-
 	test("registerProvider applies headers-only overrides to existing provider models across refresh", async () => {
 		const registry = new ModelRegistry(authStorage, modelsJsonPath);
 		const providerName = "anthropic";
@@ -163,6 +127,18 @@ describe("ModelRegistry runtime provider registration", () => {
 
 		registry.clearSourceRegistrations("ext://runtime");
 		expectProviderHeader(registry, providerName, runtimeHeader, undefined);
+	});
+
+	test("registerProvider applies authHeader overrides to existing provider models across refresh", async () => {
+		const registry = new ModelRegistry(authStorage, modelsJsonPath);
+		const providerName = "anthropic";
+
+		expect(getProviderModels(registry, providerName).length).toBeGreaterThan(1);
+		registry.registerProvider(providerName, { apiKey: "RUNTIME_AUTH_KEY", authHeader: true }, "ext://runtime");
+		await expectProviderHeaderAcrossRefresh(registry, providerName, "Authorization", "Bearer RUNTIME_AUTH_KEY");
+
+		registry.clearSourceRegistrations("ext://runtime");
+		expectProviderHeader(registry, providerName, "Authorization", undefined);
 	});
 
 	test("registerProvider preserves explicit thinking on runtime models", () => {

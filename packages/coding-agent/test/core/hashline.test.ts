@@ -1,1055 +1,815 @@
-import { describe, expect, it } from "bun:test";
+import { beforeAll, describe, expect, it } from "bun:test";
+import * as fs from "node:fs/promises";
+import * as os from "node:os";
+import * as path from "node:path";
+import { resetSettingsForTest, Settings } from "@oh-my-pi/pi-coding-agent/config/settings";
 import {
 	applyHashlineEdits,
 	buildCompactHashlineDiffPreview,
 	computeLineHash,
-	formatHashLines,
-	HASHLINE_BIGRAM_RE_SRC,
-	HASHLINE_BIGRAMS,
-	HASHLINE_BIGRAMS_COUNT,
+	type ExecuteHashlineSingleOptions,
+	executeHashlineSingle,
+	FileReadCache,
+	generateDiffString,
+	getFileReadCache,
 	HashlineMismatchError,
-	hashlineParseText,
-	parseTag,
-	streamHashLinesFromLines,
-	streamHashLinesFromUtf8,
-	stripHashlinePrefixes,
-	stripNewLinePrefixes,
-	validateLineRef,
+	HL_BODY_SEP,
+	HL_BODY_SEP_RE_RAW,
+	HL_EDIT_SEP,
+	hashlineEditParamsSchema,
+	parseHashline,
+	parseHashlineWithWarnings,
+	splitHashlineInput,
+	splitHashlineInputs,
+	tryRecoverHashlineWithCache,
 } from "@oh-my-pi/pi-coding-agent/edit";
-import type { Anchor, HashlineEdit } from "@oh-my-pi/pi-coding-agent/edit/modes/hashline";
+import type { ToolSession } from "@oh-my-pi/pi-coding-agent/tools";
 
-function makeTag(line: number, content: string): Anchor {
+beforeAll(async () => {
+	resetSettingsForTest();
+	await Settings.init({ inMemory: true, cwd: process.cwd() });
+});
+
+// Single source of truth for the payload separator under test. Every literal
+// payload line in this file goes through `pl()` so flipping
+// `HL_EDIT_SEP` (e.g. to ">" or "\\") flips the test inputs in
+// lockstep without any `|`-vs-`>` churn.
+const sep = HL_EDIT_SEP;
+const pl = (text: string): string => `${sep}${text}`;
+const outputSep = HL_BODY_SEP;
+const outputSepRe = HL_BODY_SEP_RE_RAW;
+
+function tag(line: number, content: string): string {
+	return `${line}${computeLineHash(line, content)}`;
+}
+
+function sameLineRange(anchor: string): string {
+	return `${anchor}..${anchor}`;
+}
+
+function mistag(line: number, content: string): string {
+	const hash = computeLineHash(line, content);
+	return `${line}${hash === "zz" ? "yy" : "zz"}`;
+}
+
+function applyDiff(content: string, diff: string): string {
+	return applyHashlineEdits(content, parseHashline(diff)).lines;
+}
+
+function applyDiffWithPureInsertAutoDrop(content: string, diff: string): string {
+	return applyHashlineEdits(content, parseHashline(diff), { autoDropPureInsertDuplicates: true }).lines;
+}
+
+async function withTempDir(fn: (tempDir: string) => Promise<void>): Promise<void> {
+	const tempDir = await fs.mkdtemp(path.join(os.tmpdir(), "hashline-edit-"));
+	try {
+		await fn(tempDir);
+	} finally {
+		await fs.rm(tempDir, { recursive: true, force: true });
+	}
+}
+
+function makeHashlineSession(tempDir: string, settings = Settings.isolated()): ToolSession {
+	return { cwd: tempDir, settings } as ToolSession;
+}
+
+function hashlineExecuteOptions(
+	tempDir: string,
+	input: string,
+	settings = Settings.isolated(),
+	session: ToolSession = makeHashlineSession(tempDir, settings),
+): ExecuteHashlineSingleOptions {
 	return {
-		line,
-		hash: computeLineHash(line, content),
+		session,
+		input,
+		writethrough: async (targetPath, content) => {
+			await Bun.write(targetPath, content);
+			return undefined;
+		},
+		beginDeferredDiagnosticsForPath: () => ({
+			onDeferredDiagnostics: () => {},
+			signal: new AbortController().signal,
+			finalize: () => {},
+		}),
 	};
 }
 
-/** Returns a valid bigram that's guaranteed NOT to equal the real hash of `(line, content)`. */
-function staleBigramFor(line: number, content: string): string {
-	const real = computeLineHash(line, content);
-	const idx = HASHLINE_BIGRAMS.indexOf(real as (typeof HASHLINE_BIGRAMS)[number]);
-	return HASHLINE_BIGRAMS[(idx + 1) % HASHLINE_BIGRAMS_COUNT];
-}
+describe("hashline parser — block op syntax", () => {
+	const content = "aaa\nbbb\nccc";
 
-// ═══════════════════════════════════════════════════════════════════════════
-// computeLineHash
-// ═══════════════════════════════════════════════════════════════════════════
-
-describe("computeLineHash", () => {
-	it("returns 2-4 character alphanumeric hash string", () => {
-		const hash = computeLineHash(1, "hello");
-		expect(hash).toMatch(new RegExp(`^${HASHLINE_BIGRAM_RE_SRC}$`));
-	});
-
-	it("same content at same line produces same hash", () => {
-		const a = computeLineHash(1, "hello");
-		const b = computeLineHash(1, "hello");
-		expect(a).toBe(b);
-	});
-
-	it("different content produces different hash", () => {
-		const a = computeLineHash(1, "hello");
-		const b = computeLineHash(1, "world");
-		expect(a).not.toBe(b);
-	});
-
-	it("empty line produces valid hash", () => {
-		const hash = computeLineHash(1, "");
-		expect(hash).toMatch(new RegExp(`^${HASHLINE_BIGRAM_RE_SRC}$`));
-	});
-
-	it("uses line number for symbol-only lines", () => {
-		const a = computeLineHash(1, "***");
-		const b = computeLineHash(2, "***");
-		expect(a).not.toBe(b);
-	});
-
-	it("does not use line number for alphanumeric lines", () => {
-		const a = computeLineHash(1, "hello");
-		const b = computeLineHash(2, "hello");
-		expect(a).toBe(b);
-	});
-});
-
-// ═══════════════════════════════════════════════════════════════════════════
-// formatHashLines
-// ═══════════════════════════════════════════════════════════════════════════
-
-describe("formatHashLines", () => {
-	it("formats single line", () => {
-		const result = formatHashLines("hello");
-		const hash = computeLineHash(1, "hello");
-		expect(result).toBe(`1${hash}|hello`);
-	});
-
-	it("formats multiple lines with 1-indexed numbers", () => {
-		const result = formatHashLines("foo\nbar\nbaz");
-		const lines = result.split("\n");
-		expect(lines).toHaveLength(3);
-		expect(lines[0]).toStartWith("1");
-		expect(lines[1]).toStartWith("2");
-		expect(lines[2]).toStartWith("3");
-	});
-
-	it("respects custom startLine", () => {
-		const result = formatHashLines("foo\nbar", 10);
-		const lines = result.split("\n");
-		expect(lines[0]).toStartWith("10");
-		expect(lines[1]).toStartWith("11");
-	});
-
-	it("handles empty lines in content", () => {
-		const result = formatHashLines("foo\n\nbar");
-		const lines = result.split("\n");
-		expect(lines).toHaveLength(3);
-		expect(lines[1]).toMatch(new RegExp(`^2${HASHLINE_BIGRAM_RE_SRC}|$`));
-	});
-
-	it("round-trips with computeLineHash", () => {
-		const content = "function hello() {\n  return 42;\n}";
-		const formatted = formatHashLines(content);
-		const lines = formatted.split("\n");
-
-		for (let i = 0; i < lines.length; i++) {
-			const match = lines[i].match(new RegExp(`^(\\d+)(${HASHLINE_BIGRAM_RE_SRC})\\|(.*)$`));
-			expect(match).not.toBeNull();
-			const lineNum = Number.parseInt(match![1], 10);
-			const hash = match![2];
-			const lineContent = match![3];
-			expect(computeLineHash(lineNum, lineContent)).toBe(hash);
-		}
-	});
-});
-
-// ═══════════════════════════════════════════════════════════════════════════
-// streamHashLinesFromUtf8 / streamHashLinesFromLines
-// ═══════════════════════════════════════════════════════════════════════════
-
-describe("streamHashLinesFrom*", () => {
-	async function collectText(gen: AsyncIterable<string>): Promise<string> {
-		const parts: string[] = [];
-		for await (const part of gen) {
-			parts.push(part);
-		}
-		return parts.join("\n");
-	}
-
-	async function* utf8Chunks(text: string, chunkSize: number): AsyncGenerator<Uint8Array> {
-		const bytes = new TextEncoder().encode(text);
-		for (let i = 0; i < bytes.length; i += chunkSize) {
-			yield bytes.slice(i, i + chunkSize);
-		}
-	}
-
-	it("streamHashLinesFromUtf8 matches formatHashLines", async () => {
-		const content = "foo\nbar\nbaz";
-		const streamed = await collectText(streamHashLinesFromUtf8(utf8Chunks(content, 2), { maxChunkLines: 1 }));
-		expect(streamed).toBe(formatHashLines(content));
-	});
-
-	it("streamHashLinesFromUtf8 handles empty content", async () => {
-		const content = "";
-		const streamed = await collectText(streamHashLinesFromUtf8(utf8Chunks(content, 2), { maxChunkLines: 1 }));
-		expect(streamed).toBe(formatHashLines(content));
-	});
-
-	it("streamHashLinesFromLines matches formatHashLines (including trailing newline)", async () => {
-		const content = "foo\nbar\n";
-		const lines = ["foo", "bar", ""]; // match `content.split("\\n")`
-		const streamed = await collectText(streamHashLinesFromLines(lines, { maxChunkLines: 2 }));
-		expect(streamed).toBe(formatHashLines(content));
-	});
-
-	it("chunking respects maxChunkLines", async () => {
-		const content = "a\nb\nc";
-		const parts: string[] = [];
-		for await (const part of streamHashLinesFromUtf8(utf8Chunks(content, 1), {
-			maxChunkLines: 1,
-			maxChunkBytes: 1024,
-		})) {
-			parts.push(part);
-		}
-		expect(parts).toHaveLength(3);
-		expect(parts.join("\n")).toBe(formatHashLines(content));
-	});
-});
-
-// ═══════════════════════════════════════════════════════════════════════════
-// parseTag
-// ═══════════════════════════════════════════════════════════════════════════
-
-describe("parseTag", () => {
-	it("parses valid reference", () => {
-		const ref = parseTag("5th");
-		expect(ref).toEqual({ line: 5, hash: "th" });
-	});
-
-	it("rejects single-character hash", () => {
-		expect(() => parseTag("1#Q")).toThrow(/Invalid line reference/);
-	});
-
-	it("parses long hash by taking strict 2-char prefix", () => {
-		const ref = parseTag("100thQQ");
-		expect(ref).toEqual({ line: 100, hash: "th" });
-	});
-
-	it("rejects missing separator", () => {
-		expect(() => parseTag("5QQ")).toThrow(/Invalid line reference/);
-	});
-
-	it("rejects non-numeric line", () => {
-		expect(() => parseTag("abc#Q")).toThrow(/Invalid line reference/);
-	});
-
-	it("rejects non-alphanumeric hash", () => {
-		expect(() => parseTag("5#$$$$")).toThrow(/Invalid line reference/);
-	});
-
-	it("rejects line number 0", () => {
-		expect(() => parseTag("0th")).toThrow(/Line number must be >= 1/);
-	});
-
-	it("rejects empty string", () => {
-		expect(() => parseTag("")).toThrow(/Invalid line reference/);
-	});
-
-	it("rejects empty hash", () => {
-		expect(() => parseTag("5#")).toThrow(/Invalid line reference/);
-	});
-});
-
-// ═══════════════════════════════════════════════════════════════════════════
-// validateLineRef
-// ═══════════════════════════════════════════════════════════════════════════
-
-describe("validateLineRef", () => {
-	it("accepts valid ref with matching hash", () => {
-		const lines = ["hello", "world"];
-		const hash = computeLineHash(1, "hello");
-		expect(() => validateLineRef({ line: 1, hash }, lines)).not.toThrow();
-	});
-
-	it("rejects line out of range (too high)", () => {
-		const lines = ["hello"];
-		const hash = computeLineHash(1, "hello");
-		expect(() => validateLineRef({ line: 2, hash }, lines)).toThrow(/does not exist/);
-	});
-
-	it("rejects line out of range (zero)", () => {
-		const lines = ["hello"];
-		expect(() => validateLineRef({ line: 0, hash: "aaaa" }, lines)).toThrow(/does not exist/);
-	});
-
-	it("rejects mismatched hash", () => {
-		const lines = ["hello", "world"];
-		expect(() => validateLineRef({ line: 1, hash: "0000" }, lines)).toThrow(/Edit rejected:.*has changed/);
-	});
-
-	it("validates last line correctly", () => {
-		const lines = ["a", "b", "c"];
-		const hash = computeLineHash(3, "c");
-		expect(() => validateLineRef({ line: 3, hash }, lines)).not.toThrow();
-	});
-});
-
-// ═══════════════════════════════════════════════════════════════════════════
-// applyHashlineEdits — replace
-// ═══════════════════════════════════════════════════════════════════════════
-
-describe("applyHashlineEdits — replace", () => {
-	it("replaces single line", () => {
-		const content = "aaa\nbbb\nccc";
-		const edits: HashlineEdit[] = [{ op: "replace_line", pos: makeTag(2, "bbb"), lines: ["BBB"] }];
-
-		const result = applyHashlineEdits(content, edits);
-		expect(result.lines).toBe("aaa\nBBB\nccc");
-		expect(result.firstChangedLine).toBe(2);
-	});
-
-	it("range replace (shrink)", () => {
-		const content = "aaa\nbbb\nccc\nddd";
-		const edits: HashlineEdit[] = [
-			{ op: "replace_range", pos: makeTag(2, "bbb"), end: makeTag(3, "ccc"), lines: ["ONE"] },
-		];
-
-		const result = applyHashlineEdits(content, edits);
-		expect(result.lines).toBe("aaa\nONE\nddd");
-	});
-
-	it("range replace (same count)", () => {
-		const content = "aaa\nbbb\nccc\nddd";
-		const edits: HashlineEdit[] = [
-			{ op: "replace_range", pos: makeTag(2, "bbb"), end: makeTag(3, "ccc"), lines: ["XXX", "YYY"] },
-		];
-
-		const result = applyHashlineEdits(content, edits);
-		expect(result.lines).toBe("aaa\nXXX\nYYY\nddd");
-		expect(result.firstChangedLine).toBe(2);
-	});
-
-	it("replaces first line", () => {
-		const content = "first\nsecond\nthird";
-		const edits: HashlineEdit[] = [{ op: "replace_line", pos: makeTag(1, "first"), lines: ["FIRST"] }];
-
-		const result = applyHashlineEdits(content, edits);
-		expect(result.lines).toBe("FIRST\nsecond\nthird");
-		expect(result.firstChangedLine).toBe(1);
-	});
-
-	it("replaces last line", () => {
-		const content = "first\nsecond\nthird";
-		const edits: HashlineEdit[] = [{ op: "replace_line", pos: makeTag(3, "third"), lines: ["THIRD"] }];
-
-		const result = applyHashlineEdits(content, edits);
-		expect(result.lines).toBe("first\nsecond\nTHIRD");
-		expect(result.firstChangedLine).toBe(3);
-	});
-});
-
-// ═══════════════════════════════════════════════════════════════════════════
-// applyHashlineEdits — delete
-// ═══════════════════════════════════════════════════════════════════════════
-
-describe("applyHashlineEdits — delete", () => {
-	it("deletes single line", () => {
-		const content = "aaa\nbbb\nccc";
-		const edits: HashlineEdit[] = [{ op: "replace_line", pos: makeTag(2, "bbb"), lines: [] }];
-
-		const result = applyHashlineEdits(content, edits);
-		expect(result.lines).toBe("aaa\nccc");
-		expect(result.firstChangedLine).toBe(2);
-	});
-
-	it("deletes range of lines", () => {
-		const content = "aaa\nbbb\nccc\nddd";
-		const edits: HashlineEdit[] = [
-			{ op: "replace_range", pos: makeTag(2, "bbb"), end: makeTag(3, "ccc"), lines: [] },
-		];
-
-		const result = applyHashlineEdits(content, edits);
-		expect(result.lines).toBe("aaa\nddd");
-	});
-
-	it("deletes first line", () => {
-		const content = "aaa\nbbb\nccc";
-		const edits: HashlineEdit[] = [{ op: "replace_line", pos: makeTag(1, "aaa"), lines: [] }];
-
-		const result = applyHashlineEdits(content, edits);
-		expect(result.lines).toBe("bbb\nccc");
-	});
-
-	it("deletes last line", () => {
-		const content = "aaa\nbbb\nccc";
-		const edits: HashlineEdit[] = [{ op: "replace_line", pos: makeTag(3, "ccc"), lines: [] }];
-
-		const result = applyHashlineEdits(content, edits);
-		expect(result.lines).toBe("aaa\nbbb");
-	});
-
-	it("replaces line with blank line when lines is ['']", () => {
-		const content = "aaa\nbbb\nccc";
-		const edits: HashlineEdit[] = [{ op: "replace_line", pos: makeTag(2, "bbb"), lines: [""] }];
-
-		const result = applyHashlineEdits(content, edits);
-		expect(result.lines).toBe("aaa\n\nccc");
-		expect(result.firstChangedLine).toBe(2);
-	});
-});
-
-// ═══════════════════════════════════════════════════════════════════════════
-// applyHashlineEdits — append
-// ═══════════════════════════════════════════════════════════════════════════
-
-describe("applyHashlineEdits — append", () => {
-	it("inserts after a line", () => {
-		const content = "aaa\nbbb\nccc";
-		const edits: HashlineEdit[] = [{ op: "append_at", pos: makeTag(1, "aaa"), lines: ["NEW"] }];
-
-		const result = applyHashlineEdits(content, edits);
-		expect(result.lines).toBe("aaa\nNEW\nbbb\nccc");
-		expect(result.firstChangedLine).toBe(2);
-	});
-
-	it("inserts multiple lines", () => {
-		const content = "aaa\nbbb";
-		const edits: HashlineEdit[] = [{ op: "append_at", pos: makeTag(1, "aaa"), lines: ["x", "y", "z"] }];
-
-		const result = applyHashlineEdits(content, edits);
-		expect(result.lines).toBe("aaa\nx\ny\nz\nbbb");
-	});
-
-	it("inserts after last line", () => {
-		const content = "aaa\nbbb";
-		const edits: HashlineEdit[] = [{ op: "append_at", pos: makeTag(2, "bbb"), lines: ["NEW"] }];
-
-		const result = applyHashlineEdits(content, edits);
-		expect(result.lines).toBe("aaa\nbbb\nNEW");
-	});
-
-	it("insert with empty dst inserts an empty line", () => {
-		const content = "aaa\nbbb";
-		const edits: HashlineEdit[] = [{ op: "append_at", pos: makeTag(1, "aaa"), lines: [] }];
-
-		const result = applyHashlineEdits(content, edits);
-		expect(result.lines).toBe("aaa\n\nbbb");
-		expect(result.firstChangedLine).toBe(2);
-	});
-
-	it("inserts at EOF without anchors", () => {
-		const content = "aaa\nbbb";
-		const edits: HashlineEdit[] = [{ op: "append_file", lines: ["NEW"] }];
-
-		const result = applyHashlineEdits(content, edits);
-		expect(result.lines).toBe("aaa\nbbb\nNEW");
-		expect(result.firstChangedLine).toBe(3);
-	});
-
-	it("inserts at EOF into empty file without anchors", () => {
-		const content = "";
-		const edits: HashlineEdit[] = [{ op: "append_file", lines: ["NEW"] }];
-
-		const result = applyHashlineEdits(content, edits);
-		expect(result.lines).toBe("NEW");
-		expect(result.firstChangedLine).toBe(1);
-	});
-
-	it("insert at EOF with empty dst inserts a trailing empty line", () => {
-		const content = "aaa\nbbb";
-		const edits: HashlineEdit[] = [{ op: "append_file", lines: [] }];
-
-		const result = applyHashlineEdits(content, edits);
-		expect(result.lines).toBe("aaa\nbbb\n");
-		expect(result.firstChangedLine).toBe(3);
-	});
-});
-
-// ═══════════════════════════════════════════════════════════════════════════
-// applyHashlineEdits — prepend
-// ═══════════════════════════════════════════════════════════════════════════
-
-describe("applyHashlineEdits — prepend", () => {
-	it("inserts before a line", () => {
-		const content = "aaa\nbbb\nccc";
-		const edits: HashlineEdit[] = [{ op: "prepend_at", pos: makeTag(2, "bbb"), lines: ["NEW"] }];
-		const result = applyHashlineEdits(content, edits);
-		expect(result.lines).toBe("aaa\nNEW\nbbb\nccc");
-		expect(result.firstChangedLine).toBe(2);
-	});
-
-	it("inserts multiple lines before", () => {
-		const content = "aaa\nbbb";
-		const edits: HashlineEdit[] = [{ op: "prepend_at", pos: makeTag(2, "bbb"), lines: ["x", "y", "z"] }];
-		const result = applyHashlineEdits(content, edits);
-		expect(result.lines).toBe("aaa\nx\ny\nz\nbbb");
-	});
-
-	it("inserts before first line", () => {
-		const content = "aaa\nbbb";
-		const edits: HashlineEdit[] = [{ op: "prepend_at", pos: makeTag(1, "aaa"), lines: ["NEW"] }];
-		const result = applyHashlineEdits(content, edits);
-		expect(result.lines).toBe("NEW\naaa\nbbb");
-	});
-
-	it("prepends at BOF without anchor", () => {
-		const content = "aaa\nbbb";
-		const edits: HashlineEdit[] = [{ op: "prepend_file", lines: ["NEW"] }];
-		const result = applyHashlineEdits(content, edits);
-		expect(result.lines).toBe("NEW\naaa\nbbb");
-		expect(result.firstChangedLine).toBe(1);
-	});
-
-	it("insert with before and empty text inserts an empty line", () => {
-		const content = "aaa\nbbb";
-		const edits: HashlineEdit[] = [{ op: "prepend_at", pos: makeTag(1, "aaa"), lines: [] }];
-		const result = applyHashlineEdits(content, edits);
-		expect(result.lines).toBe("\naaa\nbbb");
-		expect(result.firstChangedLine).toBe(1);
-	});
-
-	it("insert before and insert after at same line produce correct order", () => {
-		const content = "aaa\nbbb\nccc";
-		const edits: HashlineEdit[] = [
-			{ op: "prepend_at", pos: makeTag(2, "bbb"), lines: ["BEFORE"] },
-			{ op: "append_at", pos: makeTag(2, "bbb"), lines: ["AFTER"] },
-		];
-		const result = applyHashlineEdits(content, edits);
-		expect(result.lines).toBe("aaa\nBEFORE\nbbb\nAFTER\nccc");
-	});
-
-	it("insert before with set at same line", () => {
-		const content = "aaa\nbbb\nccc";
-		const edits: HashlineEdit[] = [
-			{ op: "prepend_at", pos: makeTag(2, "bbb"), lines: ["BEFORE"] },
-			{ op: "replace_line", pos: makeTag(2, "bbb"), lines: ["BBB"] },
-		];
-		const result = applyHashlineEdits(content, edits);
-		expect(result.lines).toBe("aaa\nBEFORE\nBBB\nccc");
-	});
-});
-
-// ═══════════════════════════════════════════════════════════════════════════
-
-// ═══════════════════════════════════════════════════════════════════════════
-// applyHashlineEdits — heuristics
-// ═══════════════════════════════════════════════════════════════════════════
-
-describe("applyHashlineEdits — heuristics", () => {
-	it("accepts polluted src that starts with LINE+ID but includes trailing content", () => {
-		const content = "aaa\nbbb\nccc";
-		const srcHash = computeLineHash(2, "bbb");
-		const edits: HashlineEdit[] = [
-			{
-				op: "replace_line",
-				pos: parseTag(`2${srcHash}export function foo(a, b) {}`), // comma in trailing content
-				lines: ["BBB"],
-			},
-		];
-
-		const result = applyHashlineEdits(content, edits);
-		expect(result.lines).toBe("aaa\nBBB\nccc");
-	});
-
-	it("does not override model whitespace choices in replacement content", () => {
-		const content = ["import { foo } from 'x';", "import { bar } from 'y';", "const x = 1;"].join("\n");
-		const edits: HashlineEdit[] = [
-			{
-				op: "replace_range",
-				pos: makeTag(1, "import { foo } from 'x';"),
-				end: makeTag(2, "import { bar } from 'y';"),
-				lines: ["import {foo} from 'x';", "import { bar } from 'y';", "// added"],
-			},
-		];
-		const result = applyHashlineEdits(content, edits);
-		const outLines = result.lines.split("\n");
-		// Model's whitespace choice is respected -- no longer overridden
-		expect(outLines[0]).toBe("import {foo} from 'x';");
-		expect(outLines[1]).toBe("import { bar } from 'y';");
-		expect(outLines[2]).toBe("// added");
-		expect(outLines[3]).toBe("const x = 1;");
-	});
-
-	it("treats same-line ranges as single-line replacements", () => {
-		const content = "aaa\nbbb\nccc";
-		const good = makeTag(2, "bbb");
-		const edits: HashlineEdit[] = [{ op: "replace_range", pos: good, end: good, lines: ["BBB"] }];
-		const result = applyHashlineEdits(content, edits);
-		expect(result.lines).toBe("aaa\nBBB\nccc");
-	});
-
-	it("preserves duplicated trailing closer lines exactly as provided", () => {
-		const content = "if (ok) {\n  run();\n}\nafter();";
-		const edits: HashlineEdit[] = [
-			{
-				op: "replace_range",
-				pos: makeTag(1, "if (ok) {"),
-				end: makeTag(2, "  run();"),
-				lines: ["if (ok) {", "  runSafe();", "}"],
-			},
-		];
-		const result = applyHashlineEdits(content, edits);
-		expect(result.lines).toBe("if (ok) {\n  runSafe();\n}\n}\nafter();");
-		expect(result.warnings).toHaveLength(1);
-		expect(result.warnings?.[0]).toContain("Possible boundary duplication");
-		expect(result.warnings?.[0]).toContain(`set \`end\` to 3${computeLineHash(3, "}")}`);
-	});
-
-	it("preserves duplicated trailing content when replacement re-emits the next line", () => {
-		const content = "start\n  oldCall();\nnextCall();\nafter();";
-		const edits: HashlineEdit[] = [
-			{
-				op: "replace_range",
-				pos: makeTag(1, "start"),
-				end: makeTag(2, "  oldCall();"),
-				lines: ["start", "  newCall();", "nextCall();"],
-			},
-		];
-		const result = applyHashlineEdits(content, edits);
-		expect(result.lines).toBe("start\n  newCall();\nnextCall();\nnextCall();\nafter();");
-		expect(result.warnings).toHaveLength(1);
-		expect(result.warnings?.[0]).toContain("Possible boundary duplication");
-		expect(result.warnings?.[0]).toContain(`set \`end\` to 3${computeLineHash(3, "nextCall();")}`);
-	});
-
-	it("preserves duplicated leading content when replacement re-emits the previous line", () => {
-		const content = "if (x) {\n  oldBody();\n}\nafter();";
-		const edits: HashlineEdit[] = [
-			{
-				op: "replace_range",
-				pos: makeTag(2, "  oldBody();"),
-				end: makeTag(3, "}"),
-				lines: ["if (x) {", "  newBody();", "}"],
-			},
-		];
-		const result = applyHashlineEdits(content, edits);
-		expect(result.lines).toBe("if (x) {\nif (x) {\n  newBody();\n}\nafter();");
-		expect(result.warnings).toBeUndefined();
-	});
-});
-
-// ═══════════════════════════════════════════════════════════════════════════
-// applyHashlineEdits — multiple edits
-// ═══════════════════════════════════════════════════════════════════════════
-
-describe("applyHashlineEdits — multiple edits", () => {
-	it("applies two non-overlapping replaces (bottom-up safe)", () => {
-		const content = "aaa\nbbb\nccc\nddd\neee";
-		const edits: HashlineEdit[] = [
-			{ op: "replace_line", pos: makeTag(2, "bbb"), lines: ["BBB"] },
-			{ op: "replace_line", pos: makeTag(4, "ddd"), lines: ["DDD"] },
-		];
-
-		const result = applyHashlineEdits(content, edits);
-		expect(result.lines).toBe("aaa\nBBB\nccc\nDDD\neee");
-		expect(result.firstChangedLine).toBe(2);
-	});
-
-	it("applies replace + delete in one call", () => {
-		const content = "aaa\nbbb\nccc\nddd";
-		const edits: HashlineEdit[] = [
-			{ op: "replace_line", pos: makeTag(2, "bbb"), lines: ["BBB"] },
-			{ op: "replace_line", pos: makeTag(4, "ddd"), lines: [] },
-		];
-
-		const result = applyHashlineEdits(content, edits);
-		expect(result.lines).toBe("aaa\nBBB\nccc");
-	});
-
-	it("applies replace + append in one call", () => {
-		const content = "aaa\nbbb\nccc";
-		const edits: HashlineEdit[] = [
-			{ op: "replace_line", pos: makeTag(3, "ccc"), lines: ["CCC"] },
-			{ op: "append_at", pos: makeTag(1, "aaa"), lines: ["INSERTED"] },
-		];
-
-		const result = applyHashlineEdits(content, edits);
-		expect(result.lines).toBe("aaa\nINSERTED\nbbb\nCCC");
-	});
-
-	it("applies non-overlapping edits against original anchors when line counts change", () => {
-		const content = "one\ntwo\nthree\nfour\nfive\nsix";
-		const edits: HashlineEdit[] = [
-			{
-				op: "replace_range",
-				pos: makeTag(2, "two"),
-				end: makeTag(3, "three"),
-				lines: ["TWO_THREE"],
-			},
-			{ op: "replace_line", pos: makeTag(6, "six"), lines: ["SIX"] },
-		];
-
-		const result = applyHashlineEdits(content, edits);
-		expect(result.lines).toBe("one\nTWO_THREE\nfour\nfive\nSIX");
-	});
-
-	it("single-line replace expanding to multiple lines is not a noop", () => {
-		const content = "aaa\n\nccc";
-		const blankHash = computeLineHash(2, "");
-		const edits: HashlineEdit[] = [
-			{ op: "replace_line", pos: { line: 2, hash: blankHash }, lines: ["", "inserted", ""] },
-		];
-		const result = applyHashlineEdits(content, edits);
-		expect(result.lines).toBe("aaa\n\ninserted\n\nccc");
-		expect(result.firstChangedLine).toBe(2);
-	});
-
-	it("empty edits array is a no-op", () => {
-		const content = "aaa\nbbb";
-		const result = applyHashlineEdits(content, []);
-		expect(result.lines).toBe(content);
-		expect(result.firstChangedLine).toBeUndefined();
-	});
-});
-
-// ═══════════════════════════════════════════════════════════════════════════
-// applyHashlineEdits — error cases
-// ═══════════════════════════════════════════════════════════════════════════
-
-describe("applyHashlineEdits — errors", () => {
-	it("rejects stale hash", () => {
-		const content = "aaa\nbbb\nccc";
-		// Use a hash that doesn't match any line (avoid 00 — ccc hashes to 00)
-		const edits: HashlineEdit[] = [
-			{ op: "replace_line", pos: parseTag(`2${staleBigramFor(2, "bbb")}`), lines: ["BBB"] },
-		];
-		expect(() => applyHashlineEdits(content, edits)).toThrow(HashlineMismatchError);
-	});
-
-	it("stale hash error shows * markers with correct hashes", () => {
-		const content = "aaa\nbbb\nccc\nddd\neee";
-		const edits: HashlineEdit[] = [
-			{ op: "replace_line", pos: parseTag(`2${staleBigramFor(2, "bbb")}`), lines: ["BBB"] },
-		];
-
-		try {
-			applyHashlineEdits(content, edits);
-			expect.unreachable("should have thrown");
-		} catch (err) {
-			expect(err).toBeInstanceOf(HashlineMismatchError);
-			const msg = (err as HashlineMismatchError).message;
-			// Mismatched line uses leading `*` and `|` separator (grep-style)
-			const correctHash = computeLineHash(2, "bbb");
-			expect(msg).toContain(`*2${correctHash}|bbb`);
-			// Context lines use leading space and `|` separator
-			const contextLines = msg.split("\n").filter(l => /^ \d+[a-z]{2}\|/.test(l));
-			expect(contextLines.length).toBeGreaterThan(0);
-		}
+	it("inserts payload before/after a Lid, and at BOF/EOF", () => {
+		const diff = [
+			`< ${tag(2, "bbb")}`,
+			pl("before b"),
+			`+ ${tag(2, "bbb")}`,
+			pl("after b"),
+			"+ BOF",
+			pl("top"),
+			"+ EOF",
+			pl("tail"),
+		].join("\n");
+		expect(applyDiff(content, diff)).toBe("top\naaa\nbefore b\nbbb\nafter b\nccc\ntail");
 	});
 
-	it("stale hash error collects all mismatches", () => {
-		const content = "aaa\nbbb\nccc\nddd\neee";
-		// Use hashes that don't match any line (avoid 00 — ccc hashes to 00)
-		const edits: HashlineEdit[] = [
-			{ op: "replace_line", pos: parseTag(`2${staleBigramFor(2, "bbb")}`), lines: ["BBB"] },
-			{ op: "replace_line", pos: parseTag(`4${staleBigramFor(4, "ddd")}`), lines: ["DDD"] },
-		];
-
-		try {
-			applyHashlineEdits(content, edits);
-			expect.unreachable("should have thrown");
-		} catch (err) {
-			expect(err).toBeInstanceOf(HashlineMismatchError);
-			const e = err as HashlineMismatchError;
-			expect(e.mismatches).toHaveLength(2);
-			expect(e.mismatches[0].line).toBe(2);
-			expect(e.mismatches[1].line).toBe(4);
-			// Both mismatched lines use `*` prefix (vs leading space for context)
-			const markerLines = e.message.split("\n").filter(l => /^\*\d+[a-z]{2}\|/.test(l));
-			expect(markerLines).toHaveLength(2);
-		}
-	});
-
-	it("does not relocate when expected hash is non-unique", () => {
-		const content = "dup\nmid\ndup";
-		const staleDuplicate = parseTag(`2${computeLineHash(1, "dup")}`);
-		const edits: HashlineEdit[] = [{ op: "replace_line", pos: staleDuplicate, lines: ["DUP"] }];
-
-		expect(() => applyHashlineEdits(content, edits)).toThrow(HashlineMismatchError);
-	});
-
-	it("rejects out-of-range line", () => {
-		const content = "aaa\nbbb";
-		const edits: HashlineEdit[] = [{ op: "replace_line", pos: parseTag(`10${HASHLINE_BIGRAMS[0]}`), lines: ["X"] }];
-
-		expect(() => applyHashlineEdits(content, edits)).toThrow(/does not exist/);
-	});
-
-	it("rejects range with start > end", () => {
-		const content = "aaa\nbbb\nccc\nddd\neee";
-		const edits: HashlineEdit[] = [
-			{ op: "replace_range", pos: makeTag(5, "eee"), end: makeTag(2, "bbb"), lines: ["X"] },
-		];
-
-		expect(() => applyHashlineEdits(content, edits)).toThrow();
-	});
-
-	it("accepts append/prepend with empty text by inserting empty lines", () => {
-		const content = "aaa\nbbb";
-		const appendEdits: HashlineEdit[] = [{ op: "append_at", pos: makeTag(1, "aaa"), lines: [] }];
-		expect(applyHashlineEdits(content, appendEdits).lines).toBe("aaa\n\nbbb");
-
-		const prependEdits: HashlineEdit[] = [{ op: "prepend_at", pos: makeTag(1, "aaa"), lines: [] }];
-		expect(applyHashlineEdits(content, prependEdits).lines).toBe("\naaa\nbbb");
-	});
-});
-
-// ═══════════════════════════════════════════════════════════════════════════
-// buildCompactHashlineDiffPreview
-// ═══════════════════════════════════════════════════════════════════════════
-
-describe("buildCompactHashlineDiffPreview", () => {
-	it("keeps trailing context for first unchanged run and hashes visible lines", () => {
-		const diff = ["  1|ctx-a", "  2|ctx-b", "  3|ctx-c", "  4|ctx-d", "+ 5|added"].join("\n");
-
-		const preview = buildCompactHashlineDiffPreview(diff);
-
-		expect(preview.preview).not.toContain("ctx-a");
-		expect(preview.preview).not.toContain("ctx-b");
-		expect(preview.preview).toContain(` 3${computeLineHash(3, "ctx-c")}|ctx-c`);
-		expect(preview.preview).toContain(` 4${computeLineHash(4, "ctx-d")}|ctx-d`);
-		expect(preview.preview).toContain(" ... 2 more unchanged lines");
-		expect(preview.preview).toContain(`+5${computeLineHash(5, "added")}|added`);
-	});
-
-	it("preserves all added lines and leaves removed lines unhashed", () => {
-		const diff = ["  1|head", "+ 2|one", "+ 3|two", "+ 4|three", "+ 5|four", "- 2|old"].join("\n");
-
-		const preview = buildCompactHashlineDiffPreview(diff);
-
-		expect(preview.preview).toContain(`+2${computeLineHash(2, "one")}|one`);
-		expect(preview.preview).toContain(`+3${computeLineHash(3, "two")}|two`);
-		expect(preview.preview).toContain(`+4${computeLineHash(4, "three")}|three`);
-		expect(preview.preview).toContain(`+5${computeLineHash(5, "four")}|four`);
-		expect(preview.preview).toContain("-2   |old");
-		expect(preview.preview).not.toContain(`-2${computeLineHash(2, "old")}`);
-		expect(preview.addedLines).toBe(4);
-		expect(preview.removedLines).toBe(1);
-	});
-
-	it("keeps leading context for last unchanged run and hashes visible lines", () => {
-		const diff = ["-10|old", "+10|new", " 11|ctx-a", " 12|ctx-b", " 13|ctx-c", " 14|ctx-d"].join("\n");
-
-		const preview = buildCompactHashlineDiffPreview(diff);
-
-		expect(preview.preview).toContain(`+10${computeLineHash(10, "new")}|new`);
-		expect(preview.preview).toContain(` 11${computeLineHash(11, "ctx-a")}|ctx-a`);
-		expect(preview.preview).toContain(` 12${computeLineHash(12, "ctx-b")}|ctx-b`);
-		expect(preview.preview).not.toContain("ctx-c");
-		expect(preview.preview).not.toContain("ctx-d");
-		expect(preview.preview).toContain(" ... 2 more unchanged lines");
-	});
-
-	it("uses new-file line numbers for unchanged lines after insertions", () => {
-		const diff = ["+2|inserted", " 2|bravo", " 3|charlie"].join("\n");
-
-		const preview = buildCompactHashlineDiffPreview(diff);
-
-		expect(preview.preview).toContain(`+2${computeLineHash(2, "inserted")}|inserted`);
-		expect(preview.preview).toContain(` 3${computeLineHash(3, "bravo")}|bravo`);
-		expect(preview.preview).toContain(` 4${computeLineHash(4, "charlie")}|charlie`);
-		expect(preview.preview).not.toContain(` 2${computeLineHash(2, "bravo")}|bravo`);
-	});
-});
-
-// ═══════════════════════════════════════════════════════════════════════════
-// stripNewLinePrefixes — regression tests for DIFF_PLUS_RE
-// ═══════════════════════════════════════════════════════════════════════════
-
-describe("stripNewLinePrefixes", () => {
-	it("strips leading '+' when majority of lines start with '+'", () => {
-		const lines = ["+line one", "+line two", "+line three"];
-		expect(stripNewLinePrefixes(lines)).toEqual(["line one", "line two", "line three"]);
-	});
-
-	it("does NOT strip leading '-' from Markdown list items", () => {
-		const lines = ["- item one", "- item two", "- item three"];
-		expect(stripNewLinePrefixes(lines)).toEqual(["- item one", "- item two", "- item three"]);
-	});
-
-	it("does NOT strip leading '-' from checkbox list items", () => {
-		const lines = ["- [ ] task one", "- [x] task two", "- [ ] task three"];
-		expect(stripNewLinePrefixes(lines)).toEqual(["- [ ] task one", "- [x] task two", "- [ ] task three"]);
-	});
-
-	it("does NOT strip when fewer than 50% of lines start with '+'", () => {
-		const lines = ["+added", "regular", "regular", "regular"];
-		expect(stripNewLinePrefixes(lines)).toEqual(["+added", "regular", "regular", "regular"]);
-	});
-
-	it("strips hashline prefixes when all non-empty lines carry them", () => {
-		const lines = ["1th|foo", "2er|bar", "3in|baz"];
-		expect(stripNewLinePrefixes(lines)).toEqual(["foo", "bar", "baz"]);
-	});
-
-	it("strips diff `+` markers from anchored hashline output", () => {
-		const lines = [
-			`+1${computeLineHash(1, "foo")}|foo`,
-			`+2${computeLineHash(2, "bar")}|bar`,
-			`+3${computeLineHash(3, "baz")}|baz`,
-		];
-		expect(stripNewLinePrefixes(lines)).toEqual(["foo", "bar", "baz"]);
+	it("inserts after the final line via `+ ANCHOR` instead of falling off the file", () => {
+		const diff = [`+ ${tag(3, "ccc")}`, pl("tail")].join("\n");
+		expect(applyDiff(content, diff)).toBe("aaa\nbbb\nccc\ntail");
 	});
 
-	it("strips plus hashline prefixes in mixed +/ - change style", () => {
-		const body = "**Storage location TBD:**";
-		const lines = [`-${body}`, `+1${computeLineHash(1, body)}|${body}`];
-		expect(stripNewLinePrefixes(lines)).toEqual([`-${body}`, body]);
+	it("blanks a line in place when `= A..A` has no payload", () => {
+		const diff = `= ${sameLineRange(tag(2, "bbb"))}`;
+		expect(applyDiff(content, diff)).toBe("aaa\n\nccc");
 	});
 
-	it("does NOT strip hashline prefixes when any non-empty line is plain content", () => {
-		const lines = ["1th|foo", "bar", "3in|baz"];
-		expect(stripNewLinePrefixes(lines)).toEqual(["1th|foo", "bar", "3in|baz"]);
+	it("blanks a range to a single empty line when `= A..B` has no payload", () => {
+		const diff = `= ${tag(1, "aaa")}..${tag(2, "bbb")}`;
+		expect(applyDiff(content, diff)).toBe("\nccc");
 	});
 
-	it("does NOT strip comment lines that look like hashline prefixes (# Word:)", () => {
-		// Regression: HASHLINE_PREFIX_RE was too broad and matched '# Note:', '# TODO:', etc.
-		// A single-line replacement whose content is a comment would have nonEmpty===hashPrefixCount===1,
-		// triggering stripping and eating the '# Note: ' prefix from the written line.
-		expect(stripNewLinePrefixes(["  # Note: Using a fixed version"])).toEqual(["  # Note: Using a fixed version"]);
-		expect(stripNewLinePrefixes(["# TODO: remove this"])).toEqual(["# TODO: remove this"]);
-		expect(stripNewLinePrefixes(["# FIXME: broken"])).toEqual(["# FIXME: broken"]);
-		// Bash/Python/PS1 comment with colon (e.g. setup scripts)
-		expect(stripNewLinePrefixes(["  # step: do thing"])).toEqual(["  # step: do thing"]);
+	it("deletes one line or an inclusive range", () => {
+		expect(applyDiff(content, `- ${sameLineRange(tag(2, "bbb"))}`)).toBe("aaa\nccc");
+		expect(applyDiff(content, `- ${tag(2, "bbb")}..${tag(3, "ccc")}`)).toBe("aaa");
 	});
 
-	it("does NOT strip '+' when line starts with '++'", () => {
-		const lines = ["++conflict marker", "++another"];
-		expect(stripNewLinePrefixes(lines)).toEqual(["++conflict marker", "++another"]);
-	});
-
-	it("strips hashline prefixes when truncation marker is present (anchor corruption bug)", () => {
-		const lines = [
-			"1an|---",
-			"2re|title: example",
-			"3an|---",
-			"",
-			"[Showing lines 1-300 of 332. Use sel=301 to continue]",
-		];
-		const result = stripNewLinePrefixes(lines);
-		expect(result).not.toContain("[Showing lines 1-300 of 332. Use sel=301 to continue]");
-		expect(result[0]).toBe("---");
-		expect(result[1]).toBe("title: example");
-	});
+	it("replaces one line or an inclusive range with payload lines", () => {
+		const single = [`= ${sameLineRange(tag(2, "bbb"))}`, pl("BBB")].join("\n");
+		expect(applyDiff(content, single)).toBe("aaa\nBBB\nccc");
 
-	it("strips hashline prefixes when generic read truncation notice is present", () => {
-		const lines = ["1an|line one", "2re|line two", "", "[42 more lines in file. Use sel=3 to continue]"];
-		const result = stripNewLinePrefixes(lines);
-		expect(result[0]).toBe("line one");
-		expect(result[1]).toBe("line two");
+		const range = [`= ${tag(2, "bbb")}..${tag(3, "ccc")}`, pl("BBB"), pl("CCC")].join("\n");
+		expect(applyDiff(content, range)).toBe("aaa\nBBB\nCCC");
 	});
 
-	it("strips nested hashline prefixes (already-corrupted content re-read)", () => {
-		const lines = ["1at|1an|---", "2en|2re|title: example", "3nd|3an|---"];
-		const result = stripNewLinePrefixes(lines);
-		expect(result[0]).toBe("---");
-		expect(result[1]).toBe("title: example");
-		expect(result[2]).toBe("---");
-	});
-});
-
-// ═══════════════════════════════════════════════════════════════════════════
-// stripHashlinePrefixes — used by Write tool
-// ═══════════════════════════════════════════════════════════════════════════
-
-describe("stripHashlinePrefixes", () => {
-	it("strips when all non-empty lines have hashline prefixes", () => {
-		const lines = ["1an|---", "2re|title", "", "4on|content"];
-		expect(stripHashlinePrefixes(lines)).toEqual(["---", "title", "", "content"]);
-	});
+	it("auto-absorbs duplicated multiline prefix boundaries during replacement", () => {
+		const source = ["// one", "// two", "old();"].join("\n");
+		const diff = [`= ${sameLineRange(tag(3, "old();"))}`, pl("// one"), pl("// two"), pl("new();")].join("\n");
 
-	it("does NOT strip when lines are plain content", () => {
-		const lines = ["hello", "world"];
-		expect(stripHashlinePrefixes(lines)).toBe(lines);
+		expect(applyDiff(source, diff)).toBe(["// one", "// two", "new();"].join("\n"));
 	});
 
-	it("strips hashline prefixes even when truncation marker is present (anchor corruption bug)", () => {
-		const lines = [
-			"1an|---",
-			"2re|title: example",
-			"3an|---",
-			"",
-			"[Showing lines 1-300 of 332. Use sel=301 to continue]",
-		];
-		const result = stripHashlinePrefixes(lines);
-		expect(result).not.toContain("[Showing lines 1-300 of 332. Use sel=301 to continue]");
-		expect(result[0]).toBe("---");
-		expect(result[1]).toBe("title: example");
-	});
+	it("auto-absorbs duplicated multiline suffix boundaries during replacement", () => {
+		const source = ["old();", "// one", "// two"].join("\n");
+		const diff = [`= ${sameLineRange(tag(1, "old();"))}`, pl("new();"), pl("// one"), pl("// two")].join("\n");
 
-	it("strips nested hashline prefixes from already-corrupted content", () => {
-		const lines = ["1at|1an|---", "2en|2re|title"];
-		const result = stripHashlinePrefixes(lines);
-		expect(result[0]).toBe("---");
-		expect(result[1]).toBe("title");
+		expect(applyDiff(source, diff)).toBe(["new();", "// one", "// two"].join("\n"));
 	});
-});
-
-// ═══════════════════════════════════════════════════════════════════════════
-// hashlineParseContent — string vs array input
-// ═══════════════════════════════════════════════════════════════════════════
 
-describe("hashlineParseContent", () => {
-	it("returns empty array for null", () => {
-		expect(hashlineParseText(null)).toEqual([]);
-	});
+	it("auto-absorbs a duplicated single structural suffix during replacement", () => {
+		const source = ["old();", "};"].join("\n");
+		const diff = [`= ${sameLineRange(tag(1, "old();"))}`, pl("new();"), pl("};")].join("\n");
 
-	it("returns array input as-is when no strip heuristic applies", () => {
-		const input = ["- [x] done", "- [ ] todo"];
-		expect(hashlineParseText(input)).toBe(input);
+		expect(applyDiff(source, diff)).toBe(["new();", "};"].join("\n"));
 	});
 
-	it("strips hashline prefixes from array input when all non-empty lines are prefixed", () => {
-		const input = ["259th|", "260er|{{/*", "261in|OC deployment container livenessProbe template"];
-		expect(hashlineParseText(input)).toEqual(["", "{{/*", "OC deployment container livenessProbe template"]);
-	});
+	it("auto-absorbs a duplicated single structural prefix during replacement", () => {
+		const source = ["};", "old();"].join("\n");
+		const diff = [`= ${sameLineRange(tag(2, "old();"))}`, pl("};"), pl("new();")].join("\n");
 
-	it("splits string on newline and preserves Markdown list '-' prefix", () => {
-		const result = hashlineParseText("- item one\n- item two\n- item three");
-		expect(result).toEqual(["- item one", "- item two", "- item three"]);
+		expect(applyDiff(source, diff)).toBe(["};", "new();"].join("\n"));
 	});
 
-	it("strips '+' diff markers from string input", () => {
-		const result = hashlineParseText("+line one\n+line two");
-		expect(result).toEqual(["line one", "line two"]);
-	});
+	it("does not absorb a single structural replacement suffix when it preserves balance", () => {
+		// The replacement payload `if ok {` + `}` is itself net-zero, so the trailing
+		// `}` is a legitimate part of the new block, not a duplicate of the file's
+		// existing `}`. The single-line structural absorb must NOT fire here.
+		const source = ["old();", "}"].join("\n");
+		const diff = [`= ${sameLineRange(tag(1, "old();"))}`, pl("if ok {"), pl("}")].join("\n");
 
-	it("preserves [''] as a single blank line from array input", () => {
-		expect(hashlineParseText([""])).toEqual([""]);
+		expect(applyDiff(source, diff)).toBe(["if ok {", "}", "}"].join("\n"));
 	});
 
-	it("preserves trailing empty strings in array input", () => {
-		expect(hashlineParseText(["foo", ""])).toEqual(["foo", ""]);
-	});
+	it("does not auto-absorb a single duplicated boundary line", () => {
+		const source = ["keep", "old();"].join("\n");
+		const diff = [`= ${sameLineRange(tag(2, "old();"))}`, pl("keep"), pl("new();")].join("\n");
 
-	it("still strips trailing empty from string split", () => {
-		expect(hashlineParseText("foo\n")).toEqual(["foo"]);
+		expect(applyDiff(source, diff)).toBe(["keep", "keep", "new();"].join("\n"));
 	});
 
-	it("regression: set op with Markdown list string content preserves '-' in file", () => {
-		// Reproducer for the bug where DIFF_PLUS_RE = /^[+-](?![+-])/ matched '-'
-		// and stripped it from every line, corrupting list-item replacements.
-		const fileContent = "# Title\n- old item\n- old item 2\nfooter";
-		const edits: HashlineEdit[] = [
-			{
-				op: "replace_line",
-				pos: makeTag(2, "- old item"),
-				lines: hashlineParseText("- [x] new item"),
-			},
-		];
-		const result = applyHashlineEdits(fileContent, edits);
-		expect(result.lines).toBe("# Title\n- [x] new item\n- old item 2\nfooter");
-	});
+	it("does not auto-absorb a duplicate boundary that another op already targets", () => {
+		// Lines 3-4 ("X","Y") match the payload's trailing block, but line 4
+		// is also the anchor of a separate insert. Absorbing it would silently
+		// steal that anchor and turn the insert into a replacement.
+		const source = ["A", "B", "X", "Y", "Z"].join("\n");
+		const diff = [
+			`= ${tag(1, "A")}..${tag(2, "B")}`,
+			pl("alpha"),
+			pl("X"),
+			pl("Y"),
+			`< ${tag(4, "Y")}`,
+			pl("extra"),
+		].join("\n");
 
-	it("regression: set op replacing multiple list items preserves all '-' prefixes", () => {
-		// All replacement lines start with '- ', triggering the 50% heuristic when '-' matched.
-		const fileContent = "- [x] done\n- [ ] pending\n- [ ] also pending";
-		const newContent = hashlineParseText("- [x] done");
-		const edits: HashlineEdit[] = [{ op: "replace_line", pos: makeTag(2, "- [ ] pending"), lines: newContent }];
-		const result = applyHashlineEdits(fileContent, edits);
-		expect(result.lines).toBe("- [x] done\n- [x] done\n- [ ] also pending");
+		expect(applyDiff(source, diff)).toBe(["alpha", "X", "Y", "X", "extra", "Y", "Z"].join("\n"));
 	});
 
-	it("preserves comment lines starting with '# Word:' through hashlineParseText", () => {
-		// Regression: HASHLINE_PREFIX_RE used to match '# Note:', '# TODO:', etc. because the
-		// hash ID segment was overly permissive ([0-9a-zA-Z]{1,16}). It now matches only the
-		// 40-bigram alphabet from HASHLINE_BIGRAMS, so accidental colon-suffixed words don't strip.
-		expect(hashlineParseText(["  # Note: Using version 1.24.x"])).toEqual(["  # Note: Using version 1.24.x"]);
-		expect(hashlineParseText(["# TODO: remove this"])).toEqual(["# TODO: remove this"]);
-		expect(hashlineParseText(["# step: install deps"])).toEqual(["# step: install deps"]);
-		expect(hashlineParseText("  # Note: v1.24.x\n  # Requires: CUDA 12")).toEqual([
-			"  # Note: v1.24.x",
-			"  # Requires: CUDA 12",
-		]);
-	});
+	it("surfaces a warning when boundary duplicates are auto-absorbed", () => {
+		const source = ["// one", "// two", "old();"].join("\n");
+		const diff = [`= ${sameLineRange(tag(3, "old();"))}`, pl("// one"), pl("// two"), pl("new();")].join("\n");
 
-	it("regression: replacing a comment line preserves '# Note:' prefix in output file", () => {
-		// Before fix: HASHLINE_PREFIX_RE matched '# Note:' as a hashline prefix.
-		// With a single replacement line the strip heuristic fired (nonEmpty===1,
-		// hashPrefixCount===1), eating the comment marker and writing bare text.
-		const fileContent = ["  # cuDNN section", "  # Note: Using version 1.23.0", '  $Version = "1.23.0"'].join("\n");
-		const edits: HashlineEdit[] = [
-			{
-				op: "replace_line",
-				pos: makeTag(2, "  # Note: Using version 1.23.0"),
-				lines: hashlineParseText(["  # Note: Using version 1.24.x"]),
-			},
-		];
-		const result = applyHashlineEdits(fileContent, edits);
-		expect(result.lines).toBe(
-			["  # cuDNN section", "  # Note: Using version 1.24.x", '  $Version = "1.23.0"'].join("\n"),
+		const result = applyHashlineEdits(source, parseHashline(diff));
+		expect(result.lines).toBe(["// one", "// two", "new();"].join("\n"));
+		expect(result.warnings).toBeDefined();
+		expect(result.warnings).toEqual(
+			expect.arrayContaining([expect.stringMatching(/Auto-absorbed 2 duplicate line\(s\) above replacement/)]),
 		);
 	});
 
-	it("regression: replacing a TODO comment preserves '# TODO:' prefix", () => {
-		const fileContent = "const x = 1;\n// TODO: old\n# TODO: remove this\nconst y = 2;";
-		const edits: HashlineEdit[] = [
-			{
-				op: "replace_line",
-				pos: makeTag(3, "# TODO: remove this"),
-				lines: hashlineParseText(["# TODO: remove this -- done"]),
-			},
-		];
-		const result = applyHashlineEdits(fileContent, edits);
-		expect(result.lines).toBe("const x = 1;\n// TODO: old\n# TODO: remove this -- done\nconst y = 2;");
+	it("does not auto-drop generic (multi-line) pure-insert duplicate boundaries by default", () => {
+		// Multi-line context echo (`aaa`, `bbb`) is gated on the
+		// `autoDropPureInsertDuplicates` opt-in, unlike the single-line
+		// structural absorb covered by the test below.
+		const source = ["aaa", "bbb", "ccc"].join("\n");
+		const diff = [`+ ${tag(2, "bbb")}`, pl("aaa"), pl("bbb"), pl("NEW")].join("\n");
+		expect(applyDiff(source, diff)).toBe("aaa\nbbb\naaa\nbbb\nNEW\nccc");
+	});
+
+	it("auto-drops a duplicated single structural suffix for pure insert by default", () => {
+		const source = ["if ok {", "   keep();", "   }"].join("\n");
+		const diff = [`< ${tag(3, "   }")}`, pl("   added();"), pl("   }")].join("\n");
+
+		expect(applyDiff(source, diff)).toBe(["if ok {", "   keep();", "   added();", "   }"].join("\n"));
+	});
+
+	it("auto-drops a duplicated single structural prefix for pure insert by default", () => {
+		const source = ["   });", "next();"].join("\n");
+		const diff = [`+ ${tag(1, "   });")}`, pl("   });"), pl("added();")].join("\n");
+
+		expect(applyDiff(source, diff)).toBe(["   });", "added();", "next();"].join("\n"));
+	});
+
+	it("does not drop a single structural pure-insert suffix when it preserves balance", () => {
+		const source = ["if outer {", "}"].join("\n");
+		const diff = [`< ${tag(2, "}")}`, pl("if inner {"), pl("}")].join("\n");
+
+		expect(applyDiff(source, diff)).toBe(["if outer {", "if inner {", "}", "}"].join("\n"));
+	});
+
+	it("auto-absorbs duplicated leading payload of a pure `+ ANCHOR` insert", () => {
+		// `+ 2 ~aaa ~bbb ~NEW`: payload echoes the two file lines AT/ABOVE the
+		// insertion point (aaa, bbb), then adds NEW. The leading echo is absorbed.
+		const source = ["aaa", "bbb", "ccc"].join("\n");
+		const diff = [`+ ${tag(2, "bbb")}`, pl("aaa"), pl("bbb"), pl("NEW")].join("\n");
+		expect(applyDiffWithPureInsertAutoDrop(source, diff)).toBe("aaa\nbbb\nNEW\nccc");
+	});
+
+	it("auto-absorbs context-wrap echo (leading-above + trailing-below) on `+ ANCHOR`", () => {
+		// `+ 2 ~aaa ~bbb ~NEW ~ccc ~ddd`: payload wraps NEW with context above
+		// (aaa, bbb) AND below (ccc, ddd). Both ends should be absorbed, leaving
+		// only NEW inserted after bbb.
+		const source = ["aaa", "bbb", "ccc", "ddd"].join("\n");
+		const diff = [`+ ${tag(2, "bbb")}`, pl("aaa"), pl("bbb"), pl("NEW"), pl("ccc"), pl("ddd")].join("\n");
+		expect(applyDiffWithPureInsertAutoDrop(source, diff)).toBe("aaa\nbbb\nNEW\nccc\nddd");
+	});
+
+	it("auto-absorbs duplicated trailing payload of a pure `< ANCHOR` insert", () => {
+		// Insert before line 3 ("ccc"). Trailing payload echoes the anchor and the
+		// line after it. Drop the trailing duplicates.
+		const source = ["aaa", "bbb", "ccc", "ddd"].join("\n");
+		const diff = [`< ${tag(3, "ccc")}`, pl("NEW"), pl("ccc"), pl("ddd")].join("\n");
+		expect(applyDiffWithPureInsertAutoDrop(source, diff)).toBe("aaa\nbbb\nNEW\nccc\nddd");
+	});
+
+	it("auto-absorbs duplicated leading payload at EOF insert", () => {
+		const source = ["aaa", "bbb", "ccc"].join("\n");
+		// `+ EOF` payload echoes the last two file lines, then adds NEW.
+		const diff = ["+ EOF", pl("bbb"), pl("ccc"), pl("NEW")].join("\n");
+		expect(applyDiffWithPureInsertAutoDrop(source, diff)).toBe("aaa\nbbb\nccc\nNEW");
+	});
+
+	it("auto-absorbs duplicated trailing payload at BOF insert", () => {
+		const source = ["aaa", "bbb", "ccc"].join("\n");
+		// `< BOF` payload prepends NEW but trails with the first two file lines.
+		const diff = ["< BOF", pl("NEW"), pl("aaa"), pl("bbb")].join("\n");
+		expect(applyDiffWithPureInsertAutoDrop(source, diff)).toBe("NEW\naaa\nbbb\nccc");
+	});
+
+	it("does not auto-absorb a single duplicated boundary line in a pure insert", () => {
+		// One-line echo should NOT trigger absorb (matches replacement-absorb threshold).
+		const source = ["aaa", "bbb", "ccc"].join("\n");
+		const diff = [`+ ${tag(2, "bbb")}`, pl("bbb"), pl("NEW")].join("\n");
+		// Only "bbb" matches above; that's a 1-line dup, not absorbed.
+		expect(applyDiffWithPureInsertAutoDrop(source, diff)).toBe("aaa\nbbb\nbbb\nNEW\nccc");
+	});
+
+	it("surfaces a warning when pure-insert duplicates are auto-dropped", () => {
+		const source = ["aaa", "bbb", "ccc"].join("\n");
+		const diff = [`+ ${tag(2, "bbb")}`, pl("aaa"), pl("bbb"), pl("NEW")].join("\n");
+		const result = applyHashlineEdits(source, parseHashline(diff), { autoDropPureInsertDuplicates: true });
+		expect(result.lines).toBe("aaa\nbbb\nNEW\nccc");
+		expect(result.warnings).toBeDefined();
+		expect(result.warnings).toEqual(
+			expect.arrayContaining([expect.stringMatching(/Auto-dropped 2 duplicate line\(s\) at the start of insert/)]),
+		);
+	});
+
+	it("preserves payload text exactly after the first separator", () => {
+		const diff = [
+			`= ${sameLineRange(tag(2, "bbb"))}`,
+			pl(""),
+			pl("# not a header"),
+			pl("+ not an op"),
+			pl("  spaced"),
+		].join("\n");
+		expect(applyDiff(content, diff)).toBe("aaa\n\n# not a header\n+ not an op\n  spaced\nccc");
+	});
+
+	it("treats blank lines inside a payload run as empty payload lines", () => {
+		// Truly blank lines (no leading separator) inside an active payload run
+		// are silently rewritten to empty payload lines as long as more payload
+		// follows. This recovers from a common typo where the model forgets the
+		// separator on what should be a blank inserted line.
+		const diff = [`= ${sameLineRange(tag(2, "bbb"))}`, pl("first"), "", "", pl("after")].join("\n");
+		expect(applyDiff(content, diff)).toBe("aaa\nfirst\n\n\nafter\nccc");
+	});
+
+	it("does not consume trailing blank lines between sections as payload", () => {
+		// Blanks that precede a non-payload op (here, another `=`) end the
+		// payload run cleanly — they're section separators, not payload.
+		const diff = [
+			`= ${sameLineRange(tag(1, "aaa"))}`,
+			pl("AAA"),
+			"",
+			"",
+			`= ${sameLineRange(tag(3, "ccc"))}`,
+			pl("CCC"),
+		].join("\n");
+		expect(applyDiff(content, diff)).toBe("AAA\nbbb\nCCC");
+	});
+
+	it("rejects missing payloads and orphan payload lines", () => {
+		expect(() => parseHashline(`+ ${tag(1, "aaa")}`)).toThrow(/require at least one/);
+		expect(() => parseHashline(pl("orphan"))).toThrow(/payload line has no preceding/);
+	});
+
+	it("leniently treats a bare blank line after + / < as an empty payload", () => {
+		const hash = computeLineHash(5, "aaa");
+		const anchor = { line: 5, hash };
+		expect(parseHashline(`< ${tag(5, "aaa")}\n`)).toEqual([
+			{ kind: "insert", cursor: { kind: "before_anchor", anchor }, text: "", lineNum: 1, index: 0 },
+		]);
+		expect(parseHashline(`+ ${tag(5, "aaa")}\n`)).toEqual([
+			{ kind: "insert", cursor: { kind: "after_anchor", anchor }, text: "", lineNum: 1, index: 0 },
+		]);
+	});
+
+	it("rejects old cursor and equals-inline syntax after cutover", () => {
+		expect(() => parseHashline(`@${tag(1, "aaa")}\n+old`)).toThrow(/unrecognized op/);
+		expect(() => parseHashline(`${tag(1, "aaa")}=AAA`)).toThrow(/unrecognized op/);
+	});
+
+	it("rejects single-anchor delete/replace shorthand", () => {
+		expect(() => parseHashline(`= ${tag(2, "bbb")}\n${pl("BBB")}`)).toThrow(/explicit ranges are required/);
+		expect(() => parseHashline(`- ${tag(2, "bbb")}`)).toThrow(/explicit ranges are required/);
+	});
+});
+
+describe("hashline — stale anchors", () => {
+	it("throws HashlineMismatchError when a Lid hash no longer matches", () => {
+		const diff = [`= ${sameLineRange(mistag(2, "bbb"))}`, pl("BBB")].join("\n");
+		expect(() => applyDiff("aaa\nbbb\nccc", diff)).toThrow(HashlineMismatchError);
+	});
+
+	it("rejects when an anchor's stored line shifted (no auto-rebase)", () => {
+		const stale = tag(2, "bbb");
+		const diff = [`= ${sameLineRange(stale)}`, pl("BBB")].join("\n");
+		expect(() => applyDiff("aaa\nINSERTED\nbbb\nccc", diff)).toThrow(HashlineMismatchError);
+	});
+
+	it("rejects when the line hash matches a different nearby line", () => {
+		// Significant-content lines hash by content alone; identical content gives
+		// identical hashes, so an anchor pointing at a different line with the
+		// same hash must not be silently relocated.
+		const file = ["x = 1", "y = 2", "x = 1", "z = 3", "x = 1", "w = 4"].join("\n");
+		const collidingHash = computeLineHash(1, "x = 1");
+		// User points at line 4 (`z = 3`) with the colliding hash; without auto-
+		// rebase, this is a plain mismatch.
+		const diff = [`= ${sameLineRange(`4${collidingHash}`)}`, pl("REPLACED")].join("\n");
+		expect(() => applyDiff(file, diff)).toThrow(HashlineMismatchError);
+	});
+});
+
+describe("splitHashlineInput — @ headers", () => {
+	it("extracts path and diff body from @path header", () => {
+		const input = [`@src/foo.ts`, `= ${sameLineRange(tag(2, "bbb"))}`, pl("BBB")].join("\n");
+		expect(splitHashlineInput(input)).toEqual({
+			path: "src/foo.ts",
+			diff: `= ${sameLineRange(tag(2, "bbb"))}\n${pl("BBB")}`,
+		});
+	});
+
+	it("strips leading blank lines and unquotes matching path quotes", () => {
+		expect(splitHashlineInput(`\n@"foo bar.ts"\n+ BOF\n${pl("x")}`)).toEqual({
+			path: "foo bar.ts",
+			diff: `+ BOF\n${pl("x")}`,
+		});
+	});
+
+	it("normalizes cwd-prefixed absolute paths to cwd-relative paths", () => {
+		const cwd = process.cwd();
+		const absolute = path.join(cwd, "src", "foo.ts");
+		expect(splitHashlineInput(`@${absolute}\n+ BOF\n${pl("x")}`, { cwd }).path).toBe("src/foo.ts");
+	});
+
+	it("uses explicit fallback path only when input has recognizable operations", () => {
+		expect(splitHashlineInput(`+ BOF\n${pl("x")}`, { path: "a.ts" })).toEqual({
+			path: "a.ts",
+			diff: `+ BOF\n${pl("x")}`,
+		});
+		expect(() => splitHashlineInput("plain text", { path: "a.ts" })).toThrow(/must begin with/);
+	});
+
+	it("splits multiple edit sections", () => {
+		const input = ["@a.ts", "+ BOF", pl("a"), "@b.ts", "+ EOF", pl("b")].join("\n");
+		expect(splitHashlineInputs(input)).toEqual([
+			{ path: "a.ts", diff: `+ BOF\n${pl("a")}` },
+			{ path: "b.ts", diff: `+ EOF\n${pl("b")}` },
+		]);
+	});
+
+	it("tolerates extra '@' chars on the section header", () => {
+		const input = ["@@ a.ts", "+ BOF", pl("a"), "@@@b.ts", "+ EOF", pl("b")].join("\n");
+		expect(splitHashlineInputs(input)).toEqual([
+			{ path: "a.ts", diff: `+ BOF\n${pl("a")}` },
+			{ path: "b.ts", diff: `+ EOF\n${pl("b")}` },
+		]);
+	});
+
+	it("silently drops a duplicate header with no operations between them", () => {
+		const input = ["@@ src/foo.ts", "@@ src/foo.ts", `+ BOF`, pl("x")].join("\n");
+		expect(splitHashlineInputs(input)).toEqual([{ path: "src/foo.ts", diff: `+ BOF\n${pl("x")}` }]);
+	});
+
+	it("silently drops a trailing header with no operations", () => {
+		const input = ["@@ a.ts", "+ BOF", pl("a"), "@@ b.ts"].join("\n");
+		expect(splitHashlineInputs(input)).toEqual([{ path: "a.ts", diff: `+ BOF\n${pl("a")}` }]);
+	});
+});
+
+describe("hashline executor", () => {
+	it("creates a missing file with a file-scoped insert", async () => {
+		await withTempDir(async tempDir => {
+			const input = `@new.ts\n+ BOF\n${pl("export const x = 1;")}\n`;
+			const result = await executeHashlineSingle(hashlineExecuteOptions(tempDir, input));
+			expect(result.content[0]?.type === "text" ? result.content[0].text : "").toContain("new.ts:");
+			expect(await Bun.file(path.join(tempDir, "new.ts")).text()).toBe("export const x = 1;");
+		});
+	});
+
+	it("honors the pure-insert duplicate auto-drop setting", async () => {
+		await withTempDir(async tempDir => {
+			const filePath = path.join(tempDir, "a.ts");
+			const source = ["aaa", "bbb", "ccc"].join("\n");
+			const input = `@a.ts\n+ ${tag(2, "bbb")}\n${pl("aaa")}\n${pl("bbb")}\n${pl("NEW")}\n`;
+
+			await Bun.write(filePath, source);
+			await executeHashlineSingle(hashlineExecuteOptions(tempDir, input));
+			expect(await Bun.file(filePath).text()).toBe("aaa\nbbb\naaa\nbbb\nNEW\nccc");
+
+			await Bun.write(filePath, source);
+			const enabled = Settings.isolated({ "edit.hashlineAutoDropPureInsertDuplicates": true });
+			const result = await executeHashlineSingle(hashlineExecuteOptions(tempDir, input, enabled));
+			expect(await Bun.file(filePath).text()).toBe("aaa\nbbb\nNEW\nccc");
+			expect(result.content[0]?.type === "text" ? result.content[0].text : "").toContain("Auto-dropped");
+		});
+	});
+
+	it("preflights every section before writing multi-file edits", async () => {
+		await withTempDir(async tempDir => {
+			const aPath = path.join(tempDir, "a.ts");
+			const bPath = path.join(tempDir, "b.ts");
+			await Bun.write(aPath, "aaa\n");
+			await Bun.write(bPath, "bbb\n");
+			const input = [
+				"@a.ts",
+				`= ${sameLineRange(tag(1, "aaa"))}`,
+				pl("AAA"),
+				"@b.ts",
+				`= ${sameLineRange(mistag(1, "bbb"))}`,
+				pl("BBB"),
+			].join("\n");
+
+			await expect(executeHashlineSingle(hashlineExecuteOptions(tempDir, input))).rejects.toThrow(
+				/anchor(s)? do(es)? not match the current file/,
+			);
+			expect(await Bun.file(aPath).text()).toBe("aaa\n");
+			expect(await Bun.file(bPath).text()).toBe("bbb\n");
+		});
+	});
+
+	it("applies multiple sections targeting the same file against the original snapshot", async () => {
+		await withTempDir(async tempDir => {
+			const filePath = path.join(tempDir, "a.ts");
+			const original = ["L1", "L2", "L3", "L4", "L5", "L6", "L7", "L8", "L9", "L10"].join("\n");
+			await Bun.write(filePath, `${original}\n`);
+
+			// Two sections, both anchored against the ORIGINAL file. Section 1 expands
+			// line 2 into 9 lines (net +8 shift). Section 2's anchor points at line 8
+			// of the original; after section 1 applies, that content moves to line 16.
+			// A naive sequential apply reads the modified disk and fails anchor
+			// validation outright.
+			const input = [
+				"@a.ts",
+				`= ${sameLineRange(tag(2, "L2"))}`,
+				pl("L2a"),
+				pl("L2b"),
+				pl("L2c"),
+				pl("L2d"),
+				pl("L2e"),
+				pl("L2f"),
+				pl("L2g"),
+				pl("L2h"),
+				pl("L2i"),
+				"@a.ts",
+				`+ ${tag(8, "L8")}`,
+				pl("INSERTED"),
+			].join("\n");
+
+			await executeHashlineSingle(hashlineExecuteOptions(tempDir, input));
+
+			expect(await Bun.file(filePath).text()).toBe(
+				[
+					"L1",
+					"L2a",
+					"L2b",
+					"L2c",
+					"L2d",
+					"L2e",
+					"L2f",
+					"L2g",
+					"L2h",
+					"L2i",
+					"L3",
+					"L4",
+					"L5",
+					"L6",
+					"L7",
+					"L8",
+					"INSERTED",
+					"L9",
+					"L10",
+					"",
+				].join("\n"),
+			);
+		});
+	});
+});
+
+describe("hashlineEditParamsSchema — extra-field tolerance", () => {
+	it("accepts extra `path` field alongside `input`", () => {
+		expect(hashlineEditParamsSchema.safeParse({ path: "x.ts", input: `@x.ts\n+ BOF\n${pl("x")}` }).success).toBe(
+			true,
+		);
+	});
+
+	it("still requires `input`", () => {
+		expect(hashlineEditParamsSchema.safeParse({ path: "x.ts" }).success).toBe(false);
+	});
+});
+
+describe("buildCompactHashlineDiffPreview — anchors track post-edit line numbers", () => {
+	it("emits hashes against the new file's line numbers for context after a range expansion", () => {
+		const before = ["a1", "a2", "a3", "a4", "a5", "a6", "a7"].join("\n");
+		const after = ["a1", "a2", "a3", "X", "Y", "Z", "a5", "a6", "a7"].join("\n");
+		const { diff } = generateDiffString(before, after);
+		const preview = buildCompactHashlineDiffPreview(diff);
+
+		// Walk the preview and verify every ` LINE+HASH${outputSep}content` line matches what
+		// the file now has at that line number.
+		const newFileLines = after.split("\n");
+		for (const line of preview.preview.split("\n")) {
+			if (!line.startsWith(" ")) continue;
+			// Skip context-elision markers ("...") which carry no real file content.
+			if (line.endsWith(`${outputSep}...`)) continue;
+			const match = new RegExp(`^\\s(\\d+)([a-z]{2})${outputSepRe}(.*)$`).exec(line);
+			expect(match).not.toBeNull();
+			if (!match) continue;
+			const lineNum = Number(match[1]);
+			const hash = match[2];
+			const content = match[3];
+			expect(newFileLines[lineNum - 1]).toBe(content);
+			expect(computeLineHash(lineNum, content)).toBe(hash);
+		}
+	});
+
+	it("emits + lines with hashes against new line numbers and - lines with the placeholder", () => {
+		const before = "alpha\nbeta\ngamma\n";
+		const after = "alpha\nDELTA\nEPSILON\ngamma\n";
+		const { diff } = generateDiffString(before, after);
+		const preview = buildCompactHashlineDiffPreview(diff);
+
+		const additions = preview.preview.split("\n").filter(line => line.startsWith("+"));
+		expect(additions).toEqual([
+			`+2${computeLineHash(2, "DELTA")}${outputSep}DELTA`,
+			`+3${computeLineHash(3, "EPSILON")}${outputSep}EPSILON`,
+		]);
+
+		const removals = preview.preview.split("\n").filter(line => line.startsWith("-"));
+		expect(removals).toEqual([`-2--${outputSep}beta`]);
+	});
+});
+
+describe("hashline — anchor-stale recovery via read snapshot cache", () => {
+	it("recovers when the file was modified out-of-band after a read", async () => {
+		await withTempDir(async tempDir => {
+			const filePath = path.join(tempDir, "a.ts");
+			const v0Lines = ["L1", "L2", "L3", "L4", "L5", "L6", "L7", "L8"];
+			await Bun.write(filePath, `${v0Lines.join("\n")}\n`);
+
+			const session = makeHashlineSession(tempDir);
+			// Simulate the read tool having shown V0 to the model in this session.
+			getFileReadCache(session).recordContiguous(filePath, 1, v0Lines);
+
+			// External actor (linter, subagent, user) prepends 7 lines. Anchors
+			// authored against V0 no longer match V1, so the model's edit cannot
+			// land without consulting the cached snapshot.
+			const headerLines = ["H1", "H2", "H3", "H4", "H5", "H6", "H7"];
+			const v1Lines = [...headerLines, ...v0Lines];
+			await Bun.write(filePath, `${v1Lines.join("\n")}\n`);
+
+			// Model authors anchor against V0 — line 2 is "L2" in V0.
+			const input = `@a.ts\n= ${sameLineRange(tag(2, "L2"))}\n${pl("L2-MODEL")}\n`;
+			const result = await executeHashlineSingle(hashlineExecuteOptions(tempDir, input, undefined, session));
+
+			const finalLines = (await Bun.file(filePath).text()).replace(/\n$/, "").split("\n");
+			// The external prepend AND the model's edit must both be present.
+			expect(finalLines.slice(0, 7)).toEqual(["H1", "H2", "H3", "H4", "H5", "H6", "H7"]);
+			expect(finalLines).toContain("L2-MODEL");
+			expect(finalLines).not.toContain("L2");
+			// Other unchanged lines preserved.
+			expect(finalLines).toContain("L7");
+			expect(finalLines).toContain("L8");
+
+			const text = result.content[0]?.type === "text" ? result.content[0].text : "";
+			expect(text).toMatch(/Recovered from stale anchors using a previous read snapshot/);
+		});
+	});
+
+	it("falls back to mismatch error when the cache does not cover the failing anchor", async () => {
+		await withTempDir(async tempDir => {
+			const filePath = path.join(tempDir, "a.ts");
+			const v0Lines = Array.from({ length: 10 }, (_, idx) => `L${idx + 1}`);
+			await Bun.write(filePath, `${v0Lines.join("\n")}\n`);
+
+			const session = makeHashlineSession(tempDir);
+			// Cache only covers the first three lines — but the edit targets line 6.
+			getFileReadCache(session).recordContiguous(filePath, 1, v0Lines.slice(0, 3));
+
+			const v1Lines = [...v0Lines];
+			v1Lines[5] = "L6-CHANGED";
+			await Bun.write(filePath, `${v1Lines.join("\n")}\n`);
+
+			const input = `@a.ts\n= ${sameLineRange(tag(6, "L6"))}\n${pl("L6-MODEL")}\n`;
+			await expect(
+				executeHashlineSingle(hashlineExecuteOptions(tempDir, input, undefined, session)),
+			).rejects.toThrow(HashlineMismatchError);
+			// Disk content unchanged.
+			expect(await Bun.file(filePath).text()).toBe(`${v1Lines.join("\n")}\n`);
+		});
+	});
+
+	it("returns null from tryRecoverHashlineWithCache when applyPatch cannot land", () => {
+		const cache = new FileReadCache();
+		const fakePath = "/tmp/__hashline-recovery-applypatch__.ts";
+		cache.recordContiguous(fakePath, 1, ["alpha", "beta", "gamma", "delta", "epsilon"]);
+
+		// Live file is completely different — patch context cannot match even
+		// with fuzz tolerance.
+		const currentText = "totally\nunrelated\ncontent\nhere\nnow\n";
+		const edits = parseHashline(`= ${sameLineRange(tag(2, "beta"))}\n${pl("BETA-MODEL")}`);
+
+		const recovered = tryRecoverHashlineWithCache({
+			cache,
+			absolutePath: fakePath,
+			currentText,
+			edits,
+			options: {},
+		});
+		expect(recovered).toBeNull();
+	});
+
+	it("isolates caches across sessions", () => {
+		const a = new FileReadCache();
+		const b = new FileReadCache();
+		const fakePath = "/tmp/__hashline-cache-isolation__.ts";
+		a.recordContiguous(fakePath, 1, ["x", "y", "z"]);
+		expect(a.get(fakePath)).not.toBeNull();
+		expect(b.get(fakePath)).toBeNull();
+	});
+
+	it("captures the post-edit result so the next edit can recover from anchors against it", async () => {
+		await withTempDir(async tempDir => {
+			const filePath = path.join(tempDir, "a.ts");
+			const v0Lines = ["alpha", "beta", "gamma", "delta", "epsilon"];
+			await Bun.write(filePath, `${v0Lines.join("\n")}\n`);
+
+			const session = makeHashlineSession(tempDir);
+			// Initial read populates the cache with V0.
+			getFileReadCache(session).recordContiguous(filePath, 1, v0Lines);
+
+			// First edit: change line 2 → BETA. After the write, the cache should
+			// reflect V1 (post-edit), not V0.
+			const firstInput = `@a.ts\n= ${sameLineRange(tag(2, "beta"))}\n${pl("BETA")}\n`;
+			await executeHashlineSingle(hashlineExecuteOptions(tempDir, firstInput, undefined, session));
+			const v1Lines = ["alpha", "BETA", "gamma", "delta", "epsilon"];
+			expect(await Bun.file(filePath).text()).toBe(`${v1Lines.join("\n")}\n`);
+			const snap = getFileReadCache(session).get(filePath);
+			expect(snap?.lines.get(1)).toBe("alpha");
+			expect(snap?.lines.get(2)).toBe("BETA");
+			expect(snap?.lines.get(3)).toBe("gamma");
+
+			// External actor prepends 7 lines after the edit. Anchors authored
+			// against V1 (the post-edit state the model just observed) no longer
+			// match V2 — recovery must consult the cached V1 snapshot to land the
+			// second edit.
+			const v2Lines = ["H1", "H2", "H3", "H4", "H5", "H6", "H7", ...v1Lines];
+			await Bun.write(filePath, `${v2Lines.join("\n")}\n`);
+
+			const secondInput = `@a.ts\n= ${sameLineRange(tag(3, "gamma"))}\n${pl("GAMMA")}\n`;
+			const result = await executeHashlineSingle(hashlineExecuteOptions(tempDir, secondInput, undefined, session));
+
+			const finalLines = (await Bun.file(filePath).text()).replace(/\n$/, "").split("\n");
+			expect(finalLines.slice(0, 7)).toEqual(["H1", "H2", "H3", "H4", "H5", "H6", "H7"]);
+			expect(finalLines).toContain("BETA");
+			expect(finalLines).toContain("GAMMA");
+			expect(finalLines).not.toContain("gamma");
+			const text = result.content[0]?.type === "text" ? result.content[0].text : "";
+			expect(text).toMatch(/Recovered from stale anchors using a previous read snapshot/);
+		});
+	});
+
+	it("drops a cached entry when newly recorded lines disagree on overlap", () => {
+		const cache = new FileReadCache();
+		const fakePath = "/tmp/__hashline-cache-conflict__.ts";
+		cache.recordContiguous(fakePath, 1, ["a", "b", "c", "d", "e"]);
+		cache.recordSparse(fakePath, [
+			[3, "c"],
+			[4, "D-CHANGED"],
+			[5, "e"],
+			[6, "f"],
+			[7, "g"],
+		]);
+
+		const snap = cache.get(fakePath);
+		expect(snap).not.toBeNull();
+		// Old entries dropped; only the divergent record's entries remain.
+		expect(snap?.lines.has(1)).toBe(false);
+		expect(snap?.lines.has(2)).toBe(false);
+		expect(snap?.lines.get(4)).toBe("D-CHANGED");
+		expect(snap?.lines.get(7)).toBe("g");
+	});
+
+	it("evicts old paths past the per-session LRU cap", () => {
+		const cache = new FileReadCache();
+		// Cap is 30 paths. Insert 32 distinct paths; the oldest two must evict.
+		for (let i = 0; i < 32; i++) {
+			cache.recordContiguous(`/tmp/file-${i}.ts`, 1, ["x"]);
+		}
+		expect(cache.get("/tmp/file-0.ts")).toBeNull();
+		expect(cache.get("/tmp/file-1.ts")).toBeNull();
+		expect(cache.get("/tmp/file-2.ts")).not.toBeNull();
+		expect(cache.get("/tmp/file-31.ts")).not.toBeNull();
+	});
+});
+
+describe("hashline *** Abort recovery sentinel (harmony-leak mitigation)", () => {
+	const sentinel = "*** Abort";
+
+	it("parser breaks at *** Abort and surfaces a warning", () => {
+		const diff = [`+ ${tag(1, "alpha")}`, pl("HELLO"), sentinel, `+ ${tag(99, "junk")}`, pl("never")].join("\n");
+		const { edits, warnings } = parseHashlineWithWarnings(diff);
+		expect(edits).toHaveLength(1);
+		expect(edits[0]).toMatchObject({ kind: "insert", text: "HELLO" });
+		expect(warnings.length).toBeGreaterThan(0);
+		expect(warnings[0]).toMatch(/truncated mid-call/i);
+	});
+
+	it("appended sentinel from harmony-leak truncation: ops above are preserved", () => {
+		// Mirrors the exact shape harmony-leak emits inside a single section.
+		const diff = `+ ${tag(1, "alpha")}\n${pl("KEPT")}\n*** Abort\n`;
+		const { edits, warnings } = parseHashlineWithWarnings(diff);
+		expect(edits).toHaveLength(1);
+		expect(edits[0]).toMatchObject({ text: "KEPT" });
+		expect(warnings.length).toBeGreaterThan(0);
+	});
+
+	it("splitter respects *** Abort like *** End Patch", () => {
+		const input = [
+			`@a.ts`,
+			`+ ${tag(1, "alpha")}`,
+			pl("a-payload"),
+			sentinel,
+			`@b.ts`,
+			`+ ${tag(1, "beta")}`,
+			pl("never-emitted"),
+		].join("\n");
+		const sections = splitHashlineInputs(input);
+		expect(sections).toHaveLength(1);
+		expect(sections[0].path).toBe("a.ts");
+		expect(sections[0].diff.includes("never-emitted")).toBe(false);
+	});
+
+	it("clean input without sentinel produces no warning", () => {
+		const diff = `+ ${tag(1, "alpha")}\n${pl("PAYLOAD")}\n`;
+		const { warnings } = parseHashlineWithWarnings(diff);
+		expect(warnings).toEqual([]);
 	});
 });

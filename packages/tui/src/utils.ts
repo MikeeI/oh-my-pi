@@ -1,9 +1,11 @@
-import type { Ellipsis, ExtractSegmentsResult, SliceResult } from "@oh-my-pi/pi-natives";
 import {
+	Ellipsis,
+	type ExtractSegmentsResult,
 	extractSegments as nativeExtractSegments,
 	sliceWithWidth as nativeSliceWithWidth,
 	truncateToWidth as nativeTruncateToWidth,
 	wrapTextWithAnsi as nativeWrapTextWithAnsi,
+	type SliceResult,
 } from "@oh-my-pi/pi-natives";
 import { getDefaultTabWidth, getIndentation } from "@oh-my-pi/pi-utils";
 
@@ -21,7 +23,12 @@ export function truncateToWidth(
 	ellipsisKind?: Ellipsis | null,
 	pad?: boolean | null,
 ): string {
-	return nativeTruncateToWidth(text, maxWidth, ellipsisKind ?? null, pad ?? null, getDefaultTabWidth());
+	// Guard nullish napi inputs: napi-rs 3 on the Windows prebuilt rejects
+	// `null` for `Option<u8>` (Ellipsis) / `Option<bool>` (pad) (issue #848),
+	// and `maxWidth` is a required `u32` that throws on `null`/`undefined`
+	// everywhere. Pass concrete defaults that mirror the Rust `unwrap_or`s.
+	const safeWidth = Number.isFinite(maxWidth) ? Math.max(0, Math.trunc(maxWidth)) : 0;
+	return nativeTruncateToWidth(text, safeWidth, ellipsisKind ?? Ellipsis.Unicode, pad ?? false, getDefaultTabWidth());
 }
 
 export function wrapTextWithAnsi(text: string, width: number): string[] {
@@ -105,12 +112,26 @@ export function visibleWidth(str: string): number {
 	return visibleWidthRaw(str);
 }
 
-const makeBoolArray = (chars: string): ReadonlyArray<boolean> => {
-	const table = Array.from({ length: 128 }, () => false);
+const THAI_LAO_AM_REGEX = /[\u0e33\u0eb3]/;
+const THAI_LAO_AM_GLOBAL_REGEX = /[\u0e33\u0eb3]/g;
+
+/**
+ * Normalize text for terminal output without changing logical editor content.
+ * Some terminals render precomposed Thai/Lao AM vowels inconsistently during
+ * differential repaint. Their compatibility decompositions have the same cell
+ * width but avoid stale-cell artifacts in terminal renderers.
+ */
+export function normalizeTerminalOutput(str: string): string {
+	if (!THAI_LAO_AM_REGEX.test(str)) return str;
+	return str.replace(THAI_LAO_AM_GLOBAL_REGEX, char => (char === "\u0e33" ? "\u0e4d\u0e32" : "\u0ecd\u0eb2"));
+}
+
+const makeBoolArray = (chars: string): Uint8Array => {
+	const table = new Uint8Array(128);
 	for (let i = 0; i < chars.length; i++) {
 		const code = chars.charCodeAt(i);
 		if (code < table.length) {
-			table[code] = true;
+			table[code] = 1;
 		}
 	}
 	return table;
@@ -122,8 +143,8 @@ const ASCII_WHITESPACE = makeBoolArray("\x09\x0a\x0b\x0c\x0d\x20");
  * Check if a character is whitespace.
  */
 export function isWhitespaceChar(char: string): boolean {
-	const code = char.codePointAt(0) || 0;
-	return ASCII_WHITESPACE[code] ?? false;
+	const code = char.codePointAt(0) ?? 0;
+	return code < 128 && ASCII_WHITESPACE[code] === 1;
 }
 
 const ASCII_PUNCTUATION = makeBoolArray("(){}[]<>.,;:'\"!?+-=*/\\|&%^$#@~`");
@@ -132,8 +153,8 @@ const ASCII_PUNCTUATION = makeBoolArray("(){}[]<>.,;:'\"!?+-=*/\\|&%^$#@~`");
  * Check if a character is punctuation.
  */
 export function isPunctuationChar(char: string): boolean {
-	const code = char.codePointAt(0) || 0;
-	return ASCII_PUNCTUATION[code] ?? false;
+	const code = char.codePointAt(0) ?? 0;
+	return code < 128 && ASCII_PUNCTUATION[code] === 1;
 }
 
 export type WordNavKind = "whitespace" | "delimiter" | "cjk" | "word" | "other";

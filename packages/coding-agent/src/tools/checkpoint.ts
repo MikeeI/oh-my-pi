@@ -1,6 +1,6 @@
 import type { AgentTool, AgentToolContext, AgentToolResult, AgentToolUpdateCallback } from "@oh-my-pi/pi-agent-core";
 import { prompt } from "@oh-my-pi/pi-utils";
-import { type Static, Type } from "@sinclair/typebox";
+import * as z from "zod/v4";
 import checkpointDescription from "../prompts/tools/checkpoint.md" with { type: "text" };
 import rewindDescription from "../prompts/tools/rewind.md" with { type: "text" };
 import type { ToolSession } from ".";
@@ -17,17 +17,17 @@ export interface CheckpointState {
 	startedAt: string;
 }
 
-const checkpointSchema = Type.Object({
-	goal: Type.String({ description: "investigation goal", examples: ["investigate retry logic"] }),
+const checkpointSchema = z.object({
+	goal: z.string().describe("investigation goal"),
 });
 
-type CheckpointParams = Static<typeof checkpointSchema>;
+type CheckpointParams = z.infer<typeof checkpointSchema>;
 
-const rewindSchema = Type.Object({
-	report: Type.String({ description: "investigation findings" }),
+const rewindSchema = z.object({
+	report: z.string().describe("investigation findings"),
 });
 
-type RewindParams = Static<typeof rewindSchema>;
+type RewindParams = z.infer<typeof rewindSchema>;
 
 export interface CheckpointToolDetails {
 	goal: string;
@@ -49,10 +49,12 @@ function isTopLevelSession(session: ToolSession): boolean {
 export class CheckpointTool implements AgentTool<typeof checkpointSchema, CheckpointToolDetails> {
 	readonly name = "checkpoint";
 	readonly label = "Checkpoint";
+	readonly summary = "Create a git-based checkpoint to save and restore session state";
 	readonly description: string;
 	readonly parameters = checkpointSchema;
 	readonly strict = true;
-	readonly intent = (args: Partial<CheckpointParams>) => args.goal;
+	readonly loadMode = "discoverable";
+	readonly intent = (args: Partial<CheckpointParams>) => (args.goal ? `checkpointing: ${args.goal}` : "checkpointing");
 
 	constructor(private readonly session: ToolSession) {
 		this.description = prompt.render(checkpointDescription);
@@ -92,10 +94,12 @@ export class CheckpointTool implements AgentTool<typeof checkpointSchema, Checkp
 export class RewindTool implements AgentTool<typeof rewindSchema, RewindToolDetails> {
 	readonly name = "rewind";
 	readonly label = "Rewind";
+	readonly summary = "Rewind to a previously created checkpoint";
 	readonly description: string;
 	readonly parameters = rewindSchema;
 	readonly strict = true;
-	readonly intent = (): string => "Rewinding to checkpoint";
+	readonly loadMode = "discoverable";
+	readonly intent = (): string => "rewinding";
 
 	constructor(private readonly session: ToolSession) {
 		this.description = prompt.render(rewindDescription);

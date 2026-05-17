@@ -21,43 +21,64 @@ export declare class MacAppearanceObserver {
 /**
  * Long-lived macOS power assertion.
  *
- * On macOS this acquires an `IOKit` assertion that prevents idle sleep until
- * the handle is stopped or dropped. On other platforms it is a no-op handle so
- * the caller can keep one cross-platform code path.
+ * On macOS this acquires one or more `IOKit` assertions that prevent the
+ * requested sleep modes until the handle is stopped or dropped. On other
+ * platforms it is a no-op handle so the caller can keep one cross-platform
+ * code path.
  */
 export declare class MacOSPowerAssertion {
-  /** Acquire a macOS power assertion. */
+  /**
+   * Acquire a macOS power assertion. On non-macOS platforms returns a
+   * no-op handle so callers can stay cross-platform.
+   */
   static start(options?: MacOSPowerAssertionOptions | undefined | null): MacOSPowerAssertion
-  /** Release the power assertion early. */
+  /**
+   * Release every assertion held by this handle. Safe to call multiple
+   * times; subsequent calls are a no-op.
+   */
   stop(): void
 }
 
-/** Image container for native interop. */
-export declare class PhotonImage {
+/** Stable process reference. */
+export declare class Process {
+  /** Open a stable process reference from a PID. */
+  static fromPid(pid: number): Process | null
+  /** Open stable process references whose executable path matches exactly. */
+  static fromPath(path: string): Array<Process>
+  /** Operating-system process identifier for this process reference. */
+  get pid(): number
+  /** Parent process id for this process, when available. */
+  get ppid(): number | null
+  /** Launch arguments for this process. */
+  args(): Array<string>
   /**
-   * Create a new `PhotonImage` from encoded image bytes (PNG, JPEG, WebP,
-   * GIF). Returns the decoded image handle on success.
+   * Send `signal` to this process and its descendants, children first.
    *
-   * # Errors
-   * Returns an error if the image format cannot be detected or decoded.
+   * On Linux and macOS the signal is forwarded as-is. On Windows there is no
+   * signal abstraction, so the `signal` argument is ignored and the entire
+   * tree is hard-killed via `TerminateProcess`. Defaults to the POSIX
+   * hard-kill signal.
    */
-  static parse(bytes: Uint8Array): ImageTask
-  /** Get the image width in pixels. */
-  get width(): number
-  /** Get the image height in pixels. */
-  get height(): number
+  killTree(signal?: number | undefined | null): number
   /**
-   * Encode the image to bytes in the specified format.
+   * Gracefully terminate this process and its descendants.
    *
-   * # Errors
-   * Returns an error if encoding fails or format is invalid.
+   * By default this waits 1000ms after polite termination before
+   * hard-killing. Pass `graceful_ms < 0` to skip the graceful phase.
    */
-  encode(format: ImageFormat, quality: number): Promise<Array<number>>
+  terminate(options?: ProcessTerminateOptions | undefined | null): Promise<boolean>
   /**
-   * Resize the image to the specified pixel dimensions using the filter.
-   * Returns a new `PhotonImage` containing the resized image.
+   * Wait until this process exits.
+   *
+   * When `options.timeout_ms` is omitted, waits until the process exits.
    */
-  resize(width: number, height: number, filter: SamplingFilter): ImageTask
+  waitForExit(options?: ProcessWaitOptions | undefined | null): Promise<boolean>
+  /** Process group id for this process, when supported by the platform. */
+  groupId(): number | null
+  /** Direct children of this process as stable process references. */
+  children(): Array<Process>
+  /** Current status of this process reference. */
+  status(): ProcessStatus
 }
 
 /** Stateful PTY session for interactive stdin/stdout passthrough. */
@@ -96,6 +117,35 @@ export declare class Shell {
    */
   abort(): Promise<void>
 }
+
+/**
+ * Version sentinel — exists solely so the JS loader can prove at load time
+ * that the `.node` file on disk is from the same package release as the
+ * `index.js` ESM wrapper invoking it.
+ *
+ * The `js_name` is bumped by `scripts/release.ts` to match the new
+ * `Cargo.toml` / `package.json` version on every release. The JS loader
+ * computes the expected name from `package.json#version` and refuses to use
+ * a `.node` that doesn't expose it, turning the silent
+ * `<sym> is not a function` crash from a locked-file update (the canonical
+ * Windows `bun install -g` failure mode) into a clear load-time error.
+ *
+ * Bump policy: `__piNativesV{major}_{minor}_{patch}` — non-alphanumerics in
+ * the version string are mapped to `_` to keep it a valid JS identifier.
+ * MUST stay in sync with `VERSION_SENTINEL_EXPORT` in
+ * `packages/natives/native/index.js` (which derives the name from
+ * `package.json#version`).
+ */
+export declare function __piNativesV15_1_2(): void
+
+/**
+ * Apply conservative pre-execution rewrites to a bash command.
+ *
+ * Strips trailing `| head|tail [safe-args]` and redundant trailing `2>&1`
+ * from each top-level pipeline. The full rules and bail conditions live in
+ * `pi_shell::fixup`. Synchronous and cheap (one parse pass over the input).
+ */
+export declare function applyBashFixups(command: string): BashFixupResult
 
 /**
  * Apply ast-grep rewrite rules to matching files; honors `dryRun` and returns
@@ -283,6 +333,17 @@ export interface AstReplaceResult {
   parseErrors?: Array<string>
 }
 
+/**
+ * Result of [`apply_bash_fixups`]: a possibly-rewritten command plus the
+ * substrings that were removed (in source order).
+ */
+export interface BashFixupResult {
+  /** Possibly-rewritten command. Equal to the input when no fixup fired. */
+  command: string
+  /** Substrings removed, in source order — suitable for a user-facing notice. */
+  stripped: Array<string>
+}
+
 /** Clipboard image payload encoded as PNG bytes. */
 export interface ClipboardImage {
   /** PNG-encoded image bytes. */
@@ -311,6 +372,20 @@ export interface ContextLine {
 export declare function copyToClipboard(text: string): void
 
 /**
+ * Count tokens in `input`.
+ *
+ * `input` may be a single string or an array of strings; an array returns
+ * the sum across all elements (encoded in parallel via rayon). Always
+ * returns a single token total — use this for any aggregate budget question
+ * without paying a per-element napi crossing.
+ *
+ * Uses ordinary encoding (no special-token handling), which is the right
+ * choice for measuring user/model content rather than wire-protocol tokens.
+ * Defaults to `o200k_base`; pass `Cl100kBase` for older `OpenAI` models.
+ */
+export declare function countTokens(input: string | Array<string>, encoding?: Encoding | undefined | null): number
+
+/**
  * Detect macOS system appearance via CoreFoundation.
  * Returns `"dark"` or `"light"` on macOS, `null` on other platforms.
  */
@@ -337,6 +412,14 @@ export declare enum Ellipsis {
  */
 export declare function encodeSixel(bytes: Uint8Array, targetWidthPx: number, targetHeightPx: number): string
 
+/** Tokenizer encoding to use. */
+export declare enum Encoding {
+  /** GPT-4o / o1 / GPT-5 (default). */
+  O200kBase = 'O200kBase',
+  /** GPT-3.5 / GPT-4 / older. */
+  Cl100kBase = 'Cl100kBase'
+}
+
 /**
  * Execute a brush shell command.
  *
@@ -344,7 +427,7 @@ export declare function encodeSixel(bytes: Uint8Array, targetWidthPx: number, ta
  * streamed stdout/stderr output. Returns the exit code when the command
  * completes, or flags when cancelled or timed out.
  */
-export declare function executeShell(options: ShellExecuteOptions, onChunk?: ((error: Error | null, chunk: string) => void) | undefined | null): Promise<ShellExecuteResult>
+export declare function executeShell(options: ShellExecuteOptions, onChunk?: ((error: Error | null, chunk: string) => void) | undefined | null): Promise<ShellRunResult>
 
 /**
  * Extract the before/after slices around an overlay region.
@@ -455,6 +538,8 @@ export interface GlobMatch {
    * `symlink_metadata`).
    */
   mtime?: number
+  /** File size in bytes for regular files. */
+  size?: number
 }
 
 /** Input options for `glob`, including traversal, filtering, and cancellation. */
@@ -583,7 +668,10 @@ export declare enum GrepOutputMode {
 export interface GrepResult {
   /** Matches or per-file counts, depending on output mode. */
   matches: Array<GrepMatch>
-  /** Total matches across all files. */
+  /**
+   * Total matches across all files, or matched file count in filesWithMatches
+   * mode.
+   */
   totalMatches: number
   /** Number of files with at least one match. */
   filesWithMatches: number
@@ -666,18 +754,6 @@ export interface HtmlToMarkdownOptions {
   skipImages?: boolean
 }
 
-/** Output format for [`PhotonImage::encode`]. */
-export declare enum ImageFormat {
-  /** PNG encoded bytes. */
-  PNG = 0,
-  /** JPEG encoded bytes. */
-  JPEG = 1,
-  /** WebP encoded bytes. */
-  WEBP = 2,
-  /** GIF encoded bytes. */
-  GIF = 3
-}
-
 /**
  * Invalidate the filesystem scan cache.
  *
@@ -688,6 +764,110 @@ export declare enum ImageFormat {
  * delete).
  */
 export declare function invalidateFsScanCache(path?: string | undefined | null): void
+
+/** Kind enum of the backend selected by default for this build target. */
+export declare function isoBackend(): IsoBackendKind
+
+/**
+ * Isolation backend identifier. Numeric so the JS side can `switch` on
+ * the enum without string comparisons.
+ */
+export declare enum IsoBackendKind {
+  Apfs = 0,
+  Btrfs = 1,
+  Zfs = 2,
+  LinuxReflink = 3,
+  Overlayfs = 4,
+  WindowsBlockClone = 5,
+  Projfs = 6,
+  Rcopy = 7
+}
+
+/** How a single file changed between `lower` and `merged`. */
+export declare enum IsoChangeKind {
+  Added = 0,
+  Modified = 1,
+  Removed = 2
+}
+
+/**
+ * Capture the changes between `lower` and `merged`.
+ *
+ * Uses [`pi_iso::IsolationBackend::diff`]'s default implementation —
+ * `git diff` when `merged/.git` exists, otherwise a mtime-skipped tree
+ * walk. The backend selection only affects the lifecycle methods; diff
+ * behaviour is uniform.
+ */
+export declare function isoDiff(lower: string, merged: string): Promise<IsoDiff>
+
+export interface IsoDiff {
+  files: Array<IsoFileChange>
+}
+
+/** One entry in an [`IsoDiff`]. */
+export interface IsoFileChange {
+  /** Path relative to `merged`. */
+  path: string
+  op: IsoChangeKind
+  /**
+   * Unified-diff text. `None` (`null` in JS) means the file is binary;
+   * read it directly from `merged` if you need the bytes.
+   */
+  diff?: string
+}
+
+/**
+ * True if `message` is an error message produced by [`IsoError::Unavailable`].
+ * Use this to distinguish "this backend isn't installed" from a hard
+ * failure when handling caught errors on the JS side.
+ */
+export declare function isoIsUnavailableError(message: string): boolean
+
+/**
+ * Probe whether the requested backend can start on this host. Pass
+ * `null`/omit `kind` to probe the platform-native backend.
+ */
+export declare function isoProbe(kind?: IsoBackendKind | undefined | null): IsoProbeResult
+
+/** Probe result for a specific isolation backend. */
+export interface IsoProbeResult {
+  /** True when the backend's prerequisites are satisfied. */
+  available: boolean
+  /** Human-readable explanation when `available` is false. */
+  reason?: string
+  /** Resolved backend kind. */
+  kind: IsoBackendKind
+}
+
+/**
+ * Pick the best backend available right now. `preferred` is treated as
+ * a hint — see [`pi_iso::resolve`] for the exact priority rules.
+ */
+export declare function isoResolve(preferred?: IsoBackendKind | undefined | null): IsoResolveResult
+
+/** Outcome of [`iso_resolve`]. */
+export interface IsoResolveResult {
+  /** Backend that will actually be tried first. */
+  kind: IsoBackendKind
+  /** Host-available backends in retry order, starting with `kind`. */
+  candidates: Array<IsoBackendKind>
+  /**
+   * True when the resolver fell back from `preferred` (or from the
+   * first automatic candidate) to a different backend.
+   */
+  fellBack: boolean
+  /** Human-readable reason for the fallback, if any. */
+  reason?: string
+}
+
+/**
+ * Materialise `merged` as a writable view of `lower` using the requested
+ * backend. `kind` defaults to the native backend.
+ */
+export declare function isoStart(kind: IsoBackendKind | undefined | null, lower: string, merged: string): Promise<void>
+
+/** Tear down a previously started backend at `merged`. */
+export declare function isoStop(kind: IsoBackendKind | undefined | null, merged: string): Promise<void>
 
 /** Event types from Kitty keyboard protocol (flag 2). */
 export declare enum KeyEventType {
@@ -700,20 +880,48 @@ export declare enum KeyEventType {
 }
 
 /**
- * Kill a process tree (the process and all its descendants).
+ * Walk the workspace once and return tree entries plus AGENTS.md candidates.
  *
- * Arguments: `pid` is the root process and `signal` is the kill signal.
- * Kills children first (bottom-up) to prevent orphan re-parenting issues.
- * Returns the number of processes successfully killed.
+ * File-level ignore rules for AGENTS.md are bypassed by checking each
+ * traversed directory directly when `collectAgentsMd` is enabled, but ignored
+ * directories are still pruned by the walker and are not searched.
  */
-export declare function killTree(pid: number, signal: number): number
+export declare function listWorkspace(options: ListWorkspaceOptions): Promise<ListWorkspaceResult>
 
-/**
- * List all descendant PIDs of `pid`.
- *
- * Returns an empty array if the process has no children or doesn't exist.
- */
-export declare function listDescendants(pid: number): Array<number>
+/** Input options for `listWorkspace`, the single-pass workspace startup scan. */
+export interface ListWorkspaceOptions {
+  /** Directory to scan. */
+  path: string
+  /** Maximum depth for returned tree entries. Root children are depth 1. */
+  maxDepth: number
+  /** Include hidden files and directories. Default: false. */
+  hidden?: boolean
+  /** Respect .gitignore files. Default: true. */
+  gitignore?: boolean
+  /**
+   * Also surface AGENTS.md files in directories at depth 1..=4, even when
+   * gitignore would otherwise hide the file. Walks deeper than `maxDepth`
+   * to find them. Default: false.
+   */
+  collectAgentsMd?: boolean
+  /** Timeout in milliseconds for the operation. */
+  timeoutMs?: number
+  /** Abort signal for cancelling the operation. */
+  signal?: unknown
+}
+
+/** Result payload returned by a workspace scan. */
+export interface ListWorkspaceResult {
+  /** Entries within `maxDepth`, with mtime and regular-file size metadata. */
+  entries: Array<GlobMatch>
+  /**
+   * Directory-scoped AGENTS.md files within depth 1..=4 (capped at 200).
+   * Always empty when `collectAgentsMd` is false.
+   */
+  agentsMdFiles: Array<string>
+  /** True when any output cap was hit. */
+  truncated: boolean
+}
 
 /**
  * System UI appearance reported by native macOS APIs (`detectMacOSAppearance`
@@ -726,11 +934,27 @@ export declare enum MacOSAppearance {
   Light = 'light'
 }
 
-/** Options for starting a macOS power assertion. */
+/**
+ * Options for starting a macOS power assertion.
+ *
+ * Each boolean maps to a `caffeinate(8)` flag and a corresponding `IOKit`
+ * `IOPMAssertion` type. Multiple flags can be combined; when set, one
+ * assertion is taken per flag and all are released together when the
+ * handle is stopped or dropped.
+ *
+ * If every flag is unset (or omitted), the handle behaves as if `idle`
+ * were `true` — preserving the historical default of `caffeinate -i`.
+ */
 export interface MacOSPowerAssertionOptions {
   /** Human-readable reason shown in macOS power diagnostics. */
   reason?: string
-  /** Keep the display awake in addition to preventing idle system sleep. */
+  /** `caffeinate -i`: prevent the system from idle-sleeping. */
+  idle?: boolean
+  /** `caffeinate -s`: prevent the system from sleeping (AC power only). */
+  system?: boolean
+  /** `caffeinate -u`: declare the user is active (wakes the display). */
+  user?: boolean
+  /** `caffeinate -d`: prevent the display from idle-sleeping. */
   display?: boolean
 }
 
@@ -856,31 +1080,36 @@ export declare function parseKey(data: string, kittyProtocolActive: boolean): st
  */
 export declare function parseKittySequence(data: string): ParsedKittyResult | null
 
-/** Probe whether `ProjFS` overlay virtualization can be started on this system. */
-export declare function projfsOverlayProbe(): ProjfsOverlayProbeResult
-
-/**
- * Result of probing Windows Projected File System (`ProjFS`) support for
- * overlay workflows.
- */
-export interface ProjfsOverlayProbeResult {
-  /** True when `ProjFS` APIs are available and loaded. */
-  available: boolean
-  /**
-   * Human-readable reason when `available` is false (e.g. wrong OS or missing
-   * DLL).
-   */
-  reason?: string
+/** Current state of a process reference. */
+export declare enum ProcessStatus {
+  /** The referenced process is still running. */
+  Running = 'running',
+  /** The referenced process has exited or is no longer observable. */
+  Exited = 'exited'
 }
 
-/**
- * Start a `ProjFS` overlay: `projection_root` shows the merged view;
- * `lower_root` is the backing tree.
- */
-export declare function projfsOverlayStart(lowerRoot: string, projectionRoot: string): void
+export interface ProcessTerminateOptions {
+  /** Also signal the process group when supported by the platform. */
+  group?: boolean
+  /**
+   * Milliseconds to wait after polite termination before hard-killing.
+   * Omit to use the default grace period. Pass a negative value to skip the
+   * graceful phase and hard-kill immediately.
+   */
+  gracefulMs?: number
+  /** Milliseconds to wait after hard-kill for the process tree to exit. */
+  timeoutMs?: number
+  /** Abort signal for cancelling termination while waiting. */
+  signal?: unknown
+}
 
-/** Stop `ProjFS` virtualization for an active `projection_root` session. */
-export declare function projfsOverlayStop(projectionRoot: string): void
+/** Options for waiting on a process exit. */
+export interface ProcessWaitOptions {
+  /** Milliseconds to wait before returning false. Omit to wait indefinitely. */
+  timeoutMs?: number
+  /** Abort signal for cancelling the wait. */
+  signal?: unknown
+}
 
 /** Result of a PTY command run. */
 export interface PtyRunResult {
@@ -908,6 +1137,11 @@ export interface PtyStartOptions {
   cols?: number
   /** PTY row count. */
   rows?: number
+  /**
+   * Shell binary to use (e.g. "sh", "bash", or an absolute path).
+   * Defaults to "sh" if not provided.
+   */
+  shell?: string
 }
 
 /**
@@ -919,26 +1153,6 @@ export interface PtyStartOptions {
  * Returns an error if clipboard access fails or image encoding fails.
  */
 export declare function readImageFromClipboard(): Promise<ClipboardImage | undefined | null>
-
-/** Sampling filter for resize operations. */
-export declare enum SamplingFilter {
-  /** Nearest-neighbor sampling (fast, low quality). */
-  Nearest = 1,
-  /** Triangle filter (linear interpolation). */
-  Triangle = 2,
-  /** Catmull-Rom filter with sharper edges. */
-  CatmullRom = 3,
-  /** Gaussian filter for smoother results. */
-  Gaussian = 4,
-  /** Lanczos3 filter for high-quality downscaling. */
-  Lanczos3 = 5
-}
-
-/**
- * Strip ANSI escape sequences, remove control characters / lone surrogates,
- * and normalize line endings.
- */
-export declare function sanitizeText(text: string): string
 
 /**
  * Search content for a pattern (one-shot, compiles pattern each time).
@@ -1009,18 +1223,6 @@ export interface ShellExecuteOptions {
   signal?: unknown
 }
 
-/** Result of executing a shell command via brush-core. */
-export interface ShellExecuteResult {
-  /** Exit code when the command completes normally. */
-  exitCode?: number
-  /** Whether the command was cancelled via abort. */
-  cancelled: boolean
-  /** Whether the command timed out before completion. */
-  timedOut: boolean
-  /** See [`ShellRunResult::minimized`]. */
-  minimized?: MinimizerResult
-}
-
 /** Options for configuring a persistent shell session. */
 export interface ShellOptions {
   /** Environment variables to apply once per session. */
@@ -1080,6 +1282,45 @@ export interface SliceResult {
  * width.
  */
 export declare function sliceWithWidth(line: string, startCol: number, length: number, strict: boolean | undefined | null, tabWidth: number): SliceResult
+
+export declare function summarizeCode(options: SummaryOptions): SummaryResult
+
+export interface SummaryOptions {
+  /** Source code to summarize. */
+  code: string
+  /** Language alias (e.g. "rust", "typescript") used before path inference. */
+  lang?: string
+  /** File path used to infer language by extension when `lang` is omitted. */
+  path?: string
+  /** Minimum total node lines before eliding a body/literal node. */
+  minBodyLines?: number
+  /** Minimum total comment lines before eliding a multiline block comment. */
+  minCommentLines?: number
+}
+
+export interface SummaryResult {
+  /** Canonical language name when parsing succeeded. */
+  language?: string
+  /** True when tree-sitter parsed the source without syntax errors. */
+  parsed: boolean
+  /** True when at least one elision span was emitted. */
+  elided: boolean
+  /** Total source lines. */
+  totalLines: number
+  /** Kept/elided segments in source order. */
+  segments: Array<SummarySegment>
+}
+
+export interface SummarySegment {
+  /** "kept" or "elided". */
+  kind: string
+  /** 1-based inclusive start line. */
+  startLine: number
+  /** 1-based inclusive end line. */
+  endLine: number
+  /** Verbatim text for kept segments; absent for elided segments. */
+  text?: string
+}
 
 /**
  * Check if a language is supported for highlighting.
