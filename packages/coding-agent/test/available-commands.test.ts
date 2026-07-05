@@ -80,7 +80,7 @@ describe("buildAvailableSlashCommands", () => {
 		expect(byName["custom:hello"].source).toBe("custom");
 		expect(byName.notes.source).toBe("file");
 		expect(byName["review-all"].source).toBe("routine");
-		expect(byName["review-all"].input).toEqual({ hint: "arguments" });
+		expect(byName["review-all"].input).toBeUndefined();
 	});
 
 	test("loads file commands and routines into the session before advertising them", async () => {

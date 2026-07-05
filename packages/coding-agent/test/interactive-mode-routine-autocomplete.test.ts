@@ -113,7 +113,7 @@ describe("InteractiveMode routine autocomplete", () => {
 		return result?.items ?? [];
 	}
 
-	it("shows routine slash commands with routine description suffix", async () => {
+	it("shows routine slash commands with the routine description only", async () => {
 		await writeRoutine("review-all");
 		const created = createHarness();
 		const slot = captureAutocompleteProvider(created.mode);
@@ -121,7 +121,7 @@ describe("InteractiveMode routine autocomplete", () => {
 		await created.mode.refreshSlashCommandState(tempDir.path());
 
 		const item = (await fetchSlashItems(slot.current!, "/rev")).find(item => item.value === "review-all");
-		expect(item?.description).toBe("arguments - Run core PR review routines (routine)");
+		expect(item?.description).toBe("Run core PR review routines");
 	});
 
 	it("filters prompt templates that share a routine name", async () => {
@@ -140,7 +140,7 @@ describe("InteractiveMode routine autocomplete", () => {
 
 		const matches = (await fetchSlashItems(slot.current!, "/review-all")).filter(item => item.value === "review-all");
 		expect(matches).toHaveLength(1);
-		expect(matches[0]?.description).toBe("arguments - Run core PR review routines (routine)");
+		expect(matches[0]?.description).toBe("Run core PR review routines");
 	});
 
 	it("rejects routine collision with builtin slash command", async () => {

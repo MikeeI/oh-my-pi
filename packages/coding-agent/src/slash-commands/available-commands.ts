@@ -124,7 +124,6 @@ export async function buildAvailableSlashCommands(
 		appendCommand({
 			name: routine.name,
 			description: routine.description,
-			input: { hint: "arguments" },
 			source: "routine",
 		});
 	}
