@@ -195,6 +195,8 @@
 
 ### Fixed
 
+- Fixed routine slash-command autocomplete to show only the routine description, without the synthetic `arguments -` prefix or `(routine)` suffix.
+
 - Fixed macOS Backspace behavior in the `/resume` picker for terminals delivering `\x7f` instead of `\e[3~`.
 - Fixed queued follow-up message rows leaking into native terminal scrollback during live repaints by anchoring the pending-messages container.
 - Fixed `/rename` title arguments treating `#` prompt-action tokens as autocomplete triggers instead of literal text.
