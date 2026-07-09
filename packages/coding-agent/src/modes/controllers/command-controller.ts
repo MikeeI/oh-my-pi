@@ -50,7 +50,7 @@ import { replaceTabs, truncateToWidth } from "../../tools/render-utils";
 import { getChangelogPath, parseChangelog } from "../../utils/changelog";
 import { copyToClipboard } from "../../utils/clipboard";
 import { openPath } from "../../utils/open";
-import { setSessionTerminalTitle } from "../../utils/title-generator";
+import { generateSessionTitleFromRecentTranscript, setSessionTerminalTitle } from "../../utils/title-generator";
 
 function showMarkdownPanel(ctx: InteractiveModeContext, title: string, markdown: string): void {
 	const block = new TranscriptBlock();
@@ -1013,8 +1013,26 @@ export class CommandController {
 	}
 
 	async handleRenameCommand(title: string): Promise<void> {
+		const explicitTitle = title.trim();
 		try {
-			const stored = await this.ctx.sessionManager.setSessionName(title, "user");
+			if (!explicitTitle) {
+				this.ctx.showStatus("Generating session name from recent messages...");
+			}
+			const resolvedTitle =
+				explicitTitle ||
+				(await generateSessionTitleFromRecentTranscript(
+					this.ctx.session.messages,
+					this.ctx.session.modelRegistry,
+					this.ctx.settings,
+					this.ctx.session.sessionId,
+					this.ctx.session.model,
+					provider => this.ctx.session.agent.metadataForProvider(provider),
+				));
+			if (!resolvedTitle) {
+				this.ctx.showError("Could not generate a session name from recent messages.");
+				return;
+			}
+			const stored = await this.ctx.sessionManager.setSessionName(resolvedTitle, "user");
 			if (!stored) {
 				this.ctx.showError("Session name cannot be empty.");
 				return;

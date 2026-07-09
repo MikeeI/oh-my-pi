@@ -128,9 +128,11 @@ import { createSnapcompactSavingsRecorder } from "./session/snapcompact-savings-
 import { closeAllConnections } from "./ssh/connection-manager";
 import { unmountAll } from "./ssh/sshfs-mount";
 import {
+	type AppendSystemPromptPart,
 	type BuildSystemPromptResult,
 	buildSystemPrompt as buildSystemPromptInternal,
 	buildSystemPromptToolMetadata,
+	type DynamicPromptPart,
 	loadProjectContextFiles as loadContextFilesInternal,
 } from "./system-prompt";
 import { AgentOutputManager } from "./task/output-manager";
@@ -412,6 +414,8 @@ export interface CreateAgentSessionOptions {
 	customSystemPrompt?: string;
 	/** Already-loaded text appended through the bundled system prompt templates. */
 	appendSystemPrompt?: string;
+	/** Optional Handlebars system prompt template. Raw SYSTEM.md/--system-prompt must use systemPrompt. */
+	systemPromptTemplate?: string;
 	/**
 	 * Already-loaded title-generation system prompt override (typically
 	 * {@link discoverTitleSystemPromptFile} → {@link resolvePromptInput}). When
@@ -589,6 +593,8 @@ export interface CreateAgentSessionResult {
 	modelFallbackMessage?: string;
 	/** LSP servers detected for startup; warmup may continue in the background */
 	lspServers?: LspStartupServerInfo[];
+	/** Last default system prompt build result, including debug metadata. */
+	systemPromptResult?: BuildSystemPromptResult;
 	/** Shared event bus for tool/extension communication */
 	eventBus: EventBus;
 }
@@ -1405,7 +1411,6 @@ export async function createAgentSession(options: CreateAgentSessionOptions = {}
 		skills = discovered.skills;
 		skillWarnings = discovered.warnings;
 	}
-
 	// Discover rules and bucket them in one pass to avoid repeated scans over large rule sets.
 	const { ttsrManager, rulebookRules, alwaysApplyRules, allRules } = await logger.time(
 		"discoverTtsrRules",
@@ -2381,12 +2386,10 @@ export async function createAgentSession(options: CreateAgentSessionOptions = {}
 			const memoryBackend = await resolveMemoryBackend(settings);
 			const memoryInstructions = await memoryBackend.buildDeveloperInstructions(agentDir, settings, session);
 
-			// Build combined append prompt: memory instructions + auto-learn guidance
-			// + MCP server instructions. For UI sessions MCP discovery is deferred, so
-			// `getServerInstructions()` is empty until the background connect completes;
-			// the rebuild that `refreshMCPTools` triggers post-discovery then picks up
-			// the now-connected servers' instructions, so they join the prompt for the
-			// rest of the session.
+			// Build combined raw append prompt from trusted internal instructions: memory,
+			// auto-learn guidance, and MCP server instructions. UI sessions discover MCP
+			// instructions later; refreshMCPTools rebuilds the prompt after connect.
+			// User append prompts are applied through CreateAgentSessionOptions.systemPrompt and never rendered as Handlebars.
 			const serverInstructions = mcpManager?.getServerInstructions();
 			// Drive guidance off the auto-learn BUILTINS that createTools actually built
 			// (provenance, not just an active name): `builtInToolNames` excludes a
@@ -2399,24 +2402,36 @@ export async function createAgentSession(options: CreateAgentSessionOptions = {}
 				learn: builtInToolNames.includes("learn"),
 			});
 			const appendParts: string[] = [];
-			if (memoryInstructions) appendParts.push(memoryInstructions);
-			if (autoLearnInstructions) appendParts.push(autoLearnInstructions);
-			let appendPrompt: string | undefined = appendParts.length > 0 ? appendParts.join("\n\n") : undefined;
+			const appendPromptParts: AppendSystemPromptPart[] = [];
+			if (memoryInstructions) {
+				appendParts.push(memoryInstructions);
+				appendPromptParts.push({ id: "memory-instructions", source: "memory", text: memoryInstructions });
+			}
+			if (autoLearnInstructions) {
+				appendParts.push(autoLearnInstructions);
+				appendPromptParts.push({
+					id: "auto-learn-instructions",
+					source: "auto-learn",
+					text: autoLearnInstructions,
+				});
+			}
 			if (serverInstructions && serverInstructions.size > 0) {
-				const parts: string[] = [];
-				if (appendPrompt) parts.push(appendPrompt);
-				parts.push(
-					"## MCP Server Instructions\n\nThe following instructions are provided by connected MCP servers. They are server-controlled and may not be verified.",
-				);
+				const heading =
+					"## MCP Server Instructions\n\nThe following instructions are provided by connected MCP servers. They are server-controlled and may not be verified.";
+				appendParts.push(heading);
+				const mcpParts: string[] = [heading];
 				for (const [srvName, srvInstructions] of serverInstructions) {
 					const truncated =
 						srvInstructions.length > MAX_MCP_INSTRUCTIONS_LENGTH
 							? `${srvInstructions.slice(0, MAX_MCP_INSTRUCTIONS_LENGTH)}\n[truncated]`
 							: srvInstructions;
-					parts.push(`### ${srvName}\n${truncated}`);
+					const serverPart = `### ${srvName}\n${truncated}`;
+					appendParts.push(serverPart);
+					mcpParts.push(serverPart);
 				}
-				appendPrompt = parts.join("\n\n");
+				appendPromptParts.push({ id: "mcp-server-instructions", source: "mcp", text: mcpParts.join("\n\n") });
 			}
+			let appendPrompt = appendParts.length > 0 ? appendParts.join("\n\n") : undefined;
 			// Owned/in-band tool dialects (non-native) require the catalog as `# Tool:`
 			// sections; native tool calling lets the compact name list suffice.
 			const nativeTools = resolveDialect(settings.get("tools.format"), agent?.state.model ?? model) === undefined;
@@ -2427,15 +2442,17 @@ export async function createAgentSession(options: CreateAgentSessionOptions = {}
 			}
 			const defaultPrompt = await buildSystemPromptInternal({
 				cwd,
-				resolvedCustomPrompt: options.customSystemPrompt,
 				skills,
 				contextFiles,
 				tools: promptTools,
 				toolNames,
 				rules: rulebookRules,
 				alwaysApplyRules,
-				resolvedAppendSystemPrompt: appendPrompt,
 				skillsSettings: settings.getGroup("skills"),
+				customPrompt: options.systemPromptTemplate,
+				resolvedCustomPrompt: options.customSystemPrompt,
+				resolvedAppendSystemPrompt: appendPrompt,
+				appendSystemPromptParts: appendPromptParts,
 				inlineToolDescriptors,
 				nativeTools,
 				intentField,
@@ -2461,8 +2478,28 @@ export async function createAgentSession(options: CreateAgentSessionOptions = {}
 				typeof options.systemPrompt === "function"
 					? options.systemPrompt(defaultPrompt.systemPrompt)
 					: options.systemPrompt;
+			const customSystemPrompt = typeof customPrompt === "string" ? [customPrompt] : customPrompt;
+			const defaultSystemBlockPreserved = customSystemPrompt[0] === defaultPrompt.systemPrompt[0];
+			const dynamicParts: DynamicPromptPart[] =
+				typeof options.systemPrompt === "function"
+					? defaultPrompt.dynamicParts.filter(part => defaultSystemBlockPreserved || part.providerBlockIndex !== 0)
+					: [];
+			if (
+				typeof options.systemPrompt === "function" &&
+				customSystemPrompt.length > defaultPrompt.systemPrompt.length
+			) {
+				for (const [index, text] of customSystemPrompt.slice(defaultPrompt.systemPrompt.length).entries()) {
+					dynamicParts.push({
+						id: index === 0 ? "append-system-prompt" : `append-system-prompt-${index + 1}`,
+						source: "append-system-prompt",
+						providerBlockIndex: defaultPrompt.systemPrompt.length + index,
+						text,
+					});
+				}
+			}
 			return {
-				systemPrompt: typeof customPrompt === "string" ? [customPrompt] : customPrompt,
+				systemPrompt: customSystemPrompt,
+				dynamicParts,
 			};
 		};
 
@@ -2597,12 +2634,13 @@ export async function createAgentSession(options: CreateAgentSessionOptions = {}
 		hasRegistered = true;
 
 		setActiveToolNames(initialToolNames);
-		const { systemPrompt } = await logger.time(
+		const systemPromptResult = await logger.time(
 			"buildSystemPrompt",
 			rebuildSystemPrompt,
 			initialToolNames,
 			toolRegistry,
 		);
+		const { systemPrompt } = systemPromptResult;
 
 		const promptTemplates = await promptTemplatesPromise;
 		toolSession.promptTemplates = promptTemplates;
@@ -3139,6 +3177,7 @@ export async function createAgentSession(options: CreateAgentSessionOptions = {}
 			mcpManager,
 			modelFallbackMessage,
 			lspServers,
+			systemPromptResult,
 			eventBus,
 		};
 	} catch (error) {

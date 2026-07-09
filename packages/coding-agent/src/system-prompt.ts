@@ -67,6 +67,14 @@ function promptSourceContainsRule(source: string | null | undefined, ruleContent
 	return false;
 }
 
+function dedupePromptSource(
+	source: string | null | undefined,
+	promptSources: Array<string | null | undefined>,
+): string | null {
+	if (!source) return null;
+	return promptSources.some(promptSource => promptSourceContainsRule(promptSource, source)) ? null : source;
+}
+
 function dedupeAlwaysApplyRules(
 	alwaysApplyRules: AlwaysApplyRule[] | undefined,
 	promptSources: Array<string | null | undefined>,
@@ -76,13 +84,6 @@ function dedupeAlwaysApplyRules(
 	return alwaysApplyRules.filter(
 		rule => !promptSources.some(source => promptSourceContainsRule(source, rule.content)),
 	);
-}
-
-function dedupePromptSource(source: string | null | undefined, otherSources: Array<string | null | undefined>): string {
-	const resolvedSource = firstNonEmpty(source);
-	if (!resolvedSource) return "";
-
-	return otherSources.some(otherSource => promptSourceContainsRule(otherSource, resolvedSource)) ? "" : resolvedSource;
 }
 
 function firstNonEmpty(...values: (string | undefined | null)[]): string | null {
@@ -441,7 +442,7 @@ export function buildSystemPromptToolMetadata(
 }
 
 export interface BuildSystemPromptOptions {
-	/** Custom system prompt (replaces default). */
+	/** Handlebars system prompt template (replaces default). Raw SYSTEM.md/CLI prompts must not use this path. */
 	customPrompt?: string;
 	/** Already-loaded custom system prompt text; bypasses path resolution. */
 	resolvedCustomPrompt?: string;
@@ -449,10 +450,12 @@ export interface BuildSystemPromptOptions {
 	tools?: Map<string, SystemPromptToolMetadata>;
 	/** Tool names to include in prompt. */
 	toolNames?: string[];
-	/** Text to append to system prompt. */
+	/** Raw text to append to system prompt. */
 	appendSystemPrompt?: string;
 	/** Already-loaded append prompt text; bypasses path resolution. */
 	resolvedAppendSystemPrompt?: string;
+	/** Source-attributed internal append prompt pieces. */
+	appendSystemPromptParts?: AppendSystemPromptPart[];
 	/** Inline full tool descriptors in the system prompt. Default: false */
 	inlineToolDescriptors?: boolean;
 	/**
@@ -503,16 +506,309 @@ export interface BuildSystemPromptOptions {
 	activeRepoContext?: ActiveRepoContext | null;
 }
 
+export type DynamicPromptPartSource =
+	| "system-prompt.md"
+	| "project-prompt.md"
+	| "SYSTEM.md"
+	| "memory"
+	| "mcp"
+	| "auto-learn"
+	| "append-system-prompt";
+
+export interface DynamicPromptPart {
+	id: string;
+	source: DynamicPromptPartSource;
+	providerBlockIndex: number;
+	text: string;
+}
+
+export interface AppendSystemPromptPart {
+	id: string;
+	source: "memory" | "mcp" | "auto-learn" | "append-system-prompt";
+	text: string;
+}
+
 /** Result of building provider-facing system prompt messages. */
 export interface BuildSystemPromptResult {
 	/** Ordered system prompt blocks. Providers should preserve entries as distinct messages/blocks. */
 	systemPrompt: string[];
+	/** Source-attributed dynamic prompt fragments for debug inspection. */
+	dynamicParts: DynamicPromptPart[];
+}
+
+function renderDynamicPartText(template: string, data: prompt.TemplateContext): string {
+	return prompt.render(template, data).trim();
+}
+
+function addDynamicPart(
+	parts: DynamicPromptPart[],
+	part: Omit<DynamicPromptPart, "text">,
+	text: string,
+	renderedBlock?: string,
+): void {
+	const trimmed = text.trim();
+	if (!trimmed) return;
+	if (renderedBlock !== undefined && !renderedBlock.includes(trimmed)) return;
+	parts.push({ ...part, text: trimmed });
+}
+
+function addRenderedDynamicPart(
+	parts: DynamicPromptPart[],
+	part: Omit<DynamicPromptPart, "text">,
+	template: string,
+	data: prompt.TemplateContext,
+	renderedBlock?: string,
+): void {
+	addDynamicPart(parts, part, renderDynamicPartText(template, data), renderedBlock);
+}
+
+function collectSystemTemplateDynamicParts(data: prompt.TemplateContext, renderedBlock: string): DynamicPromptPart[] {
+	const parts: DynamicPromptPart[] = [];
+	const basePart = (id: string): Omit<DynamicPromptPart, "text"> => ({
+		id,
+		source: "system-prompt.md",
+		providerBlockIndex: 0,
+	});
+
+	addRenderedDynamicPart(
+		parts,
+		basePart("skills"),
+		`{{#if skills.length}}
+Skills are specialized knowledge. If one matches your task, you MUST read \`skill://<name>\` before proceeding.
+<skills>
+{{#each skills}}
+- {{name}}: {{description}}
+{{/each}}
+</skills>
+{{/if}}`,
+		data,
+		renderedBlock,
+	);
+	addRenderedDynamicPart(
+		parts,
+		basePart("always-apply-rules"),
+		`{{#if alwaysApplyRules.length}}
+<generic-rules>
+{{#each alwaysApplyRules}}
+{{content}}
+{{/each}}
+</generic-rules>
+{{/if}}`,
+		data,
+		renderedBlock,
+	);
+	addRenderedDynamicPart(
+		parts,
+		basePart("rules"),
+		`{{#if rules.length}}
+<domain-rules>
+{{#each rules}}
+- {{name}} ({{#list globs join=", "}}{{this}}{{/list}}): {{description}}
+{{/each}}
+</domain-rules>
+{{/if}}`,
+		data,
+		renderedBlock,
+	);
+	addRenderedDynamicPart(
+		parts,
+		basePart("tool-inventory"),
+		`{{#if toolInfo.length}}
+{{#if toolListMode}}
+# Tool Inventory
+{{#each toolInfo}}
+- {{#if label}}{{label}}: \`{{name}}\`{{else}}\`{{name}}\`{{/if}}
+{{/each}}
+{{else}}
+{{toolInventory}}
+{{/if}}
+{{/if}}`,
+		data,
+		renderedBlock,
+	);
+	addRenderedDynamicPart(
+		parts,
+		basePart("intent-tracing"),
+		`{{#if intentTracing}}- Most tools take \`{{intentField}}\`: a concise intent, present participle, 2–6 words, no period, capitalized.{{/if}}`,
+		data,
+		renderedBlock,
+	);
+	addRenderedDynamicPart(
+		parts,
+		basePart("secrets"),
+		`{{#if secretsEnabled}}- Redacted \`#XXXX#\` tokens in output are opaque strings.{{/if}}`,
+		data,
+		renderedBlock,
+	);
+	addRenderedDynamicPart(
+		parts,
+		basePart("mcp-discovery"),
+		`{{#if mcpDiscoveryMode}}
+<discovery-notice>
+{{#if hasMCPDiscoveryServers}}Discoverable MCP servers this session: {{#list mcpDiscoveryServerSummaries join=", "}}{{this}}{{/list}}.{{/if}}
+If the task may involve external systems (SaaS APIs, chat, tickets, databases, deployments, or other non-local integrations), you SHOULD call \`{{toolRefs.search_tool_bm25}}\` before concluding no such tool exists.
+</discovery-notice>
+{{/if}}`,
+		data,
+		renderedBlock,
+	);
+	addRenderedDynamicPart(
+		parts,
+		basePart("lsp"),
+		`{{#has tools "lsp"}}
+# LSP
+You NEVER use search or manual edits for code intelligence when a language server is available:
+- definition / type_definition / implementation / references / hover
+- code_actions for refactors, imports, and fixes—list first, then apply with \`apply: true\` plus \`query\`
+{{/has}}`,
+		data,
+		renderedBlock,
+	);
+	addRenderedDynamicPart(
+		parts,
+		basePart("ast-tools"),
+		`{{#ifAny (includes tools "ast_grep") (includes tools "ast_edit")}}
+# AST
+You SHOULD use syntax-aware tools before text hacks:
+{{#has tools "ast_grep"}}- \`{{toolRefs.ast_grep}}\` for structural discovery.{{/has}}
+{{#has tools "ast_edit"}}- \`{{toolRefs.ast_edit}}\` for codemods.{{/has}}
+- Use \`search\` only for plain-text lookup when structure is irrelevant.
+{{/ifAny}}`,
+		data,
+		renderedBlock,
+	);
+	addRenderedDynamicPart(
+		parts,
+		basePart("eager-tasks"),
+		`{{#if eagerTasks}}
+{{#has tools "task"}}
+{{#if eagerTasksAlways}}
+Delegation is the default here, not the exception. Once the design is settled, you MUST fan the work out to \`{{toolRefs.task}}\` subagents rather than doing it yourself. Work alone ONLY when one of these is unambiguously true:
+- A single-file edit under approximately 30 lines
+- A direct answer or explanation requiring no code changes
+- The user explicitly asked you to run a command yourself.
+
+Everything else—multi-file changes, refactors, new features, tests, investigations—MUST be decomposed and delegated.{{#if taskBatch}} Batch independent slices into one parallel \`{{toolRefs.task}}\` call; never serialize what can run concurrently.{{/if}}{{else}}Delegation is preferred here. Once the design is settled, you SHOULD fan substantial work out to \`{{toolRefs.task}}\` subagents instead of doing everything yourself. Multi-file changes, refactors, new features, tests, and investigations are strong candidates. Use your judgment for small, single-file, or interactive work.{{#if taskBatch}} When you delegate independent slices, batch them into one parallel \`{{toolRefs.task}}\` call rather than serializing them.{{/if}}
+{{/if}}
+{{/has}}
+{{/if}}`,
+		data,
+		renderedBlock,
+	);
+	addRenderedDynamicPart(
+		parts,
+		basePart("images"),
+		`{{#has tools "inspect_image"}}- Image tasks: prefer \`{{toolRefs.inspect_image}}\` over \`{{toolRefs.read}}\` to spare session context.{{/has}}`,
+		data,
+		renderedBlock,
+	);
+	addRenderedDynamicPart(
+		parts,
+		basePart("tool-priority"),
+		`{{#has tools "read"}}- File or directory reads → \`{{toolRefs.read}}\`, not \`cat\` or \`ls\` (a directory path lists entries).{{/has}}
+{{#has tools "edit"}}- Surgical edits → \`{{toolRefs.edit}}\`, not \`sed\`.{{/has}}
+{{#has tools "write"}}- Create or overwrite → \`{{toolRefs.write}}\`, not shell redirection.{{/has}}
+{{#has tools "lsp"}}- Code intelligence → \`{{toolRefs.lsp}}\`, not blind search.{{/has}}
+{{#has tools "search"}}- Regex search → \`{{toolRefs.search}}\`, not \`grep\`, \`rg\`, or \`awk\`.{{/has}}
+{{#has tools "find"}}- Globbing → \`{{toolRefs.find}}\`, not \`ls **/*.ext\` or \`fd\`.{{/has}}
+{{#has tools "eval"}}- Quick compute → \`{{toolRefs.eval}}\`; you SHOULD go step by step.{{/has}}
+{{#has tools "bash"}}- Use \`{{toolRefs.bash}}\` for terminal work—builds, tests, git, package managers—and pipelines that COMPUTE a fact: \`wc -l\`, \`sort | uniq -c\`, \`comm\`, \`diff a b\`, checksums. Commands shadowing the tools above are blocked.
+- Litmus: produces a count, frequency, set difference, or checksum no tool returns → bash. Merely moves, pages, or trims bytes a tool can fetch → use the tool.{{/has}}`,
+		data,
+		renderedBlock,
+	);
+
+	return parts;
+}
+
+function collectProjectPromptDynamicParts(data: prompt.TemplateContext, renderedBlock: string): DynamicPromptPart[] {
+	const parts: DynamicPromptPart[] = [];
+	const basePart = (id: string): Omit<DynamicPromptPart, "text"> => ({
+		id,
+		source: "project-prompt.md",
+		providerBlockIndex: 1,
+	});
+
+	addRenderedDynamicPart(
+		parts,
+		basePart("workstation"),
+		`<workstation>
+{{#list environment prefix="- " join="\n"}}{{label}}: {{value}}{{/list}}
+{{#if model}}- Model: {{model}}{{/if}}
+</workstation>`,
+		data,
+		renderedBlock,
+	);
+	addRenderedDynamicPart(
+		parts,
+		basePart("context-files"),
+		`{{#if contextFiles.length}}
+<context>
+You MUST follow the context files below for all tasks:
+{{#each contextFiles}}
+<file path="{{path}}">
+{{content}}
+</file>
+{{/each}}
+</context>
+{{/if}}`,
+		data,
+		renderedBlock,
+	);
+	addRenderedDynamicPart(
+		parts,
+		basePart("dir-context"),
+		`{{#if agentsMdSearch.files.length}}
+<dir-context>
+Some directories may have their own rules. Deeper rules override higher ones.
+Before making changes within these directories, you MUST read:
+{{#list agentsMdSearch.files join="\n"}}- {{this}}{{/list}}
+</dir-context>
+{{/if}}`,
+		data,
+		renderedBlock,
+	);
+	addRenderedDynamicPart(
+		parts,
+		basePart("workspace-tree"),
+		`{{#if includeWorkspaceTree}}
+{{#if workspaceTree.rendered}}
+<workspace-tree>
+Working directory layout (sorted by mtime, recent first; depth ≤ 3):
+{{workspaceTree.rendered}}
+{{#if workspaceTree.truncated}}
+(some entries elided to keep the tree short — use \`find\`/\`read\` to drill in)
+{{/if}}
+</workspace-tree>
+{{/if}}
+{{/if}}`,
+		data,
+		renderedBlock,
+	);
+	addRenderedDynamicPart(
+		parts,
+		basePart("cwd-date"),
+		`Today is {{date}}, and the current working directory is '{{cwd}}'.`,
+		data,
+		renderedBlock,
+	);
+	addRenderedDynamicPart(
+		parts,
+		basePart("append-prompt"),
+		`{{#if appendPrompt}}
+{{appendPrompt}}
+{{/if}}`,
+		data,
+		renderedBlock,
+	);
+
+	return parts;
 }
 
 /** Build the system prompt with tools, guidelines, and context */
 export async function buildSystemPrompt(options: BuildSystemPromptOptions = {}): Promise<BuildSystemPromptResult> {
 	if ($env.NULL_PROMPT === "true") {
-		return { systemPrompt: [] };
+		return { systemPrompt: [], dynamicParts: [] };
 	}
 
 	const {
@@ -522,6 +818,7 @@ export async function buildSystemPrompt(options: BuildSystemPromptOptions = {}):
 		appendSystemPrompt,
 		inlineToolDescriptors: providedInlineToolDescriptors,
 		resolvedAppendSystemPrompt: providedResolvedAppendPrompt,
+		appendSystemPromptParts = [],
 		nativeTools = true,
 		skillsSettings,
 		toolNames: providedToolNames,
@@ -637,6 +934,7 @@ export async function buildSystemPrompt(options: BuildSystemPromptOptions = {}):
 	const gpuPromise = logger.time("getCachedGpu", getCachedGpu);
 
 	const [
+		resolvedSystemPromptTemplate,
 		resolvedCustomPrompt,
 		resolvedAppendPrompt,
 		systemPromptCustomization,
@@ -648,10 +946,15 @@ export async function buildSystemPrompt(options: BuildSystemPromptOptions = {}):
 		gpu,
 	] = await Promise.all([
 		withDeadline(
+			"systemPromptTemplate",
+			resolvePromptInput(customPrompt, "system prompt template"),
+			undefined as string | undefined,
+		),
+		withDeadline(
 			"customPrompt",
 			providedResolvedCustomPrompt !== undefined
 				? Promise.resolve(providedResolvedCustomPrompt)
-				: resolvePromptInput(customPrompt, "system prompt"),
+				: Promise.resolve(undefined),
 			prepDefaults.resolvedCustomPrompt,
 		),
 		withDeadline(
@@ -736,24 +1039,29 @@ export async function buildSystemPrompt(options: BuildSystemPromptOptions = {}):
 	const hasRead = toolNames.includes("read");
 	const filteredSkills = hasRead ? skills.filter(skill => skill.hide !== true) : [];
 
+	const usesCustomPrompt = resolvedCustomPrompt !== undefined;
 	const effectiveSystemPromptCustomization = dedupePromptSource(systemPromptCustomization, [
+		resolvedSystemPromptTemplate,
 		resolvedCustomPrompt,
 		resolvedAppendPrompt,
 	]);
+	const activeTemplate = resolvedSystemPromptTemplate ?? systemPromptTemplate;
 	const contextPromptSources = contextFiles.map(file => file.content);
 	const promptSources = [
 		effectiveSystemPromptCustomization,
+		resolvedSystemPromptTemplate,
 		resolvedCustomPrompt,
 		resolvedAppendPrompt,
 		...contextPromptSources,
 	];
 	const injectedAlwaysApplyRules = dedupeAlwaysApplyRules(alwaysApplyRules, promptSources);
 
+	const appendPrompt = resolvedAppendPrompt ?? "";
 	const environment = getEnvironmentInfo(cpuModel, gpu);
-	const data = {
+	const renderData: prompt.TemplateContext = {
 		systemPromptCustomization: effectiveSystemPromptCustomization,
 		customPrompt: resolvedCustomPrompt,
-		appendPrompt: resolvedAppendPrompt ?? "",
+		appendPrompt,
 		tools: toolNames,
 		toolInfo,
 		toolInventory,
@@ -786,12 +1094,15 @@ export async function buildSystemPrompt(options: BuildSystemPromptOptions = {}):
 		includeWorkspaceTree,
 		renderMermaid,
 	};
-	const rendered = prompt.render(resolvedCustomPrompt ? customSystemPromptTemplate : systemPromptTemplate, data);
+	const rendered = prompt.render(usesCustomPrompt ? customSystemPromptTemplate : activeTemplate, renderData);
 	const systemPrompt = [rendered];
 	// Custom prompt templates already render context files and append text; the
 	// project footer still carries environment, cwd, workspace, and dir-context.
 	const projectPrompt = prompt
-		.render(projectPromptTemplate, resolvedCustomPrompt ? { ...data, contextFiles: [], appendPrompt: "" } : data)
+		.render(
+			projectPromptTemplate,
+			usesCustomPrompt ? { ...renderData, contextFiles: [], appendPrompt: "" } : renderData,
+		)
 		.trim();
 	if (projectPrompt) {
 		systemPrompt.push(projectPrompt);
@@ -800,5 +1111,18 @@ export async function buildSystemPrompt(options: BuildSystemPromptOptions = {}):
 		systemPrompt.push(activeRepoContextPrompt);
 	}
 
-	return { systemPrompt };
+	// Dynamic parts: emit only when the active template is one we control.
+	// `--system-prompt` is treated as fully opaque (matches prior behavior).
+	const dynamicParts: DynamicPromptPart[] =
+		!usesCustomPrompt && resolvedSystemPromptTemplate === undefined
+			? collectSystemTemplateDynamicParts(renderData, rendered)
+			: [];
+	if (projectPrompt) {
+		dynamicParts.push(...collectProjectPromptDynamicParts(renderData, projectPrompt));
+	}
+	for (const part of appendSystemPromptParts) {
+		addDynamicPart(dynamicParts, { ...part, providerBlockIndex: projectPrompt ? 1 : 0 }, part.text);
+	}
+
+	return { systemPrompt, dynamicParts };
 }

@@ -16,15 +16,9 @@ try {
  */
 import { parentPort } from "node:worker_threads";
 import type { CliConfig } from "@oh-my-pi/pi-utils/cli";
-import {
-	APP_NAME,
-	getActiveProfile,
-	MIN_BUN_VERSION,
-	resolveProfileEnv,
-	setProfile,
-	VERSION,
-} from "@oh-my-pi/pi-utils/dirs";
+import { getActiveProfile, MIN_BUN_VERSION, resolveProfileEnv, setProfile } from "@oh-my-pi/pi-utils/dirs";
 import { declareWorkerHostEntry, installWorkerInbox } from "@oh-my-pi/pi-utils/worker-host";
+import { APP_DISPLAY_NAME, APP_VERSION } from "./app-version";
 import { installProfileAlias, resolveProfileAliasCommandFromProcess } from "./cli/profile-alias";
 import { extractProfileFlags } from "./cli/profile-bootstrap";
 
@@ -35,7 +29,7 @@ if (Bun.semver.order(Bun.version, MIN_BUN_VERSION) < 0) {
 	process.exit(1);
 }
 
-process.title = APP_NAME;
+process.title = APP_DISPLAY_NAME;
 
 // Worker-host entry declaration (Worker threads and worker subprocesses
 // re-enter `Bun.main` with a hidden argv selector instead of loading separate
@@ -329,7 +323,7 @@ export async function runCli(argv: string[]): Promise<void> {
 		process.exitCode = 1;
 		return;
 	}
-	return run({ bin: APP_NAME, version: VERSION, argv: resolved.argv, commands, help: showHelp });
+	return run({ bin: APP_DISPLAY_NAME, version: APP_VERSION, argv: resolved.argv, commands, help: showHelp });
 }
 
 // Floating call instead of top-level await: TLA forces `--bytecode` (CJS

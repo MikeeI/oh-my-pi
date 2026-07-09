@@ -36,6 +36,7 @@ import { expandTilde, resolveToCwd } from "../tools/path-utils";
 import { urlHyperlinkAlways } from "../tui";
 import { getChangelogPath, parseChangelog } from "../utils/changelog";
 import { copyToClipboard } from "../utils/clipboard";
+import { generateSessionTitleFromRecentTranscript } from "../utils/title-generator";
 import { CollabQrCodeComponent } from "./helpers/collab-qrcode";
 import { buildContextReportText } from "./helpers/context-report";
 import { formatDuration } from "./helpers/format";
@@ -1605,27 +1606,41 @@ const BUILTIN_SLASH_COMMAND_REGISTRY: ReadonlyArray<SlashCommandSpec> = [
 	},
 	{
 		name: "rename",
-		description: "Rename the current session",
-		inlineHint: "<title>",
+		description: "Rename the current session, or generate a name from recent messages",
+		inlineHint: "[title]",
 		allowArgs: true,
 		handle: async (command, runtime) => {
-			if (!command.args) return usage("Usage: /rename <title>", runtime);
-			const ok = await runtime.sessionManager.setSessionName(command.args, "user");
+			const explicitTitle = command.args.trim();
+			let title: string | null;
+			try {
+				title =
+					explicitTitle ||
+					(await generateSessionTitleFromRecentTranscript(
+						runtime.session.messages,
+						runtime.session.modelRegistry,
+						runtime.settings,
+						runtime.session.sessionId,
+						runtime.session.model,
+					));
+			} catch (err) {
+				await runtime.output(errorMessage(err));
+				return commandConsumed();
+			}
+			if (!title) {
+				await runtime.output("Could not generate a session name from recent messages.");
+				return commandConsumed();
+			}
+			const ok = await runtime.sessionManager.setSessionName(title, "user");
 			if (!ok) {
 				await runtime.output("Session name not changed (a user-set name takes precedence).");
 				return commandConsumed();
 			}
 			await runtime.notifyTitleChanged?.();
-			await runtime.output(`Session renamed to ${command.args}.`);
+			await runtime.output(`Session renamed to ${runtime.sessionManager.getSessionName() ?? title}.`);
 			return commandConsumed();
 		},
 		handleTui: async (command, runtime) => {
 			const title = command.args.trim();
-			if (!title) {
-				runtime.ctx.showError("Usage: /rename <title>");
-				runtime.ctx.editor.setText("");
-				return;
-			}
 			runtime.ctx.editor.setText("");
 			await runtime.ctx.handleRenameCommand(title);
 		},
