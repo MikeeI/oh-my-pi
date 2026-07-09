@@ -22,6 +22,7 @@ import {
 	type ExtensionWidgetOptions,
 	getExtensionUISelectOptionLabel,
 } from "../../extensibility/extensions";
+import { loadRoutines } from "../../extensibility/routines";
 import { buildSkillPromptMessage, parseSkillInvocation } from "../../extensibility/skills";
 import { loadSlashCommands } from "../../extensibility/slash-commands";
 import { type Theme, theme } from "../../modes/theme/theme";
@@ -829,6 +830,7 @@ export async function runRpcMode(
 		clearPluginRootsAndCaches(projectPath ? [projectPath] : undefined);
 		resetCapabilities();
 		session.setSlashCommands(await loadSlashCommands({ cwd }));
+		session.setRoutines(await loadRoutines({ cwd }));
 		await session.refreshSshTool({ activateIfAvailable: true });
 		await emitAvailableCommandsUpdate();
 	};

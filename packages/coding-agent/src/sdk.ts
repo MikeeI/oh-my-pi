@@ -75,6 +75,7 @@ import {
 	type ToolDefinition,
 	wrapRegisteredTools,
 } from "./extensibility/extensions";
+import { loadRoutines as loadRoutinesInternal, type Routine } from "./extensibility/routines";
 import {
 	loadSkills as loadSkillsInternal,
 	type Skill,
@@ -495,6 +496,8 @@ export interface CreateAgentSessionOptions {
 	promptTemplates?: PromptTemplate[];
 	/** File-based slash commands. Default: discovered from commands/ directories */
 	slashCommands?: FileSlashCommand[];
+	/** User-defined routines. Default: discovered from user routines directory */
+	routines?: Routine[];
 
 	/** Enable MCP server discovery from .mcp.json files. Default: true */
 	enableMCP?: boolean;
@@ -794,6 +797,13 @@ export async function discoverPromptTemplates(cwd?: string, agentDir?: string): 
  */
 export async function discoverSlashCommands(cwd?: string): Promise<FileSlashCommand[]> {
 	return loadSlashCommandsInternal({ cwd: cwd ?? getProjectDir() });
+}
+
+/**
+ * Discover user-defined routines.
+ */
+export async function discoverRoutines(cwd?: string): Promise<Routine[]> {
+	return loadRoutinesInternal({ cwd: cwd ?? getProjectDir() });
 }
 
 /**
@@ -1196,6 +1206,10 @@ export async function createAgentSession(options: CreateAgentSessionOptions = {}
 		? Promise.resolve(options.slashCommands)
 		: logger.time("discoverSlashCommands", discoverSlashCommands, cwd);
 	slashCommandsPromise.catch(() => {});
+	const routinesPromise = options.routines
+		? Promise.resolve(options.routines)
+		: logger.time("discoverRoutines", discoverRoutines, cwd);
+	routinesPromise.catch(() => {});
 	const skillsSettings = settings.getGroup("skills");
 	const disabledExtensionIds = settings.get("disabledExtensions") ?? [];
 	const discoveredSkillsPromise =
@@ -1411,6 +1425,7 @@ export async function createAgentSession(options: CreateAgentSessionOptions = {}
 		skills = discovered.skills;
 		skillWarnings = discovered.warnings;
 	}
+	const routines = await routinesPromise;
 	// Discover rules and bucket them in one pass to avoid repeated scans over large rule sets.
 	const { ttsrManager, rulebookRules, alwaysApplyRules, allRules } = await logger.time(
 		"discoverTtsrRules",
@@ -2910,6 +2925,7 @@ export async function createAgentSession(options: CreateAgentSessionOptions = {}
 			scopedModels: options.scopedModels,
 			promptTemplates,
 			slashCommands,
+			routines,
 			extensionRunner,
 			customCommands: customCommandsResult.commands,
 			skills,

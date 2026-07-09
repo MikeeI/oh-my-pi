@@ -233,6 +233,13 @@ import { createExtensionModelQuery } from "../extensibility/extensions/model-api
 import type { CompactOptions, ContextUsage } from "../extensibility/extensions/types";
 import { ExtensionToolWrapper } from "../extensibility/extensions/wrapper";
 import type { HookCommandContext } from "../extensibility/hooks/types";
+import {
+	buildRoutineExecutionPlan,
+	parseRoutineInvocation,
+	type Routine,
+	type RoutineExecutionPlan,
+	type RoutineProgress,
+} from "../extensibility/routines";
 import type { RecoveredRetryError } from "../extensibility/shared-events";
 import type { Skill, SkillWarning } from "../extensibility/skills";
 import { expandSlashCommand, type FileSlashCommand } from "../extensibility/slash-commands";
@@ -698,6 +705,8 @@ export interface AgentSessionConfig {
 	promptTemplates?: PromptTemplate[];
 	/** File-based slash commands for expansion */
 	slashCommands?: FileSlashCommand[];
+	/** User-defined routines for slash-style sequential execution */
+	routines?: Routine[];
 	/** Extension runner (created in main.ts with wrapped tools) */
 	extensionRunner?: ExtensionRunner;
 	/** Loaded skills (already discovered by SDK) */
@@ -1584,6 +1593,9 @@ export class AgentSession {
 	#autoResolvedLevel: Effort | undefined;
 	#promptTemplates: PromptTemplate[];
 	#slashCommands: FileSlashCommand[];
+	#routines: Routine[];
+	#activeRoutineToken: symbol | undefined;
+	#activeRoutineAbortController: AbortController | undefined;
 
 	// Event subscription state
 	#unsubscribeAgent?: () => void;
@@ -2085,6 +2097,7 @@ export class AgentSession {
 		}
 		this.#applyThinkingLevelToAgent(this.#thinkingLevel);
 		this.#promptTemplates = config.promptTemplates ?? [];
+		this.#routines = config.routines ?? [];
 		this.#slashCommands = config.slashCommands ?? [];
 		this.#extensionRunner = config.extensionRunner;
 		this.#skills = config.skills ?? [];
@@ -7226,6 +7239,14 @@ export class AgentSession {
 		this.#slashCommands = [...slashCommands];
 	}
 
+	get routines(): ReadonlyArray<Routine> {
+		return this.#routines;
+	}
+
+	setRoutines(routines: Routine[]): void {
+		this.#routines = [...routines];
+	}
+
 	/** Custom commands (TypeScript slash commands and MCP prompts) */
 	get customCommands(): ReadonlyArray<LoadedCustomCommand> {
 		if (this.#mcpPromptCommands.length === 0) return this.#customCommands;
@@ -7522,6 +7543,17 @@ export class AgentSession {
 	 * the ACP agent) use this to know whether to expect an `agent_end` event.
 	 */
 	async prompt(text: string, options?: PromptOptions): Promise<boolean> {
+		return this.#promptInternal(text, options, undefined);
+	}
+
+	async #promptInternal(
+		text: string,
+		options: PromptOptions | undefined,
+		routineToken: symbol | undefined,
+	): Promise<boolean> {
+		if (this.#activeRoutineToken && routineToken !== this.#activeRoutineToken) {
+			throw new AgentBusyError("A routine is running");
+		}
 		const expandPromptTemplates = options?.expandPromptTemplates ?? true;
 
 		// Handle extension commands first (execute immediately, even during streaming)
@@ -7540,6 +7572,12 @@ export class AgentSession {
 				text = customResult;
 			}
 
+			if (text.startsWith("/")) {
+				const handledRoutine = await this.runRoutineInvocation(text);
+				if (handledRoutine) {
+					return false;
+				}
+			}
 			// Try file-based slash commands (markdown files from commands/ directories)
 			// Only if text still starts with "/" (wasn't transformed by custom command)
 			if (text.startsWith("/")) {
@@ -7636,6 +7674,86 @@ export class AgentSession {
 			this.#toolChoiceQueue.removeByLabel("eager-todo");
 		}
 		return true;
+	}
+
+	#throwIfRoutineRunning(): void {
+		if (this.#activeRoutineToken) {
+			throw new AgentBusyError("A routine is running");
+		}
+	}
+
+	async runRoutineInvocation(
+		text: string,
+		options: {
+			onProgress?: (progress: RoutineProgress) => void | Promise<void>;
+		} = {},
+	): Promise<boolean> {
+		const invocation = parseRoutineInvocation(text, this.#routines);
+		if (!invocation) return false;
+		if (this.#activeRoutineToken) {
+			throw new AgentBusyError("A routine is already running");
+		}
+
+		const token = Symbol(invocation.routine.name);
+		const abortController = new AbortController();
+		this.#activeRoutineToken = token;
+		this.#activeRoutineAbortController = abortController;
+		let currentIndex = 0;
+		let total = invocation.routine.steps.length;
+		try {
+			if (this.isStreaming || this.queuedMessageCount > 0) {
+				await options.onProgress?.({
+					routine: invocation.routine.name,
+					status: "queued",
+					index: 0,
+					total,
+				});
+				await this.waitForIdle();
+			}
+
+			const plan: RoutineExecutionPlan = buildRoutineExecutionPlan(
+				invocation,
+				this.#slashCommands,
+				new Set(this.#routines.map(routine => routine.name)),
+			);
+			total = plan.steps.length;
+			for (let i = 0; i < plan.steps.length; i++) {
+				if (abortController.signal.aborted) {
+					throw new Error("Routine cancelled");
+				}
+				const step = plan.steps[i];
+				currentIndex = i + 1;
+				await options.onProgress?.({
+					routine: plan.routine.name,
+					status: "running",
+					index: currentIndex,
+					total,
+					step: step.label,
+				});
+				await this.#promptInternal(step.text, { expandPromptTemplates: false }, token);
+				await this.waitForIdle();
+			}
+			await options.onProgress?.({
+				routine: invocation.routine.name,
+				status: "complete",
+				index: total,
+				total,
+			});
+			return true;
+		} catch (error) {
+			const message = error instanceof Error ? error.message : String(error);
+			await options.onProgress?.({
+				routine: invocation.routine.name,
+				status: abortController.signal.aborted ? "cancelled" : "failed",
+				index: currentIndex,
+				total,
+				message,
+			});
+			throw error;
+		} finally {
+			this.#activeRoutineToken = undefined;
+			this.#activeRoutineAbortController = undefined;
+		}
 	}
 
 	async promptCustomMessage<T = unknown>(
@@ -8033,6 +8151,7 @@ export class AgentSession {
 	 * Queue a steering message to interrupt the agent mid-run.
 	 */
 	async steer(text: string, images?: ImageContent[]): Promise<void> {
+		this.#throwIfRoutineRunning();
 		if (text.startsWith("/")) {
 			this.#throwIfExtensionCommand(text);
 		}
@@ -8049,6 +8168,7 @@ export class AgentSession {
 	 * flipping advisor auto-resume.
 	 */
 	async followUp(text: string, images?: ImageContent[], options?: FollowUpOptions): Promise<void> {
+		this.#throwIfRoutineRunning();
 		if (text.startsWith("/")) {
 			this.#throwIfExtensionCommand(text);
 		}
@@ -8671,6 +8791,7 @@ export class AgentSession {
 	}): Promise<void> {
 		const userInterrupt = options?.reason === USER_INTERRUPT_LABEL;
 		this.#pendingAbortErrorId = userInterrupt ? AIError.create(AIError.Flag.UserInterrupt) : undefined;
+		this.#activeRoutineAbortController?.abort();
 		if (userInterrupt) this.#advisorAutoResumeSuppressed = true;
 		// Pull advisor concerns out of the steer/follow-up queues before any await so
 		// the post-abort stranded-message drain can't auto-resume the run on them.

@@ -734,7 +734,7 @@ export class UiHelpers {
 			}
 		}
 
-		return this.ctx.fileSlashCommands.has(commandName);
+		return this.ctx.fileSlashCommands.has(commandName) || this.ctx.routineSlashCommands.has(commandName);
 	}
 
 	async flushCompactionQueue(options?: { willRetry?: boolean }): Promise<void> {

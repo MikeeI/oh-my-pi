@@ -69,6 +69,7 @@ import type {
 	ExtensionWidgetOptions,
 } from "../extensibility/extensions";
 import type { CompactOptions } from "../extensibility/extensions/types";
+import { loadRoutines } from "../extensibility/routines";
 import type { Skill } from "../extensibility/skills";
 import { loadSlashCommands } from "../extensibility/slash-commands";
 import { type GuidedGoalMessage, runGuidedGoalTurn } from "../goals/guided-setup";
@@ -513,6 +514,7 @@ export class InteractiveMode implements InteractiveModeContext {
 	lastStatusSpacer: Spacer | undefined = undefined;
 	lastStatusText: Text | undefined = undefined;
 	fileSlashCommands: Set<string> = new Set();
+	routineSlashCommands: Set<string> = new Set();
 	skillCommands: Map<string, Skill> = new Map();
 	oauthManualInput: OAuthManualInputManager = new OAuthManualInputManager();
 	collabHost?: CollabHost;
@@ -1073,22 +1075,51 @@ export class InteractiveMode implements InteractiveModeContext {
 	/** Reload slash commands and autocomplete for the provided working directory. */
 	async refreshSlashCommandState(cwd?: string): Promise<void> {
 		const basePath = cwd ?? this.sessionManager.getCwd();
-		const fileCommands = await loadSlashCommands({ cwd: basePath });
+		const [fileCommands, routines] = await Promise.all([
+			loadSlashCommands({ cwd: basePath }),
+			loadRoutines({ cwd: basePath }),
+		]);
 		const fileSlashCommands: SlashCommand[] = fileCommands.map(cmd => ({
 			name: cmd.name,
 			description: cmd.description,
 		}));
-		const reservedNames = new Set<string>();
-		for (const command of [...this.#pendingSlashCommands, ...fileSlashCommands]) {
-			reservedNames.add(command.name);
-			for (const alias of command.aliases ?? []) reservedNames.add(alias);
+		const existingCommandNames = new Set<string>();
+		for (const command of this.#pendingSlashCommands) {
+			existingCommandNames.add(command.name);
+			for (const alias of command.aliases ?? []) existingCommandNames.add(alias);
+		}
+		for (const command of fileSlashCommands) {
+			existingCommandNames.add(command.name);
+			for (const alias of command.aliases ?? []) existingCommandNames.add(alias);
+		}
+		const routineNames = new Set<string>();
+		for (const routine of routines) {
+			if (routineNames.has(routine.name)) {
+				throw new Error(`Duplicate routine /${routine.name}`);
+			}
+			if (existingCommandNames.has(routine.name)) {
+				throw new Error(`Routine /${routine.name} conflicts with existing slash command /${routine.name}`);
+			}
+			routineNames.add(routine.name);
 		}
 		this.fileSlashCommands = new Set(fileCommands.map(cmd => cmd.name));
+		this.routineSlashCommands = routineNames;
+		this.session.setSlashCommands(fileCommands);
+		this.session.setRoutines(routines);
+		const routineSlashCommands: SlashCommand[] = routines.map(routine => ({
+			name: routine.name,
+			description: routine.description,
+		}));
 		// Surface discovered prompt templates in the picker. AgentSession.prompt() expands
 		// `expandSlashCommand` before `expandPromptTemplate`, and builtin command
 		// execution resolves aliases before template expansion. Mirror that command
 		// resolution order by skipping templates whose names already appear in any
-		// builtin/hook/custom/skill/file command token.
+		// builtin/hook/custom/skill/file/routine command token.
+		const reservedNames = new Set<string>(existingCommandNames);
+		for (const command of routineSlashCommands) {
+			reservedNames.add(command.name);
+			for (const alias of command.aliases ?? []) reservedNames.add(alias);
+		}
 		const promptTemplateCommands: SlashCommand[] = this.session.promptTemplates
 			.filter(template => !reservedNames.has(template.name))
 			.map(template => ({
@@ -1098,11 +1129,10 @@ export class InteractiveMode implements InteractiveModeContext {
 				description: template.description,
 			}));
 		this.#baseAutocompleteProvider = this.#inputController.createAutocompleteProvider(
-			[...this.#pendingSlashCommands, ...fileSlashCommands, ...promptTemplateCommands],
+			[...this.#pendingSlashCommands, ...fileSlashCommands, ...routineSlashCommands, ...promptTemplateCommands],
 			basePath,
 		);
 		this.#applyAutocompleteProvider();
-		this.session.setSlashCommands(fileCommands);
 	}
 
 	/**

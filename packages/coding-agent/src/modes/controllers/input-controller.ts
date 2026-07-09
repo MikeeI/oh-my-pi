@@ -5,6 +5,7 @@ import type { ImageContent } from "@oh-my-pi/pi-ai";
 import { type AutocompleteProvider, matchesKey, type SlashCommand } from "@oh-my-pi/pi-tui";
 import { $env, isEnoent, logger, sanitizeText } from "@oh-my-pi/pi-utils";
 import { isSettingsInitialized, settings } from "../../config/settings";
+import { formatRoutineProgress } from "../../extensibility/routines";
 import { resolveLocalRoot } from "../../internal-urls";
 import { AssistantMessageComponent } from "../../modes/components/assistant-message";
 import { extractImagePathFromText } from "../../modes/components/custom-editor";
@@ -692,6 +693,10 @@ export class InputController {
 				return;
 			}
 
+			if (text && (await this.#invokeRoutineCommand(text))) {
+				return;
+			}
+
 			// Handle skill commands (/skill:name [args]). Enter ⇒ steer (matches the
 			// free-text Enter semantics below); Ctrl+Enter routes through `handleFollowUp`.
 			// During compaction, queue immediately so bash/python/loop-mode branches do
@@ -1051,6 +1056,30 @@ export class InputController {
 		}
 	}
 
+	async #invokeRoutineCommand(text: string): Promise<boolean> {
+		if (!text.startsWith("/")) return false;
+		const runRoutineInvocation = this.ctx.session.runRoutineInvocation;
+		if (typeof runRoutineInvocation !== "function") return false;
+		try {
+			const handled = await runRoutineInvocation.call(this.ctx.session, text, {
+				onProgress: progress => this.ctx.showStatus(formatRoutineProgress(progress)),
+			});
+			if (!handled) return false;
+			if (!shouldSkipHistory(text)) this.ctx.editor.addToHistory(text);
+			this.ctx.editor.setText("");
+			this.ctx.updatePendingMessagesDisplay();
+			this.ctx.ui.requestRender();
+			return true;
+		} catch (error) {
+			if (!shouldSkipHistory(text)) this.ctx.editor.addToHistory(text);
+			this.ctx.editor.setText("");
+			this.ctx.showError(error instanceof Error ? error.message : String(error));
+			this.ctx.updatePendingMessagesDisplay();
+			this.ctx.ui.requestRender();
+			return true;
+		}
+	}
+
 	/**
 	 * Dispatch a `/skill:<name> [args]` invocation through `promptCustomMessage`
 	 * using the supplied `streamingBehavior`. Returns false when the text is not
@@ -1153,6 +1182,10 @@ export class InputController {
 				if (!shouldSkipHistory(text)) this.ctx.editor.addToHistory(text);
 				text = slashResult;
 			}
+		}
+
+		if (text && (await this.#invokeRoutineCommand(text))) {
+			return;
 		}
 
 		// Skill commands invoke through the custom-message path regardless of

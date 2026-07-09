@@ -53,6 +53,7 @@ import {
 } from "../../extensibility/extensions";
 import { runExtensionCompact } from "../../extensibility/extensions/compact-handler";
 import { getSessionSlashCommands } from "../../extensibility/extensions/get-commands-handler";
+import { loadRoutines } from "../../extensibility/routines";
 import { buildSkillPromptMessage, parseSkillInvocation } from "../../extensibility/skills";
 import { loadSlashCommands } from "../../extensibility/slash-commands";
 import { resolveLocalUrlToPath } from "../../internal-urls";
@@ -1847,6 +1848,7 @@ export class AcpAgent implements Agent {
 		resetCapabilities();
 		const fileCommands = await loadSlashCommands({ cwd });
 		record.session.setSlashCommands(fileCommands);
+		record.session.setRoutines(await loadRoutines({ cwd }));
 		await record.session.refreshSshTool({ activateIfAvailable: true });
 		await this.#emitAvailableCommandsUpdate(record);
 	}
