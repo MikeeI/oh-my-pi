@@ -1,12 +1,15 @@
 PROJECT
 ===================================
 
+{{#inspectPart "workstation"}}
 <workstation>
 {{#list environment prefix="- " join="\n"}}{{label}}: {{value}}{{/list}}
 {{#if model}}- Model: {{model}}{{/if}}
 </workstation>
+{{/inspectPart}}
 
 {{#if contextFiles.length}}
+{{#inspectPart "context-files"}}
 <context>
 You MUST follow the context files below for all tasks:
 {{#each contextFiles}}
@@ -15,14 +18,17 @@ You MUST follow the context files below for all tasks:
 </file>
 {{/each}}
 </context>
+{{/inspectPart}}
 {{/if}}
 
 {{#if agentsMdSearch.files.length}}
+{{#inspectPart "dir-context"}}
 <dir-context>
 Some directories may have their own rules. Deeper rules override higher ones.
 Before making changes within these directories, you MUST read:
 {{#list agentsMdSearch.files join="\n"}}- {{this}}{{/list}}
 </dir-context>
+{{/inspectPart}}
 {{/if}}
 
 {{#ifAny contextFiles.length agentsMdSearch.files.length}}
@@ -30,6 +36,7 @@ The context files above are loaded automatically. You NEVER `grep`/`glob` for `A
 {{/ifAny}}
 
 {{#if includeWorkspaceTree}}
+{{#inspectPart "workspace-tree"}}
 {{#if workspaceTree.rendered}}
 <workspace-tree>
 Working directory layout (sorted by mtime, recent first; depth ≤ 3):
@@ -39,9 +46,12 @@ Working directory layout (sorted by mtime, recent first; depth ≤ 3):
 {{/if}}
 </workspace-tree>
 {{/if}}
+{{/inspectPart}}
 {{/if}}
 
+{{#inspectPart "cwd-date"}}
 Today is {{date}}, and the current working directory is '{{cwd}}'.
+{{/inspectPart}}
 
 <critical>
 - Each response MUST advance the task. There is no stopping condition other than completion.
@@ -50,5 +60,7 @@ Today is {{date}}, and the current working directory is '{{cwd}}'.
 </critical>
 
 {{#if appendPrompt}}
+{{#inspectPart "append-prompt"}}
 {{appendPrompt}}
+{{/inspectPart}}
 {{/if}}

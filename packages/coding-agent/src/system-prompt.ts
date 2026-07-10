@@ -94,15 +94,6 @@ function firstNonEmpty(...values: (string | undefined | null)[]): string | null 
 	return null;
 }
 
-function renderActiveRepoContextPrompt(activeRepoContext: ActiveRepoContext | null): string {
-	if (!activeRepoContext) return "";
-	return prompt
-		.render(activeRepoContextTemplate, {
-			relativeRepoRoot: normalizePromptPath(activeRepoContext.relativeRepoRoot),
-		})
-		.trim();
-}
-
 function parseWmicTable(output: string, header: string): string | null {
 	const lines = output
 		.split("\n")
@@ -508,7 +499,9 @@ export interface BuildSystemPromptOptions {
 
 export type DynamicPromptPartSource =
 	| "system-prompt.md"
+	| "custom-system-prompt.md"
 	| "project-prompt.md"
+	| "active-repo-context.md"
 	| "SYSTEM.md"
 	| "memory"
 	| "mcp"
@@ -536,273 +529,81 @@ export interface BuildSystemPromptResult {
 	dynamicParts: DynamicPromptPart[];
 }
 
-function renderDynamicPartText(template: string, data: prompt.TemplateContext): string {
-	return prompt.render(template, data).trim();
+interface CapturedDynamicPromptPart {
+	id: string;
+	text: string;
 }
+
+interface DynamicPromptCaptureContext {
+	[DYNAMIC_PROMPT_PART_CAPTURE]?: CapturedDynamicPromptPart[];
+}
+
+interface RenderedPromptBlock {
+	text: string;
+	dynamicParts: DynamicPromptPart[];
+}
+
+const DYNAMIC_PROMPT_PART_CAPTURE = Symbol("dynamic-prompt-part-capture");
+
+prompt.registerHelper("inspectPart", function (this: unknown, id: unknown, options: prompt.HelperOptions): string {
+	if (typeof id !== "string" || !id) {
+		throw new Error("inspectPart requires a non-empty string id");
+	}
+	const text = options.fn(this);
+	const root = options.data?.root as DynamicPromptCaptureContext | undefined;
+	root?.[DYNAMIC_PROMPT_PART_CAPTURE]?.push({ id, text });
+	return text;
+});
 
 function addDynamicPart(
 	parts: DynamicPromptPart[],
 	part: Omit<DynamicPromptPart, "text">,
 	text: string,
-	renderedBlock?: string,
+	renderedBlock: string,
 ): void {
-	const trimmed = text.trim();
-	if (!trimmed) return;
-	if (renderedBlock !== undefined && !renderedBlock.includes(trimmed)) return;
-	parts.push({ ...part, text: trimmed });
+	const normalized = normalizePromptBlock(text);
+	if (!normalized) return;
+	if (!renderedBlock.includes(normalized)) {
+		throw new Error(
+			`Dynamic prompt part "${part.id}" (${part.source}) is not present in provider block ${part.providerBlockIndex}`,
+		);
+	}
+	parts.push({ ...part, text: normalized });
 }
 
-function addRenderedDynamicPart(
-	parts: DynamicPromptPart[],
-	part: Omit<DynamicPromptPart, "text">,
+function renderInspectablePromptBlock(
 	template: string,
 	data: prompt.TemplateContext,
-	renderedBlock?: string,
-): void {
-	addDynamicPart(parts, part, renderDynamicPartText(template, data), renderedBlock);
-}
+	source: DynamicPromptPartSource,
+	providerBlockIndex: number,
+	trimOutput = false,
+): RenderedPromptBlock {
+	const captured: CapturedDynamicPromptPart[] = [];
+	const renderContext: prompt.TemplateContext & DynamicPromptCaptureContext = {
+		...data,
+		[DYNAMIC_PROMPT_PART_CAPTURE]: captured,
+	};
+	const rendered = prompt.render(template, renderContext);
+	const text = trimOutput ? rendered.trim() : rendered;
+	const dynamicParts: DynamicPromptPart[] = [];
+	const ids = new Set<string>();
 
-function collectSystemTemplateDynamicParts(data: prompt.TemplateContext, renderedBlock: string): DynamicPromptPart[] {
-	const parts: DynamicPromptPart[] = [];
-	const basePart = (id: string): Omit<DynamicPromptPart, "text"> => ({
-		id,
-		source: "system-prompt.md",
-		providerBlockIndex: 0,
-	});
+	for (const part of captured) {
+		const normalized = normalizePromptBlock(part.text);
+		if (!normalized) continue;
+		if (ids.has(part.id)) {
+			throw new Error(`Duplicate dynamic prompt part "${part.id}" in ${source}`);
+		}
+		if (!text.includes(normalized)) {
+			throw new Error(
+				`Dynamic prompt part "${part.id}" (${source}) is not present in provider block ${providerBlockIndex}`,
+			);
+		}
+		ids.add(part.id);
+		dynamicParts.push({ id: part.id, source, providerBlockIndex, text: normalized });
+	}
 
-	addRenderedDynamicPart(
-		parts,
-		basePart("skills"),
-		`{{#if skills.length}}
-Skills are specialized knowledge. If one matches your task, you MUST read \`skill://<name>\` before proceeding.
-<skills>
-{{#each skills}}
-- {{name}}: {{description}}
-{{/each}}
-</skills>
-{{/if}}`,
-		data,
-		renderedBlock,
-	);
-	addRenderedDynamicPart(
-		parts,
-		basePart("always-apply-rules"),
-		`{{#if alwaysApplyRules.length}}
-<generic-rules>
-{{#each alwaysApplyRules}}
-{{content}}
-{{/each}}
-</generic-rules>
-{{/if}}`,
-		data,
-		renderedBlock,
-	);
-	addRenderedDynamicPart(
-		parts,
-		basePart("rules"),
-		`{{#if rules.length}}
-<domain-rules>
-{{#each rules}}
-- {{name}} ({{#list globs join=", "}}{{this}}{{/list}}): {{description}}
-{{/each}}
-</domain-rules>
-{{/if}}`,
-		data,
-		renderedBlock,
-	);
-	addRenderedDynamicPart(
-		parts,
-		basePart("tool-inventory"),
-		`{{#if toolInfo.length}}
-{{#if toolListMode}}
-# Tool Inventory
-{{#each toolInfo}}
-- {{#if label}}{{label}}: \`{{name}}\`{{else}}\`{{name}}\`{{/if}}
-{{/each}}
-{{else}}
-{{toolInventory}}
-{{/if}}
-{{/if}}`,
-		data,
-		renderedBlock,
-	);
-	addRenderedDynamicPart(
-		parts,
-		basePart("intent-tracing"),
-		`{{#if intentTracing}}- Most tools take \`{{intentField}}\`: a concise intent, present participle, 2–6 words, no period, capitalized.{{/if}}`,
-		data,
-		renderedBlock,
-	);
-	addRenderedDynamicPart(
-		parts,
-		basePart("secrets"),
-		`{{#if secretsEnabled}}- Redacted \`#XXXX#\` tokens in output are opaque strings.{{/if}}`,
-		data,
-		renderedBlock,
-	);
-	addRenderedDynamicPart(
-		parts,
-		basePart("mcp-discovery"),
-		`{{#if mcpDiscoveryMode}}
-<discovery-notice>
-{{#if hasMCPDiscoveryServers}}Discoverable MCP servers this session: {{#list mcpDiscoveryServerSummaries join=", "}}{{this}}{{/list}}.{{/if}}
-If the task may involve external systems (SaaS APIs, chat, tickets, databases, deployments, or other non-local integrations), you SHOULD call \`{{toolRefs.search_tool_bm25}}\` before concluding no such tool exists.
-</discovery-notice>
-{{/if}}`,
-		data,
-		renderedBlock,
-	);
-	addRenderedDynamicPart(
-		parts,
-		basePart("lsp"),
-		`{{#has tools "lsp"}}
-# LSP
-You NEVER use search or manual edits for code intelligence when a language server is available:
-- definition / type_definition / implementation / references / hover
-- code_actions for refactors, imports, and fixes—list first, then apply with \`apply: true\` plus \`query\`
-{{/has}}`,
-		data,
-		renderedBlock,
-	);
-	addRenderedDynamicPart(
-		parts,
-		basePart("ast-tools"),
-		`{{#ifAny (includes tools "ast_grep") (includes tools "ast_edit")}}
-# AST
-You SHOULD use syntax-aware tools before text hacks:
-{{#has tools "ast_grep"}}- \`{{toolRefs.ast_grep}}\` for structural discovery.{{/has}}
-{{#has tools "ast_edit"}}- \`{{toolRefs.ast_edit}}\` for codemods.{{/has}}
-- Use \`search\` only for plain-text lookup when structure is irrelevant.
-{{/ifAny}}`,
-		data,
-		renderedBlock,
-	);
-	addRenderedDynamicPart(
-		parts,
-		basePart("eager-tasks"),
-		`{{#if eagerTasks}}
-{{#has tools "task"}}
-{{#if eagerTasksAlways}}
-Delegation is the default here, not the exception. Once the design is settled, you MUST fan the work out to \`{{toolRefs.task}}\` subagents rather than doing it yourself. Work alone ONLY when one of these is unambiguously true:
-- A single-file edit under approximately 30 lines
-- A direct answer or explanation requiring no code changes
-- The user explicitly asked you to run a command yourself.
-
-Everything else—multi-file changes, refactors, new features, tests, investigations—MUST be decomposed and delegated.{{#if taskBatch}} Batch independent slices into one parallel \`{{toolRefs.task}}\` call; never serialize what can run concurrently.{{/if}}{{else}}Delegation is preferred here. Once the design is settled, you SHOULD fan substantial work out to \`{{toolRefs.task}}\` subagents instead of doing everything yourself. Multi-file changes, refactors, new features, tests, and investigations are strong candidates. Use your judgment for small, single-file, or interactive work.{{#if taskBatch}} When you delegate independent slices, batch them into one parallel \`{{toolRefs.task}}\` call rather than serializing them.{{/if}}
-{{/if}}
-{{/has}}
-{{/if}}`,
-		data,
-		renderedBlock,
-	);
-	addRenderedDynamicPart(
-		parts,
-		basePart("images"),
-		`{{#has tools "inspect_image"}}- Image tasks: prefer \`{{toolRefs.inspect_image}}\` over \`{{toolRefs.read}}\` to spare session context.{{/has}}`,
-		data,
-		renderedBlock,
-	);
-	addRenderedDynamicPart(
-		parts,
-		basePart("tool-priority"),
-		`{{#has tools "read"}}- File or directory reads → \`{{toolRefs.read}}\`, not \`cat\` or \`ls\` (a directory path lists entries).{{/has}}
-{{#has tools "edit"}}- Surgical edits → \`{{toolRefs.edit}}\`, not \`sed\`.{{/has}}
-{{#has tools "write"}}- Create or overwrite → \`{{toolRefs.write}}\`, not shell redirection.{{/has}}
-{{#has tools "lsp"}}- Code intelligence → \`{{toolRefs.lsp}}\`, not blind search.{{/has}}
-{{#has tools "search"}}- Regex search → \`{{toolRefs.search}}\`, not \`grep\`, \`rg\`, or \`awk\`.{{/has}}
-{{#has tools "find"}}- Globbing → \`{{toolRefs.find}}\`, not \`ls **/*.ext\` or \`fd\`.{{/has}}
-{{#has tools "eval"}}- Quick compute → \`{{toolRefs.eval}}\`; you SHOULD go step by step.{{/has}}
-{{#has tools "bash"}}- Use \`{{toolRefs.bash}}\` for terminal work—builds, tests, git, package managers—and pipelines that COMPUTE a fact: \`wc -l\`, \`sort | uniq -c\`, \`comm\`, \`diff a b\`, checksums. Commands shadowing the tools above are blocked.
-- Litmus: produces a count, frequency, set difference, or checksum no tool returns → bash. Merely moves, pages, or trims bytes a tool can fetch → use the tool.{{/has}}`,
-		data,
-		renderedBlock,
-	);
-
-	return parts;
-}
-
-function collectProjectPromptDynamicParts(data: prompt.TemplateContext, renderedBlock: string): DynamicPromptPart[] {
-	const parts: DynamicPromptPart[] = [];
-	const basePart = (id: string): Omit<DynamicPromptPart, "text"> => ({
-		id,
-		source: "project-prompt.md",
-		providerBlockIndex: 1,
-	});
-
-	addRenderedDynamicPart(
-		parts,
-		basePart("workstation"),
-		`<workstation>
-{{#list environment prefix="- " join="\n"}}{{label}}: {{value}}{{/list}}
-{{#if model}}- Model: {{model}}{{/if}}
-</workstation>`,
-		data,
-		renderedBlock,
-	);
-	addRenderedDynamicPart(
-		parts,
-		basePart("context-files"),
-		`{{#if contextFiles.length}}
-<context>
-You MUST follow the context files below for all tasks:
-{{#each contextFiles}}
-<file path="{{path}}">
-{{content}}
-</file>
-{{/each}}
-</context>
-{{/if}}`,
-		data,
-		renderedBlock,
-	);
-	addRenderedDynamicPart(
-		parts,
-		basePart("dir-context"),
-		`{{#if agentsMdSearch.files.length}}
-<dir-context>
-Some directories may have their own rules. Deeper rules override higher ones.
-Before making changes within these directories, you MUST read:
-{{#list agentsMdSearch.files join="\n"}}- {{this}}{{/list}}
-</dir-context>
-{{/if}}`,
-		data,
-		renderedBlock,
-	);
-	addRenderedDynamicPart(
-		parts,
-		basePart("workspace-tree"),
-		`{{#if includeWorkspaceTree}}
-{{#if workspaceTree.rendered}}
-<workspace-tree>
-Working directory layout (sorted by mtime, recent first; depth ≤ 3):
-{{workspaceTree.rendered}}
-{{#if workspaceTree.truncated}}
-(some entries elided to keep the tree short — use \`find\`/\`read\` to drill in)
-{{/if}}
-</workspace-tree>
-{{/if}}
-{{/if}}`,
-		data,
-		renderedBlock,
-	);
-	addRenderedDynamicPart(
-		parts,
-		basePart("cwd-date"),
-		`Today is {{date}}, and the current working directory is '{{cwd}}'.`,
-		data,
-		renderedBlock,
-	);
-	addRenderedDynamicPart(
-		parts,
-		basePart("append-prompt"),
-		`{{#if appendPrompt}}
-{{appendPrompt}}
-{{/if}}`,
-		data,
-		renderedBlock,
-	);
-
-	return parts;
+	return { text, dynamicParts };
 }
 
 /** Build the system prompt with tools, guidelines, and context */
@@ -1000,7 +801,6 @@ export async function buildSystemPrompt(options: BuildSystemPromptOptions = {}):
 	const date = formatLocalCalendarDate();
 	const dateTime = date;
 	const promptCwd = shortenPath(normalizePromptPath(resolvedCwd));
-	const activeRepoContextPrompt = renderActiveRepoContextPrompt(activeRepoContext);
 
 	// Build tool metadata for system prompt rendering.
 	// Priority: explicit list > tools map > conservative SDK fallback.
@@ -1094,34 +894,63 @@ export async function buildSystemPrompt(options: BuildSystemPromptOptions = {}):
 		includeWorkspaceTree,
 		renderMermaid,
 	};
-	const rendered = prompt.render(usesCustomPrompt ? customSystemPromptTemplate : activeTemplate, renderData);
-	const systemPrompt = [rendered];
-	// Custom prompt templates already render context files and append text; the
+	const systemTemplate = usesCustomPrompt ? customSystemPromptTemplate : activeTemplate;
+	const systemBlock = usesCustomPrompt
+		? renderInspectablePromptBlock(systemTemplate, renderData, "custom-system-prompt.md", 0)
+		: resolvedSystemPromptTemplate === undefined
+			? renderInspectablePromptBlock(systemTemplate, renderData, "system-prompt.md", 0)
+			: { text: prompt.render(systemTemplate, renderData), dynamicParts: [] };
+	const systemPrompt = [systemBlock.text];
+	const dynamicParts: DynamicPromptPart[] = [...systemBlock.dynamicParts];
+
+	// Custom prompt wrappers already render context files and append text; the
 	// project footer still carries environment, cwd, workspace, and dir-context.
-	const projectPrompt = prompt
-		.render(
-			projectPromptTemplate,
-			usesCustomPrompt ? { ...renderData, contextFiles: [], appendPrompt: "" } : renderData,
-		)
-		.trim();
-	if (projectPrompt) {
-		systemPrompt.push(projectPrompt);
-	}
-	if (activeRepoContextPrompt) {
-		systemPrompt.push(activeRepoContextPrompt);
+	const projectRenderData = usesCustomPrompt ? { ...renderData, contextFiles: [], appendPrompt: "" } : renderData;
+	const projectBlockIndex = systemPrompt.length;
+	const projectBlock = renderInspectablePromptBlock(
+		projectPromptTemplate,
+		projectRenderData,
+		"project-prompt.md",
+		projectBlockIndex,
+		true,
+	);
+	if (projectBlock.text) {
+		systemPrompt.push(projectBlock.text);
+		dynamicParts.push(...projectBlock.dynamicParts);
 	}
 
-	// Dynamic parts: emit only when the active template is one we control.
-	// `--system-prompt` is treated as fully opaque (matches prior behavior).
-	const dynamicParts: DynamicPromptPart[] =
-		!usesCustomPrompt && resolvedSystemPromptTemplate === undefined
-			? collectSystemTemplateDynamicParts(renderData, rendered)
-			: [];
-	if (projectPrompt) {
-		dynamicParts.push(...collectProjectPromptDynamicParts(renderData, projectPrompt));
+	if (appendSystemPromptParts.length > 0) {
+		const appendContainer = dynamicParts.find(part => part.id === "append-prompt");
+		if (!appendContainer) {
+			throw new Error("Append system prompt parts were provided, but no append prompt was rendered");
+		}
+		const renderedBlock = systemPrompt[appendContainer.providerBlockIndex];
+		if (renderedBlock === undefined) {
+			throw new Error(`Append prompt references missing provider block ${appendContainer.providerBlockIndex}`);
+		}
+		for (const part of appendSystemPromptParts) {
+			addDynamicPart(
+				dynamicParts,
+				{ ...part, providerBlockIndex: appendContainer.providerBlockIndex },
+				part.text,
+				renderedBlock,
+			);
+		}
 	}
-	for (const part of appendSystemPromptParts) {
-		addDynamicPart(dynamicParts, { ...part, providerBlockIndex: projectPrompt ? 1 : 0 }, part.text);
+
+	if (activeRepoContext) {
+		const activeRepoBlockIndex = systemPrompt.length;
+		const activeRepoBlock = renderInspectablePromptBlock(
+			activeRepoContextTemplate,
+			{ relativeRepoRoot: normalizePromptPath(activeRepoContext.relativeRepoRoot) },
+			"active-repo-context.md",
+			activeRepoBlockIndex,
+			true,
+		);
+		if (activeRepoBlock.text) {
+			systemPrompt.push(activeRepoBlock.text);
+			dynamicParts.push(...activeRepoBlock.dynamicParts);
+		}
 	}
 
 	return { systemPrompt, dynamicParts };

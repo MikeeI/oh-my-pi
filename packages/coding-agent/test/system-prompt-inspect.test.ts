@@ -11,7 +11,12 @@ const TEST_CONFIG: CliConfig = {
 
 const tools = new Map<string, SystemPromptToolMetadata>([
 	["read", { wireName: "read", label: "Read", description: "Read files" }],
+	["grep", { wireName: "grep", label: "Grep", description: "Search file contents" }],
+	["glob", { wireName: "glob", label: "Glob", description: "Find paths" }],
 	["lsp", { wireName: "lsp", label: "LSP", description: "Language server" }],
+	["ast_grep", { wireName: "ast_grep", label: "AST Grep", description: "Search syntax trees" }],
+	["ast_edit", { wireName: "ast_edit", label: "AST Edit", description: "Rewrite syntax trees" }],
+	["inspect_image", { wireName: "inspect_image", label: "Inspect Image", description: "Inspect images" }],
 	["task", { wireName: "task", label: "Task", description: "Subagents" }],
 ]);
 
@@ -22,11 +27,11 @@ function part(parts: DynamicPromptPart[], id: string): DynamicPromptPart {
 }
 
 describe("system prompt inspect metadata", () => {
-	test("collects dynamic parts without exposing native static prompt text", async () => {
+	test("attributes every inspectable fragment to its provider block", async () => {
 		const result = await buildSystemPrompt({
 			cwd: "/tmp/inspect-project",
 			tools,
-			toolNames: ["read", "lsp", "task"],
+			toolNames: ["read", "grep", "glob", "lsp", "ast_grep", "ast_edit", "inspect_image", "task"],
 			skills: [
 				{
 					name: "skill-a",
@@ -42,30 +47,93 @@ describe("system prompt inspect metadata", () => {
 			workspaceTree: {
 				rootPath: "/tmp/inspect-project",
 				rendered: ".\n  - package.json",
-				truncated: false,
+				truncated: true,
 				totalLines: 2,
 				agentsMdFiles: ["nested/AGENTS.md"],
 			},
 			includeWorkspaceTree: true,
-			appendSystemPrompt: "Memory text\n\nMCP text",
+			appendSystemPrompt: "Memory text\n\nMCP text\n\nAuto-learn text",
 			appendSystemPromptParts: [
 				{ id: "memory-instructions", source: "memory", text: "Memory text" },
 				{ id: "mcp-server-instructions", source: "mcp", text: "MCP text" },
 				{ id: "auto-learn-instructions", source: "auto-learn", text: "Auto-learn text" },
 			],
+			intentField: "i",
+			mcpDiscoveryMode: true,
+			mcpDiscoveryServerSummaries: ["example: search"],
 			eagerTasks: true,
+			secretsEnabled: true,
+			renderMermaid: true,
+			activeRepoContext: {
+				cwd: "/tmp/inspect-project",
+				repoRoot: "/tmp/inspect-project/repo",
+				relativeRepoRoot: "repo",
+				source: "single-direct-child-repo",
+			},
 		});
 
-		expect(result.systemPrompt.length).toBe(2);
+		expect(result.systemPrompt).toHaveLength(3);
+		expect(result.dynamicParts.map(promptPart => promptPart.id)).toEqual(
+			expect.arrayContaining([
+				"mermaid",
+				"skills",
+				"always-apply-rules",
+				"rules",
+				"tool-inventory",
+				"mcp-discovery",
+				"intent-tracing",
+				"secrets",
+				"images",
+				"tool-priority",
+				"lsp",
+				"ast-tools",
+				"eager-tasks",
+				"workstation",
+				"context-files",
+				"dir-context",
+				"workspace-tree",
+				"cwd-date",
+				"append-prompt",
+				"memory-instructions",
+				"mcp-server-instructions",
+				"auto-learn-instructions",
+				"active-repo-context",
+			]),
+		);
 		expect(part(result.dynamicParts, "skills").text).toContain("skill-a: Skill A");
 		expect(part(result.dynamicParts, "rules").text).toContain("rule-a");
 		expect(part(result.dynamicParts, "always-apply-rules").text).toContain("Always rule body");
 		expect(part(result.dynamicParts, "context-files").text).toContain("Agent context");
-		expect(part(result.dynamicParts, "workspace-tree").text).toContain("package.json");
-		expect(part(result.dynamicParts, "memory-instructions").source).toBe("memory");
-		expect(part(result.dynamicParts, "mcp-server-instructions").source).toBe("mcp");
-		expect(part(result.dynamicParts, "auto-learn-instructions").source).toBe("auto-learn");
-		expect(result.dynamicParts.every(p => !p.text.includes("You are THE staff engineer"))).toBe(true);
+		expect(part(result.dynamicParts, "workspace-tree").text).toContain("use `glob`/`read` to drill in");
+		expect(part(result.dynamicParts, "tool-priority").text).toContain("Regex search → `grep`");
+		expect(part(result.dynamicParts, "tool-priority").text).toContain("Globbing → `glob`");
+		expect(part(result.dynamicParts, "ast-tools").text).toContain("Use `grep` only for plain-text lookup");
+		expect(part(result.dynamicParts, "mermaid").text).toContain("```mermaid");
+		expect(part(result.dynamicParts, "memory-instructions")).toMatchObject({
+			source: "memory",
+			providerBlockIndex: 1,
+		});
+		expect(part(result.dynamicParts, "mcp-server-instructions")).toMatchObject({
+			source: "mcp",
+			providerBlockIndex: 1,
+		});
+		expect(part(result.dynamicParts, "auto-learn-instructions")).toMatchObject({
+			source: "auto-learn",
+			providerBlockIndex: 1,
+		});
+		expect(part(result.dynamicParts, "active-repo-context")).toMatchObject({
+			source: "active-repo-context.md",
+			providerBlockIndex: 2,
+		});
+		expect(
+			result.dynamicParts.every(promptPart =>
+				result.systemPrompt[promptPart.providerBlockIndex]?.includes(promptPart.text),
+			),
+		).toBe(true);
+		expect(result.systemPrompt.every(block => !block.includes("inspectPart"))).toBe(true);
+		expect(result.dynamicParts.every(promptPart => !promptPart.text.includes("You are a helpful assistant"))).toBe(
+			true,
+		);
 	});
 
 	test("does not attribute static custom prompt text as dynamic", async () => {
@@ -75,6 +143,7 @@ describe("system prompt inspect metadata", () => {
 			tools,
 			toolNames: ["read", "lsp"],
 			contextFiles: [],
+			skills: [],
 			workspaceTree: {
 				rootPath: "/tmp/inspect-project",
 				rendered: "",
@@ -82,11 +151,46 @@ describe("system prompt inspect metadata", () => {
 				totalLines: 0,
 				agentsMdFiles: [],
 			},
+			activeRepoContext: null,
 		});
 
 		expect(result.systemPrompt[0]).toContain("Static custom SYSTEM body");
 		expect(result.dynamicParts.every(p => p.source !== "system-prompt.md")).toBe(true);
 		expect(result.dynamicParts.every(p => !p.text.includes("Static custom SYSTEM body"))).toBe(true);
+	});
+
+	test("attributes resolved custom-prompt append fragments to provider block zero", async () => {
+		const result = await buildSystemPrompt({
+			cwd: "/tmp/inspect-project",
+			resolvedCustomPrompt: "Static custom SYSTEM body",
+			resolvedAppendSystemPrompt: "Memory text",
+			appendSystemPromptParts: [{ id: "memory-instructions", source: "memory", text: "Memory text" }],
+			tools,
+			toolNames: ["read", "lsp"],
+			contextFiles: [],
+			skills: [],
+			workspaceTree: {
+				rootPath: "/tmp/inspect-project",
+				rendered: "",
+				truncated: false,
+				totalLines: 0,
+				agentsMdFiles: [],
+			},
+			activeRepoContext: null,
+		});
+
+		expect(result.systemPrompt).toHaveLength(2);
+		expect(result.systemPrompt[0]).toContain("Static custom SYSTEM body");
+		expect(result.systemPrompt[0]).toContain("Memory text");
+		expect(result.systemPrompt[1]).not.toContain("Memory text");
+		expect(part(result.dynamicParts, "append-prompt")).toMatchObject({
+			source: "custom-system-prompt.md",
+			providerBlockIndex: 0,
+		});
+		expect(part(result.dynamicParts, "memory-instructions")).toMatchObject({
+			source: "memory",
+			providerBlockIndex: 0,
+		});
 	});
 });
 
