@@ -2,6 +2,10 @@
 
 ## [Unreleased]
 
+### Fixed
+
+- Fixed long streamed `diff` and `patch` code fences leaving gray additions and deletions in native terminal scrollback after the visible tail finalized with syntax colors. ([#5126](https://github.com/can1357/oh-my-pi/issues/5126))
+
 ## [16.4.1] - 2026-07-10
 
 ### Changed

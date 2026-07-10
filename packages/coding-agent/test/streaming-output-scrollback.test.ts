@@ -3,10 +3,10 @@ import type { AssistantMessage } from "@oh-my-pi/pi-ai";
 import { AssistantMessageComponent } from "@oh-my-pi/pi-coding-agent/modes/components/assistant-message";
 import { ToolExecutionComponent } from "@oh-my-pi/pi-coding-agent/modes/components/tool-execution";
 import { TranscriptContainer } from "@oh-my-pi/pi-coding-agent/modes/components/transcript-container";
-import { theme as activeTheme, initTheme } from "@oh-my-pi/pi-coding-agent/modes/theme/theme";
+import { theme as activeTheme, highlightCode, initTheme } from "@oh-my-pi/pi-coding-agent/modes/theme/theme";
 import { evalToolRenderer } from "@oh-my-pi/pi-coding-agent/tools/eval-render";
 import { previewWindowRows } from "@oh-my-pi/pi-coding-agent/tools/render-utils";
-import { type Component, TUI } from "@oh-my-pi/pi-tui";
+import { type Component, coalesceAdjacentSgr, TUI } from "@oh-my-pi/pi-tui";
 import { VirtualTerminal } from "../../tui/test/virtual-terminal";
 
 // Long, path-like output that wraps at the box's inner width — the case that
@@ -288,6 +288,97 @@ describe("streaming tool output never sprays duplicate scrollback banners", () =
 			const finalRows = plainScrollBuffer(term);
 			expect(finalRows.filter(row => row.includes("Thinking paragraph 0"))).toHaveLength(1);
 			expect(finalRows.filter(row => row.includes("Answer paragraph 0 "))).toHaveLength(1);
+		} finally {
+			assistant.dispose();
+			tui.stop();
+			await term.flush();
+		}
+	}, 30_000);
+
+	test("keeps streamed open-diff colors when completed rows enter native scrollback", async () => {
+		const rows = 8;
+		stubStdoutRows(rows);
+		const term = new VirtualTerminal(60, rows);
+		Object.defineProperty(term, "isNativeViewportAtBottom", { configurable: true, value: () => undefined });
+		const writes: string[] = [];
+		const terminalWrite = term.write.bind(term);
+		term.write = (data: string) => {
+			writes.push(data);
+			terminalWrite(data);
+		};
+		const tui = new TUI(term);
+		const transcript = new TranscriptContainer();
+		const assistant = new AssistantMessageComponent(undefined, false);
+		transcript.addChild(assistant);
+		tui.addChild(transcript);
+
+		const earlyAdd = "+ADD_EARLY_COLOR_MARKER";
+		const earlyDelete = "-DELETE_EARLY_COLOR_MARKER";
+		const lateAdd = "+ADD_LATE_COLOR_MARKER";
+		const lateDelete = "-DELETE_LATE_COLOR_MARKER";
+		const diffLines = [
+			"diff --git a/file.ts b/file.ts",
+			"index 1111111..2222222 100644",
+			"--- a/file.ts",
+			"+++ b/file.ts",
+			"@@ -1,12 +1,12 @@",
+			earlyDelete,
+			earlyAdd,
+			...Array.from({ length: 14 }, (_, index) => ` context line ${index}`),
+			lateDelete,
+			lateAdd,
+		];
+		const semanticMarker = (marker: string): string => {
+			const highlighted = coalesceAdjacentSgr(highlightCode(marker, "diff").join("\n"));
+			const markerPrefix = highlighted.indexOf(marker[0]);
+			const markerBody = highlighted.indexOf(marker.slice(1), markerPrefix + 1);
+			expect(markerPrefix).toBeGreaterThanOrEqual(0);
+			expect(markerBody).toBeGreaterThan(markerPrefix);
+			return highlighted.slice(markerPrefix, markerBody + marker.length - 1);
+		};
+
+		try {
+			tui.start();
+			await settleFrame(term);
+
+			for (let lineCount = 1; lineCount <= diffLines.length; lineCount++) {
+				const openDiff = `\`\`\`diff\n${diffLines.slice(0, lineCount).join("\n")}\n`;
+				assistant.updateContent(makeAssistantMessage([{ type: "text", text: openDiff }]), { transient: true });
+				tui.requestRender();
+				await settleFrame(term);
+			}
+
+			const midStreamRows = plainScrollBuffer(term);
+			expect(midStreamRows.some(row => row.includes(earlyDelete))).toBe(true);
+			expect(midStreamRows.some(row => row.includes(earlyAdd))).toBe(true);
+			const beforeFinalizeWrites = writes.map(coalesceAdjacentSgr).join("");
+			expect(beforeFinalizeWrites).toContain(semanticMarker(earlyDelete));
+			expect(beforeFinalizeWrites).toContain(semanticMarker(earlyAdd));
+
+			const finalizedDiff = `\`\`\`diff\n${diffLines.join("\n")}\n\`\`\``;
+			assistant.updateContent(makeAssistantMessage([{ type: "text", text: finalizedDiff }]), { transient: false });
+			assistant.markTranscriptBlockFinalized();
+			for (let frame = 0; frame < 2; frame++) {
+				tui.requestRender();
+				await settleFrame(term);
+			}
+
+			const painted = writes.map(coalesceAdjacentSgr).join("");
+			const orderedMarkers = [
+				semanticMarker(earlyDelete),
+				semanticMarker(earlyAdd),
+				semanticMarker(lateDelete),
+				semanticMarker(lateAdd),
+			];
+			for (const marker of orderedMarkers) expect(painted).toContain(marker);
+			expect(orderedMarkers.map(marker => painted.indexOf(marker))).toEqual(
+				[...orderedMarkers].map(marker => painted.indexOf(marker)).toSorted((a, b) => a - b),
+			);
+
+			const finalRows = plainScrollBuffer(term);
+			for (const marker of [earlyDelete, earlyAdd, lateDelete, lateAdd]) {
+				expect(finalRows.filter(row => row.includes(marker))).toHaveLength(1);
+			}
 		} finally {
 			assistant.dispose();
 			tui.stop();

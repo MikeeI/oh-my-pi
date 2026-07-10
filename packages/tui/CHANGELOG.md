@@ -2,6 +2,10 @@
 
 ## [Unreleased]
 
+### Fixed
+
+- Fixed long streamed `diff` and `patch` code fences losing semantic syntax colors after their early rows entered native terminal scrollback. Newline-complete rows now reuse incremental highlighting while the active fence grows, so additions and deletions retain their final colors without re-highlighting the entire accumulated block on every update. ([#5126](https://github.com/can1357/oh-my-pi/issues/5126))
+
 ## [16.4.1] - 2026-07-10
 
 ### Added

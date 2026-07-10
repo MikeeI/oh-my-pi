@@ -1,5 +1,6 @@
 import { afterAll, afterEach, beforeAll, describe, expect, it } from "bun:test";
 import { stripVTControlCharacters } from "node:util";
+import { highlightCode as nativeHighlightCode } from "@oh-my-pi/pi-natives";
 import { clearRenderCache, Markdown, renderInlineMarkdown } from "@oh-my-pi/pi-tui/components/markdown";
 import { setTerminalTextSizing, TERMINAL } from "@oh-my-pi/pi-tui/terminal-capabilities";
 import { type Component, TUI } from "@oh-my-pi/pi-tui/tui";
@@ -1365,67 +1366,144 @@ describe("Module-level LRU render cache", () => {
 		expect(l2Markdown.render(width)).toBe(first);
 	});
 
-	it("skips code-block highlighting for transient streaming renders", () => {
-		clearRenderCache();
-		let highlightCallCount = 0;
-		const themeWithSpy = {
-			...defaultMarkdownTheme,
-			highlightCode: (_code: string, _lang?: string): string[] => {
-				highlightCallCount++;
-				return ["HIGHLIGHTED"];
-			},
+	describe("transient diff highlighting", () => {
+		const renderOpenFence = (
+			language: string,
+			body: string,
+			nested = false,
+			highlightCalls: Array<{ code: string; language?: string }> = [],
+		) => {
+			const themeWithSpy = {
+				...defaultMarkdownTheme,
+				highlightCode: (code: string, lang?: string): string[] => {
+					highlightCalls.push({ code, language: lang });
+					return code.split("\n").map(line => (line === "" ? "" : `«${line}»`));
+				},
+			};
+			const prefix = nested ? `- changes\n\n  \`\`\`${language}\n  ` : `\`\`\`${language}\n`;
+			const indentation = nested ? body.replaceAll("\n", "\n  ") : body;
+			const markdown = new Markdown(`${prefix}${indentation}`, 0, 0, themeWithSpy);
+			markdown.transientRenderCache = true;
+			return { markdown, highlightCalls };
 		};
 
-		const markdown = new Markdown("```ts\nconst streamed = true;\n```", 0, 0, themeWithSpy);
-		markdown.transientRenderCache = true;
-		const plain = stripVTControlCharacters(markdown.render(80).join("\n"));
+		it.each([
+			["top-level", false],
+			["nested-list", true],
+		] as const)("highlights completed lines and keeps the incomplete tail volatile in %s fences", (_name, nested) => {
+			clearRenderCache();
+			const { markdown, highlightCalls } = renderOpenFence("diff", "-old\n+new\n+part", nested);
 
-		expect(highlightCallCount).toBe(0);
-		expect(plain).toContain("const streamed = true;");
-		expect(plain).not.toContain("HIGHLIGHTED");
-	});
+			const first = markdown.render(80).join("\n");
+			expect(first).toContain("«-old»");
+			expect(first).toContain("«+new»");
+			expect(first).toContain("«+part»");
+			expect(highlightCalls).toEqual([
+				{ code: "-old\n+new\n", language: "diff" },
+				{ code: "+part", language: "diff" },
+			]);
 
-	it("re-renders code-block highlighting when a transient instance becomes stable", () => {
-		clearRenderCache();
-		let highlightCallCount = 0;
-		const themeWithSpy = {
-			...defaultMarkdownTheme,
-			highlightCode: (_code: string, _lang?: string): string[] => {
-				highlightCallCount++;
-				return ["HIGHLIGHTED"];
-			},
-		};
+			const updatedBody = "-old\n+new\n+partial";
+			const prefix = nested ? "- changes\n\n  ```diff\n  " : "```diff\n";
+			markdown.setText(`${prefix}${nested ? updatedBody.replaceAll("\n", "\n  ") : updatedBody}`);
+			markdown.render(80);
+			expect(highlightCalls).toEqual([
+				{ code: "-old\n+new\n", language: "diff" },
+				{ code: "+part", language: "diff" },
+				{ code: "+partial", language: "diff" },
+			]);
 
-		const markdown = new Markdown("```ts\nconst streamed = true;\n```", 0, 0, themeWithSpy);
-		markdown.transientRenderCache = true;
-		const plain = stripVTControlCharacters(markdown.render(80).join("\n"));
-		expect(highlightCallCount).toBe(0);
-		expect(plain).toContain("const streamed = true;");
+			const appendedBody = "-old\n+new\n+partial\n-tail";
+			markdown.setText(`${prefix}${nested ? appendedBody.replaceAll("\n", "\n  ") : appendedBody}`);
+			markdown.render(80);
+			expect(highlightCalls).toEqual([
+				{ code: "-old\n+new\n", language: "diff" },
+				{ code: "+part", language: "diff" },
+				{ code: "+partial", language: "diff" },
+				{ code: "+partial\n", language: "diff" },
+				{ code: "-tail", language: "diff" },
+			]);
+		});
 
-		markdown.transientRenderCache = false;
-		const highlighted = stripVTControlCharacters(markdown.render(80).join("\n"));
-		expect(highlightCallCount).toBe(1);
-		expect(highlighted).toContain("HIGHLIGHTED");
-	});
+		it("invalidates completed-line cache after rewind or replacement", () => {
+			clearRenderCache();
+			const { markdown, highlightCalls } = renderOpenFence("diff", "-old\n+tail");
+			markdown.render(80);
+			markdown.setText("```diff\n-replacement\n+new-tail");
+			markdown.render(80);
 
-	it("skips nested list code-block highlighting for transient streaming renders", () => {
-		clearRenderCache();
-		let highlightCallCount = 0;
-		const themeWithSpy = {
-			...defaultMarkdownTheme,
-			highlightCode: (_code: string, _lang?: string): string[] => {
-				highlightCallCount++;
-				return ["HIGHLIGHTED"];
-			},
-		};
+			expect(highlightCalls).toEqual([
+				{ code: "-old\n", language: "diff" },
+				{ code: "+tail", language: "diff" },
+				{ code: "-replacement\n", language: "diff" },
+				{ code: "+new-tail", language: "diff" },
+			]);
+		});
 
-		const markdown = new Markdown("- item\n\n  ```ts\n  const streamed = true;\n  ```", 0, 0, themeWithSpy);
-		markdown.transientRenderCache = true;
-		const plain = stripVTControlCharacters(markdown.render(80).join("\n"));
+		it("treats patch as a streaming diff alias", () => {
+			clearRenderCache();
+			const { markdown, highlightCalls } = renderOpenFence("patch", "@@ -1 +1 @@\r\n-old\r\n+new");
+			markdown.render(80);
+			expect(highlightCalls).toEqual([
+				{ code: "@@ -1 +1 @@\n-old\n", language: "patch" },
+				{ code: "+new", language: "patch" },
+			]);
+		});
 
-		expect(highlightCallCount).toBe(0);
-		expect(plain).toContain("const streamed = true;");
-		expect(plain).not.toContain("HIGHLIGHTED");
+		it("keeps non-diff transient fences on the unhighlighted code-block fallback", () => {
+			clearRenderCache();
+			const highlightCalls: Array<{ code: string; language?: string }> = [];
+			const { markdown } = renderOpenFence("ts", "const streamed = true;\nconst tail", false, highlightCalls);
+			const plain = stripVTControlCharacters(markdown.render(80).join("\n"));
+
+			expect(highlightCalls).toHaveLength(0);
+			expect(plain).toContain("const streamed = true;");
+			expect(plain).not.toContain("«");
+		});
+
+		it("matches bundled diff highlighting byte-for-byte for whole blocks and newline-preserving chunks", () => {
+			const colors = {
+				comment: "\x1b[38;5;244m",
+				keyword: "\x1b[38;5;33m",
+				function: "\x1b[38;5;39m",
+				variable: "\x1b[38;5;220m",
+				string: "\x1b[38;5;114m",
+				number: "\x1b[38;5;141m",
+				type: "\x1b[38;5;81m",
+				operator: "\x1b[38;5;208m",
+				punctuation: "\x1b[38;5;250m",
+				inserted: "\x1b[38;5;40m",
+				deleted: "\x1b[38;5;196m",
+			};
+			const fixtures = [
+				"diff --git a/x b/x\nindex 111..222 100644\n--- a/x\n+++ b/x\n@@ -1,2 +1,3 @@\n context\n-old\n+new\n\\ No newline at end of file\n",
+				"@@ -1 +1 @@\r\n-old\r\n+new\r\n",
+				"--- a/empty\n+++ b/empty\n@@ -0,0 +1,2 @@\n+\n+value\n",
+				"@@ -2,3 +2,3 @@ function x()\n same\n-before\n+after\n\n",
+				"diff --git a/a b/a\nrename from a\nrename to b\n",
+				"@@ -10,2 +10,2 @@\n unchanged\n-deleted without terminator",
+			];
+			for (let documentIndex = 0; documentIndex < 500; documentIndex++) {
+				const newline = documentIndex % 7 === 0 ? "\r\n" : "\n";
+				const hunkCount = (documentIndex % 4) + 1;
+				const hunks = Array.from({ length: hunkCount }, (_, hunkIndex) =>
+					[
+						`@@ -${hunkIndex + 1},2 +${hunkIndex + 1},2 @@ generated_${documentIndex}`,
+						` context-${documentIndex}-${hunkIndex}`,
+						`-before-${documentIndex}-${hunkIndex}`,
+						`+after-${documentIndex}-${hunkIndex}`,
+						...(documentIndex % 11 === 0 ? ["\\ No newline at end of file"] : []),
+					].join(newline),
+				).join(newline);
+				fixtures.push(`${hunks}${documentIndex % 5 === 0 ? "" : newline}`);
+			}
+
+			for (const fixture of fixtures) {
+				const whole = nativeHighlightCode(fixture, "diff", colors);
+				const chunks = fixture.match(/.*?(?:\r\n|\n|$)/gs)?.filter(chunk => chunk.length > 0) ?? [];
+				expect(chunks.map(chunk => nativeHighlightCode(chunk, "diff", colors)).join("")).toBe(whole);
+			}
+		});
 	});
 });
 

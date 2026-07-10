@@ -938,6 +938,14 @@ interface StreamPrefixLineCache extends RenderSignature {
 	lines: readonly string[];
 }
 
+interface StreamingDiffCache {
+	lineageKey: string;
+	lang: "diff" | "patch";
+	text: string;
+	completePrefixLength: number;
+	highlightedLines: readonly string[];
+}
+
 export class Markdown implements Component {
 	#text: string;
 	#paddingX: number; // Left/right padding
@@ -966,6 +974,7 @@ export class Markdown implements Component {
 	#streamPrefixText?: string;
 	#streamPrefixTokens?: Token[];
 	#streamPrefixLineCache?: StreamPrefixLineCache;
+	#streamingDiffCache?: StreamingDiffCache;
 	// Rows of the most recent render() that are settled — top padding plus the
 	// rendered frozen token prefix — exposed via getLastRenderSettledRows()
 	// for native-scrollback commit gating.
@@ -1021,6 +1030,7 @@ export class Markdown implements Component {
 			this.#streamPrefixText = undefined;
 			this.#streamPrefixTokens = undefined;
 			this.#streamPrefixLineCache = undefined;
+			this.#streamingDiffCache = undefined;
 			this.#settledExposedText = undefined;
 		}
 		this.invalidate();
@@ -1040,6 +1050,7 @@ export class Markdown implements Component {
 		const next = value === true;
 		if (this.#transientRenderCache === next) return;
 		this.#transientRenderCache = next;
+		this.#streamingDiffCache = undefined;
 		this.invalidate();
 	}
 
@@ -1331,7 +1342,7 @@ export class Markdown implements Component {
 		for (let i = start; i < end; i++) {
 			const token = tokens[i];
 			const nextToken = tokens[i + 1];
-			renderedLines.push(...this.#renderToken(token, contentWidth, nextToken?.type));
+			renderedLines.push(...this.#renderToken(token, contentWidth, nextToken?.type, undefined, `top-level:${i}`));
 		}
 
 		const wrappedLines: string[] = [];
@@ -1480,7 +1491,88 @@ export class Markdown implements Component {
 		};
 	}
 
-	#renderToken(token: Token, width: number, nextTokenType?: string, styleContext?: InlineStyleContext): string[] {
+	#renderCodeTokenBody(token: Tokens.Code, lineageKey?: string): string[] {
+		const text = token.text;
+		const highlightCode = this.#theme.highlightCode;
+		if (!this.transientRenderCache || this.#renderingFrozenPrefix) {
+			return highlightCode
+				? highlightCode(text, token.lang)
+				: text.split("\n").map(line => this.#theme.codeBlock(line));
+		}
+
+		const normalizedLang = token.lang?.toLowerCase();
+		if (!highlightCode || (normalizedLang !== "diff" && normalizedLang !== "patch")) {
+			return text.split("\n").map(line => this.#theme.codeBlock(line));
+		}
+
+		// Keep a single bounded lineage keyed by the fence's stable token path.
+		// Callers without a stable path skip the cache rather than risk sharing
+		// highlighted rows between unrelated fences.
+		if (lineageKey === undefined) {
+			return text.split("\n").map(line => this.#theme.codeBlock(line));
+		}
+
+		try {
+			const cached = this.#streamingDiffCache;
+			const appendsCachedLineage =
+				cached !== undefined &&
+				cached.lineageKey === lineageKey &&
+				cached.lang === normalizedLang &&
+				text.startsWith(cached.text);
+			const completePrefixLength = text.lastIndexOf("\n") + 1;
+			const cachedPrefixLength = appendsCachedLineage ? cached.completePrefixLength : 0;
+			if (
+				appendsCachedLineage &&
+				(cachedPrefixLength > completePrefixLength ||
+					text.slice(0, cachedPrefixLength) !== cached.text.slice(0, cachedPrefixLength))
+			) {
+				throw new Error("inconsistent streaming diff prefix");
+			}
+
+			const highlightedLines = appendsCachedLineage ? [...cached.highlightedLines] : [];
+			if (completePrefixLength > cachedPrefixLength) {
+				// The batch includes its original LF/CRLF terminators; only the
+				// synthetic split element after the final terminator is discarded.
+				const completeBatch = text.slice(cachedPrefixLength, completePrefixLength);
+				const expectedLines = completeBatch.split("\n").length - 1;
+				const highlightedBatch = highlightCode(completeBatch, token.lang);
+				if (highlightedBatch.length === expectedLines + 1 && highlightedBatch.at(-1) === "") {
+					highlightedBatch.pop();
+				}
+				if (highlightedBatch.length !== expectedLines) {
+					throw new Error("streaming diff highlight line mismatch");
+				}
+				highlightedLines.push(...highlightedBatch);
+			}
+
+			this.#streamingDiffCache = {
+				lineageKey,
+				lang: normalizedLang,
+				text,
+				completePrefixLength,
+				highlightedLines,
+			};
+
+			const tail = text.slice(completePrefixLength);
+			if (tail) {
+				const highlightedTail = highlightCode(tail, token.lang);
+				if (highlightedTail.length !== 1) throw new Error("streaming diff tail line mismatch");
+				return [...highlightedLines, highlightedTail[0]!];
+			}
+			return highlightedLines;
+		} catch {
+			this.#streamingDiffCache = undefined;
+			return text.split("\n").map(line => this.#theme.codeBlock(line));
+		}
+	}
+
+	#renderToken(
+		token: Token,
+		width: number,
+		nextTokenType?: string,
+		styleContext?: InlineStyleContext,
+		codeLineageKey?: string,
+	): string[] {
 		const lines: string[] = [];
 
 		// Display math block (own-line `$$…$$` / `\[…\]`): stack `\frac` vertically
@@ -1563,17 +1655,8 @@ export class Markdown implements Component {
 
 				const codeIndent = padding(this.#codeBlockIndent);
 				lines.push(this.#theme.codeBlockBorder(`\`\`\`${token.lang || ""}`));
-				if (this.#theme.highlightCode && (!this.transientRenderCache || this.#renderingFrozenPrefix)) {
-					const highlightedLines = this.#theme.highlightCode(token.text, token.lang);
-					for (const hlLine of highlightedLines) {
-						lines.push(`${codeIndent}${hlLine}`);
-					}
-				} else {
-					// Split code by newlines and style each line
-					const codeLines = token.text.split("\n");
-					for (const codeLine of codeLines) {
-						lines.push(`${codeIndent}${this.#theme.codeBlock(codeLine)}`);
-					}
+				for (const codeLine of this.#renderCodeTokenBody(token as Tokens.Code, codeLineageKey)) {
+					lines.push(`${codeIndent}${codeLine}`);
 				}
 				lines.push(this.#theme.codeBlockBorder("```"));
 				if (nextTokenType && nextTokenType !== "space") {
@@ -1583,7 +1666,7 @@ export class Markdown implements Component {
 			}
 
 			case "list": {
-				const listLines = this.#renderList(token as ListToken, 0, styleContext);
+				const listLines = this.#renderList(token as ListToken, 0, styleContext, codeLineageKey);
 				lines.push(...listLines);
 				// Don't add spacing after lists if a space token follows
 				// (the space token will handle it)
@@ -1858,7 +1941,7 @@ export class Markdown implements Component {
 	/**
 	 * Render a list with proper nesting support
 	 */
-	#renderList(token: ListToken, depth: number, styleContext?: InlineStyleContext): string[] {
+	#renderList(token: ListToken, depth: number, styleContext?: InlineStyleContext, codeLineageKey?: string): string[] {
 		const lines: string[] = [];
 		const indent = "  ".repeat(depth);
 		// Use the list's start property (defaults to 1 for ordered lists)
@@ -1873,7 +1956,12 @@ export class Markdown implements Component {
 
 			// Process item tokens; nested-list lines arrive structurally tagged and
 			// already carry their own full indent.
-			const itemLines = this.#renderListItem(item.tokens || [], depth, styleContext);
+			const itemLines = this.#renderListItem(
+				item.tokens || [],
+				depth,
+				styleContext,
+				codeLineageKey === undefined ? undefined : `${codeLineageKey}/item:${i}`,
+			);
 
 			if (itemLines.length > 0) {
 				const firstLine = itemLines[0]!;
@@ -1914,14 +2002,17 @@ export class Markdown implements Component {
 		tokens: Token[],
 		parentDepth: number,
 		styleContext?: InlineStyleContext,
+		codeLineageKey?: string,
 	): Array<{ text: string; nested: boolean }> {
 		const lines: Array<{ text: string; nested: boolean }> = [];
 
-		for (const token of tokens) {
+		for (let tokenIndex = 0; tokenIndex < tokens.length; tokenIndex++) {
+			const token = tokens[tokenIndex]!;
+			const tokenLineageKey = codeLineageKey === undefined ? undefined : `${codeLineageKey}/token:${tokenIndex}`;
 			if (token.type === "list") {
 				// Nested list - render with one additional indent level
 				// These lines carry their own indent, so tag them for pass-through
-				const nestedLines = this.#renderList(token as ListToken, parentDepth + 1, styleContext);
+				const nestedLines = this.#renderList(token as ListToken, parentDepth + 1, styleContext, tokenLineageKey);
 				for (const nestedLine of nestedLines) {
 					lines.push({ text: nestedLine, nested: true });
 				}
@@ -1953,16 +2044,8 @@ export class Markdown implements Component {
 				// Code block in list item
 				const codeIndent = padding(this.#codeBlockIndent);
 				lines.push({ text: this.#theme.codeBlockBorder(`\`\`\`${token.lang || ""}`), nested: false });
-				if (this.#theme.highlightCode && (!this.transientRenderCache || this.#renderingFrozenPrefix)) {
-					const highlightedLines = this.#theme.highlightCode(token.text, token.lang);
-					for (const hlLine of highlightedLines) {
-						lines.push({ text: `${codeIndent}${hlLine}`, nested: false });
-					}
-				} else {
-					const codeLines = token.text.split("\n");
-					for (const codeLine of codeLines) {
-						lines.push({ text: `${codeIndent}${this.#theme.codeBlock(codeLine)}`, nested: false });
-					}
+				for (const codeLine of this.#renderCodeTokenBody(token as Tokens.Code, tokenLineageKey)) {
+					lines.push({ text: `${codeIndent}${codeLine}`, nested: false });
 				}
 				lines.push({ text: this.#theme.codeBlockBorder("```"), nested: false });
 			} else if (isMathToken(token)) {
