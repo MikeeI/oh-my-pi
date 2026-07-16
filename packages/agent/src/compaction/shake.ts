@@ -202,17 +202,28 @@ function mergeRanges(ranges: Array<{ start: number; end: number }>): Array<{ sta
 	return kept;
 }
 
+function isDiffFence(text: string): boolean {
+	const openingLineEnd = text.indexOf("\n");
+	const openingLine = (openingLineEnd === -1 ? text : text.slice(0, openingLineEnd)).trimStart();
+	const markerLength =
+		openingLine[0] === "`" ? openingLine.match(/^`+/)?.[0].length : openingLine.match(/^~+/)?.[0].length;
+	if (!markerLength || markerLength < 3) return false;
+	const info = openingLine.slice(markerLength).trim().split(/\s+/, 1)[0]?.toLowerCase();
+	return info === "diff" || info === "patch" || info === "udiff";
+}
+
 function pushBlockRegions(
 	entry: SessionMessageEntry | CustomMessageEntry,
 	blockIndex: number,
 	text: string,
 	config: ShakeConfig,
 	label: string,
+	preserveDiffFences: boolean,
 	out: ShakeRegion[],
 ): void {
 	for (const range of scanTextForBlockRanges(text)) {
 		const slice = text.slice(range.start, range.end);
-		if (slice.length === 0) continue;
+		if (slice.length === 0 || (preserveDiffFences && isDiffFence(slice))) continue;
 		const tokens = countTokens(slice);
 		if (tokens < config.fenceMinTokens) continue;
 		out.push({
@@ -238,7 +249,7 @@ function collectBlockRegions(
 		if (message.role === "assistant") {
 			for (let bi = 0; bi < message.content.length; bi++) {
 				const block = message.content[bi];
-				if (block.type === "text") pushBlockRegions(entry, bi, block.text, config, "assistant", out);
+				if (block.type === "text") pushBlockRegions(entry, bi, block.text, config, "assistant", true, out);
 			}
 			return;
 		}
@@ -259,13 +270,13 @@ function scanContentBlocks(
 	out: ShakeRegion[],
 ): void {
 	if (typeof content === "string") {
-		pushBlockRegions(entry, -1, content, config, label, out);
+		pushBlockRegions(entry, -1, content, config, label, false, out);
 		return;
 	}
 	for (let bi = 0; bi < content.length; bi++) {
 		const block = content[bi];
 		if (block.type === "text" && typeof block.text === "string") {
-			pushBlockRegions(entry, bi, block.text, config, label, out);
+			pushBlockRegions(entry, bi, block.text, config, label, false, out);
 		}
 	}
 }

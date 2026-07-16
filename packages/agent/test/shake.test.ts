@@ -1,6 +1,11 @@
 import { describe, expect, test } from "bun:test";
 import type { AgentMessage } from "@oh-my-pi/pi-agent-core";
-import type { SessionEntry, SessionMessageEntry, ShakeConfig } from "@oh-my-pi/pi-agent-core/compaction";
+import type {
+	CustomMessageEntry,
+	SessionEntry,
+	SessionMessageEntry,
+	ShakeConfig,
+} from "@oh-my-pi/pi-agent-core/compaction";
 import {
 	AGGRESSIVE_SHAKE_CONFIG,
 	applyShakeRegion,
@@ -142,6 +147,56 @@ describe("collectShakeRegions — fenced / XML blocks", () => {
 		expect(collectShakeRegions([entry], cfg({ fenceMinTokens: 400 }))).toHaveLength(0);
 	});
 
+	test("preserves diff fences only for assistant-authored proposals", () => {
+		for (const lang of ["diff", "patch", "udiff"]) {
+			const text = `proposal\n${fencedBlock(120, lang)}\nafter`;
+			const customEntry: CustomMessageEntry = {
+				type: "custom_message",
+				id: nextId(),
+				parentId: null,
+				timestamp: new Date().toISOString(),
+				customType: "assistant",
+				content: text,
+				display: true,
+			};
+			const cases: Array<{ label: string; entry: SessionEntry; expectedKind?: "block" | "toolResult" }> = [
+				{
+					label: "assistant",
+					entry: messageEntry(assistantMessage([{ type: "text", text }])),
+				},
+				{
+					label: "user",
+					entry: messageEntry({ role: "user", content: [{ type: "text", text }], timestamp: Date.now() }),
+					expectedKind: "block",
+				},
+				{
+					label: "developer",
+					entry: messageEntry({ role: "developer", content: [{ type: "text", text }], timestamp: Date.now() }),
+					expectedKind: "block",
+				},
+				{
+					label: "custom",
+					entry: customEntry,
+					expectedKind: "block",
+				},
+				{
+					label: "toolResult",
+					entry: messageEntry(toolResultMessage("read", text)),
+					expectedKind: "toolResult",
+				},
+			];
+
+			for (const roleCase of cases) {
+				const regions = collectShakeRegions([roleCase.entry], cfg());
+				if (roleCase.expectedKind === undefined) {
+					expect(regions, `${lang}:${roleCase.label}`).toHaveLength(0);
+				} else {
+					expect(regions, `${lang}:${roleCase.label}`).toHaveLength(1);
+					expect(regions[0]?.kind, `${lang}:${roleCase.label}`).toBe(roleCase.expectedKind);
+				}
+			}
+		}
+	});
 	test("detects a top-level XML block", () => {
 		const xml = xmlBlock(120);
 		const text = `before\n${xml}\nafter`;

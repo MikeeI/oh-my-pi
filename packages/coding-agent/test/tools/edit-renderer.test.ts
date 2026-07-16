@@ -223,6 +223,41 @@ describe("editToolRenderer", () => {
 		expect(rendered).not.toContain(" …");
 	});
 
+	it("uses the sole per-file path when rebuilding a persisted edit result", async () => {
+		const uiTheme = await getUiTheme();
+		let renderedFilePath: string | undefined;
+		const diff = " 1|# Context\n-2|old\n+2|new";
+		const component = editToolRenderer.renderResult(
+			{
+				content: [{ type: "text", text: "Updated data/sync/agent/SYSTEM.template.md" }],
+				details: {
+					diff,
+					perFileResults: [
+						{
+							path: "data/sync/agent/SYSTEM.template.md",
+							diff,
+							op: "update",
+						},
+					],
+				},
+			},
+			{
+				expanded: false,
+				isPartial: false,
+				renderContext: {
+					renderDiff: (text, options) => {
+						renderedFilePath = options?.filePath;
+						return renderDiff(text, options);
+					},
+				},
+			},
+			uiTheme,
+		);
+
+		component.render(160);
+		expect(renderedFilePath).toBe("data/sync/agent/SYSTEM.template.md");
+	});
+
 	it("omits changed-line suffixes from completed edit headers and middle-elides long paths", async () => {
 		const uiTheme = await getUiTheme();
 		const component = editToolRenderer.renderResult(

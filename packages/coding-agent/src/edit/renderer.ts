@@ -809,6 +809,9 @@ export const editToolRenderer = {
 		if (perFileResults && (perFileResults.length > 1 || totalFiles > 1)) {
 			return renderMultiFileResult(perFileResults, totalFiles, options, uiTheme);
 		}
+		if (perFileResults?.length === 1) {
+			return renderSingleFileResult({ ...result, details: perFileResults[0] }, options, uiTheme, args);
+		}
 		return renderSingleFileResult(result, options, uiTheme, args);
 	},
 };
