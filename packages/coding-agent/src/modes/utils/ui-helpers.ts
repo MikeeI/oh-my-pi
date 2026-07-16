@@ -42,8 +42,8 @@ import {
 	type SkillPromptDetails,
 } from "../../session/messages";
 import type { SessionContext, StrippedToolCallsMarker } from "../../session/session-context";
-import { replaceTabs } from "../../tools/render-utils";
 import { parseSlashCommand } from "../../slash-commands/helpers/parse";
+import { replaceTabs } from "../../tools/render-utils";
 import { buildSkillCommandPrompt, invokeSkillCommandFromText, isKnownSkillCommand } from "../skill-command";
 import { createAssistantMessageComponent } from "./interactive-context-helpers";
 import {

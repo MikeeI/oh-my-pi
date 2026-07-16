@@ -967,7 +967,6 @@ export async function buildSystemPrompt(options: BuildSystemPromptOptions = {}):
 	];
 	const injectedAlwaysApplyRules = dedupeAlwaysApplyRules(alwaysApplyRules, promptSources);
 
-	const appendPrompt = resolvedAppendPrompt ?? "";
 	const environment = getEnvironmentInfo(cpuModel, gpu);
 	const renderData: prompt.TemplateContext = {
 		systemPromptCustomization: effectiveSystemPromptCustomization,

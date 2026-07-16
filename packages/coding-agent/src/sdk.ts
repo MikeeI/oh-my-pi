@@ -166,7 +166,6 @@ import {
 	BashTool,
 	BUILTIN_TOOLS,
 	type ContextFileEntry,
-	computeEssentialBuiltinNames,
 	createTools,
 	createVibeTools,
 	type DeferredDiagnosticsEntry,

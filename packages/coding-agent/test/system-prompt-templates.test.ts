@@ -716,8 +716,11 @@ describe("system Handlebars prompt templates", () => {
 				},
 			],
 			rules: [],
-			toolNames: ["read"],
-			tools: new Map([["read", { label: "Read", description: "Reads files" }]]),
+			toolNames: ["read", "write"],
+			tools: new Map([
+				["read", { label: "Read", description: "Reads files" }],
+				["write", { label: "Write", description: "Writes files" }],
+			]),
 			xdevTools: [{ name: "momp_xdev_smoke", summary: "Momp xdev smoke" }],
 			xdevDocs: "XDEV_DOCS_SENTINEL",
 			autoQaEnabled: true,
