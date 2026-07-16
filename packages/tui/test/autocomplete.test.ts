@@ -199,7 +199,7 @@ describe("CombinedAutocompleteProvider", () => {
 			}
 		});
 
-		it("returns @ file-reference completions inside slash command arguments without command completions", async () => {
+		it("keeps @ literal when a slash command exclusively owns its arguments", async () => {
 			const baseDir = fs.mkdtempSync(path.join(os.tmpdir(), "autocomplete-rename-args-"));
 			try {
 				fs.writeFileSync(path.join(baseDir, "copy-target.ts"), "export {};\n");
@@ -217,8 +217,7 @@ describe("CombinedAutocompleteProvider", () => {
 				const line = "/rename repro @";
 				const result = await provider.getSuggestions([line], 0, line.length);
 
-				expect(result?.prefix).toBe("@");
-				expect(result?.items.map(item => item.value)).toContain("@copy-target.ts");
+				expect(result).toBeNull();
 			} finally {
 				fs.rmSync(baseDir, { recursive: true, force: true });
 			}
