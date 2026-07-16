@@ -53,6 +53,7 @@ import {
 	renderChangelogEntries,
 } from "../utils/changelog";
 import { copyToClipboard } from "../utils/clipboard";
+import { generateSessionTitleFromRecentTranscript } from "../utils/title-generator";
 import { CollabQrCodeComponent } from "./helpers/collab-qrcode";
 import { buildContextReportText } from "./helpers/context-report";
 import { formatDuration } from "./helpers/format";
@@ -374,6 +375,7 @@ const BUILTIN_SLASH_COMMAND_REGISTRY: ReadonlyArray<SlashCommandSpec> = [
 		description: "Toggle plan mode (agent plans before executing)",
 		inlineHint: "[prompt]",
 		allowArgs: true,
+		argumentCompletionMode: "prompt",
 		getTuiAutocompleteDescription: runtime => {
 			if (!runtime.ctx.settings.get("plan.enabled" as SettingPath)) return "Plan: disabled in settings";
 			if (runtime.ctx.planModeEnabled) {
@@ -403,6 +405,7 @@ const BUILTIN_SLASH_COMMAND_REGISTRY: ReadonlyArray<SlashCommandSpec> = [
 		description: "Toggle vibe mode (direct persistent fast/good worker sessions; read-only toolset)",
 		inlineHint: "[prompt]",
 		allowArgs: true,
+		argumentCompletionMode: "prompt",
 		getTuiAutocompleteDescription: runtime => {
 			if (runtime.ctx.vibeModeEnabled) return "Vibe: on";
 			if (runtime.ctx.planModeEnabled) return "Vibe: blocked by plan mode";
@@ -427,6 +430,7 @@ const BUILTIN_SLASH_COMMAND_REGISTRY: ReadonlyArray<SlashCommandSpec> = [
 		],
 		inlineHint: "[objective]",
 		allowArgs: true,
+		argumentCompletionMode: "prompt",
 		getTuiAutocompleteDescription: runtime => {
 			if (!runtime.ctx.settings.get("goal.enabled" as SettingPath)) return "Goal: disabled in settings";
 			if (runtime.ctx.planModeEnabled) return "Goal: blocked by plan mode";
@@ -443,6 +447,7 @@ const BUILTIN_SLASH_COMMAND_REGISTRY: ReadonlyArray<SlashCommandSpec> = [
 		description: "Interview and refine a goal before enabling goal mode",
 		inlineHint: "[rough objective]",
 		allowArgs: true,
+		argumentCompletionMode: "prompt",
 		handleTui: async (command, runtime) => {
 			await runtime.ctx.handleGuidedGoalCommand(command.args || undefined);
 			runtime.ctx.editor.setText("");
@@ -454,6 +459,7 @@ const BUILTIN_SLASH_COMMAND_REGISTRY: ReadonlyArray<SlashCommandSpec> = [
 			"Toggle loop mode. While enabled, the next prompt you send re-submits after every yield. Esc cancels the current iteration; /loop again to disable.",
 		inlineHint: "[count|duration] [prompt]",
 		allowArgs: true,
+		argumentCompletionMode: "prompt",
 		getTuiAutocompleteDescription: runtime => {
 			if (!runtime.ctx.loopModeEnabled) return "Loop: off";
 			if (runtime.ctx.loopModePaused) return "Loop: paused";
@@ -474,6 +480,7 @@ const BUILTIN_SLASH_COMMAND_REGISTRY: ReadonlyArray<SlashCommandSpec> = [
 		description: "Queue a message for after the agent yields",
 		inlineHint: "<message>",
 		allowArgs: true,
+		argumentCompletionMode: "prompt",
 		handleTui: async (command, runtime) => {
 			await runtime.ctx.handleQueueCommand(command.args);
 		},
@@ -1709,6 +1716,7 @@ const BUILTIN_SLASH_COMMAND_REGISTRY: ReadonlyArray<SlashCommandSpec> = [
 		description: "Hand off session context to a new session",
 		inlineHint: "[focus instructions]",
 		allowArgs: true,
+		argumentCompletionMode: "prompt",
 		handleTui: async (command, runtime) => {
 			const customInstructions = command.args || undefined;
 			runtime.ctx.editor.setText("");
@@ -1745,6 +1753,7 @@ const BUILTIN_SLASH_COMMAND_REGISTRY: ReadonlyArray<SlashCommandSpec> = [
 		description: "Ask an ephemeral side question using the current session context",
 		inlineHint: "<question>",
 		allowArgs: true,
+		argumentCompletionMode: "prompt",
 		handleTui: async (command, runtime) => {
 			const question = command.text.slice(`/${command.name}`.length).trim();
 			runtime.ctx.editor.setText("");
@@ -1866,27 +1875,42 @@ const BUILTIN_SLASH_COMMAND_REGISTRY: ReadonlyArray<SlashCommandSpec> = [
 	},
 	{
 		name: "rename",
-		description: "Rename the current session",
-		inlineHint: "<title>",
+		description: "Rename the current session, or generate a name from recent messages",
+		inlineHint: "[title]",
 		allowArgs: true,
+		argumentCompletionMode: "exclusive",
 		handle: async (command, runtime) => {
-			if (!command.args) return usage("Usage: /rename <title>", runtime);
-			const ok = await runtime.sessionManager.setSessionName(command.args, "user");
+			const explicitTitle = command.args.trim();
+			let title: string | null;
+			try {
+				title =
+					explicitTitle ||
+					(await generateSessionTitleFromRecentTranscript(
+						runtime.session.messages,
+						runtime.session.modelRegistry,
+						runtime.settings,
+						runtime.session.sessionId,
+						runtime.session.model,
+					));
+			} catch (err) {
+				await runtime.output(errorMessage(err));
+				return commandConsumed();
+			}
+			if (!title) {
+				await runtime.output("No conversation content to generate a title from.");
+				return commandConsumed();
+			}
+			const ok = await runtime.sessionManager.setSessionName(title, "user");
 			if (!ok) {
 				await runtime.output("Session name not changed (a user-set name takes precedence).");
 				return commandConsumed();
 			}
 			await runtime.notifyTitleChanged?.();
-			await runtime.output(`Session renamed to ${command.args}.`);
+			await runtime.output(`Session renamed to ${runtime.sessionManager.getSessionName() ?? title}.`);
 			return commandConsumed();
 		},
 		handleTui: async (command, runtime) => {
 			const title = command.args.trim();
-			if (!title) {
-				runtime.ctx.showError("Usage: /rename <title>");
-				runtime.ctx.editor.setText("");
-				return;
-			}
 			runtime.ctx.editor.setText("");
 			await runtime.ctx.handleRenameCommand(title);
 		},
@@ -2545,6 +2569,7 @@ const BUILTIN_SLASH_COMMAND_REGISTRY: ReadonlyArray<SlashCommandSpec> = [
 		aliases: ["force:"],
 		inlineHint: "<tool-name> [prompt]",
 		allowArgs: true,
+		argumentCompletionMode: "prompt",
 		getTuiAutocompleteDescription: runtime => {
 			const count = runtime.ctx.session.getActiveToolNames().length;
 			return count === 0 ? "Force: no active tools" : `Force: ${count} active tools`;
@@ -2792,6 +2817,7 @@ export const BUILTIN_SLASH_COMMAND_DEFS: ReadonlyArray<BuiltinSlashCommand> = BU
 		name: command.name,
 		aliases: command.aliases,
 		allowArgs: command.allowArgs === true,
+		argumentCompletionMode: command.argumentCompletionMode,
 		description: command.description,
 		subcommands: command.subcommands,
 		inlineHint: command.inlineHint,

@@ -33,7 +33,12 @@ import { UserMessageComponent } from "../../modes/components/user-message";
 import { decodeStreamedToolArgs, streamingStringKeysForTool } from "../../modes/controllers/tool-args-reveal";
 import { materializeImageReferenceLinksSync } from "../../modes/image-references";
 import { theme } from "../../modes/theme/theme";
-import type { CompactionQueuedMessage, InteractiveModeContext, RenderSessionContextOptions } from "../../modes/types";
+import type {
+	CompactionQueuedMessage,
+	InteractiveModeContext,
+	NewVersionNotificationOptions,
+	RenderSessionContextOptions,
+} from "../../modes/types";
 import {
 	BACKGROUND_TAN_DISPATCH_MESSAGE_TYPE,
 	type CustomMessage,
@@ -43,6 +48,7 @@ import {
 } from "../../session/messages";
 import type { SessionContext, StrippedToolCallsMarker } from "../../session/session-context";
 import { replaceTabs } from "../../tools/render-utils";
+import { parseSlashCommand } from "../../slash-commands/helpers/parse";
 import { buildSkillCommandPrompt, invokeSkillCommandFromText, isKnownSkillCommand } from "../skill-command";
 import { createAssistantMessageComponent } from "./interactive-context-helpers";
 import {
@@ -725,15 +731,16 @@ export class UiHelpers {
 		this.ctx.present([new Spacer(1), text]);
 	}
 
-	showNewVersionNotification(newVersion: string): void {
+	showNewVersionNotification(newVersion: string, options: NewVersionNotificationOptions = {}): void {
 		const block = new TranscriptBlock();
+		const source = options.sourceLabel ? `${options.sourceLabel} ` : "";
+		const actionText = options.actionText ?? "Run: omp update";
 		block.addChild(new DynamicBorder(text => theme.fg("warning", text)));
 		block.addChild(
 			new Text(
 				theme.bold(theme.fg("warning", "Update Available")) +
 					"\n" +
-					theme.fg("muted", `New version ${newVersion} is available. Run: `) +
-					theme.fg("accent", "omp update"),
+					theme.fg("muted", `New ${source}version ${newVersion} is available. ${actionText}`),
 				1,
 				0,
 			),
@@ -813,10 +820,9 @@ export class UiHelpers {
 	}
 
 	isKnownSlashCommand(text: string): boolean {
-		if (!text.startsWith("/")) return false;
-		const spaceIndex = text.indexOf(" ");
-		const commandName = spaceIndex === -1 ? text.slice(1) : text.slice(1, spaceIndex);
-		if (!commandName) return false;
+		const parsed = parseSlashCommand(text);
+		if (!parsed) return false;
+		const commandName = parsed.name;
 
 		if (this.ctx.session.extensionRunner?.getCommand(commandName)) {
 			return true;
@@ -828,7 +834,7 @@ export class UiHelpers {
 			}
 		}
 
-		return this.ctx.fileSlashCommands.has(commandName);
+		return this.ctx.fileSlashCommands.has(commandName) || this.ctx.routineSlashCommands.has(commandName);
 	}
 
 	async flushCompactionQueue(options?: { willRetry?: boolean }): Promise<void> {

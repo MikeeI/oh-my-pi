@@ -63,6 +63,9 @@ export default class Index extends Command {
 		"append-system-prompt": Flags.string({
 			description: "Append text or file contents to the system prompt",
 		}),
+		"agents-file": Flags.string({
+			description: "Replace the user-level AGENTS.md for this process",
+		}),
 		"allow-home": Flags.boolean({
 			description: "Allow starting in ~ without auto-switching to a temp dir",
 		}),
