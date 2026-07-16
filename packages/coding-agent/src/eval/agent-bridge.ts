@@ -12,6 +12,7 @@ import type { AgentProgress, SingleResult } from "../task/types";
 import type { NestedRepoPatch } from "../task/worktree";
 import type { ToolSession } from "../tools";
 import { ToolError } from "../tools/tool-errors";
+import { isAgentsContextFile } from "../utils/context-files";
 import { withBridgeTimeoutPause } from "./bridge-timeout";
 import type { JsStatusEvent } from "./js/shared/types";
 // Import review tools for side effects (registers subagent tool handlers).
@@ -221,4 +222,5 @@ export async function runEvalAgent(args: unknown, options: EvalAgentBridgeOption
 		if (error instanceof StructuredSubagentError) throw new ToolError(error.message);
 		throw error;
 	}
+
 }

@@ -34,6 +34,7 @@ export const commands: CommandEntry[] = [
 	{ name: "say", load: () => import("./commands/say").then(m => m.default) },
 	{ name: "setup", load: () => import("./commands/setup").then(m => m.default) },
 	{ name: "shell", load: () => import("./commands/shell").then(m => m.default) },
+	{ name: "system-prompt", load: () => import("./commands/system-prompt").then(m => m.default) },
 	{ name: "read", load: () => import("./commands/read").then(m => m.default) },
 	{ name: "ssh", load: () => import("./commands/ssh").then(m => m.default) },
 	{ name: "stats", load: () => import("./commands/stats").then(m => m.default) },

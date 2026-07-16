@@ -8,6 +8,7 @@ export { Container, Markdown, Spacer, Text } from "@oh-my-pi/pi-tui";
 export { getAgentDir, logger, VERSION } from "@oh-my-pi/pi-utils";
 export * as zod from "zod/v4";
 export { z } from "zod/v4";
+export type { Routine } from "./capability/routine";
 export * from "./config/keybindings";
 export * from "./config/model-registry";
 // Prompt templates
