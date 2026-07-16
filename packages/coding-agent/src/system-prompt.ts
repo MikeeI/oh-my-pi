@@ -994,7 +994,6 @@ import { expandTilde } from "./tools/path-utils";
 	];
 	const injectedAlwaysApplyRules = dedupeAlwaysApplyRules(alwaysApplyRules, promptSources);
 
-	const appendPrompt = resolvedAppendPrompt ?? "";
 	const environment = getEnvironmentInfo(cpuModel, gpu);
 	const renderData: prompt.TemplateContext = {
 		systemPromptCustomization: effectiveSystemPromptCustomization,
