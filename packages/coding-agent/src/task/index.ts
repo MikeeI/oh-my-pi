@@ -26,7 +26,6 @@ import taskSummaryTemplate from "../prompts/tools/task-summary.md" with { type: 
 import { truncateForPrompt } from "../tools/approval";
 import { isIrcEnabled } from "../tools/hub";
 import { formatBytes, formatDuration } from "../tools/render-utils";
-import { isAgentsContextFile } from "../utils/context-files";
 import { resolveSpawnPolicy } from "./spawn-policy";
 import {
 	type AgentDefinition,
