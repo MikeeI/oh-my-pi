@@ -27,7 +27,6 @@ import { TASK_EFFORTS, type TaskEffort } from "../thinking";
 import { truncateForPrompt } from "../tools/approval";
 import { isIrcEnabled } from "../tools/hub";
 import { formatBytes, formatDuration } from "../tools/render-utils";
-import { isAgentsContextFile } from "../utils/context-files";
 import { resolveSpawnPolicy } from "./spawn-policy";
 import {
 	type AgentDefinition,
