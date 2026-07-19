@@ -141,7 +141,7 @@ export default class SystemPrompt extends Command {
 		const cwd = await resolveCwd(flags.cwd);
 		const result = await inspectSystemPrompt(cwd);
 		const mode = flags["dynamic-parts"] ? "dynamic-parts" : "provider";
-		process.stdout.write(formatInspectOutput(cwd, result, { mode, json: flags.json === true }));
+		await Bun.write(Bun.stdout, formatInspectOutput(cwd, result, { mode, json: flags.json === true }));
 		await postmortem.quit(0);
 	}
 }
