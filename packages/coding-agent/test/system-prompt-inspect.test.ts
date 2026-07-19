@@ -1,8 +1,9 @@
 import { describe, expect, test } from "bun:test";
 import * as path from "node:path";
+import { countTokens, Encoding } from "@oh-my-pi/pi-natives";
 import { TempDir } from "@oh-my-pi/pi-utils";
 import type { CliConfig } from "@oh-my-pi/pi-utils/cli";
-import SystemPromptCommand, { formatInspectOutput } from "../src/commands/system-prompt";
+import SystemPromptCommand, { formatInspectOutput, type SystemPromptInspection } from "../src/commands/system-prompt";
 import { buildSystemPrompt, type DynamicPromptPart, type SystemPromptToolMetadata } from "../src/system-prompt";
 
 const TEST_CONFIG: CliConfig = {
@@ -230,6 +231,93 @@ describe("system-prompt inspect output", () => {
 			blocks: result.dynamicParts,
 		});
 	});
+
+	test("system-prompt inspect --breakdown --json separates source, tool prompt, and schema shares", () => {
+		const inspection: SystemPromptInspection = {
+			...result,
+			model: { provider: "openai-codex", id: "gpt-5.4" },
+			providerTools: [
+				{
+					name: "read",
+					description: "Read files",
+					parameters: {
+						type: "object",
+						properties: { path: { type: "string" } },
+						required: ["path"],
+						additionalProperties: false,
+					},
+					customFormat: { syntax: "lark", definition: "start: PATH" },
+				},
+			],
+		};
+		const parsed = JSON.parse(formatInspectOutput("/tmp/project", inspection, { mode: "breakdown", json: true })) as {
+			mode: string;
+			tokenizer: { provider: string; encoding: string };
+			measurementScope: { includes: string[]; excludes: string[] };
+			totalMeasuredContextTokens: number;
+			categories: {
+				providerPrompt: { tokens: number; percentOfMeasuredContext: number };
+				toolPrompts: { tokens: number; percentOfMeasuredContext: number };
+				toolSchemas: { tokens: number; percentOfMeasuredContext: number };
+			};
+			dynamicParts: Array<{ id: string; source: string; tokens: number; percentOfMeasuredContext: number }>;
+			dynamicSources: Array<{ source: string; tokens: number; percentOfMeasuredContext: number }>;
+			dynamicPercentagesMayOverlap: boolean;
+			tools: Array<{
+				name: string;
+				prompt: { tokens: number; percentOfMeasuredContext: number };
+				schema: { tokens: number; percentOfMeasuredContext: number };
+			}>;
+		};
+		const providerTokens = countTokens(inspection.systemPrompt, Encoding.O200kBase);
+		const promptTokens = countTokens(["Read files"], Encoding.O200kBase);
+		const inspectedTool = inspection.providerTools[0];
+		const schemaTokens = countTokens(
+			[`${JSON.stringify(inspectedTool?.parameters ?? {})}\n${JSON.stringify(inspectedTool?.customFormat ?? {})}`],
+			Encoding.O200kBase,
+		);
+
+		expect(parsed).toMatchObject({
+			mode: "breakdown",
+			tokenizer: { provider: "openai", encoding: "o200k_base" },
+			measurementScope: {
+				includes: expect.arrayContaining(["tool parameter schemas and grammars"]),
+				excludes: expect.arrayContaining(["provider-specific request framing and control metadata"]),
+			},
+			totalMeasuredContextTokens: providerTokens + promptTokens + schemaTokens,
+			dynamicPercentagesMayOverlap: true,
+		});
+		expect(parsed.categories.providerPrompt.tokens).toBe(providerTokens);
+		expect(parsed.categories.toolPrompts.tokens).toBe(promptTokens);
+		expect(parsed.categories.toolSchemas.tokens).toBe(schemaTokens);
+		expect(parsed.dynamicParts).toEqual([
+			expect.objectContaining({
+				id: "append-system-prompt",
+				source: "append-system-prompt",
+				tokens: countTokens(["Append text"], Encoding.O200kBase),
+			}),
+		]);
+		expect(parsed.dynamicSources).toEqual([
+			expect.objectContaining({
+				source: "append-system-prompt",
+				tokens: countTokens(["Append text"], Encoding.O200kBase),
+			}),
+		]);
+		expect(parsed.tools).toEqual([
+			expect.objectContaining({
+				name: "read",
+				prompt: expect.objectContaining({ tokens: promptTokens }),
+				schema: expect.objectContaining({ tokens: schemaTokens }),
+			}),
+		]);
+		expect(
+			parsed.categories.providerPrompt.percentOfMeasuredContext +
+				parsed.categories.toolPrompts.percentOfMeasuredContext +
+				parsed.categories.toolSchemas.percentOfMeasuredContext,
+		).toBeCloseTo(100, 1);
+		expect(parsed.dynamicParts[0]?.percentOfMeasuredContext).toBeGreaterThan(0);
+		expect(parsed.dynamicSources[0]?.percentOfMeasuredContext).toBeGreaterThan(0);
+	});
 });
 
 describe("system-prompt command", () => {
@@ -239,6 +327,13 @@ describe("system-prompt command", () => {
 		expect(parsed.args.action).toBe("inspect");
 		expect(parsed.flags.cwd).toBe("/tmp");
 		expect(parsed.flags["dynamic-parts"]).toBe(true);
+		expect(parsed.flags.json).toBe(true);
+	});
+
+	test("parses the breakdown flag", async () => {
+		const command = new SystemPromptCommand(["inspect", "--breakdown", "--json"], TEST_CONFIG);
+		const parsed = await command.parse(SystemPromptCommand);
+		expect(parsed.flags.breakdown).toBe(true);
 		expect(parsed.flags.json).toBe(true);
 	});
 
@@ -279,8 +374,8 @@ describe("system-prompt command", () => {
 		}
 	});
 
-	test("--provider combined with --dynamic-parts throws", async () => {
+	test("rejects combined output modes", async () => {
 		const command = new SystemPromptCommand(["inspect", "--provider", "--dynamic-parts"], TEST_CONFIG);
-		await expect(command.run()).rejects.toThrow("Use either --provider or --dynamic-parts, not both");
+		await expect(command.run()).rejects.toThrow("Use only one of --provider, --dynamic-parts, or --breakdown");
 	});
 });
