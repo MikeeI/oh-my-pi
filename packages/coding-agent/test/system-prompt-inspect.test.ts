@@ -1,4 +1,6 @@
 import { describe, expect, test } from "bun:test";
+import * as path from "node:path";
+import { TempDir } from "@oh-my-pi/pi-utils";
 import type { CliConfig } from "@oh-my-pi/pi-utils/cli";
 import SystemPromptCommand, { formatInspectOutput } from "../src/commands/system-prompt";
 import { buildSystemPrompt, type DynamicPromptPart, type SystemPromptToolMetadata } from "../src/system-prompt";
@@ -8,6 +10,10 @@ const TEST_CONFIG: CliConfig = {
 	version: "0.0.0-test",
 	commands: new Map(),
 };
+
+const CLI_ENTRY = path.join(import.meta.dir, "..", "src", "cli.ts");
+const PIPE_BUFFER_BYTES = 64 * 1024;
+const LARGE_PROMPT_BYTES = PIPE_BUFFER_BYTES + 32 * 1024;
 
 const tools = new Map<string, SystemPromptToolMetadata>([
 	["read", { wireName: "read", label: "Read", description: "Read files" }],
@@ -234,6 +240,37 @@ describe("system-prompt command", () => {
 		expect(parsed.flags.cwd).toBe("/tmp");
 		expect(parsed.flags["dynamic-parts"]).toBe(true);
 		expect(parsed.flags.json).toBe(true);
+	});
+
+	test("writes provider JSON larger than the stdout pipe buffer completely", async () => {
+		const tempDir = TempDir.createSync("@omp-system-prompt-inspect-");
+		const marker = "large-provider-prompt-marker";
+		const projectDir = path.join(tempDir.path(), "project");
+		try {
+			await Bun.write(path.join(projectDir, "AGENTS.md"), `${marker}\n${"x".repeat(LARGE_PROMPT_BYTES)}`);
+			const proc = Bun.spawn(
+				[process.execPath, CLI_ENTRY, "system-prompt", "inspect", "--cwd", projectDir, "--provider", "--json"],
+				{
+					stdout: "pipe",
+					stderr: "pipe",
+					env: {
+						...process.env,
+						NO_COLOR: "1",
+						PI_CODING_AGENT_DIR: path.join(tempDir.path(), "agent"),
+					},
+				},
+			);
+			const stdout = new Response(proc.stdout).text();
+			const stderr = new Response(proc.stderr).text();
+			const [exitCode, output, error] = await Promise.all([proc.exited, stdout, stderr]);
+
+			expect({ exitCode, error }).toEqual({ exitCode: 0, error: "" });
+			expect(output.length).toBeGreaterThan(PIPE_BUFFER_BYTES);
+			const parsed = JSON.parse(output) as { blocks: Array<{ text: string }> };
+			expect(parsed.blocks.some(block => block.text.includes(marker))).toBe(true);
+		} finally {
+			await tempDir.remove();
+		}
 	});
 
 	test("--provider combined with --dynamic-parts throws", async () => {
