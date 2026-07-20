@@ -206,6 +206,38 @@ function isAnonymousPrivate(mapping: ParsedMapping): boolean {
 	return anonymousPath && mapping.perms.endsWith("p");
 }
 
+function anonymousMappingLabel(pathname: string): string {
+	switch (pathname) {
+		case "":
+			return "(anonymous)";
+		case "[heap]":
+			return "[heap]";
+		case "[anon:WKFastMalloc]":
+			return "[anon:WKFastMalloc]";
+		case "[anon:JSJITCode]":
+			return "[anon:JSJITCode]";
+		case "[anon:JSStructureHeap]":
+			return "[anon:JSStructureHeap]";
+		default:
+			return "[anon:other]";
+	}
+}
+
+function mappingPermsLabel(perms: string): string {
+	switch (perms) {
+		case "rw-p":
+			return "rw-p";
+		case "rwxp":
+			return "rwxp";
+		case "r--p":
+			return "r--p";
+		case "---p":
+			return "---p";
+		default:
+			return "other-private";
+	}
+}
+
 function summarizeMappings(text: string): MappingSummary {
 	const anonymous = parseMappings(text)
 		.filter(isAnonymousPrivate)
@@ -215,8 +247,8 @@ function summarizeMappings(text: string): MappingSummary {
 			const privateKb = (mapping.fields.Private_Clean ?? 0) + (mapping.fields.Private_Dirty ?? 0);
 			return {
 				range: `${mapping.start.toString(16)}-${mapping.end.toString(16)}`,
-				perms: mapping.perms,
-				pathname: mapping.pathname || "(anonymous)",
+				perms: mappingPermsLabel(mapping.perms),
+				pathname: anonymousMappingLabel(mapping.pathname),
 				virtualKb,
 				rssKb,
 				privateKb,
@@ -226,13 +258,16 @@ function summarizeMappings(text: string): MappingSummary {
 		mapping =>
 			mapping.virtualKb === SIXTY_FOUR_MIB_KB && mapping.rssKb / mapping.virtualKb >= FULLY_RESIDENT_FRACTION,
 	).length;
-	return {
+	const summary: MappingSummary = {
 		anonymousPrivateCount: anonymous.length,
 		anonymousPrivateVirtualKb: anonymous.reduce((sum, mapping) => sum + mapping.virtualKb, 0),
 		anonymousPrivateRssKb: anonymous.reduce((sum, mapping) => sum + mapping.rssKb, 0),
 		fullyResident64MiBCount,
 		topAnonymousPrivate: anonymous.sort((left, right) => right.rssKb - left.rssKb).slice(0, TOP_MAPPING_COUNT),
 	};
+	// JSC retains the most recent RegExp input; replace the multi-MiB smaps source before heap snapshots.
+	void /^x$/.exec("x");
+	return summary;
 }
 
 function registrySnapshot(): Sample["registry"] {
@@ -431,6 +466,12 @@ async function main(): Promise<void> {
 		await recordSample("post_idle_ttl", true);
 		Bun.gc(true);
 		await recordSample("forced_gc", true);
+		if (options.heapSnapshot) {
+			await Bun.sleep(0);
+			Bun.gc(true);
+			await Bun.sleep(0);
+			Bun.gc(true);
+		}
 
 		if (options.heapSnapshot) {
 			printLine("heap_snapshot=running");
