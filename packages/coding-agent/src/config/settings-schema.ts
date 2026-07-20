@@ -931,7 +931,7 @@ export const SETTINGS_SCHEMA = {
 			group: "Display",
 			label: "Rewrite Scrollback",
 			description:
-				"Erase and replay terminal scrollback when a block's final form replaces its live preview. When off (default), stale preview copies remain in history and the final content is appended below.",
+				"On direct terminals, erase and replay scrollback when a block's final form replaces its live preview. Multiplexers never use this because ED3 clears their entire pane history. When off (default), stale preview copies may remain and final content is appended below.",
 		},
 	},
 
