@@ -64,6 +64,15 @@ export function formatInspectOutput(
 	return options.json ? `${JSON.stringify(output, null, 2)}\n` : `${renderProviderBlocks(result.systemPrompt)}\n`;
 }
 
+async function writeStdout(text: string): Promise<void> {
+	const { promise, resolve, reject } = Promise.withResolvers<void>();
+	process.stdout.write(text, error => {
+		if (error) reject(error);
+		else resolve();
+	});
+	await promise;
+}
+
 async function resolveCwd(cwdFlag: string | undefined): Promise<string> {
 	const cwd = path.resolve(cwdFlag ?? process.cwd());
 	const stat = await fs.stat(cwd).catch((error: unknown) => {
@@ -140,8 +149,8 @@ export default class SystemPrompt extends Command {
 
 		const cwd = await resolveCwd(flags.cwd);
 		const result = await inspectSystemPrompt(cwd);
-		const mode = flags["dynamic-parts"] ? "dynamic-parts" : "provider";
-		await Bun.write(Bun.stdout, formatInspectOutput(cwd, result, { mode, json: flags.json === true }));
+		const mode = flags.breakdown ? "breakdown" : flags["dynamic-parts"] ? "dynamic-parts" : "provider";
+		await writeStdout(formatInspectOutput(cwd, result, { mode, json: flags.json === true }));
 		await postmortem.quit(0);
 	}
 }
