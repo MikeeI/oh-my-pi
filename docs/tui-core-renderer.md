@@ -122,7 +122,11 @@ resize outside a multiplexer, `resetDisplay()` (Ctrl+L). It clears native
 history without `ED2` first; the replay overwrites every row from home so
 terminals without synchronized output do not expose a blank viewport. A gesture
 pins the user to the tail, so the history snap is acceptable; multiplexers never
-get ED3 (it is a no-op there and a replay would duplicate pane history).
+get ED3. In tmux 3.4, `CSI 3 J` calls
+[`screen_write_clearhistory`](https://github.com/tmux/tmux/blob/3.4/input.c#L1508-L1529),
+which deletes the pane's entire history. OMP excludes multiplexers to protect
+pre-OMP shell output and scrolled readers; replaying would also duplicate pane
+history.
 
 The ordinary update path never emits ED2/ED3 or an absolute cursor home —
 several terminal families snap a scrolled reader to the bottom on those.

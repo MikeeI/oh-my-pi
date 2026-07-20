@@ -4,6 +4,7 @@ import {
 	Image,
 	type ImageBudget,
 	ImageProtocol,
+	isInsideTerminalMultiplexer,
 	Markdown,
 	replaceTabs,
 	Spacer,
@@ -452,6 +453,10 @@ export class AssistantMessageComponent extends Container {
 
 	isTranscriptBlockFinalized(): boolean {
 		return this.#transcriptBlockFinalized;
+	}
+
+	isNativeScrollbackLiveRegionPinned(): boolean {
+		return !this.#transcriptBlockFinalized && isInsideTerminalMultiplexer();
 	}
 
 	/**
