@@ -4479,13 +4479,13 @@ export const SETTINGS_SCHEMA = {
 
 	"task.enableLsp": {
 		type: "boolean",
-		default: false,
+		default: true,
 		ui: {
 			tab: "tasks",
 			group: "Subagents",
 			label: "LSP in Subagents",
 			description:
-				"Allow subagents spawned via the task tool to use the lsp tool. Off by default to keep subagents cheap; enable when LSP-aware delegation is worth the extra tokens.",
+				"Allow all subagents to use the lsp tool when their agent definition includes it. The parent session's LSP capability and plan-mode restrictions still apply.",
 		},
 	},
 
