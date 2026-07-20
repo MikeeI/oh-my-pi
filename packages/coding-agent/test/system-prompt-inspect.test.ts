@@ -341,8 +341,13 @@ describe("system-prompt command", () => {
 		const tempDir = TempDir.createSync("@omp-system-prompt-inspect-");
 		const marker = "large-provider-prompt-marker";
 		const projectDir = path.join(tempDir.path(), "project");
+		const agentDir = path.join(tempDir.path(), "agent");
 		try {
 			await Bun.write(path.join(projectDir, "AGENTS.md"), `${marker}\n${"x".repeat(LARGE_PROMPT_BYTES)}`);
+			await Bun.write(
+				path.join(agentDir, "settings.json"),
+				JSON.stringify({ modelRoles: { default: "anthropic/claude-sonnet-4-5" } }),
+			);
 			const proc = Bun.spawn(
 				[process.execPath, CLI_ENTRY, "system-prompt", "inspect", "--cwd", projectDir, "--provider", "--json"],
 				{
@@ -350,8 +355,9 @@ describe("system-prompt command", () => {
 					stderr: "pipe",
 					env: {
 						...process.env,
+						ANTHROPIC_API_KEY: "test-key",
 						NO_COLOR: "1",
-						PI_CODING_AGENT_DIR: path.join(tempDir.path(), "agent"),
+						PI_CODING_AGENT_DIR: agentDir,
 					},
 				},
 			);
