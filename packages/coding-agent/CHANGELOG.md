@@ -270,6 +270,9 @@
 ### Fixed
 
 - Fixed Portkey/gateway custom models whose ids start with `@` (e.g. `@modal/GLM-5-2-FP8`) being rewritten to unrelated bundled wire ids (e.g. `glm-5-2`), which caused `400` responses requiring `x-portkey-config` or `x-portkey-provider`.
+### Fixed
+
+- Prevented explicitly marked AGENTS overrides from being inherited by Task and Eval subagents.
 
 ## [17.0.6] - 2026-07-20
 
