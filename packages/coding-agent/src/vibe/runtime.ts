@@ -35,8 +35,8 @@ import { type AgentDefinition, type AgentProgress, oneLineLabel, type SingleResu
 import type { ToolSession } from "../tools";
 import { formatDuration } from "../tools/render-utils";
 import { ToolError } from "../tools/tool-errors";
-import { calculateTokensPerSecond } from "../utils/token-rate";
 import { isAgentsContextFile } from "../utils/context-files";
+import { calculateTokensPerSecond } from "../utils/token-rate";
 
 /** The two worker CLI flavors the director drives. */
 export type VibeCli = "fast" | "good";

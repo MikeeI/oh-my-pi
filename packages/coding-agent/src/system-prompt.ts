@@ -27,10 +27,8 @@ import projectPromptTemplate from "./prompts/system/project-prompt.md" with { ty
 import defaultSystemPromptTemplate from "./prompts/system/system-prompt.md" with { type: "text" };
 import { normalizeConcurrencyLimit } from "./task/parallel";
 import { usesCodexTaskPrompt } from "./task/prompt-policy";
-1: import type { ContextFileEntry } from "./tools";
+import type { ContextFileEntry } from "./tools";
 import { expandTilde } from "./tools/path-utils";
-2: 	const promptCwd = normalizePromptPath(resolvedCwd);
-	const activeRepoContextPrompt = renderActiveRepoContextPrompt(activeRepoContext);
 import { type ActiveRepoContext, resolveActiveRepoContext } from "./utils/active-repo-context";
 import { formatLocalCalendarDate } from "./utils/local-date";
 import { normalizePromptPath } from "./utils/prompt-path";
@@ -924,10 +922,7 @@ export async function buildSystemPrompt(options: BuildSystemPromptOptions = {}):
 
 	const date = formatLocalCalendarDate();
 	const dateTime = date;
-1: import type { ContextFileEntry } from "./tools";
-import { expandTilde } from "./tools/path-utils";
-2: 	const promptCwd = normalizePromptPath(resolvedCwd);
-	const activeRepoContextPrompt = renderActiveRepoContextPrompt(activeRepoContext);
+	const promptCwd = normalizePromptPath(resolvedCwd);
 
 	// Build tool metadata for system prompt rendering.
 	// Priority: explicit list > tools map > conservative SDK fallback.

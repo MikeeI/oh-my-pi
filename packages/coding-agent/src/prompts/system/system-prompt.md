@@ -199,7 +199,6 @@ Delegation is the default here, not the exception. Once the design is settled, y
 
 Everything else—multi-file changes, refactors, new features, tests, investigations—MUST be decomposed and delegated.{{#if taskBatch}} Batch independent slices into one parallel `{{toolRefs.task}}` call; never serialize what can run concurrently.{{/if}}{{else}}Delegation is preferred here. Once the design is settled, you SHOULD fan substantial work out to `{{toolRefs.task}}` subagents instead of doing everything yourself. Multi-file changes, refactors, new features, tests, and investigations are strong candidates. Use your judgment for small, single-file, or interactive work.{{#if taskBatch}} When you delegate independent slices, batch them into one parallel `{{toolRefs.task}}` call rather than serializing them.{{/if}}
 {{/if}}
-
 {{/if}}
 - Use `{{toolRefs.task}}` to map unknown code instead of reading file after file yourself.
 - NEVER abandon phases under scope pressure—delegate, don't shrink.
