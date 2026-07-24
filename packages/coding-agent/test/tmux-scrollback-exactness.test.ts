@@ -10,6 +10,7 @@ const PANE_EXIT_POLL_MS = 50;
 const MARKER_COUNT = 36;
 const SESSION_NAME = "exactness";
 const PANE_TARGET = `${SESSION_NAME}:0.0`;
+const DRIVER_EXIT_MARKER = "TMUX-DRIVER-EXIT-0";
 const tmuxPath = $which("tmux") ?? "";
 const socketName = `omp-scrollback-${process.pid}-${crypto.randomUUID()}`;
 const driverPath = path.join(import.meta.dir, "fixtures", "tmux-scrollback-driver.ts");
@@ -55,26 +56,20 @@ describe.skipIf(process.platform === "win32" || !tmuxPath)("tmux scrollback exac
 		try {
 			await runTmux(["new-session", "-d", "-x", String(PANE_COLUMNS), "-y", String(PANE_ROWS), "-s", SESSION_NAME]);
 			await runTmux(["set-option", "-w", "-t", `${SESSION_NAME}:0`, "remain-on-exit", "on"]);
-			const paneCommand = `${shellQuote(process.execPath)} ${shellQuote(driverPath)}; exit $?`;
+			const paneCommand = `${shellQuote(process.execPath)} ${shellQuote(driverPath)} && echo ${shellQuote(DRIVER_EXIT_MARKER)}`;
 			await runTmux(["respawn-pane", "-k", "-t", PANE_TARGET, paneCommand]);
 
-			let paneDeathObserved = false;
 			for (let attempt = 0; attempt < PANE_EXIT_POLL_ATTEMPTS; attempt++) {
-				const status = await runTmux([
-					"display-message",
-					"-p",
-					"-t",
-					PANE_TARGET,
-					"#{pane_dead}:#{pane_dead_status}",
-				]);
+				const status = await runTmux(["display-message", "-p", "-t", PANE_TARGET, "#{pane_dead}"]);
 				paneState = status.stdout.trim();
-				if (paneDeathObserved || /^1:.+$/u.test(paneState)) break;
-				paneDeathObserved = paneState.startsWith("1:");
+				if (paneState === "1") break;
+				// tmux is an external integration, so fake timers cannot advance pane lifecycle.
 				await Bun.sleep(PANE_EXIT_POLL_MS);
 			}
 
 			capture = (await runTmux(["capture-pane", "-p", "-S", "-", "-t", PANE_TARGET])).stdout;
-			expect(paneState, `pane did not exit successfully; captured pane:\n${capture}`).toBe("1:0");
+			expect(paneState, `pane did not exit; captured pane:\n${capture}`).toBe("1");
+			expect(countOccurrences(capture, DRIVER_EXIT_MARKER), capture).toBe(1);
 			expect(countOccurrences(capture, "PREEXISTING-HISTORY"), capture).toBe(1);
 			expect(countOccurrences(capture, "STABLE-PREFACE"), capture).toBe(1);
 			for (let index = 0; index < MARKER_COUNT; index++) {
