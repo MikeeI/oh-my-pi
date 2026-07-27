@@ -4473,6 +4473,10 @@ export class InteractiveMode implements InteractiveModeContext {
 		this.#commandController.handleContextCommand();
 	}
 
+	handlePromptCacheAuditCommand(): void {
+		this.#commandController.handlePromptCacheAuditCommand();
+	}
+
 	#vibeSessionTransitionBlocked(): boolean {
 		if (!this.vibeModeEnabled) return false;
 		this.showWarning("Exit vibe mode first.");

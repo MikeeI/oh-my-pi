@@ -1414,6 +1414,10 @@ export class AgentSession {
 		return this.#agentId;
 	}
 
+	agentKind(): "main" | "sub" {
+		return this.#agentKind;
+	}
+
 	/** Dequeue the next HARD forced tool choice for the upcoming LLM call, dropping
 	 *  (and rejecting) one whose named tool is no longer active. */
 	#nextHardToolChoice(): ToolChoice | undefined {

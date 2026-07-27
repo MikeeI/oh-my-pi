@@ -34,6 +34,7 @@ import { BorderedLoader } from "../../modes/components/bordered-loader";
 import { DynamicBorder } from "../../modes/components/dynamic-border";
 import { EvalExecutionComponent } from "../../modes/components/eval-execution";
 import { MoveOverlay, type MoveOverlayResult } from "../../modes/components/move-overlay";
+import { PromptCacheAuditComponent } from "../../modes/components/prompt-cache-audit";
 import { TranscriptBlock } from "../../modes/components/transcript-container";
 import { getMarkdownTheme, getSymbolTheme, theme } from "../../modes/theme/theme";
 import type { InteractiveModeContext } from "../../modes/types";
@@ -42,6 +43,7 @@ import { buildHotkeysMarkdown } from "../../modes/utils/hotkeys-markdown";
 import { buildToolsMarkdown } from "../../modes/utils/tools-markdown";
 import type { AsyncJobSnapshotItem } from "../../session/agent-session";
 import type { AuthStorage, OAuthAccountIdentity } from "../../session/auth-storage";
+import { buildPromptCacheAudit } from "../../session/cache-telemetry";
 import type { CompactMode } from "../../session/compact-modes";
 import type { NewSessionOptions } from "../../session/session-entries";
 import { formatShakeSummary, type ShakeMode, type ShakeResult } from "../../session/shake-types";
@@ -608,6 +610,26 @@ export class CommandController {
 		block.addChild(new Text(output, 1, 0));
 		block.addChild(new DynamicBorder());
 		this.ctx.present(block);
+	}
+
+	handlePromptCacheAuditCommand(): void {
+		if (this.ctx.session.agentKind() !== "main") {
+			this.ctx.showWarning("Prompt cache audit is available only for main-agent sessions.");
+			return;
+		}
+		const model = this.ctx.session.model;
+		if (!model) {
+			this.ctx.showWarning("Prompt cache audit unavailable: no model is selected.");
+			return;
+		}
+		const audit = buildPromptCacheAudit(this.ctx.sessionManager.getBranch(), model);
+		if (!audit) {
+			this.ctx.showWarning("Prompt cache audit unavailable: no model is selected.");
+			return;
+		}
+		const component = new PromptCacheAuditComponent(audit);
+		component.setExpanded(this.ctx.toolOutputExpanded);
+		this.ctx.presentCommandOutput(component);
 	}
 
 	async handleMemoryCommand(text: string): Promise<void> {

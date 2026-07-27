@@ -10,7 +10,6 @@ import { createAdvisorMessageCard } from "../../modes/components/advisor-message
 import { AssistantMessageComponent } from "../../modes/components/assistant-message";
 import { createBackgroundTanDispatchBlock } from "../../modes/components/background-tan-message";
 import { BashExecutionComponent } from "../../modes/components/bash-execution";
-import { detectCacheInvalidation } from "../../modes/components/cache-invalidation-marker";
 import { CollabPromptMessageComponent } from "../../modes/components/collab-prompt-message";
 import {
 	BranchSummaryMessageComponent,
@@ -39,6 +38,7 @@ import type {
 	NewVersionNotificationOptions,
 	RenderSessionContextOptions,
 } from "../../modes/types";
+import { detectCacheInvalidation } from "../../session/cache-telemetry";
 import {
 	BACKGROUND_TAN_DISPATCH_MESSAGE_TYPE,
 	type CustomMessage,

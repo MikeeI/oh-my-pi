@@ -2,6 +2,10 @@
 
 ## [Unreleased]
 
+### Added
+
+- Added `/prompt-cache-audit`, a read-only current-branch timeline of provider-reported prompt-cache usage.
+
 ## [17.1.4] - 2026-07-26
 
 ### Added

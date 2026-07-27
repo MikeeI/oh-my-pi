@@ -37,8 +37,8 @@
 [38;2;71;85;105m    │[0m       [38;2;148;163;184mCached input[0m          [38;2;226;232;240m0[0m
 [38;2;71;85;105m    │[0m       [38;2;148;163;184mNew input[0m          [38;2;226;232;240m2.4k[0m
 [38;2;71;85;105m    │[0m       [38;2;148;163;184mCache creation[0m    [38;2;56;189;248m46.6k[0m
-[38;2;71;85;105m    │[0m       [38;2;148;163;184mReprocessed[0m       [1;38;2;248;113;113m49.0k[0m
-[38;2;71;85;105m    │[0m       [38;2;251;191;36mTool set changed before request[0m
+    │       Reprocessed input 49.0k
+    │       Thinking level changed before request: high
 [38;2;71;85;105m    │[0m       [38;2;148;163;184mProvider cause unknown[0m
 [38;2;71;85;105m    │[0m
 [38;2;100;116;139m14:37:12[0m  [1;38;2;74;222;128mWARM[0m
@@ -47,4 +47,5 @@
 [38;2;71;85;105m            [0m[38;2;148;163;184mCache share[0m        [1;38;2;74;222;128m96%[0m
 
 [38;2;100;116;139mCached input repeats earlier context on every request.[0m
+Reuse multiplier compares cumulative reads with the largest single read; it is not a hit rate.
 ```

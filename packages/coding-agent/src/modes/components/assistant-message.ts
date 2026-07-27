@@ -15,10 +15,11 @@ import { formatNumber } from "@oh-my-pi/pi-utils";
 import chalk from "chalk";
 import type { AssistantThinkingRenderer } from "../../extensibility/extensions/types";
 import { getMarkdownTheme, theme } from "../../modes/theme/theme";
+import type { CacheInvalidation } from "../../session/cache-telemetry";
 import { expandKeyHint, getPreviewLines, resolveImageOptions, TRUNCATE_LENGTHS } from "../../tools/render-utils";
 import { canonicalizeMessage, formatThinkingForDisplay, hasDisplayableThinking } from "../../utils/thinking-display";
 import { resolveAssistantErrorPresentation } from "../utils/transcript-render-helpers";
-import { type CacheInvalidation, CacheInvalidationMarkerComponent } from "./cache-invalidation-marker";
+import { CacheInvalidationMarkerComponent } from "./cache-invalidation-marker";
 
 /**
  * Max lines of a turn-ending provider error rendered inline in the transcript.
