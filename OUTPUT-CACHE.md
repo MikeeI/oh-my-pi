@@ -2,6 +2,19 @@
 [1;38;2;96;165;250mPrompt Cache Timeline[0m
 [38;2;148;163;184manthropic/claude-opus-4-7 · current branch · main agent[0m
 
+[1;38;2;96;165;250mCurrent route[0m
+  [38;2;148;163;184mCached requests[0m             [1;38;2;74;222;128m7[0m
+  [38;2;148;163;184mCumulative cached input[0m   [1;38;2;74;222;128m412k[0m
+  [38;2;148;163;184mLargest cached input[0m       [38;2;226;232;240m78k[0m
+  [38;2;148;163;184mReuse multiplier[0m          [1;38;2;74;222;128m5.28×[0m
+  [38;2;148;163;184mExplicit recreations[0m         [1;38;2;248;113;113m1[0m
+
+[1;38;2;96;165;250mSession volume[0m
+  [38;2;148;163;184mRequests[0m                    [38;2;226;232;240m18[0m
+  [38;2;148;163;184mCumulative cached input[0m    [1;38;2;74;222;128m696k[0m
+  [38;2;148;163;184mCache creation[0m             [1;38;2;56;189;248m124k[0m
+  [38;2;148;163;184mExplicit recreations[0m          [1;38;2;248;113;113m2[0m
+
 [38;2;100;116;139m14:32:08[0m  [38;2;167;139;250mROUTE STARTED[0m
 [38;2;71;85;105m    │[0m       [38;2;148;163;184mmodel selected[0m
 [38;2;71;85;105m    │[0m
