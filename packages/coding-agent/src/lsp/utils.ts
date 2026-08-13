@@ -316,8 +316,6 @@ export function formatPosition(line: number, col: number): string {
 // WorkspaceEdit Formatting
 // =============================================================================
 
-const WORKSPACE_EDIT_PREVIEW_LIMIT = PREVIEW_LIMITS.COLLAPSED_ITEMS;
-
 /**
  * Format a text edit as a preview.
  */
@@ -341,7 +339,7 @@ export function formatWorkspaceEdit(edit: WorkspaceEdit, cwd: string): string[] 
 		results.push(`${file}: ${textEdits.length} edit${textEdits.length > 1 ? "s" : ""}`);
 		textEditCount += textEdits.length;
 		for (const textEdit of textEdits) {
-			if (shownTextEdits >= WORKSPACE_EDIT_PREVIEW_LIMIT) continue;
+			if (shownTextEdits >= PREVIEW_LIMITS.COLLAPSED_ITEMS) continue;
 			results.push(`  ${formatTextEdit(textEdit)}`);
 			shownTextEdits++;
 		}
