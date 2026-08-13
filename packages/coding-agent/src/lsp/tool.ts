@@ -1387,7 +1387,7 @@ export class LspTool implements AgentTool<typeof lspSchema, LspToolDetails, Them
 							} else {
 								const lines = symbols.flatMap(s => formatDocumentSymbol(s));
 								output = normalizedQuery
-									? `Symbols matching "${normalizedQuery}" in ${relPath}:\n${lines.join("\n")}`
+									? `Symbols in ${relPath}:\nMatching query: "${normalizedQuery}"\n${lines.join("\n")}`
 									: `Symbols in ${relPath}:\n${lines.join("\n")}`;
 							}
 						} else {
@@ -1404,7 +1404,7 @@ export class LspTool implements AgentTool<typeof lspSchema, LspToolDetails, Them
 									return `${icon} ${s.name} @ line ${line}`;
 								});
 								output = normalizedQuery
-									? `Symbols matching "${normalizedQuery}" in ${relPath}:\n${lines.join("\n")}`
+									? `Symbols in ${relPath}:\nMatching query: "${normalizedQuery}"\n${lines.join("\n")}`
 									: `Symbols in ${relPath}:\n${lines.join("\n")}`;
 							}
 						}
