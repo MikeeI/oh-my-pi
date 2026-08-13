@@ -323,10 +323,8 @@ const WORKSPACE_EDIT_PREVIEW_LIMIT = PREVIEW_LIMITS.COLLAPSED_ITEMS;
  */
 export function formatTextEdit(edit: TextEdit, maxLength = TRUNCATE_LENGTHS.TITLE): string {
 	const range = `${edit.range.start.line + 1}:${edit.range.start.character + 1}`;
-	const preview =
-		edit.newText.length > maxLength
-			? `${edit.newText.slice(0, maxLength).replace(/\n/g, "\\n")}…`
-			: edit.newText.replace(/\n/g, "\\n");
+	const escapedText = edit.newText.replace(/\r/g, "\\r").replace(/\n/g, "\\n");
+	const preview = escapedText.length > maxLength ? `${escapedText.slice(0, maxLength)}…` : escapedText;
 	return `line ${range} ${theme?.nav.cursor ?? "→"} "${replaceTabs(preview)}"`;
 }
 

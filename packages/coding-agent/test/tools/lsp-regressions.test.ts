@@ -2358,7 +2358,7 @@ describe("lsp regressions", () => {
 							start: { line: index, character: 13 },
 							end: { line: index, character: 18 },
 						},
-						newText: `renamedValue${index + 1}`,
+						newText: index === 0 ? "renamed\r\nValue\rTail\nEnd" : `renamedValue${index + 1}`,
 					})),
 				},
 			});
@@ -2378,7 +2378,8 @@ describe("lsp regressions", () => {
 				.join("\n");
 			expect(output).toContain("old.ts: 9 edits");
 			expect(output).toContain("line 1:14");
-			expect(output).toContain('"renamedValue1"');
+			expect(output).toContain('"renamed\\r\\nValue\\rTail\\nEnd"');
+			expect(output).not.toContain("\r");
 			expect(output).toContain("INCOMPLETE preview: showing 8/9 text edits; 1 omitted");
 			expect(output).not.toContain('"renamedValue9"');
 
