@@ -216,6 +216,27 @@ Each entry names its disposition, observable behavior, implementation owner, and
 - Proof: rename cases in `test/acp-builtins.test.ts` and `test/slash-commands/rename.test.ts`.
 - Proof: `test/prompt-action-autocomplete.test.ts`.
 
+#### `MOMP-CONVERSATION-SEARCH` — Persisted conversation lookup
+
+- Disposition: `MOMP-EIGEN`, designed for upstream.
+- Contract: `conversation_search` searches persisted Main conversations without model calls.
+- Contract: omitted scope and window search the current project over the last 10 days.
+- Contract: the active session, tool traffic, thinking, developer messages, and hidden synthetic inputs are excluded.
+- Contract: only visible human user and Assistant text participates in matching and excerpts.
+- Contract: all-term and phrase modes are deterministic and case-insensitive.
+- Contract: bounded text and JSON output returns newest matches with explicit partial-coverage diagnostics.
+- Contract: Children never receive the tool.
+- Contract: the local benchmark fixes a guaranteed-miss query, warmup count, measured runs, and corpus fingerprint.
+- Contract: incomplete coverage, changing files, changing visible-message counts, or unexpected matches invalidate a run.
+- Usage: `bun --cwd packages/coding-agent run bench:conversation-search -- --cwd <workspace>`.
+- Owner: `src/session/conversation-corpus.ts` owns visible transcript projection and journal discovery.
+- Owner: `src/session/conversation-search.ts` owns lexical matching, windowing, ranking, and coverage accounting.
+- Owner: `src/tools/conversation-search.ts` owns the tool boundary and Main-only exposure.
+- Owner: `src/tools/conversation-search-format.ts` owns output variants.
+- Owner: `scripts/bench-conversation-search.ts` owns the reproducible local evaluator and output.
+- Proof: `test/conversation-search.test.ts`.
+- Proof: `test/conversation-search-benchmark.test.ts`.
+
 #### `MOMP-STATS-SUMMARY` — Multi-range CLI usage overview
 
 - Disposition: `MOMP-EIGEN`, designed for upstream.
