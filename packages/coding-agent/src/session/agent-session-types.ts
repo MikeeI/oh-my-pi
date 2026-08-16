@@ -30,9 +30,11 @@ import type { TtsrManager } from "../export/ttsr";
 import type { LoadedCustomCommand } from "../extensibility/custom-commands";
 import type { ExtensionRunner } from "../extensibility/extensions";
 import type { ContextUsage } from "../extensibility/extensions/types";
+import type { Routine } from "../extensibility/routines";
 import type { Skill, SkillWarning } from "../extensibility/skills";
 import type { FileSlashCommand } from "../extensibility/slash-commands";
 import type { SecretObfuscator } from "../secrets/obfuscator";
+import type { BuildSystemPromptResult, DynamicPromptPart } from "../system-prompt";
 import type { ConfiguredThinkingLevel } from "../thinking";
 import type { XdevState } from "../tools/xdev";
 import type { CodexAutoRedeemCoordinator } from "./codex-auto-reset";
@@ -147,6 +149,8 @@ export interface AgentSessionConfig {
 	promptTemplates?: PromptTemplate[];
 	/** File-based slash commands for expansion. */
 	slashCommands?: FileSlashCommand[];
+	/** User-defined routines for slash-style sequential execution. */
+	routines?: Routine[];
 	/** Extension runner created with wrapped tools. */
 	extensionRunner?: ExtensionRunner;
 	/** Loaded skills already discovered by the SDK. */
@@ -212,7 +216,13 @@ export interface AgentSessionConfig {
 	rebuildSystemPrompt?: (
 		toolNames: string[],
 		tools: Map<string, AgentTool>,
-	) => Promise<{ systemPrompt: string[]; xdevCatalogNames?: readonly string[] }>;
+	) => Promise<{
+		systemPrompt: string[];
+		xdevCatalogNames?: readonly string[];
+		dynamicParts?: DynamicPromptPart[];
+	}>;
+	/** Initial structured prompt build retained for live inspection. */
+	initialSystemPromptResult?: BuildSystemPromptResult;
 	/** Tools mounted under `xd://`, for `/tools` display. */
 	getXdevToolEntries?: () => Array<{ name: string; summary: string }>;
 	/** `xd://` presentation state backed by the canonical tool map. */

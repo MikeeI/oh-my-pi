@@ -144,6 +144,13 @@ import { ManagedTimers } from "../extensibility/extensions/managed-timers";
 import { createExtensionModelQuery } from "../extensibility/extensions/model-api";
 import type { CompactOptions, ContextUsage } from "../extensibility/extensions/types";
 import type { HookCommandContext } from "../extensibility/hooks/types";
+import {
+	buildRoutineExecutionPlan,
+	parseRoutineInvocation,
+	type Routine,
+	type RoutineExecutionPlan,
+	type RoutineProgress,
+} from "../extensibility/routines";
 import type { Skill, SkillWarning } from "../extensibility/skills";
 import { expandSlashCommand, type FileSlashCommand } from "../extensibility/slash-commands";
 import { normalizeToolEventInput, resolveToolEventInput } from "../extensibility/tool-event-input";
@@ -184,6 +191,7 @@ import {
 	obfuscateProviderContext,
 } from "../secrets/message-transform";
 import type { SecretObfuscator } from "../secrets/obfuscator";
+import type { BuildSystemPromptResult } from "../system-prompt";
 import {
 	AUTO_THINKING,
 	type ConfiguredThinkingLevel,
@@ -491,6 +499,9 @@ export class AgentSession {
 	readonly #providerBoundary: SessionProviderBoundary;
 	#promptTemplates: PromptTemplate[];
 	#slashCommands: FileSlashCommand[];
+	#routines: Routine[];
+	#activeRoutineToken: symbol | undefined;
+	#activeRoutineAbortController: AbortController | undefined;
 
 	// Event subscription state
 	#unsubscribeAgent?: () => void;
@@ -1108,6 +1119,7 @@ export class AgentSession {
 		});
 
 		this.#promptTemplates = config.promptTemplates ?? [];
+		this.#routines = config.routines ?? [];
 		this.#slashCommands = config.slashCommands ?? [];
 		this.#extensionRunner = config.extensionRunner;
 		this.#customCommands = config.customCommands ?? [];
@@ -1352,6 +1364,7 @@ export class AgentSession {
 			ensureWriteRegistered: config.ensureWriteRegistered,
 			ensureGoalRegistered: config.ensureGoalRegistered,
 			rebuildSystemPrompt: config.rebuildSystemPrompt,
+			initialSystemPromptResult: config.initialSystemPromptResult,
 			getMcpServerInstructions: config.getMcpServerInstructions,
 			xdev: config.xdev,
 			setActiveToolNames: config.setActiveToolNames,
@@ -1677,6 +1690,10 @@ export class AgentSession {
 
 	getAgentId(): string | undefined {
 		return this.#agentId;
+	}
+
+	agentKind(): "main" | "sub" {
+		return this.#agentKind;
 	}
 
 	/** Dequeue the next HARD forced tool choice for the upcoming LLM call, dropping
@@ -4635,6 +4652,11 @@ export class AgentSession {
 		this.#textOutputCommitted = committed;
 	}
 
+	/** Latest accepted structured system prompt build. */
+	getSystemPromptResult(): BuildSystemPromptResult {
+		return this.#tools.systemPromptResult;
+	}
+
 	/** Current retry attempt (0 if not retrying) */
 	get retryAttempt(): number {
 		return this.#recovery.attempt;
@@ -5284,6 +5306,14 @@ export class AgentSession {
 		return this.#slashCommands;
 	}
 
+	get routines(): ReadonlyArray<Routine> {
+		return this.#routines;
+	}
+
+	setRoutines(routines: Routine[]): void {
+		this.#routines = [...routines];
+	}
+
 	/** Custom commands (TypeScript slash commands and MCP prompts) */
 	get customCommands(): ReadonlyArray<LoadedCustomCommand> {
 		if (this.#mcpPromptCommands.length === 0) return this.#customCommands;
@@ -5539,6 +5569,18 @@ export class AgentSession {
 	 * the ACP agent) use this to know whether to expect an `agent_end` event.
 	 */
 	async prompt(text: string, options?: PromptOptions): Promise<boolean> {
+		return this.#promptInternal(text, options, undefined);
+	}
+
+	async #promptInternal(
+		text: string,
+		options: PromptOptions | undefined,
+		routineToken: symbol | undefined,
+	): Promise<boolean> {
+		if (this.#activeRoutineToken && routineToken !== this.#activeRoutineToken) {
+			throw new AgentBusyError("A routine is running");
+		}
+
 		// A manual `/compact` runs with the agent subscription disconnected until its
 		// cleanup finally re-drains the preserved queues. Starting a turn before then
 		// would neither persist nor forward its events and could race the in-flight
@@ -5566,6 +5608,12 @@ export class AgentSession {
 				text = customResult;
 			}
 
+			if (text.startsWith("/")) {
+				const handledRoutine = await this.runRoutineInvocation(text);
+				if (handledRoutine) {
+					return false;
+				}
+			}
 			// Try file-based slash commands (markdown files from commands/ directories)
 			// Only if text still starts with "/" (wasn't transformed by custom command)
 			if (text.startsWith("/")) {
@@ -5686,6 +5734,86 @@ export class AgentSession {
 			this.#promptDropped?.({ text: typedText, images: options?.images });
 		}
 		return true;
+	}
+
+	#throwIfRoutineRunning(): void {
+		if (this.#activeRoutineToken) {
+			throw new AgentBusyError("A routine is running");
+		}
+	}
+
+	async runRoutineInvocation(
+		text: string,
+		options: {
+			onProgress?: (progress: RoutineProgress) => void | Promise<void>;
+		} = {},
+	): Promise<boolean> {
+		const invocation = parseRoutineInvocation(text, this.#routines);
+		if (!invocation) return false;
+		if (this.#activeRoutineToken) {
+			throw new AgentBusyError("A routine is already running");
+		}
+
+		const token = Symbol(invocation.routine.name);
+		const abortController = new AbortController();
+		this.#activeRoutineToken = token;
+		this.#activeRoutineAbortController = abortController;
+		let currentIndex = 0;
+		let total = invocation.routine.steps.length;
+		try {
+			if (this.isStreaming || this.queuedMessageCount > 0) {
+				await options.onProgress?.({
+					routine: invocation.routine.name,
+					status: "queued",
+					index: 0,
+					total,
+				});
+				await this.waitForIdle();
+			}
+
+			const plan: RoutineExecutionPlan = buildRoutineExecutionPlan(
+				invocation,
+				this.#slashCommands,
+				new Set(this.#routines.map(routine => routine.name)),
+			);
+			total = plan.steps.length;
+			for (let i = 0; i < plan.steps.length; i++) {
+				if (abortController.signal.aborted) {
+					throw new Error("Routine cancelled");
+				}
+				const step = plan.steps[i];
+				currentIndex = i + 1;
+				await options.onProgress?.({
+					routine: plan.routine.name,
+					status: "running",
+					index: currentIndex,
+					total,
+					step: step.label,
+				});
+				await this.#promptInternal(step.text, { expandPromptTemplates: false }, token);
+				await this.waitForIdle();
+			}
+			await options.onProgress?.({
+				routine: invocation.routine.name,
+				status: "complete",
+				index: total,
+				total,
+			});
+			return true;
+		} catch (error) {
+			const message = error instanceof Error ? error.message : String(error);
+			await options.onProgress?.({
+				routine: invocation.routine.name,
+				status: abortController.signal.aborted ? "cancelled" : "failed",
+				index: currentIndex,
+				total,
+				message,
+			});
+			throw error;
+		} finally {
+			this.#activeRoutineToken = undefined;
+			this.#activeRoutineAbortController = undefined;
+		}
 	}
 
 	async promptCustomMessage<T = unknown>(
@@ -6161,6 +6289,7 @@ export class AgentSession {
 	 * Queue a steering message to interrupt the agent mid-run.
 	 */
 	async steer(text: string, images?: ImageContent[]): Promise<void> {
+		this.#throwIfRoutineRunning();
 		if (text.startsWith("/")) {
 			this.#throwIfExtensionCommand(text);
 		}
@@ -6177,6 +6306,7 @@ export class AgentSession {
 	 * flipping advisor auto-resume.
 	 */
 	async followUp(text: string, images?: ImageContent[], options?: FollowUpOptions): Promise<void> {
+		this.#throwIfRoutineRunning();
 		if (text.startsWith("/")) {
 			this.#throwIfExtensionCommand(text);
 		}
@@ -6913,6 +7043,7 @@ export class AgentSession {
 	}): Promise<void> {
 		const userInterrupt = options?.reason === USER_INTERRUPT_LABEL;
 		this.#pendingAbortErrorId = userInterrupt ? AIError.create(AIError.Flag.UserInterrupt) : undefined;
+		this.#activeRoutineAbortController?.abort();
 		if (userInterrupt) this.#advisors.autoResumeSuppressed = true;
 		// Pull advisor concerns out of the steer/follow-up queues before any await so
 		// the post-abort stranded-message drain can't auto-resume the run on them.

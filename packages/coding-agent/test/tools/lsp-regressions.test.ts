@@ -24,6 +24,7 @@ import {
 	type CreateFile,
 	type DeleteFile,
 	type Diagnostic,
+	type DocumentSymbol,
 	type LspClient,
 	type LspToolDetails,
 	lspSchema,
@@ -1385,10 +1386,92 @@ describe("lsp regressions", () => {
 		}
 	});
 
+	it("filters file symbol output by query", async () => {
+		const tempDir = TempDir.createSync("@omp-lsp-document-symbol-query-");
+		try {
+			const filePath = path.join(tempDir.path(), "symbols.ts");
+			await Bun.write(filePath, "export const top = 1;\n");
+			const server: ServerConfig = { command: "test-lsp", fileTypes: ["ts"], rootMarkers: [] };
+			const client = {
+				name: "test-lsp",
+				cwd: tempDir.path(),
+				config: server,
+				proc: {
+					stdin: { write() {}, flush: async () => {} },
+				} as unknown as LspClient["proc"],
+				requestId: 0,
+				diagnostics: new Map(),
+				diagnosticsVersion: 0,
+				openFiles: new Map(),
+				pendingRequests: new Map(),
+				messageBuffer: new Uint8Array(),
+				isReading: false,
+				status: "ready",
+				lastActivity: Date.now(),
+				writeQueue: Promise.resolve(),
+				activeProgressTokens: new Set(),
+				projectLoaded: Promise.resolve(),
+				resolveProjectLoaded: () => {},
+			} satisfies LspClient;
+			const documentSymbols: DocumentSymbol[] = [
+				{
+					name: "TopMatches",
+					kind: 23,
+					range: { start: { line: 0, character: 0 }, end: { line: 8, character: 1 } },
+					selectionRange: { start: { line: 0, character: 7 }, end: { line: 0, character: 17 } },
+					children: [
+						{
+							name: "push",
+							kind: 6,
+							range: { start: { line: 3, character: 1 }, end: { line: 5, character: 2 } },
+							selectionRange: { start: { line: 3, character: 4 }, end: { line: 3, character: 8 } },
+						},
+					],
+				},
+				{
+					name: "FuzzyFindOptions",
+					kind: 23,
+					range: { start: { line: 10, character: 0 }, end: { line: 15, character: 1 } },
+					selectionRange: { start: { line: 10, character: 11 }, end: { line: 10, character: 27 } },
+				},
+			];
+			configCache.set(tempDir.path(), { servers: { "test-lsp": server }, idleTimeoutMs: undefined });
+			vi.spyOn(lspClient, "getOrCreateClient").mockResolvedValue(client);
+			vi.spyOn(lspClient, "ensureFileOpen").mockResolvedValue();
+			vi.spyOn(lspClient, "sendRequest").mockResolvedValue(documentSymbols);
+
+			const result = await new LspTool(makeLspSession(tempDir.path())).execute("document-symbol-query", {
+				action: "symbols",
+				file: filePath,
+				query: "topmatches",
+				timeout: 5,
+			});
+			const output = result.content
+				.filter(block => block.type === "text")
+				.map(block => block.text)
+				.join("\n");
+
+			expect(output).toContain("Symbols in symbols.ts:");
+			expect(output).toContain('Matching query: "topmatches"');
+			expect(output).toContain("TopMatches");
+			expect(output).toContain("push");
+			expect(output).not.toContain("FuzzyFindOptions");
+
+			const theme = await getThemeByName("dark");
+			const rendered = sanitizeText(
+				renderResult(result, { expanded: false, isPartial: false }, theme!).render(120).join("\n"),
+			);
+			expect(rendered).toContain("in symbols.ts");
+			expect(rendered).not.toContain("Symbols in symbols.ts:");
+		} finally {
+			configCache.delete(tempDir.path());
+			tempDir.removeSync();
+		}
+	});
+
 	it("filters and deduplicates workspace symbols by query", () => {
 		const rustUri = fileToUri(path.join(os.tmpdir(), "rust.rs"));
 		const loggerUri = fileToUri(path.join(os.tmpdir(), "logger.ts"));
-
 		const symbols: SymbolInformation[] = [
 			{
 				name: "DisallowOverwritingRegularFilesViaOutputRedirection",
@@ -2468,18 +2551,36 @@ describe("lsp regressions", () => {
 			});
 			vi.spyOn(lspClient, "getOrCreateClient").mockResolvedValue(client);
 			vi.spyOn(lspClient, "sendRequest").mockResolvedValue({
-				documentChanges: [],
+				changes: {
+					[fileToUri(sourceFile)]: Array.from({ length: 9 }, (_, index) => ({
+						range: {
+							start: { line: index, character: 13 },
+							end: { line: index, character: 18 },
+						},
+						newText: index === 0 ? "renamed\r\nValue\rTail\nEnd" : `renamedValue${index + 1}`,
+					})),
+				},
 			});
 			const notifySpy = vi.spyOn(lspClient, "sendNotification").mockResolvedValue();
 
 			const tool = new LspTool(makeLspSession(tempDir.path()));
-			await tool.execute("rename-file-preview", {
+			const result = await tool.execute("rename-file-preview", {
 				action: "rename_file",
 				file: sourceFile,
 				new_name: destFile,
 				apply: false,
 				timeout: 5,
 			});
+			const output = result.content
+				.filter(block => block.type === "text")
+				.map(block => block.text)
+				.join("\n");
+			expect(output).toContain("old.ts: 9 edits");
+			expect(output).toContain("line 1:14");
+			expect(output).toContain('"renamed\\r\\nValue\\rTail\\nEnd"');
+			expect(output).not.toContain("\r");
+			expect(output).toContain("INCOMPLETE preview: showing 8/9 text edits; 1 omitted");
+			expect(output).not.toContain('"renamedValue9"');
 
 			expect(fs.existsSync(sourceFile)).toBe(true);
 			expect(fs.existsSync(destFile)).toBe(false);

@@ -160,13 +160,16 @@ export class PromptActionAutocompleteProvider implements AutocompleteProvider {
 			leadingSlashStart !== null && !hasPromptTextBeforeCursorLine
 				? textBeforeCursor.slice(leadingSlashStart)
 				: null;
+		let baseProviderChecked = false;
 		const spaceIndex = commandText?.indexOf(" ") ?? -1;
 		if (commandText !== null && spaceIndex !== -1) {
 			const commandName = commandText.slice(1, spaceIndex);
 			const command = this.#commands.find(cmd => cmd.name === commandName || cmd.aliases?.includes(commandName));
 			if (command && (!("allowArgs" in command) || command.allowArgs !== false)) {
-				const argumentSuggestions = await this.#baseProvider.getSuggestions(lines, cursorLine, cursorCol, signal);
-				if (argumentSuggestions) return argumentSuggestions;
+				baseProviderChecked = true;
+				const commandSuggestions = await this.#baseProvider.getSuggestions(lines, cursorLine, cursorCol, signal);
+				if (commandSuggestions) return commandSuggestions;
+				if (command.argumentCompletionMode === "exclusive") return null;
 				// No slash-argument completion for this input: preserve numeric
 				// GitHub references and internal URLs while keeping prompt-action
 				// tokens such as `#copy` literal.
@@ -210,7 +213,7 @@ export class PromptActionAutocompleteProvider implements AutocompleteProvider {
 			if (emojiSuggestions) return emojiSuggestions;
 		}
 
-		return this.#baseProvider.getSuggestions(lines, cursorLine, cursorCol, signal);
+		return baseProviderChecked ? null : this.#baseProvider.getSuggestions(lines, cursorLine, cursorCol, signal);
 	}
 
 	applyCompletion(

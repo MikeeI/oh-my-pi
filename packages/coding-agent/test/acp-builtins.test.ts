@@ -11,8 +11,10 @@ import type {
 } from "@oh-my-pi/pi-ai";
 import { Settings } from "@oh-my-pi/pi-coding-agent/config/settings";
 import type { AgentSession } from "@oh-my-pi/pi-coding-agent/session/agent-session";
+import type { SessionEntry } from "@oh-my-pi/pi-coding-agent/session/session-entries";
 import type { SessionManager } from "@oh-my-pi/pi-coding-agent/session/session-manager";
 import { executeAcpBuiltinSlashCommand } from "@oh-my-pi/pi-coding-agent/slash-commands/acp-builtins";
+import * as titleGenerator from "@oh-my-pi/pi-coding-agent/utils/title-generator";
 import { removeWithRetries, setProjectDir } from "@oh-my-pi/pi-utils";
 
 interface FakeAcpBuiltinSession {
@@ -25,6 +27,7 @@ interface FakeAcpBuiltinSession {
 	_todoPhases: Array<{ name: string; tasks: Array<{ content: string; status: string }> }>;
 	_switchedTo: string | undefined;
 	_movedFromEmptySessionFile: string | undefined;
+	agentKind(): "main" | "sub";
 	toggleFastMode(): boolean;
 	setFastMode(enabled: boolean): boolean;
 	isFastModeEnabled(): boolean;
@@ -59,22 +62,24 @@ interface FakeAcpBuiltinSession {
 interface FakeAcpBuiltinSessionManager {
 	_sessionFile: string | undefined;
 	_cwd: string;
-	_entries: { type: string }[];
+	_entries: SessionEntry[];
 	_customEntries: Array<{ customType: string; data: unknown }>;
 	_movedTo: string | undefined;
 	_flushed: boolean;
 	_droppedSessions: string[];
 	_sessionName: string | undefined;
+	_sessionNameSource: string | undefined;
 	getSessionId(): string;
 	getSessionFile(): string | undefined;
-	getEntries(): { type: string }[];
-	getBranch(): { type: string }[];
+	getEntries(): SessionEntry[];
+	getBranch(): SessionEntry[];
 	appendCustomEntry(customType: string, data?: unknown): string;
 	flush(): Promise<void>;
 	moveTo(newCwd: string): Promise<void>;
 	setSessionFile(sessionFile: string): Promise<void>;
 	dropSession(sessionPath: string): Promise<void>;
 	getCwd(): string;
+	getSessionName(): string | undefined;
 	setSessionName(name: string, source: string): Promise<boolean>;
 }
 
@@ -92,6 +97,7 @@ function createRuntime() {
 		_todoPhases: [],
 		_switchedTo: undefined,
 		_movedFromEmptySessionFile: undefined,
+		agentKind: () => "main",
 		toggleFastMode() {
 			this.fastMode = !this.fastMode;
 			return this.fastMode;
@@ -163,22 +169,23 @@ function createRuntime() {
 	fakeSessionManager = {
 		_sessionFile: undefined as string | undefined,
 		_cwd: "/tmp/project",
-		_entries: [] as { type: string }[],
+		_entries: [] as SessionEntry[],
 		_customEntries: [] as Array<{ customType: string; data: unknown }>,
 		_movedTo: undefined as string | undefined,
 		_flushed: false,
 		_droppedSessions: [] as string[],
 		_sessionName: undefined as string | undefined,
+		_sessionNameSource: undefined as string | undefined,
 		getSessionId(): string {
 			return "fake-session-id";
 		},
 		getSessionFile(): string | undefined {
 			return this._sessionFile;
 		},
-		getEntries(): { type: string }[] {
+		getEntries(): SessionEntry[] {
 			return this._entries;
 		},
-		getBranch(): { type: string }[] {
+		getBranch(): SessionEntry[] {
 			return this._entries;
 		},
 		appendCustomEntry(customType: string, data?: unknown): string {
@@ -208,8 +215,12 @@ function createRuntime() {
 		getCwd(): string {
 			return this._cwd;
 		},
-		async setSessionName(name: string, _source: string): Promise<boolean> {
+		getSessionName(): string | undefined {
+			return this._sessionName;
+		},
+		async setSessionName(name: string, source: string): Promise<boolean> {
 			this._sessionName = name;
+			this._sessionNameSource = source;
 			return true;
 		},
 	};
@@ -587,8 +598,42 @@ describe("session lifecycle commands", () => {
 		const result = await executeAcpBuiltinSlashCommand("/rename Project Apex", runtime);
 		expect(result).toEqual({ consumed: true });
 		expect(fakeSessionManager._sessionName).toBe("Project Apex");
+		expect(fakeSessionManager._sessionNameSource).toBe("user");
 		expect(output[0]).toBe("Session renamed to Project Apex.");
 		expect(notified).toBe(true);
+	});
+
+	it("/rename: generates and stores a blank title as user-owned", async () => {
+		const generatorSpy = spyOn(titleGenerator, "generateSessionTitleFromRecentTranscript").mockResolvedValue(
+			"Generated title",
+		);
+		try {
+			const { output, fakeSessionManager, runtime } = createRuntime();
+
+			const result = await executeAcpBuiltinSlashCommand("/rename", runtime);
+
+			expect(result).toEqual({ consumed: true });
+			expect(fakeSessionManager._sessionName).toBe("Generated title");
+			expect(fakeSessionManager._sessionNameSource).toBe("user");
+			expect(output[0]).toBe("Session renamed to Generated title.");
+		} finally {
+			generatorSpy.mockRestore();
+		}
+	});
+
+	it("/rename: reports missing conversation content when generation returns null", async () => {
+		const generatorSpy = spyOn(titleGenerator, "generateSessionTitleFromRecentTranscript").mockResolvedValue(null);
+		try {
+			const { output, fakeSessionManager, runtime } = createRuntime();
+
+			const result = await executeAcpBuiltinSlashCommand("/rename", runtime);
+
+			expect(result).toEqual({ consumed: true });
+			expect(fakeSessionManager._sessionName).toBeUndefined();
+			expect(output[0]).toBe("No conversation content to generate a title from.");
+		} finally {
+			generatorSpy.mockRestore();
+		}
 	});
 
 	it("/rename: outputs precedence message when setSessionName returns false", async () => {

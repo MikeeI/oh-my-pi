@@ -30,6 +30,14 @@
 ### Fixed
 
 - Fixed the stats dashboard being unreachable from container hosts by accepting an explicit `--host` bind address while preserving loopback-only binding and same-origin API access by default.
+### Changed
+
+- Unified `omp-stats --sync` and `omp stats --summary` through one shared mobile-safe summary renderer.
+- Added rolling 24-hour, 7-day, and 30-day blocks with one token-accounting and ranking contract.
+
+### Fixed
+
+- Kept stats sync diagnostics on stderr so JSON modes emit only their JSON payloads on stdout.
 
 ## [17.3.0] - 2026-08-13
 

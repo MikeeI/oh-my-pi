@@ -49,6 +49,13 @@ describe("eval tool description", () => {
 		expect(text).toContain("agent(prompt");
 	});
 
+	it("keeps large raw tool results outside Eval output", () => {
+		const text = getEvalToolDescription({ py: true, js: true, spawns: true });
+		expect(text).toContain(
+			"Keep large raw tool results separate or pass their handles instead of re-emitting them through Eval.",
+		);
+	});
+
 	it("omits agent() when the session forbids spawning", () => {
 		// Subagents with spawns: undefined (resolved to "") cannot launch tasks.
 		// The prelude doc must not promise a helper that always throws.
