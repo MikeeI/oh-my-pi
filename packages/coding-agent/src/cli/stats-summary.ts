@@ -1,7 +1,6 @@
+import type { AgentType, AggregatedStats, DashboardStats } from "@oh-my-pi/omp-stats/shared-types";
 import { replaceTabs } from "@oh-my-pi/pi-tui";
 import { formatDuration, formatNumber, formatPercent, sanitizeText } from "@oh-my-pi/pi-utils";
-import type { AgentType } from "./shared-types";
-import type { AggregatedStats, DashboardStats } from "./types";
 
 const STATS_SUMMARY_RANGES = ["24h", "7d", "30d"] as const;
 const SUMMARY_LIST_LIMIT = 5;

@@ -248,13 +248,12 @@ Each entry names its disposition, observable behavior, implementation owner, and
 - Contract: model and folder ordering uses deterministic name tie-breakers.
 - Contract: complete model and folder names render on dedicated sanitized lines without truncation.
 - Contract: conversation tokens include uncached input, cache reads, cache writes, and output.
-- Contract: `momp stats --summary` and `omp-stats --sync` share one summary composer.
-- Contract: summary and JSON payloads keep sync diagnostics on stderr.
-- Owner: `packages/stats/src/summary.ts` owns ranges, loading, ranking, sanitization, and rendering.
+- Contract: `momp stats --summary` and `momp stats --json` keep sync diagnostics on stderr.
+- Contract: the summary composer lives inside the published `@mikeei/momp` package.
+- Contract: the standalone `omp-stats` binary keeps upstream behavior and is not fork-published.
+- Owner: `packages/coding-agent/src/cli/stats-summary.ts` owns ranges, loading, ranking, sanitization, and rendering.
 - Owner: `packages/coding-agent/src/cli/stats-cli.ts` owns MOMP command integration.
-- Owner: `packages/stats/src/index.ts` owns standalone CLI integration.
-- Proof: `packages/stats/test/summary.test.ts`.
-- Proof: `packages/stats/test/cli-output.test.ts`.
+- Proof: `packages/coding-agent/test/stats-summary.test.ts`.
 - Proof: `packages/coding-agent/test/stats-cli-output.test.ts`.
 - Upstream action: retain provider-neutral `omp stats` behavior when preparing the upstream change.
 

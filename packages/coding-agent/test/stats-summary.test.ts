@@ -1,6 +1,11 @@
 import { describe, expect, it } from "bun:test";
-import { loadStatsSummary, renderStatsSummary, type StatsSummaryByRange, type StatsSummaryRange } from "../src/summary";
-import type { AggregatedStats, DashboardStats, FolderStats, ModelStats } from "../src/types";
+import type { AggregatedStats, DashboardStats, FolderStats, ModelStats } from "@oh-my-pi/omp-stats/types";
+import {
+	loadStatsSummary,
+	renderStatsSummary,
+	type StatsSummaryByRange,
+	type StatsSummaryRange,
+} from "../src/cli/stats-summary";
 
 const SUMMARY_OPTIONS = { dashboardCommand: "omp stats" } as const;
 

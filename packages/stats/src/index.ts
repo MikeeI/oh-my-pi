@@ -1,10 +1,10 @@
 #!/usr/bin/env bun
 
 import { parseArgs } from "node:util";
+import { formatDuration, formatNumber, formatPercent } from "@oh-my-pi/pi-utils";
 import { getDashboardStats, getTotalMessageCount, syncAllSessions } from "./aggregator";
 import { closeDb } from "./db";
-import { formatStatsDashboardUrl, startServer } from "./server";
-import { loadStatsSummary, renderStatsSummary } from "./summary";
+import { startServer } from "./server";
 
 export {
 	getDashboardStats,
@@ -24,7 +24,6 @@ export type {
 	GainSourceTotals,
 	GainTimeSeriesPoint,
 } from "./shared-types";
-export * from "./summary";
 export type {
 	AggregatedStats,
 	DashboardStats,
@@ -42,11 +41,60 @@ export type {
 
 
 /**
+ * Format cost in dollars.
+ */
+function formatCost(n: number): string {
+	if (n < 0.01) return `$${n.toFixed(4)}`;
+	if (n < 1) return `$${n.toFixed(3)}`;
+	return `$${n.toFixed(2)}`;
+}
+
+function normalizePremiumRequests(n: number): number {
+	return Math.round((n + Number.EPSILON) * 100) / 100;
+}
+
+/**
  * Print stats summary to console.
  */
 async function printStats(): Promise<void> {
-	const statsByRange = await loadStatsSummary(getDashboardStats);
-	console.log(renderStatsSummary(statsByRange, { dashboardCommand: "omp-stats" }));
+	const stats = await getDashboardStats();
+	const { overall, byModel, byFolder } = stats;
+
+	console.log("\n=== AI Usage Statistics ===\n");
+
+	console.log("Overall:");
+	console.log(`  Requests: ${formatNumber(overall.totalRequests)} (${formatNumber(overall.failedRequests)} errors)`);
+	console.log(`  Error Rate: ${formatPercent(overall.errorRate)}`);
+	console.log(`  Total Tokens: ${formatNumber(overall.totalInputTokens + overall.totalOutputTokens)}`);
+	console.log(`  Input Tokens: ${formatNumber(overall.totalInputTokens)}`);
+	console.log(`  Output Tokens: ${formatNumber(overall.totalOutputTokens)}`);
+	console.log(`  Cache Rate: ${formatPercent(overall.cacheRate)}`);
+	console.log(`  Cache Savings: ${formatPercent(overall.cacheSavings)}`);
+	console.log(`  Total Cost: ${formatCost(overall.totalCost)}`);
+	console.log(`  Premium Requests: ${formatNumber(normalizePremiumRequests(overall.totalPremiumRequests ?? 0))}`);
+	console.log(`  Avg Duration: ${overall.avgDuration !== null ? formatDuration(overall.avgDuration) : "-"}`);
+	console.log(`  Avg TTFT: ${overall.avgTtft !== null ? formatDuration(overall.avgTtft) : "-"}`);
+	if (overall.avgTokensPerSecond !== null) {
+		console.log(`  Avg Tokens/s: ${overall.avgTokensPerSecond.toFixed(1)}`);
+	}
+
+	if (byModel.length > 0) {
+		console.log("\nBy Model:");
+		for (const m of byModel.slice(0, 10)) {
+			console.log(
+				`  ${m.model}: ${formatNumber(m.totalRequests)} reqs, ${formatCost(m.totalCost)}, ${formatPercent(m.cacheRate)} cache rate, ${formatPercent(m.cacheSavings)} cache savings`,
+			);
+		}
+	}
+
+	if (byFolder.length > 0) {
+		console.log("\nBy Folder:");
+		for (const f of byFolder.slice(0, 10)) {
+			console.log(`  ${f.folder}: ${formatNumber(f.totalRequests)} reqs, ${formatCost(f.totalCost)}`);
+		}
+	}
+
+	console.log("");
 }
 
 /** Parsed arguments for the standalone `omp-stats` entry point. */
@@ -134,7 +182,7 @@ Examples:
 		});
 		if (tty && lastWidth > 0) process.stderr.write(`\r${" ".repeat(lastWidth)}\r`);
 		const total = await getTotalMessageCount();
-		process.stderr.write(`Synced ${processed} new entries from ${files} files (${total} total)\n\n`);
+		console.log(`Synced ${processed} new entries from ${files} files (${total} total)\n`);
 
 		if (values.json) {
 			const stats = await getDashboardStats();

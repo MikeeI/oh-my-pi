@@ -514,6 +514,7 @@
 - Fixed `omp stats` and `/stats` dashboards being unreachable from container hosts by accepting an explicit `--host` bind address while preserving the `127.0.0.1` default.
 ### Added
 
+- Added `momp stats --summary` multi-range usage rendering, self-contained in the `momp` package so it survives global installs.
 - Added a reproducible local conversation-search benchmark with fixed evaluator inputs and corpus-stability guardrails.
 - Added Main-only `conversation_search` for lexical lookup across persisted user and Assistant text.
   It defaults to the current project and last 10 days, excludes tool noise, and returns bounded text or JSON.

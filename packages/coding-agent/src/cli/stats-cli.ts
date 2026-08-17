@@ -4,11 +4,11 @@
  * Handles `omp stats` subcommand for viewing AI usage statistics.
  */
 
-import { loadStatsSummary, renderStatsSummary, type StatsSummaryLoader } from "@oh-my-pi/omp-stats/summary";
-import { truncateToWidth } from "@oh-my-pi/pi-tui/utils";
-import { APP_NAME, formatDuration, formatNumber, formatPercent } from "@oh-my-pi/pi-utils";
+import { truncateToWidth } from "@oh-my-pi/pi-tui";
+import { APP_NAME } from "@oh-my-pi/pi-utils";
 import chalk from "@oh-my-pi/pi-utils/chalk";
 import { openPath } from "../utils/open";
+import { loadStatsSummary, renderStatsSummary, type StatsSummaryLoader } from "./stats-summary";
 
 /**
  * Single-line TTY progress bar. On a non-TTY stream we just stay quiet -
