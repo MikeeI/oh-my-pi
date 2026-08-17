@@ -174,6 +174,15 @@ Each entry names its disposition, observable behavior, implementation owner, and
 - Owner: `src/prompts/tools/eval.md` owns model-visible result-handling guidance.
 - Proof: result-handling description case in `test/tools/eval-description.test.ts`.
 
+#### `MOMP-READ-SKILL-COMPACT` — Compact skill-read display
+
+- Disposition: `MOMP-EIGEN`, designed for upstream.
+- Contract: `read skill://` calls collapse into the compact grouped read view like `xd://` device reads.
+- Contract: collapsed skill loads stay expandable so their full resolved content remains visible.
+- Contract: the full skill body still reaches the model; collapsing is display-only and never trims load-bearing content.
+- Owner: `src/modes/components/read-tool-group.ts#readArgsCollapseIntoGroup` owns the collapse decision.
+- Proof: `test/read-tool-group.test.ts`.
+
 #### `MOMP-ROUTINES` — User-defined sequential routines
 
 - Disposition: `MOMP-EIGEN`.

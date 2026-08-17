@@ -519,6 +519,10 @@
 - Added Main-only `conversation_search` for lexical lookup across persisted user and Assistant text.
   It defaults to the current project and last 10 days, excludes tool noise, and returns bounded text or JSON.
 
+### Changed
+
+- Collapsed `read skill://` calls into the compact grouped read view (like `xd://` device reads) instead of rendering full tool-execution cards, so loaded skill content displays compactly while remaining expandable.
+
 ## [17.3.5] - 2026-08-16
 
 ### Added

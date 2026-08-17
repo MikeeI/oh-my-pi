@@ -32,14 +32,19 @@ export function readArgsHaveTarget(args: unknown): boolean {
 /**
  * Whether a read collapses into the compact {@link ReadToolGroupComponent}
  * rather than a full tool execution. Filesystem/external targets always
- * collapse; other internal URLs (`skill://`, `agent://`, …) render full so
- * their resolved content is visible. `xd://` device reads are the exception —
- * they list devices/docs and read better in the compact grouped view.
+ * collapse, as do `xd://` device-listing and `skill://` loads so they render
+ * compactly like a tool while staying expandable. Other internal URLs
+ * (`agent://`, `omp://`, …) render full so their resolved content stays
+ * visible.
  */
 export function readArgsCollapseIntoGroup(args: unknown): boolean {
 	const target = readArgsTarget(args);
 	if (target === undefined) return false;
-	return target.startsWith(XD_URL_PREFIX) || !InternalUrlRouter.instance().canHandle(target);
+	return (
+		target.startsWith(XD_URL_PREFIX) ||
+		target.startsWith("skill://") ||
+		!InternalUrlRouter.instance().canHandle(target)
+	);
 }
 
 /**

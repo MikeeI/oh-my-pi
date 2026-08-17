@@ -360,8 +360,6 @@ describe("ReadToolGroupComponent", () => {
 
 describe("readArgsCollapseIntoGroup", () => {
 	it.each([
-		["skill://my-skill"],
-		["skill://my-skill/file.md"],
 		["omp://docs/tools/read.md"],
 		["issue://123"],
 		["pr://can1357/oh-my-pi/456"],
@@ -382,6 +380,8 @@ describe("readArgsCollapseIntoGroup", () => {
 		["https://example.com/file"],
 		["xd://"],
 		["xd://generate_image"],
+		["skill://my-skill"],
+		["skill://my-skill/file.md"],
 	])("collapses %s into the read group", target => {
 		expect(readArgsCollapseIntoGroup({ path: target })).toBe(true);
 		expect(readArgsCollapseIntoGroup({ file_path: target })).toBe(true);
