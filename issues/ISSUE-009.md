@@ -1,9 +1,9 @@
 # ISSUE-009 — Read SSH guidance: retired search and ssh tool names remain model-visible
 
-State: Ready
+State: Published
 Mode: Pull request
 Target: New pull request
-Location: Not published.
+Location: https://github.com/can1357/oh-my-pi/pull/9045.
 Priority: Medium
 Confidence: High
 Type: correctness
@@ -71,13 +71,13 @@ Do not restore retired aliases or alter SSH protocol behavior.
 
 ## Missing
 
-- [N] User approval of the exact upstream PR target and draft before publication.
+None.
 
 ## Resume
 
-Index: Approve SSH guidance PR
-Next: Approve the exact upstream target and PR draft.
-Done when: The approved PR exists at the recorded upstream target and its URL is recorded.
+Index: Monitor SSH guidance PR
+Next: Read maintainer feedback and record the PR disposition.
+Done when: The upstream PR state and final disposition are recorded.
 
 ## Bug reproduction
 

@@ -21,7 +21,7 @@ Next finding ID: ISSUE-011
 | [ISSUE-006](issues/ISSUE-006.md) | Task prompt: same-file edits are not guaranteed to auto-resolve | Ready | Pull request | New pull request | High | Approve Task pull request | Not published. |
 | [ISSUE-007](issues/ISSUE-007.md) | Hub capability: disabled process supervision remains fully advertised | Hold | Undecided | Undecided | High | Select Hub gating scope | Not published. |
 | [ISSUE-008](issues/ISSUE-008.md) | Read prompt: raw is not a universal converter or byte bypass | Hold | Undecided | Undecided | Medium | Choose Read raw terminology | Not published. |
-| [ISSUE-009](issues/ISSUE-009.md) | Read SSH guidance: retired search and ssh tool names remain model-visible | Ready | Pull request | New pull request | Medium | Approve SSH guidance PR | Not published. |
+| [ISSUE-009](issues/ISSUE-009.md) | Read SSH guidance: retired search and ssh tool names remain model-visible | Published | Pull request | New pull request | Medium | Monitor SSH guidance PR | https://github.com/can1357/oh-my-pi/pull/9045. |
 | [ISSUE-010](issues/ISSUE-010.md) | LSP prompt: raw requests omit multi-server routing guidance | Implementing | Pull request | New pull request | Medium | Review local LSP prompt PR | Not published. |
 
 ## Terminal
