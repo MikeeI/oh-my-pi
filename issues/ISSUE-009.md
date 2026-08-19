@@ -1,6 +1,6 @@
 # ISSUE-009 — Read SSH guidance: retired search and ssh tool names remain model-visible
 
-State: Implementing
+State: Ready
 Mode: Pull request
 Target: New pull request
 Location: Not published.
@@ -71,13 +71,13 @@ Do not restore retired aliases or alter SSH protocol behavior.
 
 ## Missing
 
-- [N] Exact upstream PR target and draft approval.
+- [N] User approval of the exact upstream PR target and draft before publication.
 
 ## Resume
 
-Index: Push SSH guidance PR
-Next: Show the exact upstream target and PR draft for approval.
-Done when: The contribution branch is pushed and the exact PR target and draft are approved or published.
+Index: Approve SSH guidance PR
+Next: Approve the exact upstream target and PR draft.
+Done when: The approved PR exists at the recorded upstream target and its URL is recorded.
 
 ## Bug reproduction
 
@@ -93,7 +93,7 @@ Branch: `fix/read-ssh-guidance`
 Base: `upstream/main@74bc1f442e7bb6adcb5797ca8802ef6684281411`
 Scope: Replace stale model-visible `search` and standalone `ssh` routes with `grep`, `bash` with a remote SSH command, and `sshfs`; preserve SSH URL behavior.
 Commit: `c52d4062ac82ac23cd0add107dc0e99980880d81`
-Push: `origin/fix/read-ssh-guidance` | Pending.
+Push: `origin/fix/read-ssh-guidance` | Pushed.
 Checks:
 - `bun test packages/coding-agent/test/tools/read-guidance.test.ts packages/coding-agent/test/internal-urls/ssh-protocol.test.ts packages/coding-agent/test/ssh/file-transfer-posix-guard.test.ts packages/coding-agent/test/tools/grep-internal-urls.test.ts packages/coding-agent/test/tools/ssh-url-ungated-tools.test.ts` → 68 pass, 0 fail.
 - `bun --cwd=packages/coding-agent run check` → Biome passed; unrelated existing `tsgo` errors remain in `src/modes/theme/tui-adapters.ts:257,272` for missing `SettingsListTheme.warning`.
