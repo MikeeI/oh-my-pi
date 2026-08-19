@@ -4,7 +4,7 @@ import { parseArgs } from "node:util";
 import { formatDuration, formatNumber, formatPercent } from "@oh-my-pi/pi-utils";
 import { getDashboardStats, getTotalMessageCount, syncAllSessions } from "./aggregator";
 import { closeDb } from "./db";
-import { startServer } from "./server";
+import { formatStatsDashboardUrl, startServer } from "./server";
 
 export {
 	getDashboardStats,

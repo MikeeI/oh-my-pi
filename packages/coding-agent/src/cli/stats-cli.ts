@@ -99,16 +99,6 @@ export function parseStatsArgs(args: string[]): StatsCommandArgs | undefined {
 	return result;
 }
 
-function formatCost(n: number): string {
-	if (n < 0.01) return `$${n.toFixed(4)}`;
-	if (n < 1) return `$${n.toFixed(3)}`;
-	return `$${n.toFixed(2)}`;
-}
-
-function normalizePremiumRequests(n: number): number {
-	return Math.round((n + Number.EPSILON) * 100) / 100;
-}
-
 // =============================================================================
 // Command Handler
 // =============================================================================
