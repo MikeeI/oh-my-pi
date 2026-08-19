@@ -46,9 +46,15 @@ Target fit: New prompt-contract candidate; no exact duplicate found.
 Mode and external target remain user-unselected.
 
 ## Direction
-
 Define `:raw` as a source-specific representation rather than a universal byte promise.
-Document exact branches such as Notebook storage JSON, Markit converted output without Read formatting, image representation, and HTML response-body text.
+Document exact branches such as Notebook storage JSON, Markit converted output without Read formatting, image representation, and handler-owned URL response text.
+Proposed prompt correction [A]: replace the universal `verbatim` and `converter bypass` wording with the following source-specific guidance.
+- `:raw` suppresses Read anchors and prefixes where supported, but is not universal byte access or a universal converter bypass.
+- Documents return extracted text, and source-specific converters may still run under `:raw` (for example, Markit/PDF).
+- Notebooks return editable cells by default, while `:raw` returns storage JSON.
+- Images return decoded inline content, and `:raw` does not return original image bytes.
+- Archives read selected members, and `:raw` still returns decoded member text rather than archive bytes.
+- URLs return reader-mode text by default, while `:raw` returns the response body without JSON, feed, or HTML text shaping after binary handling.
 Do not force byte semantics into a Text/Image tool.
 
 ## Bounds

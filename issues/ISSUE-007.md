@@ -33,11 +33,13 @@ Impact [N]: Calls cannot bypass the runtime guard, but the model can spend tool 
 - [S] `https://github.com/can1357/oh-my-pi/commit/5ff277349cb1b1cda27cf1b3b4d946e160643906` consolidated launch into Hub while retaining enforcement without retaining the complete capability gate.
 - [O] Direct HubTool probe with `launch.enabled=false` retained the process-capable summary, schema fields, all process ops, and two process examples.
 - [O] The same probe returned `isError:true` and the exact disabled-setting message for `start`, `ps`, `logs`, `stop`, `restart`, `describe`, Process `send`, and Process `wait`.
+- [O] Real `createTools` registry probes with `launch.enabled=false` and `true` contained `hub` and `bash` in both cases; Hub summary, Process ops, fields, and five Process examples were identical.
+- [O] With `launch.enabled=false`, Bash still rendered `Services, watchers, debuggers, and REPLs MUST use hub (op:"start").`; no provider-visible `search` or standalone `ssh` name appeared in the same registry.
 
 ## Prior art
 
 Coverage: issues(open+closed), PRs(open+closed+merged), source history; checked=2026-08-19.
-Gaps [N]: Discussions and full registry/provider serialization capture remain unchecked.
+Gaps [N]: Discussions and live-setting refresh verification remain unchecked.
 
 - `https://github.com/can1357/oh-my-pi/issues/5399` and `https://github.com/can1357/oh-my-pi/pull/5466` — disabled tools should be omitted from model context; related presentation precedent with a different owner.
 - `https://github.com/can1357/oh-my-pi/issues/5305` — related allowlist and registration drift for a different tool.
@@ -68,22 +70,21 @@ Retain the runtime guard for stale or direct calls.
 
 ## Missing
 
-- [N] Full real-registry and provider-facing metadata capture with `launch.enabled=false` and `launch.enabled=true`.
+- [O] Full real-registry and provider-facing metadata capture with `launch.enabled=false` and `launch.enabled=true` is complete.
 - [N] Live-setting refresh verification if runtime toggles are part of the intended contract.
 - [N] Token measurement if quantified context impact is later claimed.
 - Mode and external target remain intentionally unselected.
 
 ## Resume
 
-Index: Capture full Hub gating
-Next: Build Hub and Bash through the real registry with both launch-setting values and capture provider metadata.
-Done when: Registry output shows process metadata absent when disabled, present when enabled, and coordination plus direct-route guard behavior preserved.
+Index: Select Hub gating scope
+Next: Select the smallest capability-aware Hub and Bash correction that preserves coordination and the disabled-route guard.
+Done when: The selected scope covers disabled Process metadata, Bash guidance, enabled Process behavior, and positive/negative registry proof.
 
 ## Bug reproduction
 
-Environment: Bun 1.3.14, Ubuntu 24.04.4 LTS x64, current personal checkout, `launch.enabled=false`, and `enableIrc=true`.
-Reproduction: Construct `HubTool` with `Settings.isolated({ "launch.enabled": false })`.
-Inspect its summary, schema, description, and examples.
-Execute every Process route directly, including named `send` and `wait` calls.
-Actual [O]: Process metadata remains advertised, and every route returns `isError:true` with `Process supervision is disabled (launch.enabled=false).`.
+Environment: Bun 1.3.14, Ubuntu 24.04.4 LTS x64, current personal checkout, real `createTools` registry, `launch.enabled=false` and `true`, and `enableIrc=true`.
+Reproduction: Build the real registry with both launch-setting values and inspect Hub and Bash metadata.
+Construct `HubTool` with `Settings.isolated({ "launch.enabled": false })` and execute every Process route directly, including named `send` and `wait` calls.
+Actual [O]: Disabled and enabled registries both advertise the same Process surface, Bash retains the Hub start instruction when disabled, and every disabled Process route returns `isError:true` with `Process supervision is disabled (launch.enabled=false).`.
 Expected: Hub remains available for coordination, but disabled Process metadata and guidance are absent while direct stale calls retain the guard error.
