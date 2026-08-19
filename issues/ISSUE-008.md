@@ -8,7 +8,7 @@ Priority: Medium
 Confidence: High
 Type: correctness
 Created: 2026-08-14
-Updated: 2026-08-19
+Updated: 2026-08-20
 Source: `upstream/main@74bc1f442e7bb6adcb5797ca8802ef6684281411`
 
 ## Root
@@ -33,6 +33,7 @@ Impact [N]: Agents can mistake converted or handler-owned output for original by
 - [O] The same probe showed PDF/Markit default and raw both use converted content, with raw changing Read formatting rather than bypassing conversion.
 - [O] Local image default and raw both returned text plus `image/png` content, while archive default and raw both returned extracted member text rather than archive bytes.
 - [O] Focused URL tests showed raw response bodies and non-raw handler rendering for feed and JSON inputs.
+- [O] Personal commit `ab8cd45f71` applies source-specific `:raw` guidance and adds `test/tools/read-guidance.test.ts`; focused Read tests pass with 160 passed, 1 skipped, and 0 failed.
 
 ## Prior art
 
@@ -72,16 +73,15 @@ Do not force byte semantics into a Text/Image tool.
 
 ## Missing
 
-- [O] Controlled source-kind truth-table reproduction is complete for Notebook, PDF/Markit, image, URL, and archive branches.
 - [N] Maintainer-chosen exact terminology for source-specific raw representations.
 - [N] Real external URL/PDF execution and invalid-UTF-8 byte exactness require separate triage and must not enter this record.
 - Mode and external target remain intentionally unselected.
 
 ## Resume
 
-Index: Choose Read raw terminology
-Next: Select concise source-specific `:raw` wording that preserves the observed runtime branches.
-Done when: Prompt text states each supported raw representation without implying universal converter bypass or byte preservation.
+Index: Select Read raw delivery
+Next: Choose local-only completion or an upstream pull request.
+Done when: Mode and target are recorded for the implemented correction.
 
 ## Bug reproduction
 
