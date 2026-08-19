@@ -1,15 +1,15 @@
 # ISSUE-006 — Task prompt: same-file edits are not guaranteed to auto-resolve
 
-State: Ready
+State: Published
 Mode: Pull request
 Target: New pull request
-Location: Not published.
+Location: https://github.com/can1357/oh-my-pi/pull/9047
 Priority: High
 Confidence: High
 Type: correctness
 Created: 2026-08-14
-Updated: 2026-08-14
-Source: `upstream/main@ae2d3d6ea16a47aa5208bd123dcc4cfcc8756472`
+Updated: 2026-08-20
+Source: `upstream/main@74bc1f442e7bb6adcb5797ca8802ef6684281411`
 
 ## Root
 
@@ -68,22 +68,23 @@ None.
 ## Implementation
 
 Branch: `fix/task-overlap-guidance`
-Base: `upstream/main@ae2d3d6ea16a47aa5208bd123dcc4cfcc8756472`
+Base: `upstream/main@74bc1f442e7bb6adcb5797ca8802ef6684281411`
 Scope: Replace the universal same-file auto-merge claim with ownership-aligned coordination guidance and focused coverage.
-Commit: `57c18c4f9763e66416c5520e0508285330f17d16`
+Commit: `f3b9b5b7e9e684450b47ca5495cabdf1f03161d8`
 Push: `origin/fix/task-overlap-guidance`
+Pull request: https://github.com/can1357/oh-my-pi/pull/9047
+Current-upstream verification: `git merge-tree --write-tree upstream/main HEAD` returned no conflicts.
 Checks:
 - `bun test packages/coding-agent/test/task/task-batch.test.ts -t "requires coordination instead of promising same-file auto-resolution"` → 1 pass, 0 fail.
 - `bun test packages/coding-agent/test/task/worktree.test.ts -t "still aborts on genuine cherry-pick conflicts"` → 1 pass, 0 fail.
 - `bun test packages/coding-agent/test/task/isolation-runner.test.ts -t "rejects patch-mode conflicts without dirtying the worktree"` → 1 pass, 0 fail.
-- `bun --cwd=packages/coding-agent run check` → Biome checked 2,607 files; type check passed.
-- `bun check` → all TypeScript and Rust workspace checks passed.
+- `bun --cwd=packages/coding-agent run check` → Biome and type checks passed.
 
 ## Resume
 
-Index: Approve Task pull request
-Next: Present the exact target and pull request draft for publication approval.
-Done when: The user approves this exact draft and `can1357/oh-my-pi` new pull request target.
+Index: Monitor Task overlap guidance PR
+Next: Monitor upstream pull request #9047 for review and merge.
+Done when: Upstream merges or closes pull request #9047 and the disposition is recorded.
 
 ## Bug reproduction
 
@@ -116,12 +117,11 @@ Issue #5387 documents the missing write boundary for non-isolated tasks; issues 
 - `bun test packages/coding-agent/test/task/worktree.test.ts -t "still aborts on genuine cherry-pick conflicts"` — 1 pass, 0 fail.
 - `bun test packages/coding-agent/test/task/isolation-runner.test.ts -t "rejects patch-mode conflicts without dirtying the worktree"` — 1 pass, 0 fail.
 - `bun --cwd=packages/coding-agent run check` — Biome and type checks pass.
-
-I checked the relevant issues, comments, pull requests, and discussions; this pull request is not a duplicate.
+- `I reviewed the full diff; this change corrects the Task prompt without changing isolation or merge behavior.`
 
 ---
 
-- [x] `bun check` passes
+- [ ] `bun check` passes
 - [x] Tested locally
 - [x] CHANGELOG updated (if user-facing)
 
@@ -131,7 +131,7 @@ Investigated thoroughly with GPT-5.6 (extra high reasoning effort), using [Oh My
 
 This report is not generic or unreviewed AI-generated output. Its claims were checked against the cited evidence, and it includes the relevant detail intended to help maintainers resolve the issue.
 
-If reports like this are not useful to the project, please let me know and I will refrain from submitting similar ones. My intent is to help without wasting maintainer time or energy or discouraging their work.
+If reports like this are not useful to the project, please let me know and I will refrain from submitting similar ones. My intent is to help without wasting their time or energy or discouraging their work.
 
 Thank you for your work.
 ```
