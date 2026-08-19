@@ -1,6 +1,6 @@
 # ISSUE-008 — Read prompt: raw is not a universal converter or byte bypass
 
-State: Hold
+State: Closed
 Mode: Undecided
 Target: Undecided
 Location: Not published.
@@ -44,7 +44,6 @@ Gaps [N]: Discussions, real external URL/PDF execution, and invalid-UTF-8 behavi
 - `https://github.com/can1357/oh-my-pi/pull/756` — related prompt-compression process, not the later semantic widening.
 
 Target fit: New prompt-contract candidate; no exact duplicate found.
-Mode and external target remain user-unselected.
 
 ## Direction
 Define `:raw` as a source-specific representation rather than a universal byte promise.
@@ -73,15 +72,13 @@ Do not force byte semantics into a Text/Image tool.
 
 ## Missing
 
-- [N] Maintainer-chosen exact terminology for source-specific raw representations.
-- [N] Real external URL/PDF execution and invalid-UTF-8 byte exactness require separate triage and must not enter this record.
-- Mode and external target remain intentionally unselected.
+None.
 
 ## Resume
 
-Index: Select Read raw delivery
-Next: Choose local-only completion or an upstream pull request.
-Done when: Mode and target are recorded for the implemented correction.
+Index: —
+Next: None.
+Done when: None.
 
 ## Bug reproduction
 
@@ -90,3 +87,9 @@ Reproduction: Read an IPYNB fixture with and without `:raw`.
 Read controlled PDF/Markit, PNG, URL, and ZIP-member fixtures with and without `:raw`.
 Actual [O]: Notebook raw returns storage JSON, PDF/Markit raw remains converted, image raw remains image-oriented, URL raw is handler-owned response text, and archive raw remains extracted UTF-8 member text.
 Expected: The prompt describes these source-specific representations instead of promising a universal verbatim or converter-bypassing mode.
+
+## Disposition
+
+Outcome: Fixed
+Evidence: Local commit `ab8cd45f71` on `personal`; focused Read tests passed with 160 passed, 1 skipped, and 0 failed.
+Checked: 2026-08-20
