@@ -92,7 +92,7 @@ Expected: Errors and prompt guidance name only current routes, and working `grep
 Branch: `fix/read-ssh-guidance`
 Base: `upstream/main@74bc1f442e7bb6adcb5797ca8802ef6684281411`
 Scope: Replace stale model-visible `search` and standalone `ssh` routes with `grep`, `bash` with a remote SSH command, and `sshfs`; preserve SSH URL behavior.
-Commit: `c52d4062ac82ac23cd0add107dc0e99980880d81`
+Commit: `bee9144db5c7c4736cbf70c8280ad2eb5c84ab83`
 Push: `origin/fix/read-ssh-guidance` | Pushed.
 Checks:
 - `bun test packages/coding-agent/test/tools/read-guidance.test.ts packages/coding-agent/test/internal-urls/ssh-protocol.test.ts packages/coding-agent/test/ssh/file-transfer-posix-guard.test.ts packages/coding-agent/test/tools/grep-internal-urls.test.ts packages/coding-agent/test/tools/ssh-url-ungated-tools.test.ts` → 68 pass, 0 fail.
@@ -104,31 +104,31 @@ Target: `can1357/oh-my-pi`, base `main`, head `MikeeI:fix/read-ssh-guidance`.
 Title: `fix(tools): correct SSH guidance tool names`
 Body:
 
-## Summary
+## What
 
-Model-facing SSH guidance and SSH runtime errors still recommend retired `search` and standalone `ssh` routes even though the provider-visible search tool is `grep`.
+Replace stale model-facing SSH route names with the current provider-visible tools and document truthful fallbacks.
 
-## Evidence
+- Use `grep` for specific remote files instead of retired `search`.
+- Use `bash` with a remote SSH command or `sshfs` where `ssh://` cannot operate.
+- Preserve SSH URL read, write, and `grep` behavior without restoring retired tools.
 
-- `packages/coding-agent/src/prompts/tools/read.md` advertises `search` and a standalone `ssh` fallback although the registry exposes `grep` instead.
-- SSH transfer, internal-URL, path-validation, and Grep errors emit the same retired names.
-- Existing SSH URL tests confirm that `grep` remains the supported route for remote files.
+## Why
 
-## Changes
+Read guidance and SSH runtime errors recommend `search` and a standalone `ssh` tool that are absent from the provider-visible registry.
+Models can therefore produce unavailable tool calls or miss the supported `grep ssh://file` route.
 
-- Replace retired route names with `grep`, `bash` with a remote SSH command, and `sshfs`.
-- Add focused regression assertions for Read guidance and every affected SSH error path.
-- Preserve SSH URL read, write, and `grep` behavior; do not restore retired tools.
-
-## Risks and boundaries
-
-- This changes only model-facing guidance and error wording; SSH transport and capability gates remain unchanged.
-- Unsupported remote hosts retain explicit fallbacks without adding a new tool or changing the provider-visible registry.
-
-## Verification
+## Testing
 
 - Focused SSH/Grep regression tests pass: 68 tests, 0 failures.
-- `bun --cwd=packages/coding-agent run check` passes Biome; the package type check remains blocked by pre-existing `SettingsListTheme.warning` errors in `src/modes/theme/tui-adapters.ts:257,272`.
+- `bun --cwd=packages/coding-agent run check` passes Biome.
+- The package type check reports pre-existing `SettingsListTheme.warning` errors in `src/modes/theme/tui-adapters.ts:257,272`.
+- `packages/coding-agent/CHANGELOG.md` contains the Unreleased fix entry.
+
+---
+
+- [ ] `bun check` passes
+- [x] Tested locally
+- [x] CHANGELOG updated (if user-facing)
 
 I checked the relevant issues, comments, pull requests, and discussions; this pull request is not a duplicate.
 
