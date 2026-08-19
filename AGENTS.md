@@ -352,6 +352,17 @@ Each entry names its disposition, observable behavior, implementation owner, and
 - Proof: SSH protocol, file-transfer, path-validation, and remote-directory error tests.
 - Upstream action: submit the minimal wording and regression-test correction without reviving retired tools.
 
+#### `MOMP-READ-RAW` — Source-specific raw Read representations
+
+- Disposition: `MOMP-EIGEN`, designed for upstream.
+- Contract: `:raw` is a handler-specific representation, not universal byte access or converter bypass.
+- Contract: Documents may still use PDF/Markit conversion under `:raw`.
+- Contract: Notebooks return storage JSON, images retain decoded image-oriented output, and archives return decoded member text.
+- Contract: URLs return the response body without JSON, feed, or HTML text shaping after binary handling.
+- Owner: upstream `packages/coding-agent/src/prompts/tools/read.md` and source-kind Read handlers.
+- Proof: `test/tools/read-guidance.test.ts` and source-kind raw behavior tests.
+- Upstream action: submit the prompt-only correction without changing source dispatch or inventing byte semantics.
+
 #### Non-contract artifacts
 
 The following artifacts do not justify runtime retention by themselves:

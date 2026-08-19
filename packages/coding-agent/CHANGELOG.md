@@ -430,6 +430,9 @@
 - Cancelled prompts during pre-stream turn setup restore the text and image attachments to the editor.
 - `top` builtin accepts single-dash macOS flags such as `-pid` and `-stats`.
 - GNU/BSD compat sweep across built-in shell utilities (`timeout`, `diff`, `find`, `date`, `tail`, `head`, `rg`, `stat`, `truncate`, `cksum`, `sleep`, `which`, `nohup`, `kill`).
+### Fixed
+
+- Corrected Read `:raw` guidance to describe source-specific representations instead of universal byte access.
 
 ## [17.3.8] - 2026-08-19
 

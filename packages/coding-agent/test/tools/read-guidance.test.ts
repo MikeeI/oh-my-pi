@@ -13,7 +13,19 @@ function createSession(): ToolSession {
 	};
 }
 
-describe("Read SSH guidance", () => {
+describe("Read guidance", () => {
+	it("describes raw output as source-specific instead of universal byte access", () => {
+		const description = new ReadTool(createSession()).description;
+
+		expect(description).toContain("handler-specific raw representation");
+		expect(description).toContain("does not guarantee byte-exact data");
+		expect(description).toContain("source-specific converters such as PDF/Markit");
+		expect(description).toContain("`:raw` returns storage JSON");
+		expect(description).toContain("`:raw` does not return original image bytes");
+		expect(description).toContain("Archive `:raw` returns decoded member text");
+		expect(description).not.toContain(":raw` — verbatim");
+	});
+
 	it("advertises grep and current SSH fallbacks instead of retired tool names", () => {
 		const description = new ReadTool(createSession()).description;
 
