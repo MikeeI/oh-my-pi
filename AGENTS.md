@@ -340,6 +340,18 @@ Each entry names its disposition, observable behavior, implementation owner, and
 - Required action: after integration, remove their complete fork closure and restore `UPSTREAM-GEDECKT`.
 - Proof: document-symbol query and rename-preview cases in `test/tools/lsp-regressions.test.ts`.
 
+#### `MOMP-READ-SSH-GUIDANCE` — Current SSH route guidance
+
+- Disposition: `MOMP-EIGEN`, designed for upstream.
+- Contract: Read guidance and SSH runtime errors name only provider-visible routes.
+- Contract: remote text-file search uses `grep` and unsupported hosts use `bash` with a remote SSH command or `sshfs`.
+- Contract: retired `search` and standalone `ssh` tool names never appear in model-visible SSH guidance or errors.
+- Contract: `ssh://` read, write, and `grep` behavior remains unchanged.
+- Owner: upstream `packages/coding-agent/src/prompts/tools/read.md` and SSH path/error owners.
+- Proof: `test/tools/read-guidance.test.ts`.
+- Proof: SSH protocol, file-transfer, path-validation, and remote-directory error tests.
+- Upstream action: submit the minimal wording and regression-test correction without reviving retired tools.
+
 #### Non-contract artifacts
 
 The following artifacts do not justify runtime retention by themselves:
