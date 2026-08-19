@@ -33,11 +33,14 @@ Impact [N]: Models can emit unavailable tool calls or miss working `grep ssh://f
 - [S] Current upstream `test/tools/grep-internal-urls.test.ts:613-645` confirms the current `grep` owner searches `ssh://` files and rejects only unsupported directory-listing recursion.
 - [S] `https://github.com/can1357/oh-my-pi/commit/ae1650d689aa17dc7e72b0e8e9139c2cd2c0e363` renamed `search` and `find` to `grep` and `glob` across the stack.
 - [S] `https://github.com/can1357/oh-my-pi/commit/5ff277349cb1b1cda27cf1b3b4d946e160643906` removed the standalone SSH AgentTool while retaining `ssh://` protocol support.
+- [O] Live `ReadTool.description` still advertises that SSH handling is `search`-able.
+- [O] Windows, special-file, binary-file, remote-file, and remote-directory probes emitted the retired `ssh` or `search` names in their exact runtime errors.
+- [O] A mocked remote-file `grep ssh://` fixture succeeded with output `*1|needle here` and no error.
 
 ## Prior art
 
 Coverage: issues(open+closed), PRs(open+closed+merged), source history; checked=2026-08-19.
-Gaps [N]: Discussions, rendered registry comparison, and complete current error-string capture remain unchecked.
+Gaps [N]: Discussions, full rendered-registry comparison, maintainer fallback choice, and open PR #3921 review remain unchecked.
 
 - `https://github.com/can1357/oh-my-pi/pull/3553` — historical SSH URL owner from when the old tool names were valid.
 - `https://github.com/can1357/oh-my-pi/pull/3609` — related rename fallout in stale expectations.
@@ -67,14 +70,22 @@ Do not restore retired aliases or alter SSH protocol behavior.
 
 ## Missing
 
-- [N] Rendered description versus actual provider-visible registry capture on `upstream/main@74bc1f442e7bb6adcb5797ca8802ef6684281411`.
-- [N] Full current error strings for all stale SSH and search guidance paths.
-- [N] Maintainer decision for the exact unsupported-SSH fallback.
-- [N] Re-check open PR #3921 before implementation.
+- [O] Focused runtime capture is complete for the current stale SSH and `search` error paths.
+- [O] The working `grep ssh://` file route is confirmed by the existing fixture.
+- [N] Full rendered provider-registry comparison, maintainer decision for the unsupported-SSH fallback, and re-check of open PR #3921.
 - Mode and external target remain intentionally unselected.
 
 ## Resume
 
-Index: Capture retired SSH routes
-Next: Render Read against the live built-in registry and trigger every stale SSH or search error path.
-Done when: Output proves retired `search` and standalone `ssh` routes are unavailable while current `grep` and `ssh://` owners remain functional.
+Index: Choose SSH fallback wording
+Next: Decide the truthful fallback for unsupported SSH hosts and capture the complete provider-visible registry.
+Done when: Guidance and runtime errors name only available routes while `grep ssh://file` remains functional.
+
+## Bug reproduction
+
+Environment: Bun 1.3.14, Ubuntu 24.04.4 LTS x64, current personal checkout, controlled SSH protocol fixtures, and mocked remote host `icaro`.
+Reproduction: Inspect the live Read description.
+Trigger Windows, special-file, binary-file, remote-file, and remote-directory SSH paths.
+Run `grep` against a mocked remote `ssh://` file.
+Actual [O]: Runtime guidance emits retired `ssh` and `search` names, while the canonical `grep ssh://` file route succeeds with `*1|needle here`.
+Expected: Errors and prompt guidance name only current routes, and working `grep ssh://` behavior remains unchanged.

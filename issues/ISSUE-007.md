@@ -31,11 +31,13 @@ Impact [N]: Calls cannot bypass the runtime guard, but the model can spend tool 
 - [S] Current upstream `tools/index.ts:631-635` gates Hub on coordination and IRC state, not on `launch.enabled`.
 - [S] Current upstream `tools/bash.ts` owns separate launch guidance, so Hub metadata and Bash capability rendering can diverge.
 - [S] `https://github.com/can1357/oh-my-pi/commit/5ff277349cb1b1cda27cf1b3b4d946e160643906` consolidated launch into Hub while retaining enforcement without retaining the complete capability gate.
+- [O] Direct HubTool probe with `launch.enabled=false` retained the process-capable summary, schema fields, all process ops, and two process examples.
+- [O] The same probe returned `isError:true` and the exact disabled-setting message for `start`, `ps`, `logs`, `stop`, `restart`, `describe`, Process `send`, and Process `wait`.
 
 ## Prior art
 
 Coverage: issues(open+closed), PRs(open+closed+merged), source history; checked=2026-08-19.
-Gaps [N]: Discussions and focused provider-metadata/runtime capture remain unchecked.
+Gaps [N]: Discussions and full registry/provider serialization capture remain unchecked.
 
 - `https://github.com/can1357/oh-my-pi/issues/5399` and `https://github.com/can1357/oh-my-pi/pull/5466` — disabled tools should be omitted from model context; related presentation precedent with a different owner.
 - `https://github.com/can1357/oh-my-pi/issues/5305` — related allowlist and registration drift for a different tool.
@@ -66,13 +68,22 @@ Retain the runtime guard for stale or direct calls.
 
 ## Missing
 
-- [N] Focused provider-facing metadata and direct error-result reproduction on `upstream/main@74bc1f442e7bb6adcb5797ca8802ef6684281411`.
+- [N] Full real-registry and provider-facing metadata capture with `launch.enabled=false` and `launch.enabled=true`.
 - [N] Live-setting refresh verification if runtime toggles are part of the intended contract.
 - [N] Token measurement if quantified context impact is later claimed.
 - Mode and external target remain intentionally unselected.
 
 ## Resume
 
-Index: Reproduce disabled Hub metadata
-Next: Build Hub and Bash through the real registry with `launch.enabled=false` and capture metadata plus direct process-route results.
-Done when: Capture shows Hub coordination remains active, disabled process metadata is still present, and every process call returns the exact disabled-setting error without broker execution.
+Index: Capture full Hub gating
+Next: Build Hub and Bash through the real registry with both launch-setting values and capture provider metadata.
+Done when: Registry output shows process metadata absent when disabled, present when enabled, and coordination plus direct-route guard behavior preserved.
+
+## Bug reproduction
+
+Environment: Bun 1.3.14, Ubuntu 24.04.4 LTS x64, current personal checkout, `launch.enabled=false`, and `enableIrc=true`.
+Reproduction: Construct `HubTool` with `Settings.isolated({ "launch.enabled": false })`.
+Inspect its summary, schema, description, and examples.
+Execute every Process route directly, including named `send` and `wait` calls.
+Actual [O]: Process metadata remains advertised, and every route returns `isError:true` with `Process supervision is disabled (launch.enabled=false).`.
+Expected: Hub remains available for coordination, but disabled Process metadata and guidance are absent while direct stale calls retain the guard error.

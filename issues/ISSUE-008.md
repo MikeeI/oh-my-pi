@@ -29,11 +29,15 @@ Impact [N]: Agents can mistake converted or handler-owned output for original by
 - [S] Current upstream `tools/fetch.ts:1294-1297` skips text shaping in raw mode only after binary-oriented branches have already run.
 - [S] Current upstream `tools/read-archive.ts:170-188` reads archive members and UTF-8 decodes them before applying the raw selector.
 - [S] `https://github.com/can1357/oh-my-pi/commit/b980dd24f29d53a5427cd4e58e82a9dbdbfdc4e2` and `https://github.com/can1357/oh-my-pi/commit/af1832af1bd36070a814c3bb175c3655ee44e29f` broadened and harmonized the prompt wording without a corresponding universal runtime conversion change.
+- [O] The focused source-kind probe showed Notebook default editable markers versus raw storage JSON containing `"cells"`.
+- [O] The same probe showed PDF/Markit default and raw both use converted content, with raw changing Read formatting rather than bypassing conversion.
+- [O] Local image default and raw both returned text plus `image/png` content, while archive default and raw both returned extracted member text rather than archive bytes.
+- [O] Focused URL tests showed raw response bodies and non-raw handler rendering for feed and JSON inputs.
 
 ## Prior art
 
 Coverage: issues(open+closed), PRs(open+closed+merged), source history; checked=2026-08-19.
-Gaps [N]: Discussions, real Markit/image truth-table execution, URL/archive edge cases, and invalid-UTF-8 behavior remain unchecked.
+Gaps [N]: Discussions, real external URL/PDF execution, and invalid-UTF-8 behavior remain unchecked.
 
 - `https://github.com/can1357/oh-my-pi/issues/1401` and `https://github.com/can1357/oh-my-pi/pull/1402` — related fidelity boundary for CLI PDF arguments with a different owner and no `:raw` contract.
 - `https://github.com/can1357/oh-my-pi/pull/756` — related prompt-compression process, not the later semantic widening.
@@ -62,13 +66,21 @@ Do not force byte semantics into a Text/Image tool.
 
 ## Missing
 
-- [N] Focused PDF/Markit, Notebook, image, URL, and archive truth-table reproduction on `upstream/main@74bc1f442e7bb6adcb5797ca8802ef6684281411`.
+- [O] Controlled source-kind truth-table reproduction is complete for Notebook, PDF/Markit, image, URL, and archive branches.
 - [N] Maintainer-chosen exact terminology for source-specific raw representations.
-- [N] Invalid-UTF-8 byte exactness requires separate triage and must not enter this record.
+- [N] Real external URL/PDF execution and invalid-UTF-8 byte exactness require separate triage and must not enter this record.
 - Mode and external target remain intentionally unselected.
 
 ## Resume
 
-Index: Reproduce Read raw truth table
-Next: Run a source-kind matrix for PDF or Markit, Notebook, image, URL, and archive raw reads.
-Done when: Output proves source-specific raw behavior and the prompt no longer implies universal converter bypass or byte preservation.
+Index: Choose Read raw terminology
+Next: Select concise source-specific `:raw` wording that preserves the observed runtime branches.
+Done when: Prompt text states each supported raw representation without implying universal converter bypass or byte preservation.
+
+## Bug reproduction
+
+Environment: Bun 1.3.14, Ubuntu 24.04.4 LTS x64, current personal checkout, controlled local fixtures, and focused Read handler tests.
+Reproduction: Read an IPYNB fixture with and without `:raw`.
+Read controlled PDF/Markit, PNG, URL, and ZIP-member fixtures with and without `:raw`.
+Actual [O]: Notebook raw returns storage JSON, PDF/Markit raw remains converted, image raw remains image-oriented, URL raw is handler-owned response text, and archive raw remains extracted UTF-8 member text.
+Expected: The prompt describes these source-specific representations instead of promising a universal verbatim or converter-bypassing mode.
