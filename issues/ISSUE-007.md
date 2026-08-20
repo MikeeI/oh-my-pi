@@ -1,25 +1,25 @@
 # ISSUE-007 — Hub capability: disabled process supervision remains fully advertised
 
-State: Hold
-Mode: Undecided
-Target: Undecided
-Location: Not published.
-Priority: High
-Confidence: High
-Type: correctness
+State: Investigating
+Authorized-Work: Not-Selected
+Publication-Target: Not-Selected
+External-Reference: Not published.
+Contribution-Priority: High
+Root-Cause-Confidence: High
+Finding-Category: Correctness
 Created: 2026-08-14
 Updated: 2026-08-19
 Source: `upstream/main@74bc1f442e7bb6adcb5797ca8802ef6684281411`
 
-## Root
+## Root-Cause
 
-Root [S]: Hub consolidation retained the `launch.enabled` execution guard but removed the standalone launch capability gate from Hub registration and model-facing metadata.
+Root-Cause [S]: Hub consolidation retained the `launch.enabled` execution guard but removed the standalone launch capability gate from Hub registration and model-facing metadata.
 With `launch.enabled=false`, Hub remains available for messaging and jobs while process operations, fields, examples, summaries, and Bash guidance remain advertised.
 
-## Reach and impact
+## Reach-and-Impact
 
 Reach [S]: Any normal session with Hub coordination active and process supervision disabled receives process-only operations and lifecycle guidance.
-Impact [N]: Calls cannot bypass the runtime guard, but the model can spend tool or retry turns on guaranteed errors; frequency and context-token cost are unmeasured.
+Impact: Calls cannot bypass the runtime guard, but the model can spend tool or retry turns on guaranteed errors; frequency and context-token cost are unmeasured.
 
 ## Evidence
 
@@ -36,26 +36,26 @@ Impact [N]: Calls cannot bypass the runtime guard, but the model can spend tool 
 - [O] Real `createTools` registry probes with `launch.enabled=false` and `true` contained `hub` and `bash` in both cases; Hub summary, Process ops, fields, and five Process examples were identical.
 - [O] With `launch.enabled=false`, Bash still rendered `Services, watchers, debuggers, and REPLs MUST use hub (op:"start").`; no provider-visible `search` or standalone `ssh` name appeared in the same registry.
 
-## Prior art
+## Prior-Art
 
 Coverage: issues(open+closed), PRs(open+closed+merged), source history; checked=2026-08-19.
-Gaps [N]: Discussions and live-setting refresh verification remain unchecked.
+Gaps: Discussions and live-setting refresh verification remain unchecked.
 
 - `https://github.com/can1357/oh-my-pi/issues/5399` and `https://github.com/can1357/oh-my-pi/pull/5466` — disabled tools should be omitted from model context; related presentation precedent with a different owner.
 - `https://github.com/can1357/oh-my-pi/issues/5305` — related allowlist and registration drift for a different tool.
 - `https://github.com/can1357/oh-my-pi/issues/7061` — confirms Hub must remain for coordination but does not own this `launch.enabled` metadata drift.
 
-Target fit: New capability-presentation candidate; no exact duplicate found.
-Mode and external target remain user-unselected.
+Contribution fit: New capability-presentation candidate; no exact duplicate found.
+Authorized work and Publication target remain user-unselected.
 
-## Direction
+## Proposed-Change
 
 Make Hub metadata capability-aware while preserving messaging and jobs.
 Expose process-free schema, prompt, summary, and examples when disabled and full variants when enabled.
 Fix Bash launch guidance to require both an active Hub and `launch.enabled`.
 Retain the runtime guard for stale or direct calls.
 
-## Bounds
+## Scope-and-Constraints
 
 - Preserve: Hub messaging and jobs, the runtime authorization guard, live rebuild behavior, and all process operations when enabled.
 - Exclude: Removing Hub, removing the guard, restoring standalone launch, or redesigning broker and process supervision.
@@ -68,18 +68,18 @@ Retain the runtime guard for stale or direct calls.
 - Call every process route directly and require the exact disabled-setting `isError:true` result without broker execution.
 - Use `launch.enabled=true` as the positive control and require the complete process surface.
 
-## Missing
+## Publication-Blockers
 
 - [O] Full real-registry and provider-facing metadata capture with `launch.enabled=false` and `launch.enabled=true` is complete.
-- [N] Live-setting refresh verification if runtime toggles are part of the intended contract.
-- [N] Token measurement if quantified context impact is later claimed.
-- Mode and external target remain intentionally unselected.
+- Measurement-Status: Live-setting refresh verification remains unchecked if runtime toggles are part of the intended contract.
+- Measurement-Status: Token impact remains unmeasured if quantified context impact is later claimed.
+- Authorized-Work and Publication-Target remain intentionally unselected.
 
-## Resume
+## Next-Action
 
-Index: Select Hub gating scope
-Next: Select the smallest capability-aware Hub and Bash correction that preserves coordination and the disabled-route guard.
-Done when: The selected scope covers disabled Process metadata, Bash guidance, enabled Process behavior, and positive/negative registry proof.
+Summary: Select Hub gating scope
+Action: Select the smallest capability-aware Hub and Bash correction that preserves coordination and the disabled-route guard.
+Done-When: The selected scope covers disabled Process metadata, Bash guidance, enabled Process behavior, and positive/negative registry proof.
 
 ## Bug reproduction
 

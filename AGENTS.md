@@ -520,34 +520,50 @@ Fork-maintenance completion evidence:
 - Base clean upstream contribution branches on current `upstream/main`.
 - Keep `AGENTS.md`, `FORMAT.md`, `ISSUES.md`, `issues/`, and other fork-only state out of upstream diffs.
 - Support upstream with evidence-backed, high-ROI findings while preserving active MOMP contracts.
+- Prioritize bounded corrections with meaningful user or maintainer value and limited regression and review cost.
+- Prefer a pull request when a bounded verified fix is ready and no active implementation owns it.
+- Otherwise comment when a thread owns the same problem or root cause and new evidence advances it.
+- Otherwise open a new issue when durable maintainer discussion is useful.
+- Otherwise keep the finding Investigating.
 - Apply `skill-fork-contribution-tracking` for ledger, lifecycle, personal-branch, and upstream handoff work.
 - Apply `skill-maintainer-communication` before external issues, pull requests, reviews, comments, or discussions.
 - Apply `skill-semantic-compression-3-0` when authoring or restructuring tracking content.
-- Small bug fixes, documentation corrections, and narrow improvements may go directly to an upstream pull request.
-- Open an upstream issue only for a problem or proposed work not being implemented as a pull request.
+- Apply `skill-git-commit-format` while respecting this repository's commit and contribution conventions.
+- Never choose Authorized-Work on the user's behalf.
+- Research-and-Reporting permits issues and comments but no source implementation.
+- Pull-Request-Implementation authorizes only the scope recorded for the finding.
+- Search existing work first, follow upstream templates and disclosure rules, and avoid duplicate or weak submissions.
+- Reproduce claimed bugs against current upstream and run the narrowest conclusive verification.
+- Publish one coherent root cause per issue, comment, or pull request.
 - Discuss major features and broad architectural or behavior changes in upstream Discord before implementation.
 - External publication follows `### External Publication Approval`; local tracking never authorizes an external write.
 
 ## Finding and Contribution Ledger
 
 - Agents MUST read root `ISSUES.md` before repository work.
-- `ISSUES.md` owns `Next finding ID` and the compact cross-finding projection.
-- Each `issues/ISSUE-NNN.md` owns one root cause, evidence, state, Resume, drafts, and location.
-- `FORMAT.md` owns research, evidence labels, lifecycle, drafting, implementation, and publication gates.
+- `ISSUES.md` owns `Next-Finding-ID` and the compact cross-finding projection.
+- Each `issues/ISSUE-NNN.md` owns one root cause, evidence, Next-Action, drafts, and archive record.
+- `FORMAT.md` owns research, claim basis, lifecycle, drafting, implementation, and publication gates.
 - Before allocating, search the index and relevant records for the same symptom and root cause.
 - Allocate the current permanent `ISSUE-NNN`; create its record, add its index row, and advance the allocator together.
-- Update the issue record and index together after state, mode, target, priority, Resume, or location changes.
-- New findings start `State: Hold`, `Mode: Undecided`, `Target: Undecided`, and `Location: Not published.`.
-- Label material claims `[O]`, `[S]`, `[A]`, or `[N]` according to `FORMAT.md`.
+- Update the issue record and index together after any projected field, Next-Action, or Archive change.
+- New findings start with `State: Investigating` and `Authorized-Work: Not-Selected`.
+- They also start with `Publication-Target: Not-Selected` and `External-Reference: Not published.`.
+- Label material claims `[O]`, `[S]`, or `[A]` according to `FORMAT.md`.
+- Preserve unmeasured boundaries as prose or an explicit Measurement-Status field.
 - Verify source claims against current upstream; reproduce user-visible bugs before claiming `[O]`.
-- The user selects Report or Pull request mode; local research and tracking do not select either.
+- The user selects Authorized-Work; local research and tracking never select it.
+- Research-and-Reporting MUST NOT implement the finding.
+- Pull-Request-Implementation MAY implement only the recorded scope after research resolves failure boundaries.
+- Pull-request work MUST be verified, committed, pushed, and PR-Ready before external publication.
 - Run the bundled read-only ledger validator after every ledger mutation.
+- Record the final external URL in `External-Reference` immediately after publication.
 
 ### External Publication Approval
 
 - Only an external issue, comment, review, discussion, or pull request write is approval-gated.
 - Local ledger creation and updates are not external publication.
-- Before publication, read current upstream policy and show the exact target plus complete current draft.
+- Before publication, read current upstream policy and show the exact Publication-Target and Publication-Draft.
 - Publish only after the user explicitly approves that exact target and draft.
 - Any target or draft change invalidates prior approval.
 - Without that exact instruction, NEVER comment on GitHub or create a GitHub issue.

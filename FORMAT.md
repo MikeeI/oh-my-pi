@@ -11,39 +11,39 @@ Each `issues/ISSUE-NNN.md` is authoritative for that finding's complete current 
 Current upstream contribution guides, forms, and templates override the generic external shapes below.
 
 - Investigate before drafting or implementing.
-- Let the user choose Report or Pull request mode.
-- Report mode permits issues and comments but no source implementation.
-- Pull request mode authorizes only the implementation scope recorded for the finding.
+- Let the user choose `Authorized-Work`.
+- `Research-and-Reporting` permits issues and comments but no source implementation.
+- `Pull-Request-Implementation` authorizes only the implementation scope recorded for the finding.
 - Apply the contribution decision tree below; never treat its order as publication authorization.
-- Show the exact current external draft and target before publication.
+- Show the exact current publication draft and target before publication.
 - Publish externally only after the user approves that exact draft and target.
 - Verify source claims against the current canonical upstream branch.
 - Keep fork-only tracking content out of upstream contribution diffs.
 
-## Evidence vocabulary
+## Claim basis
 
-Use evidence labels at the claim they qualify:
+Use claim-basis labels at the claim they qualify:
 
 - `[O]` Observed: reproduced behavior with command, version, environment, and result.
 - `[S]` Source-proven: current control flow, API ownership, or deterministic data flow proves the claim.
 - `[A]` Assumed: an unverified premise is required by the claim.
-- `[N]` Not measured: performance, resource, frequency, or user impact lacks measurement.
 
+These labels are evidence origins, not an ordered confidence scale.
 Never use one entry-wide label to upgrade weaker claims.
 Never convert `[S]` behavior into `[O]` impact.
-Preserve exact paths, symbols, commands, outputs, URLs, revisions, dates, and external drafts.
+Preserve exact paths, URLs, IDs, hashes, revisions, commands, outputs, versions, dates, and external drafts.
 
 ## Finding IDs and duplicate prevention
 
 - IDs use `ISSUE-NNN`, start at `ISSUE-001`, have at least three digits, and remain permanent.
 - `Next finding ID: ISSUE-NNN` in `ISSUES.md` is the only allocator.
 - Re-read the complete current `ISSUES.md` immediately before allocating.
-- Search IDs, titles, symptoms, root causes, symbols, locations, and proposed owners across `issues/`.
+- Search IDs, titles, symptoms, root causes, symbols, external references, and proposed owners across `issues/`.
 - Read every plausible matching issue record completely.
 - Update the existing record when it already owns the root cause.
 - Allocate the current ID, create its issue file, add its index row, and increment the allocator in one change.
 - Never reuse, renumber, or create subsystem-, status-, session-, or contribution-specific sequences.
-- External numbers and URLs belong in `Location`; they never replace the internal ID.
+- External numbers and URLs belong in `External-Reference`; they never replace the internal ID.
 
 Issue headings and filenames use:
 
@@ -55,25 +55,27 @@ issues/ISSUE-NNN.md
 ## `ISSUES.md` projection
 
 `ISSUES.md` provides overview, not the complete research record.
-Active rows project ID, title, State, Mode, Target, Priority, `Resume/Index`, and Location.
-Terminal rows project ID, title, State, Mode, Target, Priority, Disposition Outcome, and Location.
+Open rows project ID, title, State, Authorized-Work, Publication-Target, Contribution-Priority.
+They also project `Next-Action/Summary` and External-Reference.
+Archived rows project ID, title, Authorized-Work, Publication-Target, and Contribution-Priority.
+They also project Archive-Reason and External-Reference.
 
 The issue file is authoritative when a row disagrees with it.
 Correct both in the same task; never leave a known projection mismatch.
-Move terminal findings to the terminal table without changing their ID or file.
+Move archived findings to the archived table without changing their ID or file.
 
 ## Issue record contract
 
 Every issue file contains these fields in this order:
 
 ```text
-State: Hold | Drafted | Implementing | Ready | Published | Closed | Rejected
-Mode: Report | Pull request | Undecided
-Target: New issue | Issue comment | New pull request | Pull request comment | Undecided
-Location: <exact external URL | Not published.>
-Priority: High | Medium | Low
-Confidence: High | Medium | Low
-Type: <correctness | reliability | performance | maintainability | API | UI | build | test | other exact family>
+State: Investigating | Draft-Ready | Implementing | PR-Ready | Submitted | Archived
+Authorized-Work: Research-and-Reporting | Pull-Request-Implementation | Not-Selected
+Publication-Target: New-issue | Existing-issue-comment | New-pull-request | Existing-pull-request-comment | Not-Selected
+External-Reference: <exact external URL or identifier | Not published.>
+Contribution-Priority: High | Medium | Low
+Root-Cause-Confidence: High | Medium | Low
+Finding-Category: Correctness | Reliability | Performance | Maintainability | API | UI | Build | Test | Other
 Created: <YYYY-MM-DD>
 Updated: <YYYY-MM-DD>
 Source: `upstream/<branch>@<commit>`
@@ -81,67 +83,64 @@ Source: `upstream/<branch>@<commit>`
 
 Every issue file contains these sections:
 
-- `Root`: one cause and the behavior it owns.
-- `Reach and impact`: affected callers, users, states, frequency, and honest impact boundary.
+- `Root-Cause`: one cause and the behavior it owns.
+- `Reach-and-Impact`: affected callers, users, states, frequency, and honest impact boundary.
 - `Evidence`: exact source, reproduction, history, command, result, contract, or external evidence.
-- `Prior art`: search coverage, relevant candidates, classifications, gaps, and target fit.
-- `Direction`: smallest complete correction or ownership change.
-- `Bounds`: behavior to preserve, compatibility limits, adoption cost, and excluded scope.
+- `Prior-Art`: search coverage, relevant candidates, classifications, gaps, and target fit.
+- `Proposed-Change`: smallest complete correction or ownership change.
+- `Scope-and-Constraints`: preserved behavior, excluded scope, compatibility, and adoption cost.
 - `Verification`: narrowest checks that prove the proposed or implemented contract.
-- `Missing`: exact publication evidence still unresolved, or `None.`.
-- `Resume`: one next action and one observable completion condition, or `None.` for terminal work.
+- `Publication-Blockers`: unresolved publication evidence, or `None.`.
+- `Next-Action`: one bounded action and one observable completion condition.
 
 Use conditional sections only when applicable:
 
-- `Bug reproduction` for an observed user-visible bug.
-- `Performance evidence` for latency, throughput, allocation, I/O, or resource claims.
-- `Shared change pressure` for duplication or ownership findings.
-- `API and compatibility` for public, persisted, protocol, or migration boundaries.
-- `Implementation` while Pull request mode is Implementing, Ready, Published, or Closed.
-- `Draft` when an exact external issue, comment, or pull request draft exists.
-- `Disposition` when upstream resolves, rejects, supersedes, merges, or closes the contribution.
+- `Bug-Reproduction` for an observed user-visible bug.
+- `Performance-Evidence` for latency, throughput, allocation, I/O, or resource claims.
+- `Shared-Change-Pressure` for duplication or ownership findings.
+- `API-and-Compatibility` for public, persisted, protocol, or migration boundaries.
+- `Pull-Request-Implementation` while authorized implementation exists.
+- `Publication-Draft` when an exact external issue, comment, or pull request draft exists.
+- `Submitted-Text` when submitted text differs from the approved publication draft.
+- `Archive` only when State is Archived.
 
 ## Lifecycle states
 
-### Hold
+### Investigating
 
-Use Hold while any required publication evidence is missing.
-Source-only claims, incomplete prior-art research, stale currentness, unverified reach, and unmeasured impact remain Hold.
-`Missing` names every publication blocker; `Resume` names the single next action.
+Use Investigating while required publication evidence, Authorized-Work, Publication-Target, or direction is unresolved.
+`Publication-Blockers` names every unresolved prerequisite.
+`Next-Action` names the single bounded action that advances it.
 
-### Drafted
+### Draft-Ready
 
-Use Drafted only after research, Mode, Target, and the exact external Draft are complete.
-Drafted does not authorize publication.
-Report mode normally moves from Drafted to Published after approved publication.
-Pull request mode normally moves from Drafted to Implementing.
+Use Draft-Ready only after research, Authorized-Work, Publication-Target, and the exact Publication-Draft are complete.
+Draft-Ready does not authorize publication.
+Research-and-Reporting normally moves from Draft-Ready to Submitted after approved publication.
+Pull-Request-Implementation normally moves from Draft-Ready to Implementing.
 
 ### Implementing
 
-Use Implementing only for user-selected Pull request mode while the bounded source change is in progress.
-Record branch, base revision, scope, commit state, push state, and focused checks under `Implementation`.
+Use Implementing only for user-authorized Pull-Request-Implementation while the bounded source change is in progress.
+Record branch, base revision, scope, commit state, push state, and focused checks under Pull-Request-Implementation.
 
-### Ready
+### PR-Ready
 
-Use Ready when the source change is complete, verified, committed, pushed, and ready for an upstream pull request.
-The exact pull request Draft and Target must already exist.
-Ready does not authorize publication.
+Use PR-Ready when the source change is complete, verified, committed, pushed, and ready for an upstream pull request.
+The exact Publication-Draft and New-pull-request target must already exist.
+PR-Ready does not authorize publication.
 
-### Published
+### Submitted
 
-Use Published only after an observable external issue, comment, or pull request exists.
-Record its exact URL in `Location` immediately.
-Preserve the exact published text under `Draft` or label a distinct `Published text` block when publication changed it.
+Use Submitted only after an observable external issue, comment, or pull request exists.
+Record its exact URL in External-Reference immediately.
+Preserve the exact Submitted-Text when it differs from the approved Publication-Draft.
 
-### Closed
+### Archived
 
-Use Closed when the external contribution or underlying problem reaches an observable terminal outcome.
-Record outcome and evidence under `Disposition`; preserve the ID, history, exact location, and published text.
-
-### Rejected
-
-Use Rejected when investigation disproves the root cause or shows that the correction costs more than the evidenced problem.
-Record the rejection evidence and retain it to prevent rediscovery.
+Use Archived only when no current action remains and a recorded Archive-Reason exists.
+Archive may represent success, an external outcome, an invalidated finding, or a decision not to pursue the work.
+Preserve the ID, history, exact External-Reference, Submitted-Text, and archive evidence.
 
 ## Required research
 
@@ -155,13 +154,13 @@ Before drafting or implementing:
 6. Reproduce user-visible bugs before claiming `[O]` behavior.
 7. Measure representative workloads before claiming meaningful performance value.
 8. Inspect callers, compatibility, persistence, lifecycle, failure modes, and verification seams.
-9. Label every material claim `[O]`, `[S]`, `[A]`, or `[N]` at its point of use.
-10. Apply the contribution decision tree within the user's selected Mode.
+9. Label every material claim `[O]`, `[S]`, or `[A]` at its point of use.
+10. Apply the contribution decision tree within the user's selected Authorized-Work.
 
 A search result is only a candidate target.
 A matching symbol, subsystem, or symptom does not establish common ownership.
 Sibling-project behavior is a research lead and never proves target-project behavior.
-Unread or unavailable plausible prior art keeps the finding on Hold.
+Unread or unavailable plausible prior art keeps the finding Investigating.
 
 ## Finding quality gates
 
@@ -195,7 +194,7 @@ Expected: <contract-backed expected result>
 
 Do not use a bug form for source-only maintainability concerns without reproduced behavior.
 
-### Performance evidence
+### Performance-Evidence
 
 Meaningful performance claims require:
 
@@ -204,19 +203,19 @@ Workload: <representative input and environment>
 Baseline [O]: <command, measurements, and variance>
 Candidate [O]: <command, measurements, and variance>
 Guard [O]: <correctness-equivalence result>
-Boundary [N|O]: <end-to-end impact and what remains unmeasured>
+Boundary: <end-to-end impact and what remains unmeasured>
+End-to-end-Measurement: Measured | Not measured | Not applicable
 ```
 
 No representative measurement means no meaningful performance claim.
 
-### Shared change pressure
+### Shared-Change-Pressure
 
 Duplication or ownership findings require:
 
 ```text
 Copies [S]: <count and exact live owners>
-Pressure [S]: <one realistic reason the copies change together>
-Drift [O|S|N]: <current divergence or honest absence>
+Drift-Evidence: <[O] observed divergence | [S] source-proven divergence | None found.>
 Owner: <smallest coherent proposed owner>
 Cost: <coupling and abstraction boundary>
 ```
@@ -225,7 +224,7 @@ Clone detectors, AST matches, text similarity, and shared names produce candidat
 Framework wiring, DTO mirrors, provider boundaries, fixtures, migrations, generated code, and idioms are not findings by default.
 Consolidation must be simpler than synchronized explicit code.
 
-### API and compatibility
+### API-and-Compatibility
 
 Public, persisted, protocol, or migration changes require:
 
@@ -236,22 +235,22 @@ Compatibility: <behavior that must remain>
 Migration: <required action or None.>
 ```
 
-## Contribution decision and target selection
+## Contribution-Decision-and-Publication-Target-Selection
 
 Apply this decision tree:
 
 1. Recommend a focused pull request when its implementation gate passes.
 2. Otherwise recommend a comment when an existing thread owns the same problem or root cause.
 3. Otherwise recommend a new issue when durable maintainer discussion is useful.
-4. Otherwise keep the finding on Hold.
+4. Otherwise keep the finding Investigating until the decision is evidence-backed.
 
-The decision recommends a shape; the user still selects Mode and approves publication.
+The decision recommends a shape; the user still selects Authorized-Work and approves publication.
 
 ### Focused pull request
 
 The implementation gate requires:
 
-- Pull request mode selected by the user;
+- Pull-Request-Implementation selected by the user;
 - verified root cause, callers, failure modes, compatibility boundary, and bounded fix;
 - no active implementation already owning the correction;
 - focused checks covering every changed contract; and
@@ -259,52 +258,50 @@ The implementation gate requires:
 
 A pull request may resolve or materially advance an existing issue without a duplicate issue.
 
-### Existing issue comment
+### Existing-Issue-Comment
 
 Comment only when the thread owns the same problem or root cause and new evidence advances diagnosis or resolution.
 A useful comment adds a fact, reproduction, source anchor, measurement, verified fix, or necessary scoped question.
 Similar symptoms alone do not justify a comment.
 Use a distinct record for a distinct root cause.
 
-### Existing pull request comment
+### Existing-Pull-Request-Comment
 
 Comment only when the current diff changes the exact lifecycle, function, invariant, or owner involved.
 Add actionable evidence and state when it does not request scope expansion.
 Never redirect an unrelated pull request.
 
-### New issue
+### New-Issue
 
 Open a new issue only when no thread owns the same problem or root cause and durable discussion is useful.
 Use one issue per independent root cause.
 
-### Hold without publication
+### Investigating Without Publication
 
-Keep Hold while currentness, reach, prior art, impact, target, or correction value remains unresolved.
-State the exact gap in `Missing` and the next bounded action in `Resume`.
+Keep Investigating while currentness, reach, prior art, impact, target, or correction value remains unresolved.
+State the exact gap in Publication-Blockers and the next bounded action in Next-Action.
 
-## Resume contract
+## Next-Action-Contract
 
-Every nonterminal record contains one index projection and one current continuation action:
+Every open record contains one compact projection and one current continuation action:
 
 ```text
-Index: <2–6 word action summary>
-Next: <single bounded action>
-Done when: <observable evidence that completes it>
+Summary: <2–6 word action summary>
+Action: <single bounded action>
+Done-When: <observable evidence that completes it>
 ```
 
-`ISSUES.md/Next` must equal `Resume/Index` exactly.
-Replace `Resume` after completing the action; do not accumulate a task log.
-Re-check the source and external target before relying on a stale Resume action.
-Terminal records use `Index: —`, `Next: None.`, and `Done when: None.`.
-
-## Draft contract
+`ISSUES.md/Next-Action` must equal `Next-Action/Summary` exactly.
+Replace Next-Action after completing the action; do not accumulate a task log.
+Re-check the source and Publication-Target before relying on a stale action.
+Archived records use `Summary: —`, `Action: None.`, and `Done-When: None.`.
+## Publication-Draft-Contract
 
 Apply the upstream form or template first and map the generic content below into its fields.
 Apply `skill-maintainer-communication` to every external draft.
 Keep exact drafts literal; semantic compression applies only to their supporting ledger context.
-Any Draft or Target change requires showing the complete current draft and target again before publication.
-
-### New issue
+Any Publication-Draft or Publication-Target change requires showing both again before publication.
+### New-Issue
 
 ```markdown
 ## Summary
@@ -343,7 +340,7 @@ I checked the relevant issues, comments, pull requests, and discussions; this re
 I am reporting this finding only and am not currently proposing a pull request.
 ```
 
-### New pull request
+### New-Pull-Request
 
 ```markdown
 ## Summary
@@ -372,7 +369,7 @@ I am reporting this finding only and am not currently proposing a pull request.
 I checked the relevant issues, comments, pull requests, and discussions; this pull request is not a duplicate.
 ```
 
-### Existing issue comment
+### Existing-Issue-Comment
 
 ```markdown
 Hi, thanks for documenting this.
@@ -391,7 +388,7 @@ I checked the relevant discussion; this evidence is not already reported.
 I am reporting this finding only and am not currently proposing a pull request.
 ```
 
-### Existing pull request comment
+### Existing-Pull-Request-Comment
 
 ```markdown
 Hi, thanks for working on this.
@@ -408,11 +405,10 @@ Would it make sense to <one concrete question>?
 I checked the relevant discussion; this evidence is not already reported.
 ```
 
-## Implementation contract
 
-Pull request records use:
+## Pull-Request-Implementation-Contract
 
-```text
+Pull-Request-Implementation records use:
 Branch: <contribution branch>
 Base: `upstream/<branch>@<commit>`
 Scope: <authorized source change>
@@ -424,21 +420,21 @@ Checks:
 
 Record durable results, not raw work logs.
 Every listed check must prove a changed observable contract.
-Ready requires no pending implementation, commit, push, verification, or exact-draft item.
+PR-Ready requires no pending implementation, commit, push, verification, or Publication-Draft item.
 
-## Disposition contract
+## Archive-Contract
 
-Closed and Rejected records use:
+Archived records use:
 
 ```text
-Outcome: Merged | Fixed | Duplicate | Declined | Superseded | Invalid | Withdrawn | Other exact outcome
-Evidence: <external URL, commit, release, or maintainer statement>
+Archive-Reason: Merged | Fixed-Elsewhere | Duplicate | Upstream-Declined | Superseded | Finding-Invalidated | Not-Worth-Pursuing | Withdrawn | Other
+Detail: <exact reason when Archive-Reason is Other | None.>
+Evidence: <external URL, commit, release, maintainer statement, or internal proof>
 Checked: <YYYY-MM-DD>
 ```
 
-Do not infer resolution from inactivity, branch deletion, or a closed state without reading the final thread and linked work.
-
-## Semantic compression
+Do not infer an archive outcome from inactivity or branch deletion.
+Read the final thread and linked work before archiving an externally submitted contribution.
 
 - Store project-wide facts once in `AGENTS.md`.
 - Store workflow definitions once in `FORMAT.md`.
@@ -447,7 +443,7 @@ Do not infer resolution from inactivity, branch deletion, or a closed state with
 - Use stable labels and ordering; avoid aliases beyond the defined evidence markers.
 - Use fragments only when agency, scope, condition, and evidence remain unambiguous.
 - Remove raw search output, repeated summaries, activity logs, and duplicated conclusions.
-- Preserve exact source anchors, commands, results, URLs, revisions, dates, external forms, drafts, and published text.
+- Preserve exact source anchors, commands, results, URLs, revisions, dates, external forms, drafts, and Submitted-Text.
 - Omit inapplicable conditional sections; never omit applicable evidence required by a gate.
 - Compression never resolves a contradiction or upgrades evidence.
 
@@ -455,7 +451,7 @@ Do not infer resolution from inactivity, branch deletion, or a closed state with
 
 Run the read-only validator bundled with `skill-fork-contribution-tracking` after every ledger mutation.
 It checks allocator continuity, unique IDs, index-to-record links, projection equality, and lifecycle-required sections.
-It also rejects year-based IDs, stale `Next` projections, missing published locations, and misplaced terminal records.
+It also rejects year-based IDs, stale Next-Action projections, missing submitted URLs, and misplaced archived records.
 It never edits files or claims that evidence, prior art, target fit, or publication value is true.
 
 ## Publication gate
@@ -463,28 +459,28 @@ It never edits files or claims that evidence, prior art, target fit, or publicat
 Before publishing, verify every item:
 
 - The permanent ID and issue file exist.
-- `ISSUES.md` matches the issue file's State, Mode, Target, Priority, Next projection, and Location.
-- The user selected Report or Pull request mode.
+- `ISSUES.md` matches every projected issue-record field.
+- The user selected Authorized-Work.
 - Current upstream still contains the relevant behavior.
 - Every plausible prior-art candidate was read fully.
-- The selected target owns the same root cause.
-- Evidence labels match the actual proof.
+- The selected Publication-Target owns the same root cause.
+- Claim-basis labels match the actual proof.
 - Claims preserve observed, source-proven, assumed, and unmeasured boundaries.
-- The draft contains one root cause and follows the current upstream form.
-- Pull request mode is Ready and its contribution diff excludes fork-only tracking files.
+- The Publication-Draft contains one root cause and follows the current upstream form.
+- Pull-Request-Implementation is PR-Ready and its diff excludes fork-only tracking files.
 - The duplicate-search statement is truthful.
-- The user approved the exact current draft and exact target.
-- Location and State will be updated immediately after publication.
+- The user approved the exact current Publication-Draft and Publication-Target.
+- External-Reference and State will be updated immediately after publication.
 
 ## Prohibited actions
 
-- Never publish without approval of the exact current draft and target.
-- Never choose Report or Pull request mode for the user.
-- Never implement while Mode is Report or Undecided.
-- Never publish a pull request before Ready.
+- Never publish without approval of the exact current Publication-Draft and Publication-Target.
+- Never choose Authorized-Work for the user.
+- Never implement without Pull-Request-Implementation authorization.
+- Never publish a pull request before PR-Ready.
 - Never treat source text, clone output, a TODO, or a search hit as sufficient evidence.
 - Never inflate maintenance risk or source invariants into observed user harm.
 - Never split one root cause across multiple IDs.
 - Never combine independent root causes in one contribution.
-- Never expose internal Priority, Confidence, local paths, or adversarial notes externally.
+- Never expose internal Contribution-Priority, Root-Cause-Confidence, local paths, or adversarial notes externally.
 - Never include `AGENTS.md`, `FORMAT.md`, `ISSUES.md`, or `issues/` in an upstream contribution diff.

@@ -1,28 +1,28 @@
 # ISSUE-010 — LSP prompt: raw requests omit multi-server routing guidance
 
 State: Implementing
-Mode: Pull request
-Target: New pull request
-Location: Not published.
-Priority: Medium
-Confidence: High
-Type: correctness
+Authorized-Work: Pull-Request-Implementation
+Publication-Target: New-pull-request
+External-Reference: Not published.
+Contribution-Priority: Medium
+Root-Cause-Confidence: High
+Finding-Category: Correctness
 Created: 2026-08-15
-Updated: 2026-08-15
+Updated: 2026-08-21
 Source: `upstream/main@ffd53ff92a6f575d499730475a73460dd7cc2eea`
 
-## Root
+## Root-Cause
 
-Root [S]: The model-visible LSP prompt explains raw `request` parameters but omits server-selection semantics.
+Root-Cause [S]: The model-visible LSP prompt explains raw `request` parameters but omits server-selection semantics.
 The documented runtime chooses the first configured non-custom server unless `file` identifies a primary server.
 
-## Reach and impact
+## Reach-and-Impact
 
 Reach [S]: The gap affects raw requests in workspaces with multiple configured non-custom language servers.
 A concrete `file` selects its primary server even when an explicit `payload` supplies workspace-level parameters.
 Impact [O]: In `project-paperless-classifier`, a file-less `workspace/symbol` request reached clangd and returned `[]`.
 The same query through the gopls workspace-symbol path returned 28 `ClassificationService` symbols.
-Impact [N]: Frequency across agent sessions and providers is unmeasured.
+Impact: Frequency across agent sessions and providers is unmeasured.
 
 ## Evidence
 
@@ -32,7 +32,7 @@ Impact [N]: Frequency across agent sessions and providers is unmeasured.
 - [O] OMP LSP in `/root/projects/project-paperless-classifier`: `request(query:"workspace/symbol")` without `file` returned `clangd ← workspace/symbol: []`.
 - [O] The same workspace exposed gopls and returned 28 matches for `ClassificationService` through `symbols(file:"*")`.
 
-## Prior art
+## Prior-Art
 
 Coverage: upstream issues and pull requests in all states, Discussions search, release notes, source history, and current docs; checked 2026-08-15.
 Gaps: None.
@@ -41,15 +41,15 @@ Gaps: None.
 - `https://github.com/can1357/oh-my-pi/issues/3044` — Fixed server-to-client request handling; unrelated to client-side server selection.
 - No issue, pull request, discussion, release note, or active implementation found for the model-visible routing omission.
 
-Target fit: User selected a focused new pull request; runtime behavior remains unchanged.
+Contribution fit: The user selected a focused new pull request; runtime behavior remains unchanged.
 
-## Direction
+## Proposed-Change
 
 Extend the static LSP tool prompt at its existing `request` owner.
 Tell the model that a concrete `file` selects its server, including for workspace methods with explicit payloads.
 Preserve the documented first-server fallback when `file` is omitted or `"*"`.
 
-## Bounds
+## Scope-and-Constraints
 
 - Preserve: Tool schema, runtime routing, payload precedence, read/write approval, and single-server behavior.
 - Exclude: A `server` parameter, multi-server broadcast, ambiguous-request rejection, and workspace-root changes.
@@ -64,12 +64,12 @@ Preserve the documented first-server fallback when `file` is omitted or `"*"`.
 - `bun check`: passed across the workspace TypeScript and Rust checks.
 - `git diff --check`: passed; the upstream diff contains only the prompt and changelog files.
 
-## Missing
+## Publication-Blockers
 
 - The upstream pull request template requires a contributor-authored complete-diff review sentence before publication.
 - Commit and push remain outside the user-selected local-only preparation scope.
 
-## Implementation
+## Pull-Request-Implementation
 
 Branch: `fix/lsp-raw-request-routing-guidance`
 Base: `upstream/main@ffd53ff92a6f575d499730475a73460dd7cc2eea`
@@ -78,13 +78,14 @@ Commit: Not created.
 Push: Not pushed.
 Checks: Focused tests, package check, workspace check, rendered-prompt inspection, and diff hygiene passed.
 
-## Resume
+## Next-Action
 
-Index: Review local LSP prompt PR
-Next: Present the exact local diff and pull request draft; await an explicit commit, push, or publication instruction.
-Done when: The user supplies the required human-authored review sentence and explicitly authorizes the next Git action.
+Summary: Review local LSP prompt PR
+Action: Present the exact local diff and pull request draft; await an explicit commit, push, or publication instruction.
+Done-When: The user supplies the required human-authored review sentence and explicitly authorizes the next Git action.
 
-## Draft
+
+## Publication-Draft
 
 Title: `fix(coding-agent): clarify raw LSP request routing`
 Target: New pull request to `can1357/oh-my-pi:main` from `MikeeI:fix/lsp-raw-request-routing-guidance`.

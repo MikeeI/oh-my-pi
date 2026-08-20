@@ -1,25 +1,25 @@
 # ISSUE-008 — Read prompt: raw is not a universal converter or byte bypass
 
-State: Closed
-Mode: Undecided
-Target: Undecided
-Location: Not published.
-Priority: Medium
-Confidence: High
-Type: correctness
+State: Archived
+Authorized-Work: Not-Selected
+Publication-Target: Not-Selected
+External-Reference: Not published.
+Contribution-Priority: Medium
+Root-Cause-Confidence: High
+Finding-Category: Correctness
 Created: 2026-08-14
-Updated: 2026-08-20
+Updated: 2026-08-21
 Source: `upstream/main@74bc1f442e7bb6adcb5797ca8802ef6684281411`
 
-## Root
+## Root-Cause
 
-Root [S]: `prompts/tools/read.md` describes `:raw` globally as verbatim and converter-bypassing, but runtime semantics remain source-specific.
+Root-Cause [S]: `prompts/tools/read.md` describes `:raw` globally as verbatim and converter-bypassing, but runtime semantics remain source-specific.
 Notebook raw reaches storage JSON, Markit documents still use conversion, images retain image-oriented dispatch, internal resources retain handler-owned representations, and archive members remain extracted and UTF-8 decoded.
 
-## Reach and impact
+## Reach-and-Impact
 
 Reach [S]: Every Read-enabled model can request `:raw` for local documents, images, URLs, archives, or internal resources under the global wording.
-Impact [N]: Agents can mistake converted or handler-owned output for original bytes, use unsuitable evidence for hashing or copying, or retry when raw output does not change the representation.
+Impact: Agents can mistake converted or handler-owned output for original bytes, use unsuitable evidence for hashing or copying, or retry when raw output does not change the representation; frequency remains unmeasured.
 
 ## Evidence
 
@@ -34,19 +34,19 @@ Impact [N]: Agents can mistake converted or handler-owned output for original by
 - [O] Local image default and raw both returned text plus `image/png` content, while archive default and raw both returned extracted member text rather than archive bytes.
 - [O] Focused URL tests showed raw response bodies and non-raw handler rendering for feed and JSON inputs.
 - [O] Personal commit `ab8cd45f71` applies source-specific `:raw` guidance and adds `test/tools/read-guidance.test.ts`; focused Read tests pass with 160 passed, 1 skipped, and 0 failed.
+## Prior-Art
 
-## Prior art
 
 Coverage: issues(open+closed), PRs(open+closed+merged), source history; checked=2026-08-19.
-Gaps [N]: Discussions, real external URL/PDF execution, and invalid-UTF-8 behavior remain unchecked.
+Gaps: Discussions, real external URL/PDF execution, and invalid-UTF-8 behavior remain unchecked.
 
 - `https://github.com/can1357/oh-my-pi/issues/1401` and `https://github.com/can1357/oh-my-pi/pull/1402` — related fidelity boundary for CLI PDF arguments with a different owner and no `:raw` contract.
 - `https://github.com/can1357/oh-my-pi/pull/756` — related prompt-compression process, not the later semantic widening.
 
-Target fit: New prompt-contract candidate; no exact duplicate found.
+Contribution fit: New prompt-contract candidate; no exact duplicate found.
 
-## Direction
-Define `:raw` as a source-specific representation rather than a universal byte promise.
+## Proposed-Change
+
 Document exact branches such as Notebook storage JSON, Markit converted output without Read formatting, image representation, and handler-owned URL response text.
 Proposed prompt correction [A]: replace the universal `verbatim` and `converter bypass` wording with the following source-specific guidance.
 - `:raw` suppresses Read anchors and prefixes where supported, but is not universal byte access or a universal converter bypass.
@@ -57,7 +57,7 @@ Proposed prompt correction [A]: replace the universal `verbatim` and `converter 
 - URLs return reader-mode text by default, while `:raw` returns the response body without JSON, feed, or HTML text shaping after binary handling.
 Do not force byte semantics into a Text/Image tool.
 
-## Bounds
+## Scope-and-Constraints
 
 - Preserve: Existing source dispatch, Markit conversion, image normalization, Notebook JSON access, HTML response-body mode, archive and internal-URI ownership, and limits.
 - Exclude: Binary-safe transfer API, invalid-UTF-8 policy, converter redesign, and global byte-exact implementation.
@@ -70,15 +70,15 @@ Do not force byte semantics into a Text/Image tool.
 - Compare local image default and raw representation types.
 - Compare URL and archive raw behavior with their handler-owned output contracts.
 
-## Missing
+## Publication-Blockers
 
 None.
 
-## Resume
+## Next-Action
 
-Index: —
-Next: None.
-Done when: None.
+Summary: —
+Action: None.
+Done-When: None.
 
 ## Bug reproduction
 
@@ -88,8 +88,9 @@ Read controlled PDF/Markit, PNG, URL, and ZIP-member fixtures with and without `
 Actual [O]: Notebook raw returns storage JSON, PDF/Markit raw remains converted, image raw remains image-oriented, URL raw is handler-owned response text, and archive raw remains extracted UTF-8 member text.
 Expected: The prompt describes these source-specific representations instead of promising a universal verbatim or converter-bypassing mode.
 
-## Disposition
+## Archive
 
-Outcome: Fixed
+Archive-Reason: Fixed-Elsewhere
+Detail: None.
 Evidence: Local commit `ab8cd45f71` on `personal`; focused Read tests passed with 160 passed, 1 skipped, and 0 failed.
 Checked: 2026-08-20

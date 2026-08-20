@@ -1,24 +1,24 @@
 # ISSUE-001 — Eval prompt: agent() children do not share the promised kernel state
 
-State: Ready
-Mode: Pull request
-Target: New pull request
-Location: Not published.
-Priority: Medium
-Confidence: High
-Type: correctness
+State: PR-Ready
+Authorized-Work: Pull-Request-Implementation
+Publication-Target: New-pull-request
+External-Reference: Not published.
+Contribution-Priority: Medium
+Root-Cause-Confidence: High
+Finding-Category: Correctness
 Created: 2026-08-14
-Updated: 2026-08-14
+Updated: 2026-08-21
 Source: `upstream/main@ae2d3d6ea16a47aa5208bd123dcc4cfcc8756472`
 
-## Root
+## Root-Cause
 
-Root [S]: `eval.md` says persistent kernel state survives across “subagents” and later defines Eval `agent()` as a subagent launcher, while `runEvalAgent` intentionally sets `shareEvalSession: false`; the 2026-07-28 prompt compression removed the earlier `task` qualifier without changing the deadlock-critical runtime isolation.
+Root-Cause [S]: `eval.md` says persistent kernel state survives across “subagents” and later defines Eval `agent()` as a subagent launcher, while `runEvalAgent` intentionally sets `shareEvalSession: false`; the 2026-07-28 prompt compression removed the earlier `task` qualifier without changing the deadlock-critical runtime isolation.
 
-## Reach and impact
+## Reach-and-Impact
 
 Reach [S]: Every Eval-enabled session whose model follows the built-in `agent()` guidance can assume Parent globals and imports exist in the Child; normal `task` Children do inherit the Parent Eval session, but Eval-bridge Children do not.
-Impact [N]: The contract can produce missing-name errors, duplicated setup, or failed delegated analysis; no provider transcript or end-to-end marker failure is measured yet.
+Impact: The contract can produce missing-name errors, duplicated setup, or failed delegated analysis; no provider transcript or end-to-end marker failure is measured yet.
 
 ## Evidence
 
@@ -29,7 +29,7 @@ Impact [N]: The contract can produce missing-name errors, duplicated setup, or f
 - [S] `https://github.com/can1357/oh-my-pi/commit/af1832af1bd36070a814c3bb175c3655ee44e29f` — prompt compression changed “`task` subagents” to unqualified “subagents”.
 - [O] Contribution commit `2c9acfac066f5f8d674c6c2eeef829ba65f20db5` renders the qualified `task` sharing contract and asserts that Eval `agent()` passes no Parent Eval session ID.
 
-## Prior art
+## Prior-Art
 
 Coverage: issues(open+closed), PRs(open+closed+merged), Discussions, source history, and current Eval documentation; checked=2026-08-14.
 Gaps: Provider transcripts remain unchecked; the pull request makes no provider-impact claim.
@@ -38,13 +38,13 @@ Gaps: Provider transcripts remain unchecked; the pull request makes no provider-
 - `https://github.com/can1357/oh-my-pi/pull/3205` — Related; implements Eval `agent()` without correcting the current persistence wording.
 - `https://github.com/can1357/oh-my-pi/issues/5279` — Related architecture; preserves frontend-specific semantics.
 
-Target fit: User-selected new pull request; no existing thread or implementation owns the current prompt/runtime contradiction.
+Contribution fit: User-selected new pull request; no existing thread or implementation owns the current prompt/runtime contradiction.
 
-## Direction
+## Proposed-Change
 
 Restore the `task` qualifier and state that Children launched through Eval `agent()` use independent kernels. Preserve `shareEvalSession: false`; changing it would reintroduce the documented deadlock.
 
-## Bounds
+## Scope-and-Constraints
 
 - Preserve: Eval state sharing across calls and normal `task` Children; Eval-bridge deadlock avoidance; file and artifact sharing.
 - Exclude: Kernel-sharing redesign, task execution unification, and provider-specific prompt variants.
@@ -56,11 +56,11 @@ Restore the `task` qualifier and state that Children launched through Eval `agen
 - Capture `runSubprocess` options from `runEvalAgent`; require `parentEvalSessionId === undefined`.
 - Keep the existing deadlock-avoidance policy unchanged.
 
-## Missing
+## Publication-Blockers
 
 None.
 
-## Implementation
+## Pull-Request-Implementation
 
 Branch: `fix/eval-agent-kernel-persistence`
 Base: `upstream/main@ae2d3d6ea16a47aa5208bd123dcc4cfcc8756472`
@@ -72,13 +72,13 @@ Checks:
 - `bun --cwd=packages/coding-agent run check` → Biome checked 2,607 files; type check passed.
 - `bun check` → all TypeScript and Rust workspace checks passed.
 
-## Resume
+## Next-Action
 
-Index: Approve Eval pull request
-Next: Present the exact target and pull request draft for publication approval.
-Done when: The user approves this exact draft and `can1357/oh-my-pi` new pull request target.
+Summary: Approve Eval pull request
+Action: Present the exact target and pull request draft for publication approval.
+Done-When: The user approves this exact draft and `can1357/oh-my-pi` new pull request target.
 
-## Draft
+## Publication-Draft
 
 Title: `fix(coding-agent): clarify eval agent kernel isolation`
 Target: New pull request to `can1357/oh-my-pi:main` from `MikeeI:fix/eval-agent-kernel-persistence`.

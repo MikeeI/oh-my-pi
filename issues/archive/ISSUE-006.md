@@ -1,24 +1,24 @@
 # ISSUE-006 — Task prompt: same-file edits are not guaranteed to auto-resolve
 
-State: Closed
-Mode: Pull request
-Target: New pull request
-Location: https://github.com/can1357/oh-my-pi/pull/9047
-Priority: High
-Confidence: High
-Type: correctness
+State: Archived
+Authorized-Work: Pull-Request-Implementation
+Publication-Target: New-pull-request
+External-Reference: https://github.com/can1357/oh-my-pi/pull/9047
+Contribution-Priority: High
+Root-Cause-Confidence: High
+Finding-Category: Correctness
 Created: 2026-08-14
 Updated: 2026-08-21
 Source: `upstream/main@74bc1f442e7bb6adcb5797ca8802ef6684281411`
 
-## Root
+## Root-Cause
 
-Root [S]: `task.md` guarantees that concurrent edits to the same files auto-resolve and forbids shrinking or serializing batches for overlap. No universal merge owner implements that guarantee: default non-isolated Children share one CWD, whole-file `write` is unguarded last-writer-wins, Hashline only remaps provably unchanged anchors, and isolated branch/patch owners explicitly fail real conflicts.
+Root-Cause [S]: `task.md` guarantees that concurrent edits to the same files auto-resolve and forbids shrinking or serializing batches for overlap. No universal merge owner implements that guarantee: default non-isolated Children share one CWD, whole-file `write` is unguarded last-writer-wins, Hashline only remaps provably unchanged anchors, and isolated branch/patch owners explicitly fail real conflicts.
 
-## Reach and impact
+## Reach-and-Impact
 
 Reach [S]: The default isolation mode is `none`; all parallel mutating Child tools can touch shared paths. Opt-in branch and patch isolation also expose explicit conflict failures.
-Impact [O]: Existing focused tests reproduce genuine branch and patch conflicts as failed/manual rather than auto-resolved. Shared-CWD whole-file lost update remains source-proven but not observed in a controlled barrier test.
+Impact: Existing focused tests reproduce genuine branch and patch conflicts as failed/manual rather than auto-resolved. Shared-CWD whole-file lost update remains source-proven but not observed in a controlled barrier test.
 
 ## Evidence
 
@@ -32,8 +32,8 @@ Impact [O]: Existing focused tests reproduce genuine branch and patch conflicts 
 - [O] `bun test test/task/isolation-runner.test.ts -t "rejects patch-mode conflicts without dirtying the worktree"` → 1 pass, 0 fail; current source/test files are byte-identical to the recorded upstream revision.
 - [S] `https://github.com/can1357/oh-my-pi/commit/e7bb0556a8e82f304b4dfa23eafe0797c273165d` — introduced the guarantee as prompt-only text without Runtime or regression-test closure.
 - [O] Contribution commit `57c18c4f9763e66416c5520e0508285330f17d16` renders coordination and integration ownership guidance with no universal same-file merge promise.
+## Prior-Art
 
-## Prior art
 
 Coverage: issues(open+closed), PRs(open+closed+merged), Discussions, and source history; checked=2026-08-14.
 Gaps: A controlled shared-CWD lost-update trace remains unchecked; the bounded prompt correction relies on source ownership plus observed branch and patch conflicts.
@@ -43,13 +43,13 @@ Gaps: A controlled shared-CWD lost-update trace remains unchecked; the bounded p
 - `https://github.com/can1357/oh-my-pi/issues/4135`, `https://github.com/can1357/oh-my-pi/issues/4136`, and `https://github.com/can1357/oh-my-pi/issues/4621` — Related concrete merge/isolation conflicts; no universal resolution owner.
 - `https://github.com/can1357/oh-my-pi/issues/5387` — Related architecture; confirms non-isolated Children share the Parent CWD without an enforced write boundary, but requests write-root enforcement rather than correcting this prompt guarantee.
 
-Target fit: User-selected new pull request; no existing issue, discussion, or active pull request owns the false universal merge guarantee.
+Contribution fit: The user selected a focused new pull request; no existing issue, discussion, or active pull request owned the false universal merge guarantee.
 
-## Direction
+## Proposed-Change
 
 Remove the universal guarantee and absolute anti-serialization rule. State the actual policy: parallelize independent ownership; coordinate same-file work through Hub; name one integration owner; serialize only the irreducibly shared mutation boundary. Do not invent a universal merger.
 
-## Bounds
+## Scope-and-Constraints
 
 - Preserve: Safe parallel fan-out, Hashline remapping for unchanged anchors, non-conflicting Git merges, explicit isolation artifacts, and coordination advice.
 - Exclude: Central file ownership, semantic merge subsystem, write CAS redesign, and backend-specific conflict fixes.
@@ -61,11 +61,11 @@ Remove the universal guarantee and absolute anti-serialization rule. State the a
 - Keep the two existing genuine-conflict tests passing.
 - Preserve runtime isolation and merge behavior unchanged.
 
-## Missing
+## Publication-Blockers
 
 None.
 
-## Implementation
+## Pull-Request-Implementation
 
 Branch: `fix/task-overlap-guidance`
 Base: `upstream/main@74bc1f442e7bb6adcb5797ca8802ef6684281411`
@@ -80,11 +80,11 @@ Checks:
 - `bun test packages/coding-agent/test/task/isolation-runner.test.ts -t "rejects patch-mode conflicts without dirtying the worktree"` → 1 pass, 0 fail.
 - `bun --cwd=packages/coding-agent run check` → Biome and type checks passed.
 
-## Resume
+## Next-Action
 
-Index: —
-Next: None.
-Done when: None.
+Summary: —
+Action: None.
+Done-When: None.
 
 ## Bug reproduction
 
@@ -93,7 +93,7 @@ Reproduction: Run the two focused existing branch/patch conflict tests listed un
 Actual [O]: Both tests pass by asserting conflicts are failed, aborted, or left unapplied for manual handling.
 Expected: Model-facing guidance must not guarantee automatic resolution for paths whose Runtime owners deliberately expose conflict failure.
 
-## Draft
+## Publication-Draft
 
 Title: `fix(coding-agent): correct task overlap guidance`
 Target: New pull request to `can1357/oh-my-pi:main` from `MikeeI:fix/task-overlap-guidance`.
@@ -136,8 +136,9 @@ If reports like this are not useful to the project, please let me know and I wil
 Thank you for your work.
 ```
 
-## Disposition
+## Archive
 
-Outcome: Merged
+Archive-Reason: Merged
+Detail: None.
 Evidence: Pull request #9047 merged as `557c2e75a55194781b989ec2e89cf6acd2000c61` on 2026-08-20.
 Checked: 2026-08-21

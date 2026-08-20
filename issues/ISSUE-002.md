@@ -1,24 +1,24 @@
 # ISSUE-002 — Eval registry: disabling the last live backend re-advertises every language
 
-State: Hold
-Mode: Undecided
-Target: Undecided
-Location: Not published.
-Priority: High
-Confidence: High
-Type: correctness
+State: Investigating
+Authorized-Work: Not-Selected
+Publication-Target: Not-Selected
+External-Reference: Not published.
+Contribution-Priority: High
+Root-Cause-Confidence: High
+Finding-Category: Correctness
 Created: 2026-08-14
-Updated: 2026-08-14
+Updated: 2026-08-21
 Source: `upstream/main@ae2d3d6ea16a47aa5208bd123dcc4cfcc8756472`
 
-## Root
+## Root-Cause
 
-Root [S]: `EvalTool.parameters` maps both zero enabled languages and all enabled languages to the same full `py/js/rb/jl` schema. Fresh all-disabled startup correctly omits Eval, but live backend settings are read by the existing Eval instance without rebuilding the active tool registry, so the nonzero→zero transition leaves an advertised tool that rejects every offered language.
+Root-Cause [S]: `EvalTool.parameters` maps both zero enabled languages and all enabled languages to the same full `py/js/rb/jl` schema. Fresh all-disabled startup correctly omits Eval, but live backend settings are read by the existing Eval instance without rebuilding the active tool registry, so the nonzero→zero transition leaves an advertised tool that rejects every offered language.
 
-## Reach and impact
+## Reach-and-Impact
 
 Reach [S]: Running sessions can change four independent `eval.*` booleans to false; the retained Eval instance reads settings live for schema, summary, description, examples, and execution.
-Impact [N]: The provider can receive four guaranteed-failing language choices and spend retry turns; no live-session reproduction or frequency measurement exists yet.
+Impact: The provider can receive four guaranteed-failing language choices and spend retry turns; no live-session reproduction or frequency measurement exists yet.
 
 ## Evidence
 
@@ -29,8 +29,8 @@ Impact [N]: The provider can receive four guaranteed-failing language choices an
 - [S] `https://github.com/can1357/oh-my-pi/blob/ae2d3d6ea16a47aa5208bd123dcc4cfcc8756472/packages/coding-agent/src/tools/index.ts#L476-L529` and `#L591-L605` — fresh all-disabled construction omits Eval correctly.
 - [S] `https://github.com/can1357/oh-my-pi/blob/ae2d3d6ea16a47aa5208bd123dcc4cfcc8756472/packages/coding-agent/test/system-prompt-inventory.test.ts#L501-L519` — existing coverage proves only fresh all-disabled startup.
 - [S] `https://github.com/can1357/oh-my-pi/commit/c926eb381dcc13ef9212b327ece17ddbf6d465b1` — intended invariant says disabled backends are never advertised, but introduces the zero→full fallback.
+## Prior-Art
 
-## Prior art
 
 Coverage: issues(open+closed), PRs(open+closed+merged), source history; checked=2026-08-14.
 Gaps: Discussions and a live settings-transition trace remain unchecked.
@@ -39,13 +39,13 @@ Gaps: Discussions and a live settings-transition trace remain unchecked.
 - `https://github.com/can1357/oh-my-pi/pull/4169` — Related open backend extension; does not fix the zero transition.
 - `https://github.com/can1357/oh-my-pi/issues/3252` — Related allowlist design, not the zero-state lifecycle.
 
-Target fit: New contribution or focused follow-up candidate; no exact thread owns the `langs.length === 0` fallback and live transition. Mode and external target remain user-unselected.
+Contribution fit: New contribution or focused follow-up candidate; no exact thread owns the `langs.length === 0` fallback and live transition. Authorized work and Publication target remain user-unselected.
 
-## Direction
+## Proposed-Change
 
 At the session tool-registry owner, translate `eval.*` changes atomically into active Eval registration and provider prompt/tool rebuilding: zero removes Eval; nonzero recreates the correct subset. If toggles are restart-only by design, stop reading them partially live and state that contract explicitly.
 
-## Bounds
+## Scope-and-Constraints
 
 - Preserve: Fresh all-disabled omission, subset schemas, backend execution guards, and provider-boundary lazy schema reads.
 - Exclude: Adding backends, empty-enum schema tricks, and settings-owned tool lifecycle policy.
@@ -57,15 +57,15 @@ At the session tool-registry owner, translate `eval.*` changes atomically into a
 - Require Eval to disappear from the provider-visible active toolset; no schema, summary, description, or examples may advertise it.
 - Control: a fresh all-false session must continue to omit Eval; restoring one backend must restore only that language.
 
-## Missing
+## Publication-Blockers
 
 - [O] Real nonzero→zero transition capture on the recorded upstream revision.
 - Owner decision: atomically rebuild/remove Eval versus explicitly restart-gate backend toggles.
 - Re-check overlap with open PR #4169 before any implementation.
-- Mode and external Target remain intentionally unselected.
+- Authorized work and Publication target remain intentionally unselected.
 
-## Resume
+## Next-Action
 
-Index: Reproduce zero-backend transition
-Next: Run the real `createTools` nonzero→zero transition with PI_* flags neutralized and retain fresh all-false as the control.
-Done when: Output captures the retained Eval tool, full language union, fallback summary, and disabled execution error after the last live backend is disabled.
+Summary: Reproduce zero-backend transition
+Action: Run the real `createTools` nonzero→zero transition with PI_* flags neutralized and retain fresh all-false as the control.
+Done-When: Output captures the retained Eval tool, full language union, fallback summary, and disabled execution error after the last live backend is disabled.
