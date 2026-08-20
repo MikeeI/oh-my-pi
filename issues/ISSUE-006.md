@@ -1,6 +1,6 @@
 # ISSUE-006 — Task prompt: same-file edits are not guaranteed to auto-resolve
 
-State: Published
+State: Closed
 Mode: Pull request
 Target: New pull request
 Location: https://github.com/can1357/oh-my-pi/pull/9047
@@ -8,7 +8,7 @@ Priority: High
 Confidence: High
 Type: correctness
 Created: 2026-08-14
-Updated: 2026-08-20
+Updated: 2026-08-21
 Source: `upstream/main@74bc1f442e7bb6adcb5797ca8802ef6684281411`
 
 ## Root
@@ -82,9 +82,9 @@ Checks:
 
 ## Resume
 
-Index: Monitor Task overlap guidance PR
-Next: Monitor upstream pull request #9047 for review and merge.
-Done when: Upstream merges or closes pull request #9047 and the disposition is recorded.
+Index: —
+Next: None.
+Done when: None.
 
 ## Bug reproduction
 
@@ -135,3 +135,9 @@ If reports like this are not useful to the project, please let me know and I wil
 
 Thank you for your work.
 ```
+
+## Disposition
+
+Outcome: Merged
+Evidence: Pull request #9047 merged as `557c2e75a55194781b989ec2e89cf6acd2000c61` on 2026-08-20.
+Checked: 2026-08-21

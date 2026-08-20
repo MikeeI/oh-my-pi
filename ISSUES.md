@@ -17,10 +17,7 @@ Next finding ID: ISSUE-011
 | [ISSUE-002](issues/ISSUE-002.md) | Eval registry: disabling the last live backend re-advertises every language | Hold | Undecided | Undecided | High | Reproduce zero-backend transition | Not published. |
 | [ISSUE-003](issues/ISSUE-003.md) | Todo schema: items is described as append-only despite flattened init | Hold | Undecided | Undecided | Low | Capture Todo provider miscall | Not published. |
 | [ISSUE-004](issues/ISSUE-004.md) | Bash prompt: timeout does not extend the auto-background cutoff | Ready | Pull request | New pull request | Medium | Approve Bash pull request | Not published. |
-| [ISSUE-005](issues/ISSUE-005.md) | Task prompt: restricted specialist defaults are called general-purpose workers | Published | Pull request | New pull request | Medium | Monitor Task default guidance PR | https://github.com/can1357/oh-my-pi/pull/9046 |
-| [ISSUE-006](issues/ISSUE-006.md) | Task prompt: same-file edits are not guaranteed to auto-resolve | Published | Pull request | New pull request | High | Monitor Task overlap guidance PR | https://github.com/can1357/oh-my-pi/pull/9047 |
 | [ISSUE-007](issues/ISSUE-007.md) | Hub capability: disabled process supervision remains fully advertised | Hold | Undecided | Undecided | High | Select Hub gating scope | Not published. |
-| [ISSUE-009](issues/ISSUE-009.md) | Read SSH guidance: retired search and ssh tool names remain model-visible | Published | Pull request | New pull request | Medium | Monitor SSH guidance PR | https://github.com/can1357/oh-my-pi/pull/9045. |
 | [ISSUE-010](issues/ISSUE-010.md) | LSP prompt: raw requests omit multi-server routing guidance | Implementing | Pull request | New pull request | Medium | Review local LSP prompt PR | Not published. |
 
 ## Terminal
@@ -28,3 +25,6 @@ Next finding ID: ISSUE-011
 | ID | Finding | State | Mode | Target | Priority | Outcome | Location |
 | --- | --- | --- | --- | --- | --- | --- | --- |
 | [ISSUE-008](issues/ISSUE-008.md) | Read prompt: raw is not a universal converter or byte bypass | Closed | Undecided | Undecided | Medium | Fixed | Not published. |
+| [ISSUE-005](issues/ISSUE-005.md) | Task prompt: restricted specialist defaults are called general-purpose workers | Closed | Pull request | New pull request | Medium | Merged | https://github.com/can1357/oh-my-pi/pull/9046 |
+| [ISSUE-006](issues/ISSUE-006.md) | Task prompt: same-file edits are not guaranteed to auto-resolve | Closed | Pull request | New pull request | High | Merged | https://github.com/can1357/oh-my-pi/pull/9047 |
+| [ISSUE-009](issues/ISSUE-009.md) | Read SSH guidance: retired search and ssh tool names remain model-visible | Closed | Pull request | New pull request | Medium | Merged | https://github.com/can1357/oh-my-pi/pull/9045 |

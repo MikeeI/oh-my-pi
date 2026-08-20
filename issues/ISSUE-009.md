@@ -1,14 +1,14 @@
 # ISSUE-009 — Read SSH guidance: retired search and ssh tool names remain model-visible
 
-State: Published
+State: Closed
 Mode: Pull request
 Target: New pull request
-Location: https://github.com/can1357/oh-my-pi/pull/9045.
+Location: https://github.com/can1357/oh-my-pi/pull/9045
 Priority: Medium
 Confidence: High
 Type: correctness
 Created: 2026-08-14
-Updated: 2026-08-20
+Updated: 2026-08-21
 Source: `upstream/main@74bc1f442e7bb6adcb5797ca8802ef6684281411`
 
 ## Root
@@ -75,9 +75,9 @@ None.
 
 ## Resume
 
-Index: Monitor SSH guidance PR
-Next: Read maintainer feedback and record the PR disposition.
-Done when: The upstream PR state and final disposition are recorded.
+Index: —
+Next: None.
+Done when: None.
 
 ## Bug reproduction
 
@@ -141,3 +141,9 @@ This report is not generic or unreviewed AI-generated output. Its claims were ch
 If reports like this are not useful to the project, please let me know and I will refrain from submitting similar ones. My intent is to help without wasting maintainer time or energy or discouraging their work.
 
 Thank you for your work.
+
+## Disposition
+
+Outcome: Merged
+Evidence: Pull request #9045 merged as `a3d4e827c0e75b0b310a0f69bdf9e0b128b2e109` on 2026-08-20.
+Checked: 2026-08-21

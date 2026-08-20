@@ -1,6 +1,6 @@
 # ISSUE-005 — Task prompt: restricted specialist defaults are called general-purpose workers
 
-State: Published
+State: Closed
 Mode: Pull request
 Target: New pull request
 Location: https://github.com/can1357/oh-my-pi/pull/9046
@@ -8,7 +8,7 @@ Priority: Medium
 Confidence: High
 Type: correctness
 Created: 2026-08-14
-Updated: 2026-08-20
+Updated: 2026-08-21
 Source: `upstream/main@74bc1f442e7bb6adcb5797ca8802ef6684281411`
 
 ## Root
@@ -73,9 +73,9 @@ Checks:
 
 ## Resume
 
-Index: Monitor Task default guidance PR
-Next: Monitor upstream pull request #9046 for review and merge.
-Done when: Upstream merges or closes pull request #9046 and the disposition is recorded.
+Index: —
+Next: None.
+Done when: None.
 
 ## Draft
 
@@ -123,3 +123,9 @@ If reports like this are not useful to the project, please let me know and I wil
 
 Thank you for your work.
 ```
+
+## Disposition
+
+Outcome: Merged
+Evidence: Pull request #9046 merged as `18378f38877cef81263df42fd66e3850bba5464b` on 2026-08-20.
+Checked: 2026-08-21
