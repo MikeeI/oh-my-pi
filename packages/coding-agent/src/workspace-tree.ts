@@ -312,12 +312,11 @@ function applyLineCap(
 function formatLines(lines: readonly RenderedLine[], includeMetadata: boolean): string {
 	if (!includeMetadata) return lines.map(line => line.label).join("\n");
 
-	const maxLabelLength = lines.reduce((max, line) => Math.max(max, line.label.length), 0);
 	return lines
 		.map(line => {
 			if (!line.age) return line.label;
-			const sizeColumn = (line.size ?? "").padEnd(8);
-			return `${line.label.padEnd(maxLabelLength + 2)}${sizeColumn}  ${line.age.padEnd(4)}`.trimEnd();
+			const sizeColumn = line.size ? ` ${line.size}` : "";
+			return `${line.label}${sizeColumn} ${line.age}`;
 		})
 		.join("\n");
 }
