@@ -4,7 +4,7 @@ Use `op: "list"` to discover live peers. Default is running+idle plus running/id
 # Messaging and jobs
 - Results auto-deliver when they finish.
 - Reading a settled job through `jobs` or `wait` consumes that delivery and suppresses duplicate `async-result`.
-- Peer `send` is fire-and-forget unless `await: true` and returns an immediate delivery receipt.
+- Peer `send` returns an immediate receipt; omit `await` unless a reply was explicitly requested.
 - Sending also wakes `idle` and `parked` peers; a failed delivery means the peer is gone, so do not retry.
 - Reply with the answer first, set `replyTo`, and NEVER quote the prior message.
 - Messages MUST be concise plain prose; NEVER send JSON status objects.
@@ -22,16 +22,23 @@ Use `op: "list"` to discover live peers. Default is running+idle plus running/id
 - NEVER use Hub when a normal tool can answer directly.
 
 # Processes
-
-Project-scoped long-running processes shared by every omp instance in the same directory. A long-running service, watcher, debugger, REPL, or process needing later input MUST use `op:"start"`, not `bash`.
-
-- **`start`** launches `application` + `args` directly. `cwd` defaults to the session directory; `pty` defaults true.
-  - `ready.log` is a JavaScript `RegExp` compiled with the `u` flag; PCRE inline modifiers such as `(?i)` are REJECTED — use `[Rr]eady` instead. `ready.port` is a TCP port. Both supplied? BOTH MUST pass. `ready.timeout` is seconds. Readiness MUST be observed; process creation alone is not readiness.
-  - Names are unique per project directory. A completed name MAY be started again; a live name MUST be stopped or restarted.
-  - `restart` policy defaults `no`; `on-failure` and `always` use bounded backoff.
-  - `persist: true` opts out of last-omp teardown; `detached: true` survives broker shutdown and all omp exits (implies persist, disables PTY input). Omit both unless their survival guarantees are required.
-- **`ps`**, **`logs`**, **`wait`** (with `name`), **`send`** (with `name`), **`stop`**, **`restart`**, and **`describe`** address the stable `name`.
-- **`logs`** defaults to the last 100 lines. `head: true` reads the beginning. `grep` is a JavaScript `RegExp` compiled with the `u` flag (no inline modifiers such as `(?i)`). `follow: true` waits for output after `cursor`; reuse the returned cursor on the next call.
-- **`wait`** with `name` blocks until readiness/exit/`pattern` or `timeout` (seconds). `pattern` is a JavaScript `RegExp` compiled with the `u` flag (no inline modifiers such as `(?i)`).
-- **`send`** with `name`: `text` writes stdin (`enter` defaults true); `keys` supports ENTER, TAB, ESCAPE, CTRL_C, CTRL_D, UP, DOWN, LEFT, RIGHT; `signal` supports SIGINT, SIGTERM, SIGHUP, SIGQUIT, SIGKILL. PTY input is serialized; writes share one input stream.
-- **`stop`** performs graceful process-tree termination before hard-kill; NEVER kill an unverified PID through bash. **`restart`** reuses the retained launch spec.
+- Long-running services, watchers, debuggers, REPLs, and interactive processes MUST use `start`, not `bash`.
+- Processes are project-scoped and addressed by stable `name`.
+- `start` launches `application` plus `args`; `cwd` defaults to the session directory and `pty` defaults true.
+- Every supplied readiness condition MUST pass; process creation alone is not readiness.
+- `ready.log` is a JavaScript `RegExp` compiled with the `u` flag; PCRE inline modifiers such as `(?i)` are REJECTED.
+- `ready.port` is a TCP port; `ready.timeout` is seconds; both supplied? BOTH MUST pass.
+- Names are unique per project directory.
+- A live name MUST be stopped or restarted before reuse; a completed name MAY be started again.
+- Restart policy defaults to `no`; `on-failure` and `always` use bounded backoff.
+- `persist` survives the last OMP client exit.
+- `detached` survives all OMP exits and broker shutdown, implies `persist`, and disables PTY input.
+- Omit `persist` and `detached` unless their survival guarantees are required.
+- `ps`, `logs`, `wait`, `send`, `stop`, `restart`, and `describe` address a process by `name`.
+- `logs` defaults to the last 100 lines; `head: true` reads the beginning.
+- `logs.grep` and `wait.pattern` are JavaScript `RegExp` values compiled with the `u` flag.
+- `follow: true` waits for output after `cursor`; reuse the returned cursor on the next call.
+- `wait` with `name` blocks until readiness, exit, `pattern`, or `timeout`.
+- `send` with `name` writes `text` to stdin, sends `keys`, or delivers a `signal` through one serialized stream.
+- `stop` terminates the process tree gracefully before hard-kill; NEVER kill an unverified PID through Bash.
+- `restart` reuses the retained launch specification.

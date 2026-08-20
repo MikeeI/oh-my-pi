@@ -399,7 +399,8 @@
 ### Changed
 
 - Eval guidance keeps inspection with Read and routes in-cell concurrency through context-safe helpers.
-- Hub guidance and examples use less repeated tool context while preserving messaging, job, and process contracts.
+- Hub guidance, schema hints, and examples use less repeated context while clarifying peer waits and process defaults.
+- `bun run bench:hub-routing` measures exact Hub call routing across five Codex GPT models.
 
 ## [17.4.0] - 2026-08-20
 

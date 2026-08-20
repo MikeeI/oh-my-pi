@@ -84,7 +84,7 @@ const hubSchema = type({
 	"to?": type("string").describe('send: recipient agent id or "all"'),
 	"message?": type("string").describe("send: message body"),
 	"replyTo?": type("string").describe("send: message id being answered"),
-	"await?": type("boolean").describe('send: wait for the recipient\'s reply (invalid with to:"all")'),
+	"await?": type("boolean").describe('send: set only when a reply was explicitly requested; invalid with to:"all"'),
 	"from?": type("string").describe("wait: only accept a message from this agent id"),
 	"ids?": type("string[]").describe("wait: job ids to watch (omit = all running jobs); cancel: job ids to kill"),
 	"timeoutMs?": type("number").describe("wait (messages/jobs): timeout in milliseconds (0 waits indefinitely)"),
@@ -97,13 +97,15 @@ const hubSchema = type({
 	"application?": type("string > 0").describe("start: executable or application path"),
 	"args?": type("string[]").describe("start: argv passed directly to the application"),
 	"env?": type({ "[string]": "string" }).describe("start: extra environment variables"),
-	"cwd?": type("string").describe("start: working directory; defaults to the session directory"),
+	"cwd?": type("string").describe(
+		"start: omit for the session directory; set only when another directory is required",
+	),
 	"pty?": type("boolean").describe("start: allocate an interactive PTY; default true"),
 	"ready?": type({
 		"log?": type("string > 0").describe("regex matched against output"),
 		"port?": type("number").describe("TCP port that must accept connections"),
 		"host?": type("string > 0").describe("TCP readiness host; default 127.0.0.1"),
-		"timeout?": type("number > 0").describe("seconds to wait; default 30"),
+		"timeout?": type("number > 0").describe("start readiness deadline in seconds; default 30"),
 	}).describe("start: readiness conditions; all supplied conditions must pass"),
 	"restart?": type("'no' | 'on-failure' | 'always'").describe("start: restart policy; default no"),
 	"persist?": type("boolean").describe("start: survive the last omp client exiting; default false"),
@@ -123,7 +125,7 @@ const hubSchema = type({
 	"signal?": type("'SIGINT' | 'SIGTERM' | 'SIGHUP' | 'SIGQUIT' | 'SIGKILL'").describe(
 		"send with name: process-tree signal",
 	),
-	"timeout?": type("number > 0").describe("logs/stop/wait with name: max seconds; default 30 (stop: 5)"),
+	"timeout?": type("number > 0").describe("logs, stop, or process wait only; start readiness uses ready.timeout"),
 });
 
 type HubParams = typeof hubSchema.infer;
@@ -194,7 +196,7 @@ export class HubTool implements AgentTool<typeof hubSchema, HubDetails> {
 			},
 		},
 		{
-			caption: "Start a service and require log plus port readiness",
+			caption: "Start without cwd; require log plus port readiness",
 			call: {
 				op: "start",
 				name: "web",

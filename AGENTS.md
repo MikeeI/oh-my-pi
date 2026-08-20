@@ -360,10 +360,12 @@ Each entry names its disposition, observable behavior, implementation owner, and
 
 - Disposition: `MOMP-EIGEN`, designed for upstream.
 - Contract: Hub guidance preserves peer messaging, job delivery, and supervised-process semantics without repetition.
-- Contract: Hub examples cover the ambiguous peer/process routes and compound service readiness.
+- Contract: Hub examples and schema hints disambiguate peer waiting, process defaults, and compound service readiness.
+- Contract: a frozen real-model benchmark scores exact Hub calls for all four retained routing examples.
 - Owner: `src/prompts/tools/hub.md` owns concise model-visible behavior guidance.
 - Owner: `src/tools/hub/index.ts#HubTool.examples` owns the minimal routing examples.
-- Proof: focused Hub behavior tests and `momp system-prompt inspect --breakdown --json`.
+- Owner: `scripts/bench-hub-routing.ts` owns benchmark models, prompts, scoring, safe execution, and output.
+- Proof: `test/hub-routing-benchmark.test.ts` and `bun run bench:hub-routing`.
 - Upstream action: retain provider-neutral wording when preparing the generic prompt compaction.
 
 #### `MOMP-BASH-TOOL-CONTEXT` — Additional workstation utilities
