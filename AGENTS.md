@@ -183,6 +183,16 @@ Each entry names its disposition, observable behavior, implementation owner, and
 - Owner: `src/modes/components/read-tool-group.ts#readArgsCollapseIntoGroup` owns the collapse decision.
 - Proof: `test/read-tool-group.test.ts`.
 
+#### `MOMP-TREE-COMPACT` — Token-efficient directory context
+
+- Disposition: `MOMP-EIGEN`; compact Read metadata spacing is designed for upstream.
+- Contract: the system-prompt workspace tree omits size and mtime columns.
+- Contract: Read directory trees retain file sizes and relative mtimes with single-space separators.
+- Contract: both views retain names, hierarchy, ordering, depth, limits, and elision behavior.
+- Owner: `packages/coding-agent/src/workspace-tree.ts` owns both render modes.
+- Proof: `packages/coding-agent/test/workspace-tree.test.ts`.
+- Upstream action: PR `#9062` covers compact Read spacing; metadata-free prompt trees remain MOMP-specific.
+
 #### `MOMP-ROUTINES` — User-defined sequential routines
 
 - Disposition: `MOMP-EIGEN`.
