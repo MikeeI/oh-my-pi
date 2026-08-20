@@ -216,6 +216,6 @@ describe("buildWorkspaceTree", () => {
 
 		const tree = await buildDirectoryTree(cwd, { maxDepth: 1 });
 
-		expect(tree.rendered).toMatch(/^\.\n  - recent\.txt 1B \d+[smhdw]+ ago$/u);
+		expect(tree.rendered).toMatch(/^\.\n {2}- recent\.txt 1B \d+[smhdw]+ ago$/u);
 	});
 });

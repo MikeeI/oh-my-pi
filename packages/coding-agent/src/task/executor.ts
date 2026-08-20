@@ -880,7 +880,6 @@ export function createMCPProxyTools(mcpManager: MCPManager): CustomTool[] {
 	});
 }
 
-
 export type AbortReason = "signal" | "shutdown" | "terminate" | "timeout" | "budget";
 
 const MAX_YIELD_TOOL_ERRORS = 6;

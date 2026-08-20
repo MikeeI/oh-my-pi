@@ -3,7 +3,7 @@
  */
 import * as fs from "node:fs/promises";
 import * as path from "node:path";
-import { estimateTokens } from "@oh-my-pi/pi-agent-core/compaction";
+import { Tokenizer } from "@oh-my-pi/pi-agent-core";
 import type { Context, Message, Tool } from "@oh-my-pi/pi-ai";
 import { countTokens, Encoding } from "@oh-my-pi/pi-natives";
 import { postmortem, setProjectDir } from "@oh-my-pi/pi-utils";
@@ -28,6 +28,7 @@ type SystemPromptAction = (typeof ACTIONS)[number];
 
 const BREAKDOWN_ENCODING = Encoding.O200kBase;
 const BREAKDOWN_ENCODING_LABEL = "o200k_base";
+const BREAKDOWN_MESSAGE_TOKENIZER = new Tokenizer();
 
 export interface SubagentInspectTarget {
 	kind: "subagent";
@@ -164,7 +165,7 @@ function measureMessages(messages: readonly Message[]): Omit<TokenMeasurement, "
 	return {
 		characters: messages.reduce((total, message) => total + JSON.stringify(message).length, 0),
 		tokens: messages.reduce((total, message) => {
-			const estimated = estimateTokens(message);
+			const estimated = BREAKDOWN_MESSAGE_TOKENIZER.countMessage(message);
 			if (estimated > 0) return total + estimated;
 			const content: unknown = "content" in message ? message.content : undefined;
 			const serialized = typeof content === "string" ? content : JSON.stringify(content ?? "");
