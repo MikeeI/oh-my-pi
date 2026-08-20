@@ -191,6 +191,7 @@ Each entry names its disposition, observable behavior, implementation owner, and
 - Contract: both views retain names, hierarchy, ordering, depth, limits, and elision behavior.
 - Owner: `packages/coding-agent/src/workspace-tree.ts` owns both render modes.
 - Proof: `packages/coding-agent/test/workspace-tree.test.ts`.
+- Fixture: `research/read-directory-preview/default-shortened-output.txt` owns repeatable format token comparisons.
 - Upstream action: PR `#9062` covers compact Read spacing; metadata-free prompt trees remain MOMP-specific.
 
 #### `MOMP-ROUTINES` — User-defined sequential routines
