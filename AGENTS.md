@@ -174,6 +174,17 @@ Each entry names its disposition, observable behavior, implementation owner, and
 - Owner: `src/prompts/tools/eval.md` owns model-visible result-handling guidance.
 - Proof: result-handling description case in `test/tools/eval-description.test.ts`.
 
+#### `MOMP-EVAL-ROUTING` — Context-safe Eval orchestration
+
+- Disposition: `MOMP-EIGEN`, designed for upstream.
+- Contract: native Read owns inspection unless Eval must compute over file contents.
+- Contract: in-cell concurrency uses `parallel(thunks)` instead of user-created execution contexts.
+- Contract: Eval treats tool results as unknown until their owner or inspected shape establishes a type.
+- Contract: Eval uses only state established by successful cells in the current live kernel.
+- Owner: `src/prompts/tools/eval.md` owns model-visible Eval routing and failure guidance.
+- Proof: routing-description cases in `test/tools/eval-description.test.ts`.
+- Proof: runtime semantics in Eval workflow, bridge-policy, Python-prelude, and JavaScript-executor tests.
+
 #### `MOMP-READ-SKILL-COMPACT` — Compact skill-read display
 
 - Disposition: `MOMP-EIGEN`, designed for upstream.
@@ -257,6 +268,23 @@ Each entry names its disposition, observable behavior, implementation owner, and
 - Proof: `test/conversation-search.test.ts`.
 - Proof: `test/conversation-search-benchmark.test.ts`.
 
+#### `MOMP-RUNTIME-AUDIT` — Repeatable local performance evidence
+
+- Disposition: `MOMP-EIGEN`, designed for upstream.
+- Contract: one local command captures CPU, heap lifecycle, test timing, and exact compiled-bundle evidence.
+- Contract: CPU scenarios cover cold pre-paint boot, the smoke path, and complete prompt inspection without provider calls.
+- Contract: the heap scenario repeatedly creates, fills, disposes, and garbage-collects real `AgentSession` instances.
+- Contract: lifecycle timings use a fixed test set and repetition count so runs remain directly comparable.
+- Contract: bundle evidence comes from the production compile owner with its plugins, defines, generated inputs, and externals.
+- Contract: outputs default to an absolute reports path outside the source tree and support an explicit output directory.
+- Contract: scenario failures stop the audit and retain captured stdout and stderr for diagnosis.
+- Usage: `bun --cwd=packages/coding-agent run profile:runtime`.
+- Owner: `packages/coding-agent/scripts/profile-runtime.ts` owns orchestration, parameters, manifest, and bundle summary.
+- Owner: `packages/coding-agent/scripts/profile-runtime-heap-scenario.ts` owns deterministic retained-heap exercise and sampling.
+- Owner: `packages/coding-agent/scripts/compile-binary.ts` owns optional exact bundle metadata collection.
+- Owner: `packages/coding-agent/scripts/build-binary.ts` owns production-build metadata emission.
+- Proof: run the usage command and verify every artifact named by `manifest.json` exists after successful completion.
+
 #### `MOMP-STATS-SUMMARY` — Multi-range CLI usage overview
 
 - Disposition: `MOMP-EIGEN`, designed for upstream.
@@ -327,6 +355,16 @@ Each entry names its disposition, observable behavior, implementation owner, and
 - Owner: `src/prompts/system/agent-creation-architect.md`.
 - Proof: render and inspect the agent-creation architect prompt.
 - Upstream action: prefer provider-neutral wording when explicitly preparing an upstream change.
+
+#### `MOMP-HUB-COMPACT` — Compact Hub guidance
+
+- Disposition: `MOMP-EIGEN`, designed for upstream.
+- Contract: Hub guidance preserves peer messaging, job delivery, and supervised-process semantics without repetition.
+- Contract: Hub examples cover the ambiguous peer/process routes and compound service readiness.
+- Owner: `src/prompts/tools/hub.md` owns concise model-visible behavior guidance.
+- Owner: `src/tools/hub/index.ts#HubTool.examples` owns the minimal routing examples.
+- Proof: focused Hub behavior tests and `momp system-prompt inspect --breakdown --json`.
+- Upstream action: retain provider-neutral wording when preparing the generic prompt compaction.
 
 #### `MOMP-BASH-TOOL-CONTEXT` — Additional workstation utilities
 
@@ -423,6 +461,7 @@ When upstream implements an equivalent contract:
 Prompt files are upstream-owned by default.
 A MOMP prompt delta MUST defend a current observable model, tool-routing, or operator contract.
 Prompt wording history, personal preference, and token count alone do not justify a permanent delta.
+NEVER propose progressive disclosure or progressive exposure for prompts, tools, schemas, or capabilities.
 Keep prompt behavior in static `.md` owners and keep coupled runtime wiring and behavioral tests in the same closure.
 When removing a prompt delta, inspect imports, renderers, tool capability gates, consumers, and contract tests.
 NEVER set a prompt file to upstream while leaving fork runtime code that imports or depends on the removed prompt.

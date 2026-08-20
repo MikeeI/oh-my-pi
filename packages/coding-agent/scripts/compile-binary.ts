@@ -22,13 +22,15 @@ export interface CodingAgentCompileOptions {
 	readonly minifyIdentifiers?: boolean;
 	/** Disable Bun's built-in Darwin signing before the caller re-signs. */
 	readonly skipBuiltinCodesign?: boolean;
+	/** Include Bun's exact input/output dependency graph in the result. */
+	readonly metafile?: boolean;
 }
 
 /**
  * Compile the coding-agent executable with its legacy Pi compatibility module
  * graph supplied by an in-memory build plugin rather than generated files.
  */
-export async function compileCodingAgent(options: CodingAgentCompileOptions): Promise<void> {
+export async function compileCodingAgent(options: CodingAgentCompileOptions): Promise<Bun.BuildMetafile | undefined> {
 	const previousCodesignSetting = Bun.env.BUN_NO_CODESIGN_MACHO_BINARY;
 	if (options.skipBuiltinCodesign) {
 		Bun.env.BUN_NO_CODESIGN_MACHO_BINARY = "1";
@@ -61,10 +63,12 @@ export async function compileCodingAgent(options: CodingAgentCompileOptions): Pr
 				autoloadPackageJson: false,
 			},
 			throw: false,
+			metafile: options.metafile ?? false,
 		});
 		if (!output.success) {
 			throw new Error(`Coding-agent binary bundle failed:\n${output.logs.map(log => log.message).join("\n")}`);
 		}
+		return output.metafile;
 	} finally {
 		if (previousCodesignSetting === undefined) {
 			delete Bun.env.BUN_NO_CODESIGN_MACHO_BINARY;

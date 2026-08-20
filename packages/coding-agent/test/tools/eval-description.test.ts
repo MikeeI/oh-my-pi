@@ -56,6 +56,19 @@ describe("eval tool description", () => {
 		);
 	});
 
+	it("routes in-cell tool concurrency through context-safe Eval helpers", () => {
+		const text = getEvalToolDescription({ py: true, js: true, spawns: true });
+		expect(text).toContain("Need concurrent in-cell work? Use `parallel(thunks)`.");
+		expect(text).toContain(
+			"NEVER call injected helpers or `tool.*` from user-created threads, executors, workers, or subprocesses.",
+		);
+		expect(text).toContain("Use native Read for inspection");
+		expect(text).toContain("Treat results as unknown");
+		expect(text).toContain("JavaScript MUST await `parallel(...)` and `pipeline(...)`.");
+		expect(text).toContain("One failed thunk re-raises after all settle.");
+		expect(text).toContain("Use only names established by successful cells in the current live kernel.");
+	});
+
 	it("omits agent() when the session forbids spawning", () => {
 		// Subagents with spawns: undefined (resolved to "") cannot launch tasks.
 		// The prelude doc must not promise a helper that always throws.

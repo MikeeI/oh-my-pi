@@ -194,32 +194,7 @@ export class HubTool implements AgentTool<typeof hubSchema, HubDetails> {
 			},
 		},
 		{
-			caption: "Round-trip when you cannot proceed without the answer",
-			call: {
-				op: "send",
-				to: "Main",
-				message: "JWT or session cookies for the auth flow?",
-				await: true,
-			},
-		},
-		{
-			caption: "Completely blocked: wait for the first finished job or incoming message",
-			call: { op: "wait" },
-		},
-		{
-			caption: "Block until a specific peer answers",
-			call: { op: "wait", from: "AuthLoader", timeoutMs: 60000 },
-		},
-		{
-			caption: "Kill a hung background job",
-			call: { op: "cancel", ids: ["bash_a1b2c3"] },
-		},
-		{
-			caption: "Snapshot every background job without waiting",
-			call: { op: "jobs" },
-		},
-		{
-			caption: "Start a dev server and wait for its log banner and port",
+			caption: "Start a service and require log plus port readiness",
 			call: {
 				op: "start",
 				name: "web",
@@ -233,16 +208,8 @@ export class HubTool implements AgentTool<typeof hubSchema, HubDetails> {
 			call: { op: "logs", name: "web", follow: true, cursor: 1842, timeout: 30 },
 		},
 		{
-			caption: "Drive a REPL/debugger over stdin",
-			call: { op: "send", name: "debugger", text: "breakpoint set --name main" },
-		},
-		{
-			caption: "Interrupt a process",
+			caption: "Send terminal input to a process",
 			call: { op: "send", name: "debugger", keys: ["CTRL_C"] },
-		},
-		{
-			caption: "Block until a process is ready",
-			call: { op: "wait", name: "web", for: "ready", timeout: 30 },
 		},
 	];
 
