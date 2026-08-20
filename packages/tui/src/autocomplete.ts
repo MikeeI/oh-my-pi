@@ -536,7 +536,6 @@ export class CombinedAutocompleteProvider implements AutocompleteProvider {
 				// path (`/tmp/fo` at prompt start, `see /tmp` mid-prompt); fall
 				// through to file-path completion.
 			} else if (!isMidPromptSkillLookup) {
-
 				const commandName = commandText.slice(1, spaceIndex); // Command without "/"
 				const argumentText = commandText.slice(spaceIndex + 1); // Text after space
 				const command = this.#commands.find(cmd => commandMatchesNameOrAlias(cmd, commandName));
