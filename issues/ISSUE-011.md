@@ -78,6 +78,7 @@ Push: `origin/contrib/read-compact-directory-metadata`
 Checks:
 
 - `bun test packages/coding-agent/test/workspace-tree.test.ts` → 9 pass, 0 fail after rebase.
+- GitHub Actions run `32464713806` → every required build, smoke, and test job passed.
 Review [O]: Both `COMMENTED` reviews target the pre-rebase implementation; current head `597c7f4e20a9` is clean.
 
 ## Publication-Blockers
