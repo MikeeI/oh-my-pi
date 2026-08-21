@@ -1,9 +1,9 @@
 # ISSUE-001 — Eval prompt: agent() children do not share the promised kernel state
 
-State: PR-Ready
+State: Submitted
 Authorized-Work: Pull-Request-Implementation
 Publication-Target: New-pull-request
-External-Reference: Not published.
+External-Reference: https://github.com/can1357/oh-my-pi/pull/9154
 Contribution-Priority: Medium
 Root-Cause-Confidence: High
 Finding-Category: Correctness
@@ -75,9 +75,9 @@ Checks:
 
 ## Next-Action
 
-Summary: Approve Eval pull request
-Action: Present the exact target and pull request draft for publication approval.
-Done-When: The user approves this exact draft and `can1357/oh-my-pi` new pull request target.
+Summary: Monitor maintainer feedback
+Action: Monitor CI, review comments, and maintainer decisions for pull request #9154.
+Done-When: The pull request outcome and any requested follow-up are recorded.
 
 ## Publication-Draft
 
