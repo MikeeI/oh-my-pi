@@ -27,7 +27,7 @@ Impact: The contract can produce missing-name errors, duplicated setup, or faile
 - [S] `https://github.com/can1357/oh-my-pi/blob/ae2d3d6ea16a47aa5208bd123dcc4cfcc8756472/packages/coding-agent/src/task/structured-subagent.ts#L106-L110` and `#L443-L449` — task Children share Eval state; Eval-bridge Children must not because the Parent kernel waits on the Child.
 - [S] `https://github.com/can1357/oh-my-pi/commit/c057b0ef3394956b5d3283bccf387df5a750430f` — intentional isolation prevents a kernel deadlock.
 - [S] `https://github.com/can1357/oh-my-pi/commit/af1832af1bd36070a814c3bb175c3655ee44e29f` — prompt compression changed “`task` subagents” to unqualified “subagents”.
-- [O] PR head `620f66fde8` renders the isolation clause only when spawning is enabled and preserves `parentEvalSessionId === undefined`.
+- [O] PR head `dab8d0339d` gates isolation guidance, preserves `parentEvalSessionId === undefined`, and avoids exact prompt-wording coverage.
 
 ## Prior-Art
 
@@ -65,19 +65,19 @@ None.
 Branch: `fix/eval-agent-kernel-persistence`
 Base: `upstream/main@76a294cb19bfded1e32e2111f1f729129595bf5e`
 Scope: Correct Eval kernel-sharing guidance and preserve capability-gated prompt composition.
-Commit: `620f66fde8`
+Commit: `dab8d0339d`
 Push: `origin/fix/eval-agent-kernel-persistence`
 Personal: `personal@409c39a20a`
 Checks:
 - `bun test packages/coding-agent/test/tools/eval-description.test.ts packages/coding-agent/test/eval/agent-bridge-policy.test.ts` → 48 pass, 0 fail.
 - `bun --cwd=packages/coding-agent run check` → Biome checked 2,672 files; type check passed.
-- GitHub Actions run `32440357822` → every required build, smoke, and test job passed.
-Review [O]: Both `COMMENTED` reviews target `343e21c9ef1a`; current head `620f66fde855` is clean and unreviewed.
+- GitHub Actions run `32465176807` → every required build, smoke, and test job passed.
+Review [O]: Both `COMMENTED` reviews target `343e21c9ef1a`; clean head `dab8d0339d0f` addresses their findings.
 
 ## Next-Action
 
 Summary: Await Eval current-head review
-Action: Monitor pull request #9154 for review of head `620f66fde855` and the maintainer decision.
+Action: Monitor pull request #9154 for review of head `dab8d0339d0f` and the maintainer decision.
 Done-When: A current-head review, requested follow-up, or terminal outcome is recorded.
 
 ## Publication-Draft
