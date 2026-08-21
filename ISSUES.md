@@ -14,7 +14,7 @@ Next finding ID: ISSUE-013
 | ID | Finding | State | Authorized-Work | Publication-Target | Contribution-Priority | Next-Action | External-Reference |
 | --- | --- | --- | --- | --- | --- | --- | --- |
 | [ISSUE-001](issues/ISSUE-001.md) | Eval prompt: agent() children do not share the promised kernel state | Submitted | Pull-Request-Implementation | New-pull-request | Medium | Monitor corrected Eval PR | https://github.com/can1357/oh-my-pi/pull/9154 |
-| [ISSUE-002](issues/ISSUE-002.md) | Eval registry: disabling the last live backend re-advertises every language | Investigating | Not-Selected | Not-Selected | High | Reproduce zero-backend transition | Not published. |
+| [ISSUE-002](issues/ISSUE-002.md) | Eval registry: disabling the last live backend re-advertises every language | Investigating | Not-Selected | Not-Selected | High | Verify Eval commit boundary | Not published. |
 | [ISSUE-003](issues/ISSUE-003.md) | Todo schema: items is described as append-only despite flattened init | Submitted | Pull-Request-Implementation | New-pull-request | Low | Monitor Todo schema PR | https://github.com/can1357/oh-my-pi/pull/9159 |
 | [ISSUE-004](issues/ISSUE-004.md) | Bash prompt: timeout does not extend the auto-background cutoff | Submitted | Pull-Request-Implementation | New-pull-request | Medium | Monitor corrected Bash PR | https://github.com/can1357/oh-my-pi/pull/9155 |
 | [ISSUE-007](issues/ISSUE-007.md) | Hub capability: disabled process supervision remains fully advertised | Implementing | Pull-Request-Implementation | New-pull-request | High | Approve reviewed Hub PR | Not published. |
