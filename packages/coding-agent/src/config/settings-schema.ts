@@ -4008,7 +4008,7 @@ export const SETTINGS_SCHEMA = {
 			tab: "tools",
 			group: "Available Tools",
 			label: "Launch",
-			description: "Enable the launch tool for supervising shared long-running project processes",
+			description: "Enable Hub process supervision for shared long-running project processes",
 		},
 	},
 

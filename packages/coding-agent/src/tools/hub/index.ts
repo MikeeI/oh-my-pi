@@ -70,10 +70,7 @@ export type { LaunchParams, LaunchToolDetails } from "./launch";
 export { createIrcMessageCard, isIrcEnabled } from "./messaging";
 export * from "./types";
 
-const hubSchema = type({
-	op: type(
-		"'send' | 'wait' | 'inbox' | 'list' | 'jobs' | 'cancel' | 'start' | 'ps' | 'logs' | 'stop' | 'restart' | 'describe'",
-	).describe("hub operation"),
+const coordinationHubFields = {
 	"to?": type("string").describe('send: recipient agent id or "all"'),
 	"message?": type("string").describe("send: message body"),
 	"replyTo?": type("string").describe("send: message id being answered"),
@@ -82,6 +79,9 @@ const hubSchema = type({
 	"ids?": type("string[]").describe("wait: job ids to watch (omit = all running jobs); cancel: job ids to kill"),
 	"timeoutMs?": type("number").describe("wait (messages/jobs): timeout in milliseconds (0 waits indefinitely)"),
 	"peek?": type("boolean").describe("inbox: list messages without consuming them"),
+};
+
+const processHubFields = {
 	"name?": type("string <= 48").describe("process ops: stable project-scoped launch name"),
 	"application?": type("string > 0").describe("start: executable or application path"),
 	"args?": type("string[]").describe("start: argv passed directly to the application"),
@@ -113,8 +113,22 @@ const hubSchema = type({
 		"send with name: process-tree signal",
 	),
 	"timeout?": type("number > 0").describe("logs/stop/wait with name: max seconds; default 30 (stop: 5)"),
+};
+
+const coordinationHubSchema = type({
+	op: type("'send' | 'wait' | 'inbox' | 'list' | 'jobs' | 'cancel'").describe("hub operation"),
+	...coordinationHubFields,
 });
 
+const hubSchema = type({
+	op: type(
+		"'send' | 'wait' | 'inbox' | 'list' | 'jobs' | 'cancel' | 'start' | 'ps' | 'logs' | 'stop' | 'restart' | 'describe'",
+	).describe("hub operation"),
+	...coordinationHubFields,
+	...processHubFields,
+});
+
+type HubToolSchema = typeof coordinationHubSchema | typeof hubSchema;
 type HubParams = typeof hubSchema.infer;
 
 interface MessagingDeps {
@@ -151,13 +165,95 @@ function hubApproval(params: unknown): ToolApprovalDecision {
 	}
 }
 
-export class HubTool implements AgentTool<typeof hubSchema, HubDetails> {
+const COORDINATION_HUB_SUMMARY = "Message peer agents and control background jobs";
+const FULL_HUB_SUMMARY = "Message peer agents, control background jobs, and supervise long-running processes";
+const COORDINATION_HUB_DESCRIPTION = prompt.render(hubDescription, { hasLaunch: false });
+const FULL_HUB_DESCRIPTION = prompt.render(hubDescription, { hasLaunch: true });
+
+const COORDINATION_HUB_EXAMPLES: readonly ToolExample<HubParams>[] = [
+	{
+		caption: "List peers",
+		call: { op: "list" },
+	},
+	{
+		caption: "Fire-and-forget DM — same send wakes idle/parked peers",
+		call: {
+			op: "send",
+			to: "AuthLoader",
+			message: "Still touching src/server/auth.ts? I need to add a 401 path.",
+		},
+	},
+	{
+		caption: "Round-trip when you cannot proceed without the answer",
+		call: {
+			op: "send",
+			to: "Main",
+			message: "JWT or session cookies for the auth flow?",
+			await: true,
+		},
+	},
+	{
+		caption: "Completely blocked: wait for the first finished job or incoming message",
+		call: { op: "wait" },
+	},
+	{
+		caption: "Block until a specific peer answers",
+		call: { op: "wait", from: "AuthLoader", timeoutMs: 60000 },
+	},
+	{
+		caption: "Kill a hung background job",
+		call: { op: "cancel", ids: ["bash_a1b2c3"] },
+	},
+	{
+		caption: "Snapshot every background job without waiting",
+		call: { op: "jobs" },
+	},
+];
+
+const PROCESS_HUB_EXAMPLES: readonly ToolExample<HubParams>[] = [
+	{
+		caption: "Start a dev server and wait for its log banner and port",
+		call: {
+			op: "start",
+			name: "web",
+			application: "bun",
+			args: ["run", "dev"],
+			ready: { log: "Local:.*http", port: 5173, timeout: 30 },
+		},
+	},
+	{
+		caption: "Follow process output after a cursor",
+		call: { op: "logs", name: "web", follow: true, cursor: 1842, timeout: 30 },
+	},
+	{
+		caption: "Drive a REPL/debugger over stdin",
+		call: { op: "send", name: "debugger", text: "breakpoint set --name main" },
+	},
+	{
+		caption: "Interrupt a process",
+		call: { op: "send", name: "debugger", keys: ["CTRL_C"] },
+	},
+	{
+		caption: "Block until a process is ready",
+		call: { op: "wait", name: "web", for: "ready", timeout: 30 },
+	},
+];
+
+const FULL_HUB_EXAMPLES: readonly ToolExample<HubParams>[] = [...COORDINATION_HUB_EXAMPLES, ...PROCESS_HUB_EXAMPLES];
+
+export class HubTool implements AgentTool<HubToolSchema, HubDetails> {
 	readonly name = "hub";
 	readonly approval = hubApproval;
 	readonly label = "Hub";
-	readonly summary = "Message peer agents, control background jobs, and supervise long-running processes";
-	readonly description: string;
-	readonly parameters = hubSchema;
+	get summary(): string {
+		return this.#launchEnabled() ? FULL_HUB_SUMMARY : COORDINATION_HUB_SUMMARY;
+	}
+	get description(): string {
+		return this.#launchEnabled() ? FULL_HUB_DESCRIPTION : COORDINATION_HUB_DESCRIPTION;
+	}
+	get parameters(): HubToolSchema {
+		return this.#launchEnabled() ? hubSchema : coordinationHubSchema;
+	}
 	readonly strict = true;
 	readonly interruptible = (params: Partial<HubParams>): boolean => {
 		if (params.op === "wait") return true;
@@ -165,74 +261,14 @@ export class HubTool implements AgentTool<typeof hubSchema, HubDetails> {
 	};
 	readonly loadMode = "essential";
 
-	readonly examples: readonly ToolExample<typeof hubSchema.infer>[] = [
-		{
-			caption: "List peers",
-			call: { op: "list" },
-		},
-		{
-			caption: "Fire-and-forget DM — same send wakes idle/parked peers",
-			call: {
-				op: "send",
-				to: "AuthLoader",
-				message: "Still touching src/server/auth.ts? I need to add a 401 path.",
-			},
-		},
-		{
-			caption: "Round-trip when you cannot proceed without the answer",
-			call: {
-				op: "send",
-				to: "Main",
-				message: "JWT or session cookies for the auth flow?",
-				await: true,
-			},
-		},
-		{
-			caption: "Completely blocked: wait for the first finished job or incoming message",
-			call: { op: "wait" },
-		},
-		{
-			caption: "Block until a specific peer answers",
-			call: { op: "wait", from: "AuthLoader", timeoutMs: 60000 },
-		},
-		{
-			caption: "Kill a hung background job",
-			call: { op: "cancel", ids: ["bash_a1b2c3"] },
-		},
-		{
-			caption: "Snapshot every background job without waiting",
-			call: { op: "jobs" },
-		},
-		{
-			caption: "Start a dev server and wait for its log banner and port",
-			call: {
-				op: "start",
-				name: "web",
-				application: "bun",
-				args: ["run", "dev"],
-				ready: { log: "Local:.*http", port: 5173, timeout: 30 },
-			},
-		},
-		{
-			caption: "Follow process output after a cursor",
-			call: { op: "logs", name: "web", follow: true, cursor: 1842, timeout: 30 },
-		},
-		{
-			caption: "Drive a REPL/debugger over stdin",
-			call: { op: "send", name: "debugger", text: "breakpoint set --name main" },
-		},
-		{
-			caption: "Interrupt a process",
-			call: { op: "send", name: "debugger", keys: ["CTRL_C"] },
-		},
-		{
-			caption: "Block until a process is ready",
-			call: { op: "wait", name: "web", for: "ready", timeout: 30 },
-		},
-	];
+	get examples(): readonly ToolExample<HubParams>[] {
+		return this.#launchEnabled() ? FULL_HUB_EXAMPLES : COORDINATION_HUB_EXAMPLES;
+	}
 
-	constructor(private readonly session: ToolSession) {
-		this.description = prompt.render(hubDescription);
+	constructor(private readonly session: ToolSession) {}
+
+	#launchEnabled(): boolean {
+		return this.session.settings.get("launch.enabled");
 	}
 
 	/** Messaging deps when this session can address peers; null otherwise. */
