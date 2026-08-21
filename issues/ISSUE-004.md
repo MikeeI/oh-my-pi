@@ -91,19 +91,21 @@ Target: New pull request to `can1357/oh-my-pi:main` from `MikeeI:fix/bash-auto-b
 ## What
 
 Correct Bash tool guidance to distinguish the configured foreground threshold from the job deadline.
-
-When auto-backgrounding is enabled, the prompt now renders the threshold and states that raising `timeout` does not extend foreground waiting. Runtime behavior is unchanged.
+When auto-backgrounding is enabled, the prompt states that long calls may background by the configured threshold.
+It also states that `timeout: 0` disables the deadline and other values do not extend foreground waiting.
+Runtime behavior is unchanged.
 
 ## Why
 
-The current “Need inline? Raise `timeout`” guidance conflates two independent controls. Runtime waits for `min(thresholdMs, timeoutMs - 1000)`, so a deadline above the threshold cannot keep the call inline longer.
-
-PR #7015 introduced the wording; issues #4408, #5556, and #7235 cover related timeout or job behavior but not this threshold-saturation contract.
+The current “Need inline? Raise `timeout`” guidance conflates two independent controls.
+For positive deadlines, runtime waits for `min(thresholdMs, timeoutMs - 1000)`.
+`timeout: 0` disables the deadline while the configured threshold still caps foreground waiting.
+PR #7015 introduced the wording; issues #4408, #5556, and #7235 cover related behavior but not this conflation.
 
 ## Testing
 
-- `bun test packages/coding-agent/test/tool-guidance-efficiency.test.ts` — 2 pass, 0 fail.
-- `bun test packages/coding-agent/test/tools.test.ts -t "should auto-background at the threshold even with a longer timeout"` — 1 pass, 0 fail.
+- `bun test packages/coding-agent/test/tool-guidance-efficiency.test.ts` — 1 pass, 0 fail.
+- `bun test packages/coding-agent/test/tools.test.ts --test-name-pattern "should auto-background at the threshold even with a longer timeout"` — 1 pass, 0 fail.
 - `bun --cwd=packages/coding-agent run check` — Biome and type checks pass.
 
 I checked the relevant issues, comments, pull requests, and discussions; this pull request is not a duplicate.
@@ -117,10 +119,9 @@ I checked the relevant issues, comments, pull requests, and discussions; this pu
 ### Disclosure
 
 Investigated thoroughly with GPT-5.6 (extra high reasoning effort), using [Oh My Pi](https://github.com/can1357/oh-my-pi) as the agent framework.
-
-This report is not generic or unreviewed AI-generated output. Its claims were checked against the cited evidence, and it includes the relevant detail intended to help maintainers resolve the issue.
-
-If reports like this are not useful to the project, please let me know and I will refrain from submitting similar ones. My intent is to help without wasting maintainer time or energy or discouraging their work.
-
+This report is not generic or unreviewed AI-generated output.
+Its claims were checked against the cited evidence, and it includes the relevant detail intended to help maintainers resolve the issue.
+If reports like this are not useful to the project, please let me know and I will refrain from submitting similar ones.
+My intent is to help without wasting maintainer time or energy or discouraging their work.
 Thank you for your work.
 ```

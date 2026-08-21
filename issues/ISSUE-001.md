@@ -88,18 +88,17 @@ Target: New pull request to `can1357/oh-my-pi:main` from `MikeeI:fix/eval-agent-
 ## What
 
 Clarify the Eval tool's kernel-state contract: state persists across calls and ordinary `task` subagents, while children launched through Eval `agent()` use independent kernels.
-
 The focused tests also pin the existing bridge policy by asserting that `runEvalAgent` does not pass a Parent Eval session ID.
 
 ## Why
 
-The current prompt says state persists across all subagents, but Eval `agent()` intentionally uses `shareEvalSession: false`. Sharing that executor would reintroduce the deadlock avoided by the existing bridge design.
-
+The current prompt says state persists across all subagents, but Eval `agent()` intentionally uses `shareEvalSession: false`.
+Sharing that executor would reintroduce the deadlock avoided by the existing bridge design.
 Issues #3196 and #5279 and PR #3205 describe related Eval isolation behavior, but none corrects this later prompt regression.
 
 ## Testing
 
-- `bun test packages/coding-agent/test/tools/eval-description.test.ts packages/coding-agent/test/eval/agent-bridge-policy.test.ts` — 49 pass, 0 fail.
+- `bun test packages/coding-agent/test/tools/eval-description.test.ts packages/coding-agent/test/eval/agent-bridge-policy.test.ts` — 48 pass, 0 fail.
 - `bun --cwd=packages/coding-agent run check` — Biome and type checks pass.
 
 I checked the relevant issues, comments, pull requests, and discussions; this pull request is not a duplicate.
@@ -113,10 +112,9 @@ I checked the relevant issues, comments, pull requests, and discussions; this pu
 ### Disclosure
 
 Investigated thoroughly with GPT-5.6 (extra high reasoning effort), using [Oh My Pi](https://github.com/can1357/oh-my-pi) as the agent framework.
-
-This report is not generic or unreviewed AI-generated output. Its claims were checked against the cited evidence, and it includes the relevant detail intended to help maintainers resolve the issue.
-
-If reports like this are not useful to the project, please let me know and I will refrain from submitting similar ones. My intent is to help without wasting maintainer time or energy or discouraging their work.
-
+This report is not generic or unreviewed AI-generated output.
+Its claims were checked against the cited evidence, and it includes the relevant detail intended to help maintainers resolve the issue.
+If reports like this are not useful to the project, please let me know and I will refrain from submitting similar ones.
+My intent is to help without wasting maintainer time or energy or discouraging their work.
 Thank you for your work.
 ```
