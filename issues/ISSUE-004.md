@@ -9,7 +9,7 @@ Root-Cause-Confidence: High
 Finding-Category: Correctness
 Created: 2026-08-14
 Updated: 2026-08-21
-Source: `upstream/main@de5ffc4201c4941992402daea355adc1aad3a8db`
+Source: `upstream/main@76a294cb19bfded1e32e2111f1f729129595bf5e`
 
 ## Root-Cause
 
@@ -27,7 +27,7 @@ Impact: A model can raise a deadline from the 300-second default to 3,600 second
 - [S] `https://github.com/can1357/oh-my-pi/blob/ae2d3d6ea16a47aa5208bd123dcc4cfcc8756472/packages/coding-agent/src/tools/bash.ts#L938-L943` — foreground wait is `max(0, min(thresholdMs, timeoutMs - 1000))`.
 - [S] At the default threshold, timeout=61s, 300s, 3,600s, or 0 all yield at most 60,000ms foreground wait; only the job deadline changes.
 - [S] `https://github.com/can1357/oh-my-pi/pull/7015` — introduced the current wording after correctly rejecting `async:true` as an inline solution, but did not account for threshold saturation.
-- [O] Contribution commit `a22c9830d3ec27e561d0410aa1f9814f0eb295e1` renders the configured threshold separately from the deadline and reproduces threshold saturation with `timeout:3600`.
+- [O] PR head `b29172777b` documents threshold, deadline, and `timeout: 0` semantics without lossy duration rendering.
 
 ## Prior-Art
 
@@ -43,19 +43,20 @@ Contribution fit: User-selected new pull request; no exact issue, discussion, or
 
 ## Proposed-Change
 
-Correct only `bash.md`: distinguish job deadline from maximum foreground wait and state that raising `timeout` cannot extend the auto-background threshold. Preserve the runtime policy; coupling threshold to model-selected deadlines would defeat responsiveness.
+Correct `bash.md`: calls may background by the configured threshold, and `timeout: 0` disables the deadline.
+Other `timeout` values set the deadline without extending foreground waiting; preserve the independent runtime policy.
 
 ## Scope-and-Constraints
 
 - Preserve: Deadline clamp, `timeout:0`, auto-background threshold, steering-triggered backgrounding, owner-routed completion, and PTY routing.
 - Exclude: Runtime coupling, a new `inline` parameter, PTY workaround guidance, and background-job redesign.
-- Cost: Prompt-only correction plus one semantic prompt assertion and one focused saturation regression.
+- Cost: Prompt correction plus one focused threshold-saturation regression.
 
 ## Verification
 
 - With auto-background enabled and threshold=10ms, execute a 30ms command using `timeout:3600`.
 - Require the initial result to be a running background job and later delivery to contain both output markers.
-- Require the rendered prompt to distinguish deadline and threshold and omit “Need inline? Raise timeout.”
+- Require the rendered prompt to distinguish the deadline from the foreground threshold and document `timeout: 0`.
 
 ## Publication-Blockers
 
@@ -64,21 +65,21 @@ None.
 ## Pull-Request-Implementation
 
 Branch: `fix/bash-auto-background-guidance`
-Base: `upstream/main@de5ffc4201c4941992402daea355adc1aad3a8db`
-Scope: Correct Bash timeout/auto-background guidance and add focused prompt/runtime regression coverage.
-Commit: `a22c9830d3ec27e561d0410aa1f9814f0eb295e1`
+Base: `upstream/main@76a294cb19bfded1e32e2111f1f729129595bf5e`
+Scope: Correct Bash timeout/auto-background guidance and preserve focused runtime regression coverage.
+Commit: `b29172777b`
 Push: `origin/fix/bash-auto-background-guidance`
 Personal: `personal@409c39a20a`
 Checks:
-- `bun test packages/coding-agent/test/tool-guidance-efficiency.test.ts` → 2 pass, 0 fail.
-- `bun test packages/coding-agent/test/tools.test.ts -t "should auto-background at the threshold even with a longer timeout"` → 1 pass, 0 fail.
+- `bun test packages/coding-agent/test/tool-guidance-efficiency.test.ts` → 1 pass, 0 fail.
+- `bun test packages/coding-agent/test/tools.test.ts --test-name-pattern "should auto-background at the threshold even with a longer timeout"` → 1 pass, 0 fail.
 - `bun --cwd=packages/coding-agent run check` → Biome checked 2,672 files; type check passed.
-- `bun check` → all TypeScript and Rust workspace checks passed.
+- GitHub Actions run `32440823968` → every required build, smoke, and test job passed.
 
 ## Next-Action
 
-Summary: Monitor maintainer feedback
-Action: Monitor CI, review comments, and maintainer decisions for pull request #9155.
+Summary: Monitor corrected Bash PR
+Action: Monitor new reviews and the maintainer decision for pull request #9155.
 Done-When: The pull request outcome and any requested follow-up are recorded.
 
 ## Publication-Draft

@@ -9,7 +9,7 @@ Root-Cause-Confidence: High
 Finding-Category: Performance
 Created: 2026-08-21
 Updated: 2026-08-21
-Source: `upstream/main@de5ffc4201c4941992402daea355adc1aad3a8db`
+Source: `upstream/main@76a294cb19bfded1e32e2111f1f729129595bf5e`
 
 ## Root-Cause
 
@@ -26,6 +26,7 @@ Impact: Enabled sessions now send the same tree structure without volatile metad
 - [O] `bun test packages/coding-agent/test/workspace-tree.test.ts` → 9 pass, 0 fail; the prompt tree contains `  - stable.txt` without size, absolute mtime, or relative age.
 - [S] Personal commit `ee24b5ba372fbf8c29c57aa561d9a5407ed115a5` → implements metadata-free prompt rendering and its regression assertion.
 - [S] `config/settings-schema.ts` → `Include Workspace Tree` controls whether the workspace tree is rendered in the system prompt.
+- [O] PR head `13e7da36f1` skips size and age formatting for prompt trees while preserving mtime-based ordering.
 
 ## Prior-Art
 
@@ -35,7 +36,7 @@ Gaps: Upstream maintainer direction for the prompt-tree-specific behavior remain
 - [PR #9062](https://github.com/can1357/oh-my-pi/pull/9062) — Related but distinct; compacts Read directory spacing and deliberately leaves the prompt tree aligned.
 - `MOMP-TREE-COMPACT` in `AGENTS.md` — Current MOMP contract; metadata-free prompt trees remain fork-specific.
 
-Contribution fit: MOMP-specific workspace-tree behavior is already integrated in `personal`; no upstream target is selected.
+Contribution fit: User-selected PR #9152 is submitted; no existing thread owns the prompt-tree metadata contract.
 
 ## Proposed-Change
 
@@ -57,14 +58,14 @@ This alternative is a proposal inside the PR text only; it does not change the p
 ## Verification
 
 - `bun test packages/coding-agent/test/workspace-tree.test.ts` → 9 pass, 0 fail.
-- The focused regression asserts stable metadata-free prompt output and preserves Read metadata output.
+- The focused regression asserts metadata-free prompt output and preserves Read size plus relative-age output.
 
 ## Performance-Evidence
 
 Workload: Startup system-prompt workspace trees with `Include Workspace Tree` enabled.
 Baseline [S]: Prompt entries carried size and modification-time columns.
-Candidate [O]: Personal commit `ee24b5ba372fbf8c29c57aa561d9a5407ed115a5` removes those columns.
-Guard [O]: Focused workspace-tree tests pass with 9 pass, 0 fail.
+Candidate [O]: PR head `13e7da36f1` removes prompt metadata and skips its discarded formatting.
+Guard [O]: Focused tests preserve metadata-free prompt output, Read size and age, and mtime ordering.
 Boundary: End-to-end token, latency, and prompt-cache measurements remain unmeasured.
 End-to-end-Measurement: Not measured
 
@@ -131,13 +132,15 @@ None.
 ## Pull-Request-Implementation
 
 Branch: `contrib/workspace-tree-metadata-free`
-Base: `upstream/main@de5ffc4201c4941992402daea355adc1aad3a8db`
-Scope: Omit volatile size and mtime columns from the system-prompt workspace tree while preserving Read metadata output.
-Commit: `dbb023374e`
+Base: `upstream/main@76a294cb19bfded1e32e2111f1f729129595bf5e`
+Scope: Omit prompt-tree metadata and its formatting while preserving Read metadata output and mtime ordering.
+Commit: `13e7da36f1`
 Push: `origin/contrib/workspace-tree-metadata-free`
 Checks:
 
 - `bun test packages/coding-agent/test/workspace-tree.test.ts` → 9 pass, 0 fail.
+- `bun --cwd=packages/coding-agent run check` → Biome checked 2,672 files; type check passed.
+- GitHub Actions run `32440557630` → every required build, smoke, and test job passed.
 
 ## Publication-Draft
 
@@ -189,6 +192,6 @@ Thank you for your work.
 
 ## Next-Action
 
-Summary: Monitor workspace-tree PR
-Action: Recheck PR #9152 for maintainer feedback, requested changes, merge, or closure.
-Done-When: The PR reaches a terminal state and the issue record stores the final outcome and evidence.
+Summary: Monitor corrected tree PR
+Action: Monitor new reviews and the maintainer decision for pull request #9152.
+Done-When: The pull request outcome and any requested follow-up are recorded.

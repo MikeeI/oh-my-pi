@@ -9,7 +9,7 @@ Root-Cause-Confidence: High
 Finding-Category: Correctness
 Created: 2026-08-14
 Updated: 2026-08-21
-Source: `upstream/main@de5ffc4201c4941992402daea355adc1aad3a8db`
+Source: `upstream/main@76a294cb19bfded1e32e2111f1f729129595bf5e`
 
 ## Root-Cause
 
@@ -27,7 +27,7 @@ Impact: The contract can produce missing-name errors, duplicated setup, or faile
 - [S] `https://github.com/can1357/oh-my-pi/blob/ae2d3d6ea16a47aa5208bd123dcc4cfcc8756472/packages/coding-agent/src/task/structured-subagent.ts#L106-L110` and `#L443-L449` — task Children share Eval state; Eval-bridge Children must not because the Parent kernel waits on the Child.
 - [S] `https://github.com/can1357/oh-my-pi/commit/c057b0ef3394956b5d3283bccf387df5a750430f` — intentional isolation prevents a kernel deadlock.
 - [S] `https://github.com/can1357/oh-my-pi/commit/af1832af1bd36070a814c3bb175c3655ee44e29f` — prompt compression changed “`task` subagents” to unqualified “subagents”.
-- [O] Contribution commit `343e21c9ef1a19157f3dc545e76929e2efb72f27` renders the qualified `task` sharing contract and asserts that Eval `agent()` passes no Parent Eval session ID.
+- [O] PR head `620f66fde8` renders the isolation clause only when spawning is enabled and preserves `parentEvalSessionId === undefined`.
 
 ## Prior-Art
 
@@ -48,13 +48,13 @@ Restore the `task` qualifier and state that Children launched through Eval `agen
 
 - Preserve: Eval state sharing across calls and normal `task` Children; Eval-bridge deadlock avoidance; file and artifact sharing.
 - Exclude: Kernel-sharing redesign, task execution unification, and provider-specific prompt variants.
-- Cost: Prompt-only correction plus focused prompt/bridge-policy coverage.
+- Cost: Prompt correction plus guarded description and bridge-policy coverage.
 
 ## Verification
 
-- Render the Eval description with spawning enabled and prove the sharing statement names only `task` Children plus the Eval-`agent()` exception.
+- Render with spawning enabled and require the `task`-sharing contract plus the Eval-`agent()` isolation exception.
+- Render with spawning disabled and require every Eval `agent()` reference to be absent.
 - Capture `runSubprocess` options from `runEvalAgent`; require `parentEvalSessionId === undefined`.
-- Keep the existing deadlock-avoidance policy unchanged.
 
 ## Publication-Blockers
 
@@ -63,20 +63,20 @@ None.
 ## Pull-Request-Implementation
 
 Branch: `fix/eval-agent-kernel-persistence`
-Base: `upstream/main@de5ffc4201c4941992402daea355adc1aad3a8db`
-Scope: Correct Eval kernel-sharing guidance and add focused prompt/runtime regression coverage.
-Commit: `343e21c9ef1a19157f3dc545e76929e2efb72f27`
+Base: `upstream/main@76a294cb19bfded1e32e2111f1f729129595bf5e`
+Scope: Correct Eval kernel-sharing guidance and preserve capability-gated prompt composition.
+Commit: `620f66fde8`
 Push: `origin/fix/eval-agent-kernel-persistence`
 Personal: `personal@409c39a20a`
 Checks:
-- `bun test packages/coding-agent/test/tools/eval-description.test.ts packages/coding-agent/test/eval/agent-bridge-policy.test.ts` → 49 pass, 0 fail.
+- `bun test packages/coding-agent/test/tools/eval-description.test.ts packages/coding-agent/test/eval/agent-bridge-policy.test.ts` → 48 pass, 0 fail.
 - `bun --cwd=packages/coding-agent run check` → Biome checked 2,672 files; type check passed.
-- `bun check` → all TypeScript and Rust workspace checks passed.
+- GitHub Actions run `32440357822` → every required build, smoke, and test job passed.
 
 ## Next-Action
 
-Summary: Monitor maintainer feedback
-Action: Monitor CI, review comments, and maintainer decisions for pull request #9154.
+Summary: Monitor corrected Eval PR
+Action: Monitor new reviews and the maintainer decision for pull request #9154.
 Done-When: The pull request outcome and any requested follow-up are recorded.
 
 ## Publication-Draft
