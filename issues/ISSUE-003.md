@@ -86,6 +86,7 @@ Checks:
 - `bun check` → all TypeScript and Rust workspace checks passed.
 - Provider wire and single-phase init scenarios passed.
 - Diff hygiene passed.
+- GitHub Actions run `32438460968` → every required build, smoke, and test job passed.
 Review [O]: Head `4034d19c07ac` is clean and has a `COMMENTED` P0 review with no findings.
 
 ## Next-Action
