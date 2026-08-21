@@ -402,15 +402,15 @@ Each entry names its disposition, observable behavior, implementation owner, and
 
 #### `MOMP-READ-SSH-GUIDANCE` — Current SSH route guidance
 
-- Disposition: `MOMP-EIGEN`, designed for upstream.
+- Disposition: `UPSTREAM-GEDECKT`.
 - Contract: Read guidance and SSH runtime errors name only provider-visible routes.
 - Contract: remote text-file search uses `grep` and unsupported hosts use `bash` with a remote SSH command or `sshfs`.
 - Contract: retired `search` and standalone `ssh` tool names never appear in model-visible SSH guidance or errors.
 - Contract: `ssh://` read, write, and `grep` behavior remains unchanged.
-- Owner: upstream `packages/coding-agent/src/prompts/tools/read.md` and SSH path/error owners.
+- Owner: current upstream `packages/coding-agent/src/prompts/tools/read.md` and SSH path/error owners.
 - Proof: `test/tools/read-guidance.test.ts`.
 - Proof: SSH protocol, file-transfer, path-validation, and remote-directory error tests.
-- Upstream action: submit the minimal wording and regression-test correction without reviving retired tools.
+- Required action: keep the complete closure byte-identical to current upstream and never restore the redundant fork wording.
 
 #### `MOMP-READ-RAW` — Source-specific raw Read representations
 
