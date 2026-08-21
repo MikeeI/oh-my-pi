@@ -9,7 +9,7 @@ Root-Cause-Confidence: High
 Finding-Category: Correctness
 Created: 2026-08-14
 Updated: 2026-08-21
-Source: `upstream/main@ae2d3d6ea16a47aa5208bd123dcc4cfcc8756472`
+Source: `upstream/main@de5ffc4201c4941992402daea355adc1aad3a8db`
 
 ## Root-Cause
 
@@ -27,11 +27,11 @@ Impact: The contract can produce missing-name errors, duplicated setup, or faile
 - [S] `https://github.com/can1357/oh-my-pi/blob/ae2d3d6ea16a47aa5208bd123dcc4cfcc8756472/packages/coding-agent/src/task/structured-subagent.ts#L106-L110` and `#L443-L449` — task Children share Eval state; Eval-bridge Children must not because the Parent kernel waits on the Child.
 - [S] `https://github.com/can1357/oh-my-pi/commit/c057b0ef3394956b5d3283bccf387df5a750430f` — intentional isolation prevents a kernel deadlock.
 - [S] `https://github.com/can1357/oh-my-pi/commit/af1832af1bd36070a814c3bb175c3655ee44e29f` — prompt compression changed “`task` subagents” to unqualified “subagents”.
-- [O] Contribution commit `2c9acfac066f5f8d674c6c2eeef829ba65f20db5` renders the qualified `task` sharing contract and asserts that Eval `agent()` passes no Parent Eval session ID.
+- [O] Contribution commit `343e21c9ef1a19157f3dc545e76929e2efb72f27` renders the qualified `task` sharing contract and asserts that Eval `agent()` passes no Parent Eval session ID.
 
 ## Prior-Art
 
-Coverage: issues(open+closed), PRs(open+closed+merged), Discussions, source history, and current Eval documentation; checked=2026-08-14.
+Coverage: issues(open+closed), PRs(open+closed+merged), Discussions, source history, and current Eval documentation; checked=2026-08-21.
 Gaps: Provider transcripts remain unchecked; the pull request makes no provider-impact claim.
 
 - `https://github.com/can1357/oh-my-pi/issues/3196` — Related; documents the no-inherited-session decision needed to avoid deadlock, not the later prompt regression.
@@ -63,13 +63,14 @@ None.
 ## Pull-Request-Implementation
 
 Branch: `fix/eval-agent-kernel-persistence`
-Base: `upstream/main@ae2d3d6ea16a47aa5208bd123dcc4cfcc8756472`
+Base: `upstream/main@de5ffc4201c4941992402daea355adc1aad3a8db`
 Scope: Correct Eval kernel-sharing guidance and add focused prompt/runtime regression coverage.
-Commit: `2c9acfac066f5f8d674c6c2eeef829ba65f20db5`
+Commit: `343e21c9ef1a19157f3dc545e76929e2efb72f27`
 Push: `origin/fix/eval-agent-kernel-persistence`
+Personal: `personal@409c39a20a`
 Checks:
 - `bun test packages/coding-agent/test/tools/eval-description.test.ts packages/coding-agent/test/eval/agent-bridge-policy.test.ts` → 49 pass, 0 fail.
-- `bun --cwd=packages/coding-agent run check` → Biome checked 2,607 files; type check passed.
+- `bun --cwd=packages/coding-agent run check` → Biome checked 2,672 files; type check passed.
 - `bun check` → all TypeScript and Rust workspace checks passed.
 
 ## Next-Action

@@ -9,7 +9,7 @@ Root-Cause-Confidence: High
 Finding-Category: Correctness
 Created: 2026-08-14
 Updated: 2026-08-21
-Source: `upstream/main@ae2d3d6ea16a47aa5208bd123dcc4cfcc8756472`
+Source: `upstream/main@de5ffc4201c4941992402daea355adc1aad3a8db`
 
 ## Root-Cause
 
@@ -27,11 +27,11 @@ Impact: A model can raise a deadline from the 300-second default to 3,600 second
 - [S] `https://github.com/can1357/oh-my-pi/blob/ae2d3d6ea16a47aa5208bd123dcc4cfcc8756472/packages/coding-agent/src/tools/bash.ts#L938-L943` — foreground wait is `max(0, min(thresholdMs, timeoutMs - 1000))`.
 - [S] At the default threshold, timeout=61s, 300s, 3,600s, or 0 all yield at most 60,000ms foreground wait; only the job deadline changes.
 - [S] `https://github.com/can1357/oh-my-pi/pull/7015` — introduced the current wording after correctly rejecting `async:true` as an inline solution, but did not account for threshold saturation.
-- [O] Contribution commit `2291e7e8f96e6ec50a367cc37b19e39c82c9fb55` renders the configured threshold separately from the deadline and reproduces threshold saturation with `timeout:3600`.
+- [O] Contribution commit `a22c9830d3ec27e561d0410aa1f9814f0eb295e1` renders the configured threshold separately from the deadline and reproduces threshold saturation with `timeout:3600`.
+
 ## Prior-Art
 
-
-Coverage: issues(open+closed), PRs(open+closed+merged), review comments, Discussions, and source history; checked=2026-08-14.
+Coverage: issues(open+closed), PRs(open+closed+merged), review comments, Discussions, and source history; checked=2026-08-21.
 Gaps: None.
 
 - `https://github.com/can1357/oh-my-pi/pull/7015` — Related origin, not duplicate; review claims only raising timeout keeps the call inline but misses the separate cutoff.
@@ -64,14 +64,15 @@ None.
 ## Pull-Request-Implementation
 
 Branch: `fix/bash-auto-background-guidance`
-Base: `upstream/main@ae2d3d6ea16a47aa5208bd123dcc4cfcc8756472`
+Base: `upstream/main@de5ffc4201c4941992402daea355adc1aad3a8db`
 Scope: Correct Bash timeout/auto-background guidance and add focused prompt/runtime regression coverage.
-Commit: `2291e7e8f96e6ec50a367cc37b19e39c82c9fb55`
+Commit: `a22c9830d3ec27e561d0410aa1f9814f0eb295e1`
 Push: `origin/fix/bash-auto-background-guidance`
+Personal: `personal@409c39a20a`
 Checks:
 - `bun test packages/coding-agent/test/tool-guidance-efficiency.test.ts` → 2 pass, 0 fail.
 - `bun test packages/coding-agent/test/tools.test.ts -t "should auto-background at the threshold even with a longer timeout"` → 1 pass, 0 fail.
-- `bun --cwd=packages/coding-agent run check` → Biome checked 2,607 files; type check passed.
+- `bun --cwd=packages/coding-agent run check` → Biome checked 2,672 files; type check passed.
 - `bun check` → all TypeScript and Rust workspace checks passed.
 
 ## Next-Action
