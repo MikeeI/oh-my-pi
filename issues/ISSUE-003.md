@@ -1,9 +1,9 @@
 # ISSUE-003 — Todo schema: items is described as append-only despite flattened init
 
-State: PR-Ready
+State: Submitted
 Authorized-Work: Pull-Request-Implementation
 Publication-Target: New-pull-request
-External-Reference: Not published.
+External-Reference: https://github.com/can1357/oh-my-pi/pull/9159
 Contribution-Priority: Low
 Root-Cause-Confidence: High
 Finding-Category: Correctness
@@ -71,7 +71,7 @@ Keep prompt guidance, documentation, runtime validation, and field names unchang
 
 ## Publication-Blockers
 
-- Exact Publication-Target and Publication-Draft approval remains required after inserting the contributor sentence.
+None.
 
 ## Pull-Request-Implementation
 
@@ -89,9 +89,9 @@ Checks:
 
 ## Next-Action
 
-Summary: Approve Todo PR draft
-Action: Present the exact current target and draft; await explicit publication approval.
-Done-When: The user explicitly approves that exact target and draft.
+Summary: Monitor Todo schema PR
+Action: Monitor CI, review comments, and maintainer decisions for pull request #9159.
+Done-When: The pull request outcome and any requested follow-up are recorded.
 
 ## Publication-Draft
 
