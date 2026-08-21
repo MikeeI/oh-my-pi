@@ -154,20 +154,20 @@ describe("InputController routine dispatch", () => {
 			return true;
 		});
 
-		await editor.onSubmit?.("/review-all src/foo.ts");
+		await editor.onSubmit?.("/review-all src/foo.ts [Image #1]");
 
 		expect(runRoutineInvocation).not.toHaveBeenCalled();
 		expect(ctx.compactionQueuedMessages).toEqual([
-			{ text: "/review-all src/foo.ts", mode: "steer", images: [image] },
+			{ text: "/review-all src/foo.ts [Image #1]", mode: "steer", images: [image] },
 		]);
 
 		sessionState.isCompacting = false;
 		await new UiHelpers(ctx).flushCompactionQueue();
 
 		expect(prompt).toHaveBeenCalledTimes(1);
-		expect(prompt).toHaveBeenCalledWith("/review-all src/foo.ts");
+		expect(prompt).toHaveBeenCalledWith("/review-all src/foo.ts [Image #1]");
 		expect(runRoutineInvocation).toHaveBeenCalledTimes(1);
-		expect(runRoutineInvocation).toHaveBeenCalledWith("/review-all src/foo.ts", {
+		expect(runRoutineInvocation).toHaveBeenCalledWith("/review-all src/foo.ts [Image #1]", {
 			onProgress: expect.any(Function),
 		});
 	});

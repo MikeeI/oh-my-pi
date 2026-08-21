@@ -64,7 +64,7 @@ describe("eval tool description", () => {
 		);
 		expect(text).toContain("Use native Read for inspection");
 		expect(text).toContain("Treat results as unknown");
-		expect(text).toContain("JavaScript MUST await `parallel(...)` and `pipeline(...)`.");
+		expect(text).toContain("JavaScript MUST await `parallel(…)` and `pipeline(…)`.");
 		expect(text).toContain("One failed thunk re-raises after all settle.");
 		expect(text).toContain("Use only names established by successful cells in the current live kernel.");
 	});
