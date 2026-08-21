@@ -72,12 +72,13 @@ Checks:
 - `bun test packages/coding-agent/test/tools/eval-description.test.ts packages/coding-agent/test/eval/agent-bridge-policy.test.ts` → 48 pass, 0 fail.
 - `bun --cwd=packages/coding-agent run check` → Biome checked 2,672 files; type check passed.
 - GitHub Actions run `32440357822` → every required build, smoke, and test job passed.
+Review [O]: Both `COMMENTED` reviews target `343e21c9ef1a`; current head `620f66fde855` is clean and unreviewed.
 
 ## Next-Action
 
-Summary: Monitor corrected Eval PR
-Action: Monitor new reviews and the maintainer decision for pull request #9154.
-Done-When: The pull request outcome and any requested follow-up are recorded.
+Summary: Await Eval current-head review
+Action: Monitor pull request #9154 for review of head `620f66fde855` and the maintainer decision.
+Done-When: A current-head review, requested follow-up, or terminal outcome is recorded.
 
 ## Publication-Draft
 

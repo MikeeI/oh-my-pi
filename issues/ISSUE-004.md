@@ -75,12 +75,13 @@ Checks:
 - `bun test packages/coding-agent/test/tools.test.ts --test-name-pattern "should auto-background at the threshold even with a longer timeout"` → 1 pass, 0 fail.
 - `bun --cwd=packages/coding-agent run check` → Biome checked 2,672 files; type check passed.
 - GitHub Actions run `32440823968` → every required build, smoke, and test job passed.
+Review [O]: All `COMMENTED` reviews predate clean head `b29172777bd1`; no review covers the current head.
 
 ## Next-Action
 
-Summary: Monitor corrected Bash PR
-Action: Monitor new reviews and the maintainer decision for pull request #9155.
-Done-When: The pull request outcome and any requested follow-up are recorded.
+Summary: Await Bash current-head review
+Action: Monitor pull request #9155 for review of head `b29172777bd1` and the maintainer decision.
+Done-When: A current-head review, requested follow-up, or terminal outcome is recorded.
 
 ## Publication-Draft
 

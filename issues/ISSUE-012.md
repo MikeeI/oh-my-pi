@@ -141,6 +141,7 @@ Checks:
 - `bun test packages/coding-agent/test/workspace-tree.test.ts` → 9 pass, 0 fail.
 - `bun --cwd=packages/coding-agent run check` → Biome checked 2,672 files; type check passed.
 - GitHub Actions run `32440557630` → every required build, smoke, and test job passed.
+Review [O]: The `COMMENTED` review targets `dbb023374ea5`; clean head `13e7da36f194` addresses all three findings.
 
 ## Publication-Draft
 
@@ -192,6 +193,6 @@ Thank you for your work.
 
 ## Next-Action
 
-Summary: Monitor corrected tree PR
-Action: Monitor new reviews and the maintainer decision for pull request #9152.
-Done-When: The pull request outcome and any requested follow-up are recorded.
+Summary: Await tree current-head review
+Action: Monitor pull request #9152 for review of head `13e7da36f194` and the maintainer decision.
+Done-When: A current-head review, requested follow-up, or terminal outcome is recorded.

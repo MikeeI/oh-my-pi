@@ -9,7 +9,7 @@ Root-Cause-Confidence: High
 Finding-Category: Performance
 Created: 2026-08-21
 Updated: 2026-08-21
-Source: `upstream/main@de5ffc4201c4941992402daea355adc1aad3a8db`
+Source: `upstream/main@76a294cb19bfded1e32e2111f1f729129595bf5e`
 
 ## Root-Cause
 
@@ -24,7 +24,7 @@ Impact: The preview repeats padding on every entry; token reduction beyond the f
 
 - [O] `bun test packages/coding-agent/test/workspace-tree.test.ts` → 9 pass, 0 fail; result recorded in PR #9062.
 - [S] `packages/coding-agent/src/workspace-tree.ts` → Read listings select compact metadata while prompt trees retain aligned metadata.
-- [S] [PR #9062](https://github.com/can1357/oh-my-pi/pull/9062) → current submitted diff, review discussion, branch, and commit `aa3621023ee3`.
+- [S] [PR #9062](https://github.com/can1357/oh-my-pi/pull/9062) → clean rebased head `597c7f4e20a9` contains implementation `3e4ff8c88264` and changelog follow-up `597c7f4e20a9`.
 
 ## Prior-Art
 
@@ -71,13 +71,14 @@ Migration: None.
 ## Pull-Request-Implementation
 
 Branch: `contrib/read-compact-directory-metadata`
-Base: `upstream/main@de5ffc4201c4941992402daea355adc1aad3a8db`
+Base: `upstream/main@76a294cb19bfded1e32e2111f1f729129595bf5e`
 Scope: Compact Read directory metadata spacing without changing the separate system-prompt tree contract.
-Commit: `aa3621023ee3`
-Push: `MikeeI:contrib/read-compact-directory-metadata`
+Commit: `597c7f4e20a9` (implementation `3e4ff8c88264`; changelog follow-up `597c7f4e20a9`)
+Push: `origin/contrib/read-compact-directory-metadata`
 Checks:
 
-- `bun test packages/coding-agent/test/workspace-tree.test.ts` → 9 pass, 0 fail.
+- `bun test packages/coding-agent/test/workspace-tree.test.ts` → 9 pass, 0 fail after rebase.
+Review [O]: Both `COMMENTED` reviews target the pre-rebase implementation; current head `597c7f4e20a9` is clean.
 
 ## Publication-Blockers
 
@@ -85,9 +86,9 @@ None.
 
 ## Next-Action
 
-Summary: Monitor maintainer feedback
-Action: Recheck PR #9062 for maintainer scope decisions, requested changes, merge, or closure.
-Done-When: The PR reaches a terminal state and the issue record stores the final outcome and evidence.
+Summary: Await Read current-head review
+Action: Monitor pull request #9062 for review of head `597c7f4e20a9` and the maintainer decision.
+Done-When: A current-head review, requested follow-up, or terminal outcome is recorded.
 
 ## Publication-Draft
 

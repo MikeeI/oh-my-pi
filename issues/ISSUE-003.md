@@ -86,11 +86,12 @@ Checks:
 - `bun check` → all TypeScript and Rust workspace checks passed.
 - Provider wire and single-phase init scenarios passed.
 - Diff hygiene passed.
+Review [O]: Head `4034d19c07ac` is clean and has a `COMMENTED` P0 review with no findings.
 
 ## Next-Action
 
-Summary: Monitor Todo schema PR
-Action: Monitor CI, review comments, and maintainer decisions for pull request #9159.
+Summary: Await Todo maintainer decision
+Action: Monitor pull request #9159 for a maintainer decision or new follow-up.
 Done-When: The pull request outcome and any requested follow-up are recorded.
 
 ## Publication-Draft
