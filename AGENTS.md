@@ -196,14 +196,14 @@ Each entry names its disposition, observable behavior, implementation owner, and
 
 #### `MOMP-TREE-COMPACT` — Token-efficient directory context
 
-- Disposition: `MOMP-EIGEN`; compact Read metadata spacing is designed for upstream.
+- Disposition: `MOMP-EIGEN`; compact Read metadata spacing and metadata-free prompt-tree rendering are designed for upstream.
 - Contract: the system-prompt workspace tree omits size and mtime columns.
 - Contract: Read directory trees retain file sizes and relative mtimes with single-space separators.
 - Contract: both views retain names, hierarchy, ordering, depth, limits, and elision behavior.
 - Owner: `packages/coding-agent/src/workspace-tree.ts` owns both render modes.
 - Proof: `packages/coding-agent/test/workspace-tree.test.ts`.
 - Fixture: `research/read-directory-preview/default-shortened-output.txt` owns repeatable format token comparisons.
-- Upstream action: PR `#9062` covers compact Read spacing; metadata-free prompt trees remain MOMP-specific.
+- Upstream action: PR `#9062` covers compact Read spacing; PR `#9152` proposes metadata-free prompt-tree rendering.
 
 #### `MOMP-ROUTINES` — User-defined sequential routines
 
@@ -463,7 +463,10 @@ When upstream implements an equivalent contract:
 Prompt files are upstream-owned by default.
 A MOMP prompt delta MUST defend a current observable model, tool-routing, or operator contract.
 Prompt wording history, personal preference, and token count alone do not justify a permanent delta.
-NEVER propose progressive disclosure or progressive exposure for prompts, tools, schemas, or capabilities.
+NEVER propose new progressive disclosure or progressive exposure for prompts, tools, schemas, or capabilities.
+The existing `xd://` catalog mode is the sole settled exception.
+`tools.xdevDocs="catalog"` is the settled MOMP baseline for this repository's use case.
+NEVER propose, require, or repeat `builtins`-versus-`catalog` comparison or A/B measurement unless the user explicitly reopens this decision.
 Keep prompt behavior in static `.md` owners and keep coupled runtime wiring and behavioral tests in the same closure.
 When removing a prompt delta, inspect imports, renderers, tool capability gates, consumers, and contract tests.
 NEVER set a prompt file to upstream while leaving fork runtime code that imports or depends on the removed prompt.

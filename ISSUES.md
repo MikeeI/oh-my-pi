@@ -7,7 +7,7 @@ This file owns `Next-Finding-ID` and projects current issue-file state.
 `Next-Action` is the 2–6 word `Next-Action/Summary` projection from the issue record.
 When a row disagrees with its issue file, correct the row from the issue file in the same task.
 
-Next finding ID: ISSUE-011
+Next finding ID: ISSUE-013
 
 ## Open-Findings
 
@@ -19,6 +19,8 @@ Next finding ID: ISSUE-011
 | [ISSUE-004](issues/ISSUE-004.md) | Bash prompt: timeout does not extend the auto-background cutoff | PR-Ready | Pull-Request-Implementation | New-pull-request | Medium | Approve Bash pull request | Not published. |
 | [ISSUE-007](issues/ISSUE-007.md) | Hub capability: disabled process supervision remains fully advertised | Investigating | Not-Selected | Not-Selected | High | Select Hub gating scope | Not published. |
 | [ISSUE-010](issues/ISSUE-010.md) | LSP prompt: raw requests omit multi-server routing guidance | Implementing | Pull-Request-Implementation | New-pull-request | Medium | Review local LSP prompt PR | Not published. |
+| [ISSUE-011](issues/ISSUE-011.md) | Read: compact directory metadata spacing | Submitted | Pull-Request-Implementation | New-pull-request | Medium | Monitor maintainer feedback | https://github.com/can1357/oh-my-pi/pull/9062 |
+| [ISSUE-012](issues/ISSUE-012.md) | Prompt: metadata-free workspace tree | Submitted | Pull-Request-Implementation | New-pull-request | Medium | Monitor workspace-tree PR | https://github.com/can1357/oh-my-pi/pull/9152 |
 
 ## Archived-Findings
 
