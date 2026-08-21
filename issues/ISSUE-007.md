@@ -1,15 +1,15 @@
 # ISSUE-007 — Hub capability: disabled process supervision remains fully advertised
 
-State: Investigating
-Authorized-Work: Not-Selected
-Publication-Target: Not-Selected
+State: Implementing
+Authorized-Work: Pull-Request-Implementation
+Publication-Target: New-pull-request
 External-Reference: Not published.
 Contribution-Priority: High
 Root-Cause-Confidence: High
 Finding-Category: Correctness
 Created: 2026-08-14
-Updated: 2026-08-19
-Source: `upstream/main@74bc1f442e7bb6adcb5797ca8802ef6684281411`
+Updated: 2026-08-21
+Source: `upstream/main@76a294cb1905c1b900eea9f0c83f86b36a03a45c`
 
 ## Root-Cause
 
@@ -38,48 +38,57 @@ Impact: Calls cannot bypass the runtime guard, but the model can spend tool or r
 
 ## Prior-Art
 
-Coverage: issues(open+closed), PRs(open+closed+merged), source history; checked=2026-08-19.
-Gaps: Discussions and live-setting refresh verification remain unchecked.
+Coverage: issues(open+closed), PRs(open+closed+merged), Discussions, source history, current prompts, and current documentation; checked=2026-08-21.
+Gaps: Token impact remains unmeasured; the contribution makes no quantified impact claim.
 
 - `https://github.com/can1357/oh-my-pi/issues/5399` and `https://github.com/can1357/oh-my-pi/pull/5466` — disabled tools should be omitted from model context; related presentation precedent with a different owner.
 - `https://github.com/can1357/oh-my-pi/issues/5305` — related allowlist and registration drift for a different tool.
 - `https://github.com/can1357/oh-my-pi/issues/7061` — confirms Hub must remain for coordination but does not own this `launch.enabled` metadata drift.
 
-Contribution fit: New capability-presentation candidate; no exact duplicate found.
-Authorized work and Publication target remain user-unselected.
+Contribution fit: Focused new pull request; no exact duplicate or active implementation found.
+The user selected Pull-Request-Implementation and New-pull-request on 2026-08-21.
 
 ## Proposed-Change
 
 Make Hub metadata capability-aware while preserving messaging and jobs.
-Expose process-free schema, prompt, summary, and examples when disabled and full variants when enabled.
+Expose static process-free schema, prompt, summary, and example variants when disabled and full variants when enabled.
 Fix Bash launch guidance to require both an active Hub and `launch.enabled`.
-Retain the runtime guard for stale or direct calls.
+Retain the runtime guard for direct calls and calls that reach execution after a setting change.
 
 ## Scope-and-Constraints
 
-- Preserve: Hub messaging and jobs, the runtime authorization guard, live rebuild behavior, and all process operations when enabled.
-- Exclude: Removing Hub, removing the guard, restoring standalone launch, or redesigning broker and process supervision.
-- Cost: Dynamic schema, prompt, summary, example, Bash predicate, setting-copy, and positive/negative coverage changes.
+- Preserve: Hub messaging and jobs, the runtime authorization guard, live setting behavior, and all process operations when enabled.
+- Exclude: Removing Hub, removing the guard, restoring standalone launch, redesigning broker or process supervision, and documenting internal schema pruning.
+- Cost: Two static schema and metadata variants, live selection, one Bash predicate, one setting-description correction, and focused positive/negative coverage.
 
 ## Verification
 
-- Build the real registry with `launch.enabled=false` and capture provider-facing Hub and Bash metadata.
-- Require Hub coordination to remain available while process operations, fields, examples, and guidance disappear.
-- Call every process route directly and require the exact disabled-setting `isError:true` result without broker execution.
-- Use `launch.enabled=true` as the positive control and require the complete process surface.
+- Build the real registry with `launch.enabled=false` and require a functional coordination call.
+- Require process operations, fields, rendered examples, and Hub/Bash guidance to disappear.
+- Toggle the same live setting to `true` and require the complete process surface without rebuilding the tools.
+- Call the three distinct Process dispatch routes directly and require the exact disabled-setting `isError:true` result without broker execution.
 
 ## Publication-Blockers
 
-- [O] Full real-registry and provider-facing metadata capture with `launch.enabled=false` and `launch.enabled=true` is complete.
-- Measurement-Status: Live-setting refresh verification remains unchecked if runtime toggles are part of the intended contract.
-- Measurement-Status: Token impact remains unmeasured if quantified context impact is later claimed.
-- Authorized-Work and Publication-Target remain intentionally unselected.
+- Implementation and focused verification are pending.
+- The upstream contribution policy requires a contributor-authored complete-diff review sentence.
+- External publication requires approval of the exact current pull request target and draft.
+
+## Pull-Request-Implementation
+
+Branch: `fix/hub-disabled-process-metadata`
+Base: `upstream/main@76a294cb1905c1b900eea9f0c83f86b36a03a45c`
+Scope: Hide disabled Hub process metadata while preserving coordination, live setting behavior, and the runtime guard.
+Commit: Pending.
+Push: Pending.
+Checks:
+- Pending.
 
 ## Next-Action
 
-Summary: Select Hub gating scope
-Action: Select the smallest capability-aware Hub and Bash correction that preserves coordination and the disabled-route guard.
-Done-When: The selected scope covers disabled Process metadata, Bash guidance, enabled Process behavior, and positive/negative registry proof.
+Summary: Implement Hub capability gating
+Action: Implement and verify the selected provider-metadata correction on the contribution branch.
+Done-When: The focused behavior passes, the contribution diff is reviewed, committed, and pushed, and the exact pull request draft is ready for approval.
 
 ## Bug reproduction
 
@@ -87,4 +96,49 @@ Environment: Bun 1.3.14, Ubuntu 24.04.4 LTS x64, current personal checkout, real
 Reproduction: Build the real registry with both launch-setting values and inspect Hub and Bash metadata.
 Construct `HubTool` with `Settings.isolated({ "launch.enabled": false })` and execute every Process route directly, including named `send` and `wait` calls.
 Actual [O]: Disabled and enabled registries both advertise the same Process surface, Bash retains the Hub start instruction when disabled, and every disabled Process route returns `isError:true` with `Process supervision is disabled (launch.enabled=false).`.
-Expected: Hub remains available for coordination, but disabled Process metadata and guidance are absent while direct stale calls retain the guard error.
+Expected: Hub remains available for coordination, but disabled Process metadata and guidance are absent while direct Process calls retain the guard error.
+
+## Publication-Draft
+
+Title: `fix(coding-agent): hide disabled Hub process operations`
+Target: New pull request to `can1357/oh-my-pi:main` from `MikeeI:fix/hub-disabled-process-metadata`.
+
+```markdown
+## What
+
+Hide Hub process operations from model-facing metadata when `launch.enabled=false`.
+Peer messaging and background-job control remain available through Hub.
+The full process surface returns immediately when process supervision is enabled.
+
+## Why
+
+Hub currently keeps process operations, fields, guidance, and examples visible after process supervision is disabled.
+Those calls can only reach the existing `Process supervision is disabled` runtime guard.
+Bash also continues directing long-running processes to the disabled Hub route.
+
+## Testing
+
+- Pending focused capability tests.
+- Pending `bun run --cwd packages/coding-agent check`.
+- Pending `bun check`.
+
+[Required before publication: add one sentence written by the contributor, in their own words, confirming review of the complete diff and resulting behavior.]
+
+---
+
+- [ ] `bun check` passes
+- [ ] Tested locally
+- [x] CHANGELOG updated (if user-facing)
+
+### Disclosure
+
+Investigated thoroughly with GPT-5.6 (extra high reasoning effort), using [Oh My Pi](https://github.com/can1357/oh-my-pi) as the agent framework.
+
+This report is not generic or unreviewed AI-generated output.
+Its claims were checked against the cited evidence, and it includes the relevant detail intended to help maintainers resolve the issue.
+
+If reports like this are not useful to the project, please let me know and I will refrain from submitting similar ones.
+My intent is to help without wasting maintainer time or energy or discouraging their work.
+
+Thank you for your work.
+```
