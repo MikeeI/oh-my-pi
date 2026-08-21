@@ -1523,7 +1523,6 @@ export async function runRootCommand(
 				slow: slowModel,
 				plan: planModel,
 			});
-
 		}
 
 		// --print-thoughts (single-shot print mode) must surface reasoning, so un-hide

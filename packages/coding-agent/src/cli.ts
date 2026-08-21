@@ -20,8 +20,8 @@ import { getActiveProfile, MIN_BUN_VERSION, resolveProfileEnv, setProfile } from
 import { interceptUnhandledRejections } from "@oh-my-pi/pi-utils/postmortem";
 import { setProcessName } from "@oh-my-pi/pi-utils/process-name";
 import { declareWorkerHostEntry, installWorkerInbox, isWorkerHostSelector } from "@oh-my-pi/pi-utils/worker-host";
-import { BLOB_BROKER_WORKER_ARG } from "./blob-broker/protocol";
 import { APP_DISPLAY_NAME, APP_VERSION } from "./app-version";
+import { BLOB_BROKER_WORKER_ARG } from "./blob-broker/protocol";
 import { installProfileAlias, resolveProfileAliasCommandFromProcess } from "./cli/profile-alias";
 import { extractProfileFlags } from "./cli/profile-bootstrap";
 import { startJsEvalProcess } from "./eval/js/process-entry";

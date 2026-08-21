@@ -10,7 +10,7 @@ Keep large raw tool results separate or pass their handles instead of re-emittin
 
 {{#if py}}Top-level `await` works; `asyncio.run(…)` raises error.{{/if}}
 {{#if js}}JS runs under **Bun**: globals (`Bun.file`, `Bun.write`, `Bun.$`, `fetch`, `Buffer`) available; top-level `await`/`return` work.{{/if}}
-{{#if js}}JavaScript MUST await `parallel(...)` and `pipeline(...)`.{{/if}}
+{{#if js}}JavaScript MUST await `parallel(…)` and `pipeline(…)`.{{/if}}
 
 On error, fix and re-run only the failing step.
 One failed thunk re-raises after all settle.
