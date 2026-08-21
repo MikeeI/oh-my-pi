@@ -75,9 +75,7 @@ export async function buildDirectoryTree(cwd: string, options: BuildDirectoryTre
 		rootLimit,
 		lineCap: options.lineCap === undefined ? null : options.lineCap,
 		nativeTruncated,
-		// Tool output (read tool directory listing), not a cached prefix —
-		// the human-friendly relative "ago" is appropriate here.
-		ageMode: "relative",
+		// Read output retains human-friendly relative ages and file sizes.
 		includeMetadata: true,
 	});
 }
@@ -105,7 +103,6 @@ export async function buildWorkspaceTree(cwd: string, options: BuildWorkspaceTre
 			nativeTruncated: result.truncated,
 			// Keep the existing ordering and tree shape while omitting volatile
 			// size and mtime columns from the cached prompt block.
-			ageMode: "absolute",
 			includeMetadata: false,
 		});
 
@@ -141,13 +138,6 @@ interface AssembleOptions {
 	rootLimit: number | null;
 	lineCap: number | null;
 	nativeTruncated: boolean;
-	/**
-	 * How per-entry modification times are rendered.
-	 * - "relative": render-time "Nm ago" (fine for tool output).
-	 * - "absolute": deterministic UTC timestamp (prompt-cache-stable; used for
-	 *   the system-prompt workspace tree). See {@link makeAgeFormatter}.
-	 */
-	ageMode: "relative" | "absolute";
 	/** Whether rendered entries include size and modification-time columns. */
 	includeMetadata: boolean;
 }
@@ -205,7 +195,8 @@ function assembleTree(rootPath: string, entries: readonly GlobMatch[], opts: Ass
 	}
 
 	const rawLines: RenderedLine[] = [];
-	renderNode(root, makeAgeFormatter(opts.ageMode), rawLines);
+	const formatNodeAge = opts.includeMetadata ? makeAgeFormatter() : undefined;
+	renderNode(root, formatNodeAge, rawLines);
 	const { lines, elidedCount } = applyLineCap(rawLines, opts.lineCap);
 
 	return {
@@ -220,45 +211,28 @@ function byRecency(a: Node, b: Node): number {
 	return b.mtimeMs - a.mtimeMs || a.name.localeCompare(b.name);
 }
 
-/**
- * Build the per-node age formatter for a single render pass.
- *
- * - "relative": a render-time "Nm ago" string (computed once from `Date.now()`).
- *   Used for tool output that is not part of any cached prefix.
- * - "absolute": a deterministic UTC `YYYY-MM-DD HH:MM` derived purely from the
- *   file's mtime. Used for the system-prompt workspace tree so the rendered
- *   block stays byte-identical across sessions. A relative age is recomputed on
- *   every build, so two sessions seconds apart differ ("9m ago" → "10m ago");
- *   because KV cache is contextual, that early change invalidates the cache for
- *   everything after the tree — including the multi-thousand-token tool block —
- *   forcing a full prompt re-prefill on every new session. An absolute mtime
- *   only changes when the file itself changes, which is the correct trigger.
- */
-function makeAgeFormatter(mode: "relative" | "absolute"): (mtimeMs: number) => string {
-	if (mode === "absolute") return formatMtimeStable;
+/** Build one relative-age formatter using a consistent time for the render pass. */
+function makeAgeFormatter(): (mtimeMs: number) => string {
 	const nowMs = Date.now();
 	return (mtimeMs: number) => formatAge(Math.max(0, Math.floor((nowMs - mtimeMs) / 1000)));
 }
 
-/** Deterministic, render-time-independent timestamp: UTC `YYYY-MM-DD HH:MM`. */
-function formatMtimeStable(mtimeMs: number): string {
-	if (!mtimeMs) return "";
-	return new Date(mtimeMs).toISOString().slice(0, 16).replace("T", " ");
-}
-
-function renderNode(node: Node, formatNodeAge: (mtimeMs: number) => string, out: RenderedLine[]): void {
+function renderNode(node: Node, formatNodeAge: ((mtimeMs: number) => string) | undefined, out: RenderedLine[]): void {
 	if (node.depth === 0) {
 		out.push({ label: node.name, depth: 0, isRoot: true });
 	} else {
 		const indent = "  ".repeat(node.depth);
 		const suffix = node.isDir ? "/" : "";
-		out.push({
+		const line: RenderedLine = {
 			label: `${indent}- ${node.name}${suffix}`,
 			depth: node.depth,
 			isRoot: false,
-			size: node.isDir ? undefined : formatBytes(node.size),
-			age: formatNodeAge(node.mtimeMs),
-		});
+		};
+		if (formatNodeAge) {
+			line.size = node.isDir ? undefined : formatBytes(node.size);
+			line.age = formatNodeAge(node.mtimeMs);
+		}
+		out.push(line);
 	}
 
 	if (node.droppedCount === 0) {
