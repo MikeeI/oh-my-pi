@@ -125,3 +125,51 @@ If reports like this are not useful to the project, please let me know and I wil
 My intent is to help without wasting maintainer time or energy or discouraging their work.
 Thank you for your work.
 ```
+
+## Submitted-Text
+
+```markdown
+## What
+
+Correct Bash tool guidance to distinguish the configured foreground threshold from the job deadline.
+
+When auto-backgrounding is enabled, the prompt says long calls may auto-background by the configured threshold.
+`timeout: 0` disables the job deadline; other `timeout` values do not extend foreground waiting.
+Runtime behavior is unchanged.
+
+## Why
+
+The current “Need inline? Raise `timeout`” guidance conflates two independent controls.
+For positive deadlines, runtime waits for `min(thresholdMs, timeoutMs - 1000)`.
+`timeout: 0` disables the deadline while the configured threshold still caps foreground waiting.
+
+PR #7015 introduced the wording.
+Issues #4408, #5556, and #7235 cover related timeout or job behavior but not this threshold-saturation contract.
+
+## Testing
+
+- `bun test packages/coding-agent/test/tool-guidance-efficiency.test.ts` — 1 pass, 0 fail.
+- `bun test packages/coding-agent/test/tools.test.ts --test-name-pattern "should auto-background at the threshold even with a longer timeout"` — 1 pass, 0 fail.
+- `bun --cwd=packages/coding-agent run check` — Biome and type checks pass.
+- GitHub Actions run `32440823968` — all required jobs pass.
+
+I checked the relevant issues, comments, pull requests, and discussions; this pull request is not a duplicate.
+
+---
+
+- [x] `bun --cwd=packages/coding-agent run check` passes
+- [x] Focused tests pass
+- [x] CHANGELOG updated
+
+### Disclosure
+
+Investigated thoroughly with GPT-5.6 (extra high reasoning effort), using [Oh My Pi](https://github.com/can1357/oh-my-pi) as the agent framework.
+
+This report is not generic or unreviewed AI-generated output.
+Its claims were checked against the cited evidence, and it includes the relevant detail intended to help maintainers resolve the issue.
+
+If reports like this are not useful to the project, please let me know and I will refrain from submitting similar ones.
+My intent is to help without wasting maintainer time or energy or discouraging their work.
+
+Thank you for your work.
+```
