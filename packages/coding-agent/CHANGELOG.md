@@ -402,6 +402,11 @@
 - Hub guidance, schema hints, and examples use less repeated context while clarifying peer waits and process defaults.
 - `bun run bench:hub-routing` measures exact Hub call routing across five Codex GPT models.
 
+### Fixed
+
+- Fixed the Eval tool description implying that `agent()` children share parent kernel state; only `task` subagents inherit Eval state.
+- Fixed Bash tool guidance implying that raising the job timeout extends foreground waiting past the auto-background threshold.
+
 ## [17.4.0] - 2026-08-20
 
 ### Added

@@ -69,6 +69,12 @@ describe("eval tool description", () => {
 		expect(text).toContain("Use only names established by successful cells in the current live kernel.");
 	});
 
+	it("distinguishes shared task state from isolated agent() kernels", () => {
+		const text = getEvalToolDescription({ py: true, js: true, spawns: true });
+		expect(text).toContain("State persists across calls and `task` subagents");
+		expect(text).toContain("Eval `agent()` children use independent kernels");
+	});
+
 	it("omits agent() when the session forbids spawning", () => {
 		// Subagents with spawns: undefined (resolved to "") cannot launch tasks.
 		// The prelude doc must not promise a helper that always throws.

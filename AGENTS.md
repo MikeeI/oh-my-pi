@@ -181,9 +181,12 @@ Each entry names its disposition, observable behavior, implementation owner, and
 - Contract: in-cell concurrency uses `parallel(thunks)` instead of user-created execution contexts.
 - Contract: Eval treats tool results as unknown until their owner or inspected shape establishes a type.
 - Contract: Eval uses only state established by successful cells in the current live kernel.
+- Contract: ordinary `task` Children inherit Eval state, while Eval `agent()` Children use independent kernels.
 - Owner: `src/prompts/tools/eval.md` owns model-visible Eval routing and failure guidance.
+- Owner: upstream `src/task/structured-subagent.ts` and `src/eval/agent-bridge.ts` own the corresponding runtime split.
 - Proof: routing-description cases in `test/tools/eval-description.test.ts`.
 - Proof: runtime semantics in Eval workflow, bridge-policy, Python-prelude, and JavaScript-executor tests.
+- Proof: isolation-policy cases in `test/eval/agent-bridge-policy.test.ts`.
 
 #### `MOMP-READ-SKILL-COMPACT` — Compact skill-read display
 
@@ -368,17 +371,23 @@ Each entry names its disposition, observable behavior, implementation owner, and
 - Proof: `test/hub-routing-benchmark.test.ts` and `bun run bench:hub-routing`.
 - Upstream action: retain provider-neutral wording when preparing the generic prompt compaction.
 
-#### `MOMP-BASH-TOOL-CONTEXT` — Additional workstation utilities
+#### `MOMP-BASH-TOOL-CONTEXT` — Additional workstation utilities and timeout guidance
 
 - Disposition: `UPSTREAM-INTEGRIERT`.
 - Contract: the Bash tool prompt advertises `base32` with the upstream-owned auxiliary utilities.
-- Contract: it additionally advertises `duckdb`, `mlr`, `yq`, `jc`, `shellcheck`, `shfmt`, `diffoscope-safe`,
-  `dust`, `procs`, and `glab`.
+- Contract: the Bash tool prompt additionally advertises `duckdb`, `mlr`, `yq`, `jc`, `shellcheck`, and `shfmt`.
+- Contract: the Bash tool prompt additionally advertises `diffoscope-safe`, `dust`, `procs`, and `glab`.
 - Contract: every MOMP-only advertised executable MUST resolve on the supported workstation before publication.
+- Contract: `timeout` controls the job deadline, while `bash.autoBackground.thresholdMs` caps foreground waiting.
+- Contract: raising `timeout` never promises foreground execution beyond the configured auto-background threshold.
 - Owner: current upstream `src/prompts/tools/bash.md` owns model-visible Bash capability guidance.
+- Owner: current upstream `src/tools/bash.ts` owns the independent deadline and foreground-threshold runtime policy.
 - Required action: retain the minimal utility-list delta at that owner.
+- Required action: retain the minimal timeout-guidance delta until upstream integrates the contribution.
 - Proof: resolve every MOMP-only advertised executable through the workstation command lookup.
 - Proof: render the Bash tool prompt and verify the additional capability guidance.
+- Proof: guidance cases in `test/tool-guidance-efficiency.test.ts`.
+- Proof: threshold-saturation cases in `test/tools.test.ts`.
 
 #### `MOMP-LSP` — Upstream-owned LSP extensions
 
