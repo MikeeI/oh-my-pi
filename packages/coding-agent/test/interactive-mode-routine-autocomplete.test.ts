@@ -123,6 +123,15 @@ describe("InteractiveMode routine autocomplete", () => {
 		const item = (await fetchSlashItems(slot.current!, "/rev")).find(item => item.value === "review-all");
 		expect(item?.description).toBe("Run core PR review routines");
 	});
+	it("does not display type icons for slash commands", async () => {
+		const created = createHarness();
+		const slot = captureAutocompleteProvider(created.mode);
+
+		await created.mode.refreshSlashCommandState(tempDir.path());
+
+		const item = (await fetchSlashItems(slot.current!, "/model")).find(item => item.value === "model");
+		expect(item?.icon).toBeUndefined();
+	});
 
 	it("filters prompt templates that share a routine name", async () => {
 		await writeRoutine("review-all");

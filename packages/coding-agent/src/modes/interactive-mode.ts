@@ -1512,10 +1512,13 @@ export class InteractiveMode implements InteractiveModeContext {
 				icon: promptIcon,
 				argumentCompletionMode: "prompt",
 			}));
-		this.#baseAutocompleteProvider = this.#inputController.createAutocompleteProvider(
-			[...this.#pendingSlashCommands, ...fileSlashCommands, ...routineSlashCommands, ...promptTemplateCommands],
-			basePath,
-		);
+		const autocompleteCommands = [
+			...this.#pendingSlashCommands,
+			...fileSlashCommands,
+			...routineSlashCommands,
+			...promptTemplateCommands,
+		].map(command => ({ ...command, icon: undefined }));
+		this.#baseAutocompleteProvider = this.#inputController.createAutocompleteProvider(autocompleteCommands, basePath);
 		this.#applyAutocompleteProvider();
 	}
 

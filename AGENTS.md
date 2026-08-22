@@ -234,7 +234,7 @@ Each entry names its disposition, observable behavior, implementation owner, and
 - Proof: `test/interactive-mode-routine-autocomplete.test.ts`.
 - Proof: routine cases in `test/rpc.test.ts` and ACP tests.
 
-#### `MOMP-COMMAND-UX` — Rename and argument completion
+#### `MOMP-COMMAND-UX` — Rename, argument completion, and slash-list display
 
 - Disposition: `MOMP-EIGEN`.
 - Contract: `/rename <title>` stores an explicit user-owned title.
@@ -245,9 +245,11 @@ Each entry names its disposition, observable behavior, implementation owner, and
 - Contract: command-specific completion wins when it has a result.
 - Contract: absent command-specific completion falls through unless the command declares exclusive completion.
 - Contract: autocomplete and submission use one command-owned argument-completion mode.
+- Contract: slash-command autocomplete rows never display type-indicator icons, regardless of theme or symbol preset.
 - Owner: `src/utils/title-generator.ts` owns transcript title generation.
 - Owner: `src/slash-commands/types.ts` owns argument-completion semantics.
 - Owner: TUI, ACP, and RPC command routers own transport-specific invocation only.
+- Owner: `src/modes/interactive-mode.ts#refreshSlashCommandState` clears icons before provider construction.
 - Proof: `test/title-generator.test.ts`.
 - Proof: `test/command-controller-rename.test.ts`.
 - Proof: rename cases in `test/acp-builtins.test.ts` and `test/slash-commands/rename.test.ts`.
