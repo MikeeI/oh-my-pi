@@ -308,18 +308,33 @@ Each entry names its disposition, observable behavior, implementation owner, and
 - Proof: `packages/coding-agent/test/stats-cli-output.test.ts`.
 - Upstream action: retain provider-neutral `omp stats` behavior when preparing the upstream change.
 
-#### `MOMP-SCROLLBACK` — Multiplexer scrollback exactness
+#### `MOMP-SCROLLBACK` — Multiplexer scrollback exactness and access
 
 - Disposition: `MOMP-EIGEN`.
 - Contract: unfinished Assistant live regions remain pinned inside recognized terminal multiplexers.
 - Contract: settled Markdown prefixes may commit while only the mutable suffix remains viewport-local.
-- Contract: final Assistant content enters pane history exactly once.
+- Contract: with stable pane geometry, final Assistant content enters pane history exactly once.
 - Contract: pre-existing pane history survives.
 - Contract: multiplexer rendering never emits ED3 or invokes `clear-history`.
 - Contract: direct-terminal behavior remains controlled by `tui.scrollbackRebuild`.
+- Contract: PageUp on a focused empty editor opens tmux copy mode one page up so committed transcript remains reachable.
+- Contract: drafts, overlays, non-tmux sessions, and failed tmux commands retain existing PageUp handling.
 - Owner: `src/modes/components/assistant-message.ts` owns Assistant live-region pinning.
 - Owner: `packages/tui` owns terminal rendering and autocomplete primitives.
+- Owner: `src/modes/controllers/input-controller.ts` owns the empty-editor PageUp bridge into tmux copy mode.
 - Proof: `test/tmux-scrollback-exactness.test.ts`.
+- Proof: PageUp cases in `test/input-controller-keybindings.test.ts`.
+
+#### `MOMP-MUX-RESIZE` — Native multiplexer resize preservation
+
+- Disposition: `UPSTREAM-INTEGRIERT`.
+- Contract: height-only multiplexer resizes never lose finalized transcript rows.
+- Contract: duplication is accepted when tmux pushes mutable viewport rows into opaque native history; loss is not.
+- Contract: the `MOMP-SCROLLBACK` exact-once guarantee applies only while mutable output retains stable pane geometry.
+- Owner: current upstream `packages/tui/src/tui.ts#TUI.#doRender` owns multiplexer geometry tracking and fallback.
+- Required action: retain the upstream owner and never use ED3 or `clear-history` to repair native history.
+- Proof: `test/pinned-live-region-loss.test.ts`.
+- Proof: the live height-shrink case in `test/tmux-scrollback-exactness.test.ts`.
 
 #### `MOMP-PACKAGE-IDENTITY` — Side-by-side fork identity and update safety
 

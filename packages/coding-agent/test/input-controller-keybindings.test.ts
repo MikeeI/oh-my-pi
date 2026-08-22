@@ -416,6 +416,43 @@ describe("InputController keybinding setup", () => {
 		expect(editor.getText()).toBe("");
 	});
 
+	it("opens native tmux history when PageUp is pressed on an empty focused editor", async () => {
+		const { InputController, ctx, spies } = await createContext();
+		const openNativeScrollback = vi.fn(() => true);
+		const controller = new InputController(ctx, undefined, openNativeScrollback);
+
+		controller.setupKeyHandlers();
+		const result = dispatchInput(registeredInputListeners(spies.addInputListener), "\x1b[5~");
+
+		expect(result).toEqual({ consume: true });
+		expect(openNativeScrollback).toHaveBeenCalledTimes(1);
+	});
+
+	it("keeps PageUp in the editor when native tmux history is unavailable", async () => {
+		const { InputController, ctx, spies } = await createContext();
+		const openNativeScrollback = vi.fn(() => false);
+		const controller = new InputController(ctx, undefined, openNativeScrollback);
+
+		controller.setupKeyHandlers();
+		const result = dispatchInput(registeredInputListeners(spies.addInputListener), "\x1b[5~");
+
+		expect(result).toBeUndefined();
+		expect(openNativeScrollback).toHaveBeenCalledTimes(1);
+	});
+
+	it("keeps PageUp in the editor while a draft is present", async () => {
+		const { InputController, ctx, editor, spies } = await createContext();
+		const openNativeScrollback = vi.fn(() => true);
+		editor.setText(" ");
+		const controller = new InputController(ctx, undefined, openNativeScrollback);
+
+		controller.setupKeyHandlers();
+		const result = dispatchInput(registeredInputListeners(spies.addInputListener), "\x1b[5~");
+
+		expect(result).toBeUndefined();
+		expect(openNativeScrollback).not.toHaveBeenCalled();
+	});
+
 	it("routes b to branch a branchable /btw panel", async () => {
 		const { InputController, ctx, spies } = await createContext();
 		spies.handlesBtwBranchKey.mockReturnValue(true);

@@ -6,7 +6,7 @@ import { ProcessTerminal, TUI } from "@oh-my-pi/pi-tui";
 import { setTerminalHeadless } from "@oh-my-pi/pi-utils";
 
 const HISTORY_SETTLE_MS = 50;
-const FRAME_SETTLE_MS = 80;
+const FRAME_SETTLE_MS = 160;
 const HISTORY_FILLER_COUNT = 25;
 const MARKER_COUNT = 36;
 

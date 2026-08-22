@@ -1,6 +1,9 @@
 # Changelog
 
 ## [Unreleased]
+### Fixed
+
+- PageUp now opens tmux history from an empty prompt, keeping scrolled-off transcript text reachable.
 
 ## [18.0.6] - 2026-08-26
 
