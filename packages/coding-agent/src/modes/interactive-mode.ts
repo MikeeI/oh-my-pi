@@ -1439,7 +1439,7 @@ export class InteractiveMode implements InteractiveModeContext {
 			for (const skill of this.session.skills) {
 				const commandName = `skill:${skill.name}`;
 				this.skillCommands.set(commandName, skill);
-commands.push({
+				commands.push({
 					name: commandName,
 					description: skill.description,
 					icon,
@@ -1461,7 +1461,7 @@ commands.push({
 	/** Reload slash commands and autocomplete for the provided working directory. */
 	async refreshSlashCommandState(cwd?: string, preloaded?: ReadonlyArray<FileSlashCommand>): Promise<void> {
 		const basePath = cwd ?? this.sessionManager.getCwd();
-const [fileCommands, routines] = await Promise.all([
+		const [fileCommands, routines] = await Promise.all([
 			preloaded ? [...preloaded] : loadSlashCommands({ cwd: basePath }),
 			loadRoutines({ cwd: basePath }),
 		]);
