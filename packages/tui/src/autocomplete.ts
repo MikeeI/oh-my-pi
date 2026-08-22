@@ -348,6 +348,7 @@ function buildSlashCommandCompletions(
 						label: "name" in cmd ? cmd.name : cmd.label,
 						score: primaryScore,
 						usage,
+						...(cmd.icon && { icon: cmd.icon }),
 						...(fullDesc && { description: fullDesc }),
 					};
 				}
@@ -363,6 +364,7 @@ function buildSlashCommandCompletions(
 							label: alias,
 							score: aliasScore,
 							usage,
+							...(cmd.icon && { icon: cmd.icon }),
 							...(fullDesc && { description: fullDesc }),
 						};
 					}

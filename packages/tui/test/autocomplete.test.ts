@@ -956,7 +956,7 @@ describe("trySyncSlashCompletion", () => {
 		expect(plain?.items.map(i => i.value)).toEqual(["setup", "settings", "session"]);
 	});
 
-	it("does not display command icons in slash suggestion rows", async () => {
+	it("carries command icons into name and alias suggestion rows", async () => {
 		const provider = new CombinedAutocompleteProvider(
 			[
 				{ name: "model", description: "Switch model", icon: "\uec19" },
@@ -966,12 +966,12 @@ describe("trySyncSlashCompletion", () => {
 			"/tmp",
 		);
 		const bare = await provider.getSuggestions(["/"], 0, 1);
-		expect(bare?.items.find(i => i.value === "model")?.icon).toBeUndefined();
+		expect(bare?.items.find(i => i.value === "model")?.icon).toBe("\uec19");
 		expect(bare?.items.find(i => i.value === "hotkeys")?.icon).toBeUndefined();
 
-		// Alias rows must follow the same no-icon display contract.
+		// An alias row inherits the owning command's icon (/q resolves via alias).
 		const alias = await provider.getSuggestions(["/q"], 0, 2);
-		expect(alias?.items.find(i => i.value === "q")?.icon).toBeUndefined();
+		expect(alias?.items[0]).toMatchObject({ value: "q", icon: "\uf011" });
 	});
 
 	it("does not list aliases as separate rows for bare slash suggestions", async () => {
