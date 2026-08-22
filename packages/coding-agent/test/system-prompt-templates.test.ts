@@ -13,7 +13,6 @@ import {
 } from "@oh-my-pi/pi-coding-agent/system-prompt";
 import { getProjectDir, prompt, setProjectDir } from "@oh-my-pi/pi-utils";
 import { INTENT_FIELD } from "@oh-my-pi/pi-wire";
-import Handlebars from "handlebars";
 import type { Args } from "../src/cli/args";
 import { inspectSystemPrompt } from "../src/commands/system-prompt";
 import { ModelRegistry } from "../src/config/model-registry";
@@ -223,8 +222,7 @@ describe("system Handlebars prompt templates", () => {
 		expect(templates.size).toBeGreaterThan(0);
 
 		for (const [fileName, template] of templates) {
-			expect(() => Handlebars.parse(template), `Failed parsing ${fileName}`).not.toThrow();
-			expect(() => Handlebars.compile(template), `Failed compiling ${fileName}`).not.toThrow();
+			expect(() => prompt.compile(template), `Failed compiling ${fileName}`).not.toThrow();
 		}
 	});
 
