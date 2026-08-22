@@ -1994,7 +1994,7 @@ export class InputController {
 			this.ctx.fileSlashCommands.has(token) ||
 			session.extensionRunner?.getCommand(token) !== undefined ||
 			session.customCommands.some(loaded => loaded.command.name === token) ||
-			session.promptTemplates.some(template => template.name === token);
+			session.promptTemplates?.some(template => template.name === token) === true;
 		if (knownToken) {
 			recordSlashCommandUsage(token);
 			return;
