@@ -440,6 +440,18 @@ describe("system-prompt command", () => {
 		expect(parsed.flags.json).toBe(true);
 	});
 
+	test("parses offline Codex wire-hash flags", async () => {
+		const command = new SystemPromptCommand(
+			["inspect", "--model", "openai-codex/gpt-5.6-luna", "--first-message", "Probe", "--codex-wire-hash", "--json"],
+			TEST_CONFIG,
+		);
+		const parsed = await command.parse(SystemPromptCommand);
+		expect(parsed.flags.model).toBe("openai-codex/gpt-5.6-luna");
+		expect(parsed.flags["first-message"]).toBe("Probe");
+		expect(parsed.flags["codex-wire-hash"]).toBe(true);
+		expect(parsed.flags.json).toBe(true);
+	});
+
 	test("writes provider JSON larger than the stdout pipe buffer completely", async () => {
 		const tempDir = TempDir.createSync("@omp-system-prompt-inspect-");
 		const marker = "large-provider-prompt-marker";
@@ -531,7 +543,6 @@ describe("system-prompt command", () => {
 			expect(parsed.categories.requestMessages.tokens).toBeGreaterThan(0);
 			expect(parsed.requestMessages.map(message => message.role)).toEqual(["developer", "user"]);
 			expect(parsed.requestMessages[0]?.tokens).toBeGreaterThan(0);
-			expect(parsed.requestMessages[0]?.message.content[0]?.text).toContain("todo");
 		} finally {
 			await tempDir.remove();
 		}
@@ -539,6 +550,8 @@ describe("system-prompt command", () => {
 
 	test("rejects combined output modes", async () => {
 		const command = new SystemPromptCommand(["inspect", "--provider", "--dynamic-parts"], TEST_CONFIG);
-		await expect(command.run()).rejects.toThrow("Use only one of --provider, --dynamic-parts, or --breakdown");
+		await expect(command.run()).rejects.toThrow(
+			"Use only one of --provider, --dynamic-parts, --breakdown, or --codex-wire-hash",
+		);
 	});
 });

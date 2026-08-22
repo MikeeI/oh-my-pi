@@ -4,7 +4,8 @@
 import * as fs from "node:fs/promises";
 import * as path from "node:path";
 import { Tokenizer } from "@oh-my-pi/pi-agent-core";
-import type { Context, Message, Tool } from "@oh-my-pi/pi-ai";
+import type { Context, FetchImpl, Message, Model, SimpleStreamOptions, Tool } from "@oh-my-pi/pi-ai";
+import { streamSimple } from "@oh-my-pi/pi-ai";
 import { countTokens, Encoding } from "@oh-my-pi/pi-natives";
 import { postmortem, setProjectDir } from "@oh-my-pi/pi-utils";
 import { Args, Command, Flags, renderCommandHelp } from "@oh-my-pi/pi-utils/cli";
@@ -29,6 +30,15 @@ type SystemPromptAction = (typeof ACTIONS)[number];
 const BREAKDOWN_ENCODING = Encoding.O200kBase;
 const BREAKDOWN_ENCODING_LABEL = "o200k_base";
 const BREAKDOWN_MESSAGE_TOKENIZER = new Tokenizer();
+const UTF8_ENCODER = new TextEncoder();
+const OFFLINE_CODEX_RESPONSE = [
+	'data: {"type":"response.output_item.added","item":{"type":"message","id":"msg_offline","role":"assistant","status":"in_progress","content":[]}}',
+	'data: {"type":"response.content_part.added","part":{"type":"output_text","text":""}}',
+	'data: {"type":"response.output_text.delta","delta":"captured"}',
+	'data: {"type":"response.output_item.done","item":{"type":"message","id":"msg_offline","role":"assistant","status":"completed","content":[{"type":"output_text","text":"captured"}]}}',
+	'data: {"type":"response.completed","response":{"status":"completed","usage":{"input_tokens":0,"output_tokens":1,"total_tokens":1,"input_tokens_details":{"cached_tokens":0}}}}',
+	"",
+].join("\n\n");
 
 export interface SubagentInspectTarget {
 	kind: "subagent";
@@ -127,19 +137,134 @@ interface BreakdownInspectJson {
 	tools: BreakdownTool[];
 }
 
+interface WireHashMeasurement {
+	bytes: number;
+	sha256: string;
+}
+
+interface CodexWireHashInspectJson {
+	cwd: string;
+	mode: "codex-wire-hash";
+	model: { provider: string; id: string };
+	transport: "sse";
+	offline: true;
+	providerNetworkCalls: 0;
+	localFetchIntercepts: number;
+	request: WireHashMeasurement;
+	cacheRelevantRequest: WireHashMeasurement;
+	instructions?: WireHashMeasurement;
+	input?: WireHashMeasurement;
+	tools?: WireHashMeasurement;
+	promptCacheKey?: WireHashMeasurement;
+	promptCacheOptions?: unknown;
+	explicitBreakpointCount: number;
+}
+
+interface CapturedProviderRequest {
+	context: Context;
+	model: Model;
+	options: SimpleStreamOptions;
+}
+
 export interface SystemPromptInspection extends BuildSystemPromptResult {
 	providerTools: Tool[];
 	providerMessages: Message[];
 	model: { provider: string; id: string } | null;
 	target?: SubagentInspectTarget;
 	firstMessage?: string;
+	codexWireHash?: CodexWireHashInspectJson;
 }
 
 export interface FormatInspectOptions {
-	mode: "provider" | "dynamic-parts" | "breakdown";
+	mode: "provider" | "dynamic-parts" | "breakdown" | "codex-wire-hash";
 	json: boolean;
 }
 
+function hashJson(value: unknown): WireHashMeasurement {
+	const json = JSON.stringify(value);
+	if (json === undefined) throw new Error("Cannot hash an undefined JSON value");
+	const hasher = new Bun.CryptoHasher("sha256");
+	hasher.update(json);
+	return {
+		bytes: UTF8_ENCODER.encode(json).byteLength,
+		sha256: hasher.digest("hex"),
+	};
+}
+
+function countExplicitBreakpoints(value: unknown): number {
+	if (Array.isArray(value)) return value.reduce<number>((total, item) => total + countExplicitBreakpoints(item), 0);
+	if (typeof value !== "object" || value === null) return 0;
+	const record = value as Record<string, unknown>;
+	const own =
+		typeof record.prompt_cache_breakpoint === "object" &&
+		record.prompt_cache_breakpoint !== null &&
+		(record.prompt_cache_breakpoint as Record<string, unknown>).mode === "explicit"
+			? 1
+			: 0;
+	return own + Object.values(record).reduce<number>((total, item) => total + countExplicitBreakpoints(item), 0);
+}
+
+async function captureCodexWireHash(cwd: string, captured: CapturedProviderRequest): Promise<CodexWireHashInspectJson> {
+	if (captured.model.api !== "openai-codex-responses") {
+		throw new Error(
+			`--codex-wire-hash requires an openai-codex-responses model, got ${captured.model.provider}/${captured.model.id}`,
+		);
+	}
+
+	let wireBody: unknown;
+	let localFetchIntercepts = 0;
+	const offlineFetch: FetchImpl = async input => {
+		localFetchIntercepts++;
+		const url = typeof input === "string" ? input : input.toString();
+		if (!url.endsWith("/responses")) {
+			throw new Error(`Offline Codex inspection intercepted an unexpected fetch target: ${new URL(url).pathname}`);
+		}
+		return new Response(OFFLINE_CODEX_RESPONSE, {
+			status: 200,
+			headers: { "content-type": "text/event-stream" },
+		});
+	};
+	const stream = streamSimple(captured.model, captured.context, {
+		...captured.options,
+		preferWebsockets: false,
+		fetch: offlineFetch,
+		onPayload: payload => {
+			wireBody = payload;
+			return undefined;
+		},
+	});
+	await stream.result();
+	if (typeof wireBody !== "object" || wireBody === null || Array.isArray(wireBody)) {
+		throw new Error("Offline Codex inspection did not capture a wire request body");
+	}
+
+	const request = wireBody as Record<string, unknown>;
+	const cacheRelevantRequest = {
+		model: request.model,
+		instructions: request.instructions,
+		input: request.input,
+		tools: request.tools,
+		prompt_cache_key: request.prompt_cache_key,
+		prompt_cache_options: request.prompt_cache_options,
+	};
+	return {
+		cwd,
+		mode: "codex-wire-hash",
+		model: { provider: captured.model.provider, id: captured.model.id },
+		transport: "sse",
+		offline: true,
+		providerNetworkCalls: 0,
+		localFetchIntercepts,
+		request: hashJson(request),
+		cacheRelevantRequest: hashJson(cacheRelevantRequest),
+		...(request.instructions !== undefined ? { instructions: hashJson(request.instructions) } : {}),
+		...(request.input !== undefined ? { input: hashJson(request.input) } : {}),
+		...(request.tools !== undefined ? { tools: hashJson(request.tools) } : {}),
+		...(request.prompt_cache_key !== undefined ? { promptCacheKey: hashJson(request.prompt_cache_key) } : {}),
+		...(request.prompt_cache_options !== undefined ? { promptCacheOptions: request.prompt_cache_options } : {}),
+		explicitBreakpointCount: countExplicitBreakpoints(request.input),
+	};
+}
 function renderProviderBlocks(blocks: string[]): string {
 	return blocks.map((text, index) => `--- provider block ${index} ---\n${text}`).join("\n\n");
 }
@@ -357,6 +482,26 @@ function renderBreakdown(output: BreakdownInspectJson): string {
 	return lines.join("\n");
 }
 
+function renderCodexWireHash(output: CodexWireHashInspectJson): string {
+	const lines = [
+		`Model: ${output.model.provider}/${output.model.id}`,
+		`Transport: ${output.transport} (offline; provider network calls: ${output.providerNetworkCalls})`,
+		`Request: ${output.request.sha256} (${output.request.bytes} bytes)`,
+		`Cache-relevant request: ${output.cacheRelevantRequest.sha256} (${output.cacheRelevantRequest.bytes} bytes)`,
+		output.instructions
+			? `Instructions: ${output.instructions.sha256} (${output.instructions.bytes} bytes)`
+			: "Instructions: absent",
+		output.input ? `Input: ${output.input.sha256} (${output.input.bytes} bytes)` : "Input: absent",
+		output.tools ? `Tools: ${output.tools.sha256} (${output.tools.bytes} bytes)` : "Tools: absent",
+		output.promptCacheKey
+			? `Prompt-cache key: ${output.promptCacheKey.sha256} (${output.promptCacheKey.bytes} bytes)`
+			: "Prompt-cache key: absent",
+		`Prompt-cache options: ${output.promptCacheOptions === undefined ? "absent" : JSON.stringify(output.promptCacheOptions)}`,
+		`Explicit breakpoints: ${output.explicitBreakpointCount}`,
+	];
+	return lines.join("\n");
+}
+
 function renderSubagentTarget(target: SubagentInspectTarget): string {
 	const targetSource = target.filePath ? `${target.source}: ${shortenPath(target.filePath)}` : target.source;
 	const baseTemplate = target.baseTemplate === "bundled" ? target.baseTemplate : shortenPath(target.baseTemplate);
@@ -376,6 +521,14 @@ export function formatInspectOutput(
 ): string {
 	const target = "target" in result ? result.target : undefined;
 	const targetPrefix = target ? `${renderSubagentTarget(target)}\n\n` : "";
+	if (options.mode === "codex-wire-hash") {
+		if (!("codexWireHash" in result) || !result.codexWireHash) {
+			throw new Error("Codex wire-hash inspection requires a captured provider request");
+		}
+		return options.json
+			? `${JSON.stringify(result.codexWireHash, null, 2)}\n`
+			: `${renderCodexWireHash(result.codexWireHash)}\n`;
+	}
 	if (options.mode === "dynamic-parts") {
 		const output: DynamicInspectJson = {
 			cwd,
@@ -426,7 +579,13 @@ async function resolveCwd(cwdFlag: string | undefined): Promise<string> {
 }
 export async function inspectSystemPrompt(
 	cwd: string,
-	overrides: { systemPromptTemplateSource?: string; userAgentsFile?: string; firstMessage?: string } = {},
+	overrides: {
+		systemPromptTemplateSource?: string;
+		userAgentsFile?: string;
+		firstMessage?: string;
+		modelPattern?: string;
+		codexWireHash?: boolean;
+	} = {},
 ): Promise<SystemPromptInspection> {
 	setProjectDir(cwd);
 	const firstMessage = overrides.firstMessage;
@@ -438,11 +597,13 @@ export async function inspectSystemPrompt(
 	const modelRegistry = new ModelRegistry(authStorage);
 	let result: CreateAgentSessionResult | undefined;
 	let capturedProviderContext: Context | undefined;
+	let capturedProviderRequest: CapturedProviderRequest | undefined;
 	try {
 		result = await createAgentSession({
 			cwd,
 			authStorage,
 			modelRegistry,
+			modelPattern: overrides.modelPattern,
 			hasUI: false,
 			sessionManager: SessionManager.inMemory(cwd),
 			...systemPromptOptions,
@@ -451,8 +612,9 @@ export async function inspectSystemPrompt(
 			captureProviderContext:
 				firstMessage === undefined
 					? undefined
-					: context => {
+					: (context, capturedModel, options) => {
 							capturedProviderContext = context;
+							capturedProviderRequest = { context, model: capturedModel, options: options ?? {} };
 						},
 		});
 		if (!result.systemPromptResult) {
@@ -469,6 +631,13 @@ export async function inspectSystemPrompt(
 						return capturedProviderContext;
 					})();
 		const model = result.session.model;
+		let codexWireHash: CodexWireHashInspectJson | undefined;
+		if (overrides.codexWireHash === true) {
+			if (!capturedProviderRequest) {
+				throw new Error("Codex wire-hash inspection did not capture provider request options");
+			}
+			codexWireHash = await captureCodexWireHash(cwd, capturedProviderRequest);
+		}
 		return {
 			...result.systemPromptResult,
 			systemPrompt: providerContext.systemPrompt ?? [],
@@ -476,6 +645,7 @@ export async function inspectSystemPrompt(
 			providerMessages: providerContext.messages,
 			model: model ? { provider: model.provider, id: model.id } : null,
 			...(firstMessage !== undefined ? { firstMessage } : {}),
+			...(codexWireHash ? { codexWireHash } : {}),
 		};
 	} finally {
 		await result?.session.dispose();
@@ -613,6 +783,10 @@ export default class SystemPrompt extends Command {
 		"dynamic-parts": Flags.boolean({ description: "Output dynamic prompt parts only" }),
 		provider: Flags.boolean({ description: "Output complete provider-facing prompt blocks" }),
 		breakdown: Flags.boolean({ description: "Output token shares for prompt sources and provider tools" }),
+		"codex-wire-hash": Flags.boolean({
+			description: "Hash the actual first Codex SSE request body without provider network access",
+		}),
+		model: Flags.string({ description: "Model selector for main prompt inspection" }),
 		"first-message": Flags.string({
 			description: "Preview the actual first provider request after runtime message injection",
 		}),
@@ -626,6 +800,8 @@ export default class SystemPrompt extends Command {
 		`# Inspect token shares by prompt source and provider tool\n  ${APP_DISPLAY_NAME} system-prompt inspect --cwd /root/projects/project-paperless-go-classifier --breakdown --json`,
 		`# Inspect an actual first request, including hidden runtime-injected messages
   ${APP_DISPLAY_NAME} system-prompt inspect --first-message "Implement the requested change" --breakdown --json`,
+		`# Hash the actual first Codex wire request without a provider network call
+  ${APP_DISPLAY_NAME} system-prompt inspect --model openai-codex/gpt-5.6-luna --first-message "Probe" --codex-wire-hash --json`,
 		`# Inspect process-scoped prompt files
   ${APP_DISPLAY_NAME} system-prompt inspect --system-template /tmp/SYSTEM.template.md --agents-file /tmp/AGENTS.md`,
 		`# Inspect a configured subagent's provider-facing blocks
@@ -646,21 +822,31 @@ export default class SystemPrompt extends Command {
 		if (action !== "inspect") {
 			throw new Error(`Unsupported system-prompt action: ${action}`);
 		}
-		const selectedModes = [flags.provider, flags["dynamic-parts"], flags.breakdown].filter(Boolean).length;
+		const selectedModes = [flags.provider, flags["dynamic-parts"], flags.breakdown, flags["codex-wire-hash"]].filter(
+			Boolean,
+		).length;
 		if (selectedModes > 1) {
-			throw new Error("Use only one of --provider, --dynamic-parts, or --breakdown");
+			throw new Error("Use only one of --provider, --dynamic-parts, --breakdown, or --codex-wire-hash");
 		}
 		if (
 			flags.subagent !== undefined &&
-			(flags["system-template"] !== undefined || flags["agents-file"] !== undefined)
+			(flags["system-template"] !== undefined ||
+				flags["agents-file"] !== undefined ||
+				flags.model !== undefined ||
+				flags["codex-wire-hash"])
 		) {
-			throw new Error("--system-template and --agents-file apply only to main prompt inspection");
+			throw new Error(
+				"--system-template, --agents-file, --model, and --codex-wire-hash apply only to main inspection",
+			);
 		}
 		if (flags.subagent !== undefined && flags["first-message"] !== undefined) {
 			throw new Error("--first-message applies only to main prompt inspection");
 		}
-		if (flags["first-message"] !== undefined && !flags.breakdown) {
-			throw new Error("--first-message requires --breakdown");
+		if (flags["first-message"] !== undefined && !flags.breakdown && !flags["codex-wire-hash"]) {
+			throw new Error("--first-message requires --breakdown or --codex-wire-hash");
+		}
+		if (flags["codex-wire-hash"] && flags["first-message"] === undefined) {
+			throw new Error("--codex-wire-hash requires --first-message");
 		}
 
 		const cwd = await resolveCwd(flags.cwd);
@@ -670,9 +856,17 @@ export default class SystemPrompt extends Command {
 						systemPromptTemplateSource: flags["system-template"],
 						userAgentsFile: flags["agents-file"],
 						firstMessage: flags["first-message"],
+						modelPattern: flags.model,
+						codexWireHash: flags["codex-wire-hash"],
 					})
 				: await inspectSubagentSystemPrompt(cwd, flags.subagent);
-		const mode = flags.breakdown ? "breakdown" : flags["dynamic-parts"] ? "dynamic-parts" : "provider";
+		const mode = flags["codex-wire-hash"]
+			? "codex-wire-hash"
+			: flags.breakdown
+				? "breakdown"
+				: flags["dynamic-parts"]
+					? "dynamic-parts"
+					: "provider";
 		await writeStdout(formatInspectOutput(cwd, result, { mode, json: flags.json === true }));
 		await postmortem.quit(0);
 	}

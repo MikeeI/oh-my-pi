@@ -1,6 +1,10 @@
 # Changelog
 
 ## [Unreleased]
+### Added
+
+- Added offline Codex Main wire-request hashes and a separate synthetic GPT-5.6 breakpoint endpoint probe.
+
 ### Fixed
 
 - PageUp now opens tmux history from an empty prompt, keeping scrolled-off transcript text reachable.

@@ -426,8 +426,8 @@ export interface CreateAgentSessionOptions {
 	systemPromptTemplate?: string;
 	/** Capture source-attributed prompt fragments for diagnostic inspection. */
 	captureDynamicPromptParts?: boolean;
-	/** Capture the final provider context and return a synthetic empty response without network I/O. */
-	captureProviderContext?: (context: Context) => void;
+	/** Capture the final provider context and stream options, then return a synthetic response without network I/O. */
+	captureProviderContext?: (context: Context, model: Model, options: SimpleStreamOptions | undefined) => void;
 	/**
 	 * Already-loaded title-generation system prompt override (typically
 	 * {@link discoverTitleSystemPromptFile} → {@link resolvePromptInput}). When
@@ -3508,7 +3508,7 @@ async function createAgentSessionScoped(options: CreateAgentSessionOptions): Pro
 				if (options.captureProviderContext) {
 					if (!providerContextCaptured) {
 						providerContextCaptured = true;
-						options.captureProviderContext(context);
+						options.captureProviderContext(context, streamModel, streamOptions);
 					}
 					const stream = new AssistantMessageEventStream();
 					const text = "Provider request captured.";

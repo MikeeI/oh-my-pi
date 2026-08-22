@@ -100,6 +100,7 @@ import {
 	appendReasoningSummaryTextDelta,
 	appendResponsesImageResult,
 	appendResponsesToolResultMessages,
+	applyOpenAIResponsesPromptCachePolicy,
 	applyOpenAIServiceTier,
 	applyReasoningSummaryDone,
 	buildResponsesDeltaInput,
@@ -1555,6 +1556,7 @@ export async function buildTransformedCodexRequestBody(
 	// everything from `StreamOptions` rather than forwarding any of them.
 	// (#3117 — codex-rs sends none of these either.)
 	applyOpenAIServiceTier(params, options?.serviceTier, model);
+	applyOpenAIResponsesPromptCachePolicy(params, model, options);
 	if (context.tools && context.tools.length > 0) {
 		params.tools = convertOpenAICodexResponsesTools(context.tools, model);
 		if (options?.toolChoice) {

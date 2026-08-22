@@ -127,17 +127,20 @@ Each entry names its disposition, observable behavior, implementation owner, and
 #### `MOMP-PROMPT-INSPECT` — Provider prompt inspection
 
 - Disposition: `MOMP-EIGEN`.
-- Contract: `momp system-prompt inspect` exposes provider blocks, dynamic parts, or token breakdown.
-- Contract: `--provider`, `--dynamic-parts`, and `--breakdown` are mutually exclusive.
+- Contract: `momp system-prompt inspect` exposes provider blocks, dynamic parts, token breakdown, or Codex wire hashes.
+- Contract: `--provider`, `--dynamic-parts`, `--breakdown`, and `--codex-wire-hash` are mutually exclusive.
 - Contract: `--subagent <name>` previews a configured fresh top-level Child through runtime composition owners.
 - Contract: Child inspection reports configured-preview fidelity and omitted invocation-only state.
 - Contract: breakdown measures provider prompts, tool prompts, tool schemas, dynamic parts, and dynamic sources.
 - Contract: dynamic parts attribute the complete inline `xd://` protocol, built-in docs, schemas, and device catalog.
-- Contract: `--first-message <text>` is Main-only, requires `--breakdown`, and runs normal first-turn composition.
+- Contract: `--first-message <text>` is Main-only and requires `--breakdown` or `--codex-wire-hash`.
 - Contract: first-message inspection captures the final request after runtime message injection.
-- Contract: JSON output exposes exact request messages plus per-message and aggregate token measurements.
-- Contract: first-message inspection performs no provider network call.
+- Contract: JSON breakdown output exposes exact request messages plus per-message and aggregate token measurements.
+- Contract: `--codex-wire-hash` hashes the actual transformed Main SSE body and cache-relevant components.
+- Contract: wire-hash output exposes no prompt text, tool schema, cache key, or credential.
+- Contract: first-message and wire-hash inspection perform no provider network call.
 - Usage: `momp system-prompt inspect --cwd <workspace> --first-message "<text>" --breakdown --json`.
+- Usage: `momp system-prompt inspect --model <codex-model> --first-message "<text>" --codex-wire-hash --json`.
 - Contract: large text and JSON outputs finish writing and remain complete before process exit.
 - Contract: Main inspection is not accepted as proof of Child loading.
 - Owner: `src/commands/system-prompt.ts` owns command grammar, measurement, and output.
@@ -287,6 +290,25 @@ Each entry names its disposition, observable behavior, implementation owner, and
 - Owner: `packages/coding-agent/scripts/compile-binary.ts` owns optional exact bundle metadata collection.
 - Owner: `packages/coding-agent/scripts/build-binary.ts` owns production-build metadata emission.
 - Proof: run the usage command and verify every artifact named by `manifest.json` exists after successful completion.
+
+#### `MOMP-CODEX-CACHE-PROBE` — Explicit breakpoint endpoint evidence
+
+- Disposition: `MOMP-EIGEN`, designed for upstream.
+- Contract: `omp bench <model> --codex-cache-breakpoint-probe --json` is a synthetic provider capability probe.
+- Contract: the probe is not evidence of Main-session prompt-cache reuse.
+- Contract: each pair uses distinct provider session IDs, one stable cache key, and independent SSE requests.
+- Contract: the stable synthetic prefix remains identical while the variable suffix changes between requests.
+- Contract: both requests carry explicit GPT-5.6 cache options and a latest-stable-message breakpoint.
+- Contract: JSON reports endpoint acceptance, observed wire fields, cache usage, session distinctness, and failures.
+- Contract: probe output never emits the stable prefix, cache key, or suffix payload.
+- Owner: `packages/ai/src/providers/openai-shared.ts` owns shared Responses breakpoint placement.
+- Owner: `packages/ai/src/providers/openai-codex-responses.ts` owns Codex request construction.
+- Owner: `packages/coding-agent/src/cli/bench-cli.ts` owns probe execution and measurements.
+- Owner: `packages/coding-agent/src/commands/bench.ts` owns CLI exposure and usage.
+- Proof: `packages/ai/test/openai-codex-responses-lite.test.ts`.
+- Proof: `packages/coding-agent/test/bench-cache.test.ts`.
+- Usage: `omp bench openai-codex/gpt-5.6-luna --codex-cache-breakpoint-probe --json`.
+- Upstream action: retain provider-neutral breakpoint construction when preparing an upstream change.
 
 #### `MOMP-STATS-SUMMARY` — Multi-range CLI usage overview
 
