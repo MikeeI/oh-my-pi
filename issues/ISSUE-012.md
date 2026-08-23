@@ -9,7 +9,7 @@ Root-Cause-Confidence: High
 Finding-Category: Performance
 Created: 2026-08-21
 Updated: 2026-08-23
-Source: `upstream/main@76a294cb19bfded1e32e2111f1f729129595bf5e`
+Source: `upstream/main@160ed439ac0df594347e7d7018b813a7ffdb5e81`
 
 ## Root-Cause
 
@@ -26,8 +26,8 @@ Impact: Enabled sessions now send the same tree structure without volatile metad
 - [O] `bun test packages/coding-agent/test/workspace-tree.test.ts` → 9 pass, 0 fail; the prompt tree contains `  - stable.txt` without size, absolute mtime, or relative age.
 - [S] Personal commit `ee24b5ba372fbf8c29c57aa561d9a5407ed115a5` → implements metadata-free prompt rendering and its regression assertion.
 - [S] `config/settings-schema.ts` → `Include Workspace Tree` controls whether the workspace tree is rendered in the system prompt.
-- [O] PR head `13e7da36f1` skips size and age formatting for prompt trees while preserving mtime-based ordering.
-- [O] GitHub reports PR #9152 open with merge state `DIRTY` against current `main`; checked 2026-08-23.
+- [O] PR head `12251f939ef9` skips size and age formatting for prompt trees while preserving mtime-based ordering.
+- [O] GitHub reports PR #9152 open, mergeable, and clean against `upstream/main@160ed439ac0d`; checked 2026-08-23.
 
 ## Prior-Art
 
@@ -133,16 +133,16 @@ None.
 ## Pull-Request-Implementation
 
 Branch: `contrib/workspace-tree-metadata-free`
-Base: `upstream/main@76a294cb19bfded1e32e2111f1f729129595bf5e`
+Base: `upstream/main@160ed439ac0df594347e7d7018b813a7ffdb5e81`
 Scope: Omit prompt-tree metadata and its formatting while preserving Read metadata output and mtime ordering.
-Commit: `13e7da36f1`
+Commit: `12251f939ef9` (implementation `c0d130ca34d7`; formatting cutover `12251f939ef9`)
 Push: `origin/contrib/workspace-tree-metadata-free`
 Checks:
 
-- `bun test packages/coding-agent/test/workspace-tree.test.ts` → 9 pass, 0 fail.
-- `bun --cwd=packages/coding-agent run check` → Biome checked 2,672 files; type check passed.
-- GitHub Actions run `32440557630` → every required build, smoke, and test job passed.
-Review [O]: The `COMMENTED` review targets `dbb023374ea5`; head `13e7da36f194` addressed all three findings before current upstream drift.
+- `bun test packages/coding-agent/test/workspace-tree.test.ts` → 9 pass, 0 fail after rebase.
+- `bun --cwd=packages/coding-agent run check` → Biome and type check passed.
+- GitHub Actions runs `32662044989` and `32662045062` → all required CI jobs and OMP Nix passed.
+Review [O]: The `COMMENTED` review targets `dbb023374ea5`; clean head `12251f939ef9` retains all three resolutions.
 
 ## Publication-Draft
 
@@ -194,6 +194,6 @@ Thank you for your work.
 
 ## Next-Action
 
-Summary: Rebase tree PR branch
-Action: Rebase pull request #9152 onto current `upstream/main`, resolve the workspace-tree drift, and rerun focused checks.
-Done-When: GitHub reports a clean current head and every required check passes.
+Summary: Await tree current-head review
+Action: Monitor pull request #9152 for review of clean head `12251f939ef9` and the maintainer decision.
+Done-When: A current-head review, requested follow-up, or terminal outcome is recorded.

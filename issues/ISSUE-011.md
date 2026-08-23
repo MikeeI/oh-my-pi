@@ -9,7 +9,7 @@ Root-Cause-Confidence: High
 Finding-Category: Performance
 Created: 2026-08-21
 Updated: 2026-08-23
-Source: `upstream/main@76a294cb19bfded1e32e2111f1f729129595bf5e`
+Source: `upstream/main@160ed439ac0df594347e7d7018b813a7ffdb5e81`
 
 ## Root-Cause
 
@@ -22,10 +22,10 @@ Impact: The preview repeats padding on every entry; token reduction beyond the f
 
 ## Evidence
 
-- [O] `bun test packages/coding-agent/test/workspace-tree.test.ts` → 9 pass, 0 fail; result recorded in PR #9062.
+- [O] Rebased head `df1d6cb7a68b` passes `bun test packages/coding-agent/test/workspace-tree.test.ts` with 9 pass and 0 fail.
 - [S] `packages/coding-agent/src/workspace-tree.ts` → Read listings select compact metadata while prompt trees retain aligned metadata.
-- [S] [PR #9062](https://github.com/can1357/oh-my-pi/pull/9062) → head `597c7f4e20a9` contains implementation `3e4ff8c88264` and changelog follow-up `597c7f4e20a9`.
-- [O] GitHub reports PR #9062 open with merge state `DIRTY` against current `main`; checked 2026-08-23.
+- [S] [PR #9062](https://github.com/can1357/oh-my-pi/pull/9062) → head `df1d6cb7a68b` contains implementation `400669749a96` and changelog follow-up `df1d6cb7a68b`.
+- [O] GitHub reports PR #9062 open, mergeable, and clean against `upstream/main@160ed439ac0d`; checked 2026-08-23.
 
 ## Prior-Art
 
@@ -72,15 +72,16 @@ Migration: None.
 ## Pull-Request-Implementation
 
 Branch: `contrib/read-compact-directory-metadata`
-Base: `upstream/main@76a294cb19bfded1e32e2111f1f729129595bf5e`
+Base: `upstream/main@160ed439ac0df594347e7d7018b813a7ffdb5e81`
 Scope: Compact Read directory metadata spacing without changing the separate system-prompt tree contract.
-Commit: `597c7f4e20a9` (implementation `3e4ff8c88264`; changelog follow-up `597c7f4e20a9`)
+Commit: `df1d6cb7a68b` (implementation `400669749a96`; changelog follow-up `df1d6cb7a68b`)
 Push: `origin/contrib/read-compact-directory-metadata`
 Checks:
 
 - `bun test packages/coding-agent/test/workspace-tree.test.ts` → 9 pass, 0 fail after rebase.
-- GitHub Actions run `32464713806` → every required build, smoke, and test job passed.
-Review [O]: Both `COMMENTED` reviews target the pre-rebase implementation; head `597c7f4e20a9` addressed them before current upstream drift.
+- `bun --cwd=packages/coding-agent run check` → Biome and type check passed.
+- GitHub Actions runs `32662040078` and `32662040094` → OMP Nix and all required CI jobs passed.
+Review [O]: Both `COMMENTED` reviews target the earlier implementation; clean head `df1d6cb7a68b` retains their resolutions.
 
 ## Publication-Blockers
 
@@ -88,9 +89,9 @@ None.
 
 ## Next-Action
 
-Summary: Rebase Read PR branch
-Action: Rebase pull request #9062 onto current `upstream/main`, resolve the workspace-tree drift, and rerun focused checks.
-Done-When: GitHub reports a clean current head and every required check passes.
+Summary: Await Read current-head review
+Action: Monitor pull request #9062 for review of clean head `df1d6cb7a68b` and the maintainer decision.
+Done-When: A current-head review, requested follow-up, or terminal outcome is recorded.
 
 ## Publication-Draft
 
