@@ -2,13 +2,43 @@ import type { AssistantMessage } from "@oh-my-pi/pi-ai";
 import { AssistantMessageComponent } from "@oh-my-pi/pi-coding-agent/modes/components/assistant-message";
 import { TranscriptContainer } from "@oh-my-pi/pi-coding-agent/modes/components/transcript-container";
 import { initTheme } from "@oh-my-pi/pi-coding-agent/modes/theme/theme";
-import { ProcessTerminal, TUI } from "@oh-my-pi/pi-tui";
+import {
+	ProcessTerminal,
+	type TerminalFramePlan,
+	type TerminalStartOptions,
+	TUI,
+	type ViewportSize,
+} from "@oh-my-pi/pi-tui";
 import { setTerminalHeadless } from "@oh-my-pi/pi-utils";
 
 const HISTORY_SETTLE_MS = 50;
-const FRAME_SETTLE_MS = 160;
+const FRAME_SETTLE_MS = 250;
 const HISTORY_FILLER_COUNT = 25;
 const MARKER_COUNT = 36;
+
+class DriverTerminal extends ProcessTerminal {
+	#resizesEnabled = false;
+
+	override start(
+		onInput: (data: string) => void,
+		onResize: () => void,
+		onDisconnect?: () => void,
+		options?: TerminalStartOptions,
+	): void {
+		super.start(
+			onInput,
+			() => {
+				if (this.#resizesEnabled) onResize();
+			},
+			onDisconnect,
+			options,
+		);
+	}
+
+	enableResizes(): void {
+		this.#resizesEnabled = true;
+	}
+}
 
 function makeMsg(text: string): AssistantMessage {
 	return {
@@ -50,12 +80,37 @@ async function main(): Promise<void> {
 	const previousHeadless = setTerminalHeadless(false);
 	let tui: TUI | undefined;
 	try {
-		tui = new TUI(new ProcessTerminal());
+		const terminal = new DriverTerminal();
+		tui = new TUI(terminal);
 		const transcript = new TranscriptContainer();
 		const assistant = new AssistantMessageComponent();
 		transcript.addChild(assistant);
 		tui.addChild(transcript);
+		const frameProvider = {
+			renderFrame(viewport: ViewportSize): TerminalFramePlan {
+				const width = Math.max(1, viewport.columns);
+				const rows = Math.max(0, viewport.rows);
+				const now = Date.now();
+				return {
+					history: transcript.peekFinalizedBatch(width, rows),
+					viewport: transcript.renderViewport(width, rows, {
+						now,
+						tick: Math.floor(now / 80),
+					}),
+				};
+			},
+			acknowledgeHistory(id: number): void {
+				transcript.acknowledgeFinalizedBatch(id);
+			},
+			resetHistory(): void {
+				transcript.resetRetirement();
+			},
+		};
+		tui.setFrameProvider(frameProvider);
 		tui.start();
+		// Let the real terminal finish its startup resize/alternate-buffer transaction before streaming content.
+		await renderFrame(tui);
+		terminal.enableResizes();
 
 		const markers = Array.from(
 			{ length: MARKER_COUNT },

@@ -2350,6 +2350,17 @@ export class TUI extends Container {
 			// old viewport are committed history (correct to push), but old live
 			// viewport rows are not — erase them first so a scroll can only push
 			// committed rows and blanks, never an unfinished frame.
+			if (historyRows.length > 0 && this.#providerWindow.length > 0) {
+				// tmux can retain cells erased by ED2 as the next write scrolls the
+				// viewport, so overwrite every stale live row with blanks first.
+				const blankRow = " ".repeat(width);
+				const staleTop = Math.max(0, Math.min(this.#providerViewportTop, height - 1));
+				const staleRows = Math.min(this.#providerWindow.length, height - staleTop);
+				for (let index = 0; index < staleRows; index++) {
+					const screenRow = staleTop + index;
+					buffer += `\x1b[${screenRow + 1};1H${this.#lineRewriteSequence(blankRow, width, screenRow)}`;
+				}
+			}
 			const pushed = Math.max(0, startTop + preparedHistory.length + rows - height);
 			if (pushed > this.#providerViewportTop && this.#providerWindow.length > 0) {
 				buffer += `\x1b[${this.#providerViewportTop + 1};1H\x1b[J`;

@@ -343,7 +343,8 @@ Each entry names its disposition, observable behavior, implementation owner, and
 - Contract: direct-terminal behavior remains controlled by `tui.scrollbackRebuild`.
 - Contract: PageUp on a focused empty editor opens tmux copy mode one page up so committed transcript remains reachable.
 - Contract: drafts, overlays, non-tmux sessions, and failed tmux commands retain existing PageUp handling.
-- Owner: `src/modes/components/assistant-message.ts` owns Assistant live-region pinning.
+- Owner: `src/modes/components/transcript-container.ts` owns finalized-prefix batching.
+- Owner: `packages/tui/src/tui.ts#TUI.#emitPlanFrame` owns live-region blanking and terminal history append.
 - Owner: `packages/tui` owns terminal rendering and autocomplete primitives.
 - Owner: `src/modes/controllers/input-controller.ts` owns the empty-editor PageUp bridge into tmux copy mode.
 - Proof: `test/tmux-scrollback-exactness.test.ts`.
@@ -357,7 +358,6 @@ Each entry names its disposition, observable behavior, implementation owner, and
 - Contract: the `MOMP-SCROLLBACK` exact-once guarantee applies only while mutable output retains stable pane geometry.
 - Owner: current upstream `packages/tui/src/tui.ts#TUI.#doRender` owns multiplexer geometry tracking and fallback.
 - Required action: retain the upstream owner and never use ED3 or `clear-history` to repair native history.
-- Proof: `test/pinned-live-region-loss.test.ts`.
 - Proof: the live height-shrink case in `test/tmux-scrollback-exactness.test.ts`.
 
 #### `MOMP-PACKAGE-IDENTITY` — Side-by-side fork identity and update safety

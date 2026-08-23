@@ -7,7 +7,7 @@ const PANE_COLUMNS = 164;
 const PANE_ROWS = 19;
 const PANE_EXIT_POLL_ATTEMPTS = 100;
 const PANE_EXIT_POLL_MS = 50;
-const LIVE_FRAME_POLL_ATTEMPTS = 100;
+const LIVE_FRAME_POLL_ATTEMPTS = 1000;
 const LIVE_FRAME_POLL_MS = 5;
 const RESIZED_PANE_ROWS = 13;
 const MARKER_COUNT = 36;
@@ -63,6 +63,18 @@ async function waitForPaneOutput(target: string, marker: string): Promise<string
 	}
 	return capture;
 }
+async function waitForPaneTranscript(target: string): Promise<string> {
+	let capture = "";
+	for (let attempt = 0; attempt < LIVE_FRAME_POLL_ATTEMPTS; attempt++) {
+		capture = (await runTmux(["capture-pane", "-p", "-S", "-", "-t", target])).stdout;
+		if (capture.includes("STABLE-PREFACE") && capture.includes("MARK-000") && capture.includes("MARK-035")) {
+			return capture;
+		}
+		// tmux output may flush after the pane process exits.
+		await Bun.sleep(LIVE_FRAME_POLL_MS);
+	}
+	return capture;
+}
 
 async function waitForPaneDeath(target: string): Promise<string> {
 	let paneState = "";
@@ -94,7 +106,7 @@ describe.skipIf(process.platform === "win32" || !tmuxPath)("tmux scrollback exac
 			await runTmux(["respawn-pane", "-k", "-t", PANE_TARGET, paneCommand]);
 
 			const paneState = await waitForPaneDeath(PANE_TARGET);
-			capture = (await runTmux(["capture-pane", "-p", "-S", "-", "-t", PANE_TARGET])).stdout;
+			capture = await waitForPaneTranscript(PANE_TARGET);
 			expect(paneState, `pane did not exit; captured pane:\n${capture}`).toBe("1");
 			expect(countOccurrences(capture, DRIVER_EXIT_MARKER), capture).toBe(1);
 			expect(countOccurrences(capture, "PREEXISTING-HISTORY"), capture).toBe(1);
@@ -133,7 +145,7 @@ describe.skipIf(process.platform === "win32" || !tmuxPath)("tmux scrollback exac
 			]);
 
 			const paneState = await waitForPaneDeath(paneTarget);
-			capture = (await runTmux(["capture-pane", "-p", "-S", "-", "-t", paneTarget])).stdout;
+			capture = await waitForPaneTranscript(paneTarget);
 			expect(paneState, `pane did not exit; captured pane:\n${capture}`).toBe("1");
 			expect(countOccurrences(capture, DRIVER_EXIT_MARKER), capture).toBe(1);
 			expect(countOccurrences(capture, "PREEXISTING-HISTORY"), capture).toBe(1);
