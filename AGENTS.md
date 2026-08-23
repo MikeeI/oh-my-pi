@@ -245,7 +245,7 @@ Each entry names its disposition, observable behavior, implementation owner, and
 - Contract: command-specific completion wins when it has a result.
 - Contract: absent command-specific completion falls through unless the command declares exclusive completion.
 - Contract: autocomplete and submission use one command-owned argument-completion mode.
-- Contract: slash-command autocomplete rows never display type-indicator icons, regardless of theme or symbol preset.
+- Contract: slash-command autocomplete rows never display emojis or type-indicator icons, regardless of theme or symbol preset.
 - Owner: `src/utils/title-generator.ts` owns transcript title generation.
 - Owner: `src/slash-commands/types.ts` owns argument-completion semantics.
 - Owner: TUI, ACP, and RPC command routers own transport-specific invocation only.
