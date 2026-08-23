@@ -8,7 +8,7 @@ Contribution-Priority: Medium
 Root-Cause-Confidence: High
 Finding-Category: Performance
 Created: 2026-08-21
-Updated: 2026-08-21
+Updated: 2026-08-23
 Source: `upstream/main@76a294cb19bfded1e32e2111f1f729129595bf5e`
 
 ## Root-Cause
@@ -27,6 +27,7 @@ Impact: Enabled sessions now send the same tree structure without volatile metad
 - [S] Personal commit `ee24b5ba372fbf8c29c57aa561d9a5407ed115a5` → implements metadata-free prompt rendering and its regression assertion.
 - [S] `config/settings-schema.ts` → `Include Workspace Tree` controls whether the workspace tree is rendered in the system prompt.
 - [O] PR head `13e7da36f1` skips size and age formatting for prompt trees while preserving mtime-based ordering.
+- [O] GitHub reports PR #9152 open with merge state `DIRTY` against current `main`; checked 2026-08-23.
 
 ## Prior-Art
 
@@ -141,7 +142,7 @@ Checks:
 - `bun test packages/coding-agent/test/workspace-tree.test.ts` → 9 pass, 0 fail.
 - `bun --cwd=packages/coding-agent run check` → Biome checked 2,672 files; type check passed.
 - GitHub Actions run `32440557630` → every required build, smoke, and test job passed.
-Review [O]: The `COMMENTED` review targets `dbb023374ea5`; clean head `13e7da36f194` addresses all three findings.
+Review [O]: The `COMMENTED` review targets `dbb023374ea5`; head `13e7da36f194` addressed all three findings before current upstream drift.
 
 ## Publication-Draft
 
@@ -193,6 +194,6 @@ Thank you for your work.
 
 ## Next-Action
 
-Summary: Await tree current-head review
-Action: Monitor pull request #9152 for review of head `13e7da36f194` and the maintainer decision.
-Done-When: A current-head review, requested follow-up, or terminal outcome is recorded.
+Summary: Rebase tree PR branch
+Action: Rebase pull request #9152 onto current `upstream/main`, resolve the workspace-tree drift, and rerun focused checks.
+Done-When: GitHub reports a clean current head and every required check passes.

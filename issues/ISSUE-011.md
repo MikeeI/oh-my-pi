@@ -8,7 +8,7 @@ Contribution-Priority: Medium
 Root-Cause-Confidence: High
 Finding-Category: Performance
 Created: 2026-08-21
-Updated: 2026-08-21
+Updated: 2026-08-23
 Source: `upstream/main@76a294cb19bfded1e32e2111f1f729129595bf5e`
 
 ## Root-Cause
@@ -24,7 +24,8 @@ Impact: The preview repeats padding on every entry; token reduction beyond the f
 
 - [O] `bun test packages/coding-agent/test/workspace-tree.test.ts` → 9 pass, 0 fail; result recorded in PR #9062.
 - [S] `packages/coding-agent/src/workspace-tree.ts` → Read listings select compact metadata while prompt trees retain aligned metadata.
-- [S] [PR #9062](https://github.com/can1357/oh-my-pi/pull/9062) → clean rebased head `597c7f4e20a9` contains implementation `3e4ff8c88264` and changelog follow-up `597c7f4e20a9`.
+- [S] [PR #9062](https://github.com/can1357/oh-my-pi/pull/9062) → head `597c7f4e20a9` contains implementation `3e4ff8c88264` and changelog follow-up `597c7f4e20a9`.
+- [O] GitHub reports PR #9062 open with merge state `DIRTY` against current `main`; checked 2026-08-23.
 
 ## Prior-Art
 
@@ -79,7 +80,7 @@ Checks:
 
 - `bun test packages/coding-agent/test/workspace-tree.test.ts` → 9 pass, 0 fail after rebase.
 - GitHub Actions run `32464713806` → every required build, smoke, and test job passed.
-Review [O]: Both `COMMENTED` reviews target the pre-rebase implementation; current head `597c7f4e20a9` is clean.
+Review [O]: Both `COMMENTED` reviews target the pre-rebase implementation; head `597c7f4e20a9` addressed them before current upstream drift.
 
 ## Publication-Blockers
 
@@ -87,9 +88,9 @@ None.
 
 ## Next-Action
 
-Summary: Await Read current-head review
-Action: Monitor pull request #9062 for review of head `597c7f4e20a9` and the maintainer decision.
-Done-When: A current-head review, requested follow-up, or terminal outcome is recorded.
+Summary: Rebase Read PR branch
+Action: Rebase pull request #9062 onto current `upstream/main`, resolve the workspace-tree drift, and rerun focused checks.
+Done-When: GitHub reports a clean current head and every required check passes.
 
 ## Publication-Draft
 
