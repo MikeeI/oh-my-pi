@@ -1624,10 +1624,9 @@ export class TUI extends Container {
 	}
 
 	/**
-	 * Destructive user-gesture reset: invalidate every component, erase native
-	 * history, then repaint from row zero. Reachable only from explicit gestures (session
-	 * replace, /tree, an explicit clear) — never from ordinary rendering,
-	 * animation, resize, or finalization.
+	 * User-gesture reset: invalidate every component and repaint from row zero.
+	 * Direct terminals also erase native history; multiplexers retain history
+	 * because ED3 cannot replace their opaque scrollback safely.
 	 */
 	resetDisplay(): void {
 		if (this.#stopped) return;
@@ -1711,11 +1710,12 @@ export class TUI extends Container {
 		return true;
 	}
 	#prepareForcedRender(clearScrollback: boolean): void {
-		if (clearScrollback && !this.#clearScrollbackOnNextRender) {
+		const destructiveReset = clearScrollback && !isInsideTerminalMultiplexer();
+		if (destructiveReset && !this.#clearScrollbackOnNextRender) {
 			this.#frameProvider?.beginHistoryReplay?.();
 			if (TERMINAL.imageProtocol === ImageProtocol.Kitty) this.#imageBudget.forgetTransmitted();
 		}
-		this.#clearScrollbackOnNextRender ||= clearScrollback;
+		this.#clearScrollbackOnNextRender ||= destructiveReset;
 		this.#forceViewportRepaintOnNextRender = true;
 		if (this.#renderTimer) {
 			this.#renderTimer.cancel();
@@ -2217,7 +2217,7 @@ export class TUI extends Container {
 	 *
 	 * Append mode leaves the terminal's prior copy in place and writes a
 	 * current-width copy below it. Rebuild mode routes through the destructive
-	 * reset latch so ED3 removes stale history before the same replay.
+	 * reset latch on direct terminals; multiplexers retain their opaque history.
 	 */
 	#prepareResizeReplay(width: number, height: number): void {
 		const size = `${width}x${height}`;

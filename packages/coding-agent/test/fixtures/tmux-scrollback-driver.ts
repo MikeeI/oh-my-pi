@@ -82,6 +82,7 @@ async function main(): Promise<void> {
 	try {
 		const terminal = new DriverTerminal();
 		tui = new TUI(terminal);
+		tui.setResizeScrollback("rebuild");
 		const transcript = new TranscriptContainer();
 		const assistant = new AssistantMessageComponent();
 		transcript.addChild(assistant);

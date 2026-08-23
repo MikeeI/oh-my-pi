@@ -339,12 +339,13 @@ Each entry names its disposition, observable behavior, implementation owner, and
 - Contract: settled Markdown prefixes may commit while only the mutable suffix remains viewport-local.
 - Contract: with stable pane geometry, final Assistant content enters pane history exactly once.
 - Contract: pre-existing pane history survives.
-- Contract: multiplexer rendering never emits ED3 or invokes `clear-history`.
-- Contract: direct-terminal behavior remains controlled by `tui.scrollbackRebuild`.
+- Contract: multiplexer rendering never emits ED3 or invokes `clear-history`, including configured rebuilds.
+- Contract: direct-terminal resize behavior remains controlled by `tui.resizeScrollback`.
 - Contract: PageUp on a focused empty editor opens tmux copy mode one page up so committed transcript remains reachable.
 - Contract: drafts, overlays, non-tmux sessions, and failed tmux commands retain existing PageUp handling.
 - Owner: `src/modes/components/transcript-container.ts` owns finalized-prefix batching.
 - Owner: `packages/tui/src/tui.ts#TUI.#emitPlanFrame` owns live-region blanking and terminal history append.
+- Owner: `packages/tui/src/tui.ts#TUI.#prepareForcedRender` owns destructive-reset attenuation in multiplexers.
 - Owner: `packages/tui` owns terminal rendering and autocomplete primitives.
 - Owner: `src/modes/controllers/input-controller.ts` owns the empty-editor PageUp bridge into tmux copy mode.
 - Proof: `test/tmux-scrollback-exactness.test.ts`.
@@ -353,12 +354,12 @@ Each entry names its disposition, observable behavior, implementation owner, and
 #### `MOMP-MUX-RESIZE` — Native multiplexer resize preservation
 
 - Disposition: `UPSTREAM-INTEGRIERT`.
-- Contract: height-only multiplexer resizes never lose finalized transcript rows.
+- Contract: height-only multiplexer resizes never lose finalized transcript rows or pre-existing pane history.
 - Contract: duplication is accepted when tmux pushes mutable viewport rows into opaque native history; loss is not.
 - Contract: the `MOMP-SCROLLBACK` exact-once guarantee applies only while mutable output retains stable pane geometry.
 - Owner: current upstream `packages/tui/src/tui.ts#TUI.#doRender` owns multiplexer geometry tracking and fallback.
 - Required action: retain the upstream owner and never use ED3 or `clear-history` to repair native history.
-- Proof: the live height-shrink case in `test/tmux-scrollback-exactness.test.ts`.
+- Proof: the configured-rebuild height-shrink case in `test/tmux-scrollback-exactness.test.ts`.
 
 #### `MOMP-PACKAGE-IDENTITY` — Side-by-side fork identity and update safety
 

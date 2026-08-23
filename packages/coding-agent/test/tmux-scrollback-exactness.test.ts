@@ -122,7 +122,7 @@ describe.skipIf(process.platform === "win32" || !tmuxPath)("tmux scrollback exac
 		}
 	}, 15_000);
 
-	it("preserves every finalized row across a live tmux height shrink", async () => {
+	it("retains pane history during a configured rebuild on live tmux resize", async () => {
 		const sessionName = "resize";
 		const paneTarget = `${sessionName}:0.0`;
 		let capture = "";

@@ -1,7 +1,10 @@
 import { describe, expect, it } from "bun:test";
 import { type TerminalFramePlan, type TerminalFrameProvider, TUI, type ViewportSize } from "@oh-my-pi/pi-tui";
+import { withoutTerminalMultiplexer } from "./helpers/terminal-multiplexer";
 import { VirtualRenderScheduler } from "./virtual-render-scheduler";
 import { VirtualTerminal } from "./virtual-terminal";
+
+withoutTerminalMultiplexer();
 
 class Provider implements TerminalFrameProvider {
 	plan: TerminalFramePlan;
