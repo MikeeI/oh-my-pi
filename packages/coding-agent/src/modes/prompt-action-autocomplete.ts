@@ -175,7 +175,8 @@ export class PromptActionAutocompleteProvider implements AutocompleteProvider {
 				// tokens such as `#copy` literal.
 				const githubRefSuggestions = getGithubRefSuggestions(textBeforeCursor);
 				if (githubRefSuggestions) return githubRefSuggestions;
-				return getInternalUrlSuggestions(textBeforeCursor, this.#basePath, signal);
+				const internalUrlSuggestions = await getInternalUrlSuggestions(textBeforeCursor, this.#basePath, signal);
+				if (internalUrlSuggestions) return internalUrlSuggestions;
 			}
 		}
 

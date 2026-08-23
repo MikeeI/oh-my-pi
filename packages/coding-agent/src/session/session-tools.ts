@@ -1014,7 +1014,6 @@ export class SessionTools {
 		this.#codeModeDirectWireSignature = codeMode.active
 			? this.#computeCodeModeDirectWireSignature(appliedNames)
 			: undefined;
-		this.#codeModeInjectedEval = nextCodeModeInjectedEval;
 		if (rebuiltResult && rebuiltSignature) {
 			if (this.#lastAppliedToolSignature !== undefined) this.#host.clearInheritedProviderPromptCacheKey();
 			this.#baseSystemPrompt = rebuiltResult.systemPrompt;
