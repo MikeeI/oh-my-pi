@@ -214,6 +214,15 @@ export function scoreHubRoutingCall(
 	if (domainArguments.op === "send" && typeof domainArguments.to === "string" && domainArguments.await === undefined) {
 		domainArguments.await = false;
 	}
+	if (
+		domainArguments.op === "send" &&
+		typeof domainArguments.name === "string" &&
+		domainArguments.signal === "SIGINT" &&
+		domainArguments.keys === undefined
+	) {
+		domainArguments.keys = ["CTRL_C"];
+		delete domainArguments.signal;
+	}
 	if (Bun.deepEquals(domainArguments, scenario.expected)) return { passed: true };
 	return { passed: false, reason: "Hub arguments differ from the frozen expected call" };
 }

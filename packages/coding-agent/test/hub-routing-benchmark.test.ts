@@ -67,6 +67,16 @@ describe("Hub routing benchmark", () => {
 		expect(scoreHubRoutingCall(scenario, observation!)).toEqual({ passed: true });
 	});
 
+	it("treats SIGINT as the equivalent Ctrl-C process-send encoding", () => {
+		const scenario = HUB_ROUTING_SCENARIOS[3]!;
+		const observation = parseHubRoutingAssistantEvent(
+			assistantEvent([
+				{ name: "hub", arguments: { i: "Interrupt debugger", op: "send", name: "debugger", signal: "SIGINT" } },
+			]),
+		);
+		expect(scoreHubRoutingCall(scenario, observation!)).toEqual({ passed: true });
+	});
+
 	it("rejects extra domain arguments and multiple calls", () => {
 		const scenario = HUB_ROUTING_SCENARIOS[3]!;
 		const extraArgument = parseHubRoutingAssistantEvent(
