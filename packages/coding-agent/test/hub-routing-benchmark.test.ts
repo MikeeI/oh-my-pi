@@ -58,6 +58,15 @@ describe("Hub routing benchmark", () => {
 		});
 	});
 
+	it("treats an omitted peer-send await flag as the false schema default", () => {
+		const scenario = HUB_ROUTING_SCENARIOS[0]!;
+		const { await: _await, ...withoutDefault } = scenario.expected;
+		const observation = parseHubRoutingAssistantEvent(
+			assistantEvent([{ name: "hub", arguments: { i: "Ask the named peer", ...withoutDefault } }]),
+		);
+		expect(scoreHubRoutingCall(scenario, observation!)).toEqual({ passed: true });
+	});
+
 	it("rejects extra domain arguments and multiple calls", () => {
 		const scenario = HUB_ROUTING_SCENARIOS[3]!;
 		const extraArgument = parseHubRoutingAssistantEvent(

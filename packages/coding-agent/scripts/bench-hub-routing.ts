@@ -42,6 +42,7 @@ export const HUB_ROUTING_SCENARIOS: readonly HubRoutingScenario[] = [
 			op: "send",
 			to: "AuthLoader",
 			message: "Still touching src/server/auth.ts? I need to add a 401 path.",
+			await: false,
 		},
 	},
 	{
@@ -210,6 +211,9 @@ export function scoreHubRoutingCall(
 		return { passed: false, reason: "missing non-empty tool intent" };
 	}
 	const { i: _intent, ...domainArguments } = call.arguments;
+	if (domainArguments.op === "send" && typeof domainArguments.to === "string" && domainArguments.await === undefined) {
+		domainArguments.await = false;
+	}
 	if (Bun.deepEquals(domainArguments, scenario.expected)) return { passed: true };
 	return { passed: false, reason: "Hub arguments differ from the frozen expected call" };
 }
