@@ -1,6 +1,6 @@
 # ISSUE-003 — Todo schema: items is described as append-only despite flattened init
 
-State: Submitted
+State: Archived
 Authorized-Work: Pull-Request-Implementation
 Publication-Target: New-pull-request
 External-Reference: https://github.com/can1357/oh-my-pi/pull/9159
@@ -8,7 +8,7 @@ Contribution-Priority: Low
 Root-Cause-Confidence: High
 Finding-Category: Correctness
 Created: 2026-08-14
-Updated: 2026-08-21
+Updated: 2026-08-23
 Source: `upstream/main@de5ffc4201c4941992402daea355adc1aad3a8db`
 
 ## Root-Cause
@@ -91,9 +91,9 @@ Review [O]: Head `4034d19c07ac` is clean and has a `COMMENTED` P0 review with no
 
 ## Next-Action
 
-Summary: Await Todo maintainer decision
-Action: Monitor pull request #9159 for a maintainer decision or new follow-up.
-Done-When: The pull request outcome and any requested follow-up are recorded.
+Summary: —
+Action: None.
+Done-When: None.
 
 ## Publication-Draft
 
@@ -139,3 +139,9 @@ If reports like this are not useful to the project, please let me know and I wil
 
 Thank you for your work.
 ```
+
+## Archive
+Archive-Reason: Merged
+Detail: None.
+Evidence: `https://github.com/can1357/oh-my-pi/pull/9159` — upstream PR state `MERGED`; final thread and linked review outcome checked 2026-08-23.
+Checked: 2026-08-23

@@ -1,6 +1,6 @@
 # ISSUE-004 — Bash prompt: timeout does not extend the auto-background cutoff
 
-State: Submitted
+State: Archived
 Authorized-Work: Pull-Request-Implementation
 Publication-Target: New-pull-request
 External-Reference: https://github.com/can1357/oh-my-pi/pull/9155
@@ -8,7 +8,7 @@ Contribution-Priority: Medium
 Root-Cause-Confidence: High
 Finding-Category: Correctness
 Created: 2026-08-14
-Updated: 2026-08-21
+Updated: 2026-08-23
 Source: `upstream/main@76a294cb19bfded1e32e2111f1f729129595bf5e`
 
 ## Root-Cause
@@ -79,9 +79,9 @@ Review [O]: All `COMMENTED` reviews predate clean head `b29172777bd1`; no review
 
 ## Next-Action
 
-Summary: Await Bash current-head review
-Action: Monitor pull request #9155 for review of head `b29172777bd1` and the maintainer decision.
-Done-When: A current-head review, requested follow-up, or terminal outcome is recorded.
+Summary: —
+Action: None.
+Done-When: None.
 
 ## Publication-Draft
 
@@ -174,3 +174,9 @@ My intent is to help without wasting maintainer time or energy or discouraging t
 
 Thank you for your work.
 ```
+
+## Archive
+Archive-Reason: Merged
+Detail: None.
+Evidence: `https://github.com/can1357/oh-my-pi/pull/9155` — upstream PR state `MERGED`; final thread and linked review outcome checked 2026-08-23.
+Checked: 2026-08-23

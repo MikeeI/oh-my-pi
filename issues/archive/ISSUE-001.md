@@ -1,6 +1,6 @@
 # ISSUE-001 — Eval prompt: agent() children do not share the promised kernel state
 
-State: Submitted
+State: Archived
 Authorized-Work: Pull-Request-Implementation
 Publication-Target: New-pull-request
 External-Reference: https://github.com/can1357/oh-my-pi/pull/9154
@@ -8,7 +8,7 @@ Contribution-Priority: Medium
 Root-Cause-Confidence: High
 Finding-Category: Correctness
 Created: 2026-08-14
-Updated: 2026-08-21
+Updated: 2026-08-23
 Source: `upstream/main@76a294cb19bfded1e32e2111f1f729129595bf5e`
 
 ## Root-Cause
@@ -76,9 +76,9 @@ Review [O]: Both `COMMENTED` reviews target `343e21c9ef1a`; clean head `dab8d033
 
 ## Next-Action
 
-Summary: Await Eval current-head review
-Action: Monitor pull request #9154 for review of head `dab8d0339d0f` and the maintainer decision.
-Done-When: A current-head review, requested follow-up, or terminal outcome is recorded.
+Summary: —
+Action: None.
+Done-When: None.
 
 ## Publication-Draft
 
@@ -166,3 +166,9 @@ My intent is to help without wasting maintainer time or energy or discouraging t
 
 Thank you for your work.
 ```
+
+## Archive
+Archive-Reason: Merged
+Detail: None.
+Evidence: `https://github.com/can1357/oh-my-pi/pull/9154` — upstream PR state `MERGED`; final thread and linked review outcome checked 2026-08-23.
+Checked: 2026-08-23

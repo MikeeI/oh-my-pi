@@ -13,10 +13,7 @@ Next finding ID: ISSUE-013
 
 | ID | Finding | State | Authorized-Work | Publication-Target | Contribution-Priority | Next-Action | External-Reference |
 | --- | --- | --- | --- | --- | --- | --- | --- |
-| [ISSUE-001](issues/ISSUE-001.md) | Eval prompt: agent() children do not share the promised kernel state | Submitted | Pull-Request-Implementation | New-pull-request | Medium | Await Eval current-head review | https://github.com/can1357/oh-my-pi/pull/9154 |
 | [ISSUE-002](issues/ISSUE-002.md) | Eval registry: disabling the last live backend re-advertises every language | Investigating | Not-Selected | Not-Selected | High | Verify Eval commit boundary | Not published. |
-| [ISSUE-003](issues/ISSUE-003.md) | Todo schema: items is described as append-only despite flattened init | Submitted | Pull-Request-Implementation | New-pull-request | Low | Await Todo maintainer decision | https://github.com/can1357/oh-my-pi/pull/9159 |
-| [ISSUE-004](issues/ISSUE-004.md) | Bash prompt: timeout does not extend the auto-background cutoff | Submitted | Pull-Request-Implementation | New-pull-request | Medium | Await Bash current-head review | https://github.com/can1357/oh-my-pi/pull/9155 |
 | [ISSUE-007](issues/ISSUE-007.md) | Hub capability: disabled process supervision remains fully advertised | Implementing | Pull-Request-Implementation | New-pull-request | High | Approve reviewed Hub PR | Not published. |
 | [ISSUE-010](issues/ISSUE-010.md) | LSP prompt: raw requests omit multi-server routing guidance | Implementing | Pull-Request-Implementation | New-pull-request | Medium | Review local LSP prompt PR | Not published. |
 | [ISSUE-011](issues/ISSUE-011.md) | Read: compact directory metadata spacing | Submitted | Pull-Request-Implementation | New-pull-request | Medium | Await Read current-head review | https://github.com/can1357/oh-my-pi/pull/9062 |
@@ -26,6 +23,9 @@ Next finding ID: ISSUE-013
 
 | ID | Finding | Authorized-Work | Publication-Target | Contribution-Priority | Archive-Reason | External-Reference |
 | --- | --- | --- | --- | --- | --- | --- |
+| [ISSUE-001](issues/archive/ISSUE-001.md) | Eval prompt: agent() children do not share the promised kernel state | Pull-Request-Implementation | New-pull-request | Medium | Merged | https://github.com/can1357/oh-my-pi/pull/9154 |
+| [ISSUE-003](issues/archive/ISSUE-003.md) | Todo schema: items is described as append-only despite flattened init | Pull-Request-Implementation | New-pull-request | Low | Merged | https://github.com/can1357/oh-my-pi/pull/9159 |
+| [ISSUE-004](issues/archive/ISSUE-004.md) | Bash prompt: timeout does not extend the auto-background cutoff | Pull-Request-Implementation | New-pull-request | Medium | Merged | https://github.com/can1357/oh-my-pi/pull/9155 |
 | [ISSUE-005](issues/archive/ISSUE-005.md) | Task prompt: restricted specialist defaults are called general-purpose workers | Pull-Request-Implementation | New-pull-request | Medium | Merged | https://github.com/can1357/oh-my-pi/pull/9046 |
 | [ISSUE-006](issues/archive/ISSUE-006.md) | Task prompt: same-file edits are not guaranteed to auto-resolve | Pull-Request-Implementation | New-pull-request | High | Merged | https://github.com/can1357/oh-my-pi/pull/9047 |
 | [ISSUE-008](issues/archive/ISSUE-008.md) | Read prompt: raw is not a universal converter or byte bypass | Not-Selected | Not-Selected | Medium | Fixed-Elsewhere | Not published. |
