@@ -55,6 +55,8 @@ function createYieldingSession(): AgentSession {
 		},
 		waitForIdle: async () => {},
 		getLastAssistantMessage: () => undefined,
+		prepareForHeadlessAdvisorDrain: () => {},
+		waitForAdvisorCatchup: async () => {},
 		abort: async () => {},
 		dispose: async () => {},
 	};

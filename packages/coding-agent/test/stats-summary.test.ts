@@ -22,6 +22,7 @@ function makeAggregated(overrides: Partial<AggregatedStats>): AggregatedStats {
 		cacheRate: 0,
 		cacheSavings: 0,
 		totalCost: 0,
+		unpricedRequests: 0,
 		totalPremiumRequests: 0,
 		avgDuration: null,
 		avgTtft: null,
