@@ -8,6 +8,7 @@
 ### Fixed
 
 - PageUp now opens tmux history from an empty prompt, keeping scrolled-off transcript text reachable.
+- Published MOMP CLIs now include fork workspace runtime fixes, including exact tmux scrollback rendering.
 
 ## [18.0.6] - 2026-08-26
 

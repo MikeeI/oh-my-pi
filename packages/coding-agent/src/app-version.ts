@@ -34,6 +34,15 @@ export function updateNotificationDetails(packageName: string = APP_PACKAGE_NAME
 	return { actionText: "Run: omp update" };
 }
 
-export const APP_PACKAGE_NAME: string = name;
-export const APP_VERSION: string = version;
-export const APP_DISPLAY_NAME: string = Object.keys(bin)[0] ?? "omp";
+const bundledPackageIdentity =
+	process.env.PI_BUNDLED === "true"
+		? {
+				name: process.env.PI_BUNDLED_PACKAGE_NAME,
+				version: process.env.PI_BUNDLED_PACKAGE_VERSION,
+				binary: process.env.PI_BUNDLED_BINARY_NAME,
+			}
+		: {};
+
+export const APP_PACKAGE_NAME: string = bundledPackageIdentity.name ?? name;
+export const APP_VERSION: string = bundledPackageIdentity.version ?? version;
+export const APP_DISPLAY_NAME: string = bundledPackageIdentity.binary ?? Object.keys(bin)[0] ?? "omp";

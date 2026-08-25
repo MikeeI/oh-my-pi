@@ -365,6 +365,8 @@ Each entry names its disposition, observable behavior, implementation owner, and
 
 - Disposition: `MOMP-EIGEN`.
 - Contract: publish staging produces package `@mikeei/momp`, binary `momp`, and exact `MOMP_VERSION`.
+- Contract: the published CLI executes `dist/cli.js`, which bundles the complete fork workspace closure.
+- Contract: publish-time bundle identity is injected without changing source package metadata.
 - Contract: source `package.json` stays upstream-near; publish metadata is never hard-coded into source.
 - Contract: published `momp update` refuses self-installation.
 - Contract: the refusal prints `bun install -g @mikeei/momp@latest --force --minimum-release-age 0`.
@@ -372,6 +374,7 @@ Each entry names its disposition, observable behavior, implementation owner, and
 - Contract: startup may check upstream availability but compares against the fork's base version.
 - Contract: legacy extension self-imports resolve against the installed package identity.
 - Owner: `src/app-version.ts` owns runtime identity and upstream-version comparison.
+- Owner: `scripts/bundle-dist.ts` embeds validated package identity overrides into the bundled CLI.
 - Owner: `src/cli/update-cli.ts` owns fork-safe update behavior.
 - Owner: `src/extensibility/plugins/legacy-pi-compat.ts` owns installed-package self-import compatibility.
 - Owner: `MOMP_VERSION` owns the source release version.
