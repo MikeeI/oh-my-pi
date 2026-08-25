@@ -13,27 +13,7 @@ import type {
 	ServiceTierByFamily,
 } from "@oh-my-pi/pi-ai";
 import { resolveModelServiceTier, streamSimple } from "@oh-my-pi/pi-ai";
-9:
-import {
-	bareModelId,
-	buildModelProviderPriorityRank,
-	parseOpenAIModel,
-	semverGte,
-} from "@oh-my-pi/pi-catalog/identity";
-10:
-function assertCacheModeSupported(targets: BenchTarget[], codexBreakpointProbe: boolean): void {
-	if (codexBreakpointProbe) {
-		for (const { model } of targets) {
-			const parsed = parseOpenAIModel(bareModelId(model.requestModelId ?? model.id));
-			if (model.api !== "openai-codex-responses" || parsed === null || !semverGte(parsed.version, "5.6")) {
-				throw new Error("--codex-cache-breakpoint-probe requires an openai-codex-responses GPT-5.6+ model");
-			}
-		}
-		return;
-	}
-11:
-		const targets = resolveBenchTargets(command.models, runtime.modelRegistry, runtime.settings, writeStderr);
-		if (cacheMode) assertCacheModeSupported(targets, codexBreakpointProbe);
+import { bareModelId, parseOpenAIModel, semverGte } from "@oh-my-pi/pi-catalog/identity";
 import { replaceTabs, truncateToWidth } from "@oh-my-pi/pi-tui";
 import { formatDuration, formatNumber, prompt } from "@oh-my-pi/pi-utils";
 import chalk from "@oh-my-pi/pi-utils/chalk";
@@ -903,14 +883,6 @@ export function formatBenchTable(summary: BenchSummary): string {
 	return `${lines.join("\n")}\n`;
 }
 
-9:
-import {
-	bareModelId,
-	buildModelProviderPriorityRank,
-	parseOpenAIModel,
-	semverGte,
-} from "@oh-my-pi/pi-catalog/identity";
-10:
 function assertCacheModeSupported(targets: BenchTarget[], codexBreakpointProbe: boolean): void {
 	if (codexBreakpointProbe) {
 		for (const { model } of targets) {
@@ -921,9 +893,6 @@ function assertCacheModeSupported(targets: BenchTarget[], codexBreakpointProbe: 
 		}
 		return;
 	}
-11:
-		const targets = resolveBenchTargets(command.models, runtime.modelRegistry, runtime.settings, writeStderr);
-		if (cacheMode) assertCacheModeSupported(targets, codexBreakpointProbe);
 	if (targets.some(({ model }) => model.api === "openai-codex-responses")) {
 		throw new Error(
 			"--cache is not supported for openai-codex-responses because Codex WebSocket chaining cannot produce independent prompt-cache pairs",
@@ -1025,25 +994,6 @@ export async function runBenchCommand(command: BenchCommandArgs, deps: BenchDepe
 
 	const runtime = await (deps.createRuntime ?? createDefaultBenchRuntime)();
 	try {
-9:
-import {
-	bareModelId,
-	buildModelProviderPriorityRank,
-	parseOpenAIModel,
-	semverGte,
-} from "@oh-my-pi/pi-catalog/identity";
-10:
-function assertCacheModeSupported(targets: BenchTarget[], codexBreakpointProbe: boolean): void {
-	if (codexBreakpointProbe) {
-		for (const { model } of targets) {
-			const parsed = parseOpenAIModel(bareModelId(model.requestModelId ?? model.id));
-			if (model.api !== "openai-codex-responses" || parsed === null || !semverGte(parsed.version, "5.6")) {
-				throw new Error("--codex-cache-breakpoint-probe requires an openai-codex-responses GPT-5.6+ model");
-			}
-		}
-		return;
-	}
-11:
 		const targets = resolveBenchTargets(command.models, runtime.modelRegistry, runtime.settings, writeStderr);
 		if (cacheMode) assertCacheModeSupported(targets, codexBreakpointProbe);
 		// Explicit `--service-tier` (a single value broadcast across families) wins;

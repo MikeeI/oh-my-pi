@@ -103,8 +103,8 @@ async function main(): Promise<void> {
 			acknowledgeHistory(id: number): void {
 				transcript.acknowledgeFinalizedBatch(id);
 			},
-			resetHistory(): void {
-				transcript.resetRetirement();
+			beginHistoryReplay(): void {
+				transcript.beginReplay();
 			},
 		};
 		tui.setFrameProvider(frameProvider);

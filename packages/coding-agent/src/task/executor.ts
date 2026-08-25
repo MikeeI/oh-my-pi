@@ -3040,7 +3040,7 @@ export async function runSubprocess(options: ExecutorOptions): Promise<SingleRes
 				worktree,
 				outputSchema,
 				outputSchemaOverridesAgent: options.outputSchemaOverridesAgent,
-				ircPeers: ircEnabled ? renderIrcPeerRoster(id) : "",
+				ircPeers: ircEnabled ? await renderIrcPeerRoster(id) : "",
 				ircSelfId: ircEnabled ? id : "",
 			});
 
