@@ -528,12 +528,14 @@ const MAX_IMAGE_SIZE = MAX_IMAGE_INPUT_BYTES;
 
 const readSchema = type({
 	path: type("string").describe(
-		"Local path, internal URI (e.g. memory://, skill://), or URL. Inline selectors are supported.",
+		"Local path, internal URI (e.g. memory://, skill://), or URL; join complete `path[:selector]` targets with `;`.",
 	),
 });
 
 const readSchemaWithoutMemory = type({
-	path: type("string").describe("Local path, internal URI (e.g. skill://), or URL. Inline selectors are supported."),
+	path: type("string").describe(
+		"Local path, internal URI (e.g. skill://), or URL; join complete `path[:selector]` targets with `;`.",
+	),
 });
 
 export type ReadToolInput = typeof readSchema.infer;

@@ -5,6 +5,10 @@
 
 - Added offline Codex Main wire-request hashes and a separate synthetic GPT-5.6 breakpoint endpoint probe.
 
+### Changed
+
+- Read guidance now keeps complete pre-planned file retrieval in one batched tool call.
+
 ### Fixed
 
 - PageUp now opens tmux history from an empty prompt, keeping scrolled-off transcript text reachable.

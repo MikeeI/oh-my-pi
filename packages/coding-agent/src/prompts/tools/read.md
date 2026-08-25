@@ -1,7 +1,13 @@
 Read files, directories, archives, SQLite, images, documents, internal resources, and web URLs via `path`.
 
 <instruction>
-- SHOULD parallelize independent reads.
+- Bounded known targets → one `read` call; join complete `path[:selector]` targets with `;`.
+- Known range ≤{{DEFAULT_MAX_LINES}} lines → request the complete range once.
+- Larger known range set → repeat its path with ≤{{DEFAULT_MAX_LINES}}-line selectors.
+- Unknown extent → discover once, then batch every known missing range in the next call.
+- A failed or truncated target means retrieval is incomplete.
+- Example: `src/main.ts:1-200;src/config.ts:40-120;large.md:1-3000;large.md:3001-3418`.
+- NEVER split a bounded pre-planned batch across turns; retry only failed or truncated targets.
 - SHOULD use `read` (not browser) for web content; browser only when `read` can't deliver.
 </instruction>
 

@@ -455,6 +455,20 @@ Each entry names its disposition, observable behavior, implementation owner, and
 - Proof: SSH protocol, file-transfer, path-validation, and remote-directory error tests.
 - Required action: keep the complete closure byte-identical to current upstream and never restore the redundant fork wording.
 
+#### `MOMP-READ-BATCH` — Single-call complete retrieval
+
+- Disposition: `MOMP-EIGEN`, designed for upstream.
+- Contract: bounded known Read targets use one semicolon-delimited `path`.
+- Contract: a known extent uses one call, split only across the 3,000-line target limit.
+- Contract: an unknown extent permits one discovery call followed by one batch for every known missing range.
+- Contract: failed or truncated targets make retrieval incomplete and only those targets are retried.
+- Owner: upstream `packages/coding-agent/src/prompts/tools/read.md` owns model-visible retrieval guidance.
+- Owner: upstream `packages/coding-agent/src/tools/read.ts` owns the model-visible `path` schema.
+- Owner: upstream Read delimited-path and selector handling own the existing runtime behavior.
+- Proof: render the Read description and schema, then inspect the complete-file batching contract.
+- Proof: issue one Read call containing repeated same-file selectors and verify one complete tool result.
+- Upstream action: retain provider-neutral wording when preparing the prompt correction.
+
 #### `MOMP-READ-RAW` — Source-specific raw Read representations
 
 - Disposition: `MOMP-EIGEN`, designed for upstream.
