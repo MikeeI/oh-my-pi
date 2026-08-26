@@ -221,6 +221,9 @@ describe("terminal frame plans", () => {
 		tui.requestRender(true);
 
 		expect(terminal.writes).toHaveLength(1);
+		const replayWrite = terminal.writes[0] ?? "";
+		expect(replayWrite).not.toContain("\x1b[1;1H\x1b[J");
+		expect(replayWrite).toContain("\x1b[1;1H\x1b[2K\x1b[2;1H\x1b[J");
 		expect(provider.acknowledged).toEqual([1]);
 		expect(plainBuffer(terminal)).toEqual([
 			"history one",

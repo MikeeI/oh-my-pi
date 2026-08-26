@@ -677,6 +677,9 @@ export class TUI extends Container {
 	// shrink-then-regrow that never exceeds the pre-burst height (see the
 	// CPR-timeout fallback in #resolveResizeAnchor).
 	#resizeBurstPull = 0;
+	// A multiplexer can discard the bottom of the old grid before the resize
+	// callback runs. Re-offer at most that old screen's committed tail.
+	#multiplexerResizeReplayLimit: number | undefined;
 	// Geometry epoch: bumped on every resize transaction entry, so each CSI 6n
 	// request records the geometry it was parked under.
 	#geometryEpoch = 0;
@@ -687,10 +690,11 @@ export class TUI extends Container {
 	// survive drops (forgetting retired requests eagerly misattributes late
 	// replies, remembering them forever poisons later probes with phantoms,
 	// and age expiry is unsound because replies carry no lifetime guarantee).
-	// A rewrap can only invalidate a reply's row via a width-change SIGWINCH,
-	// which bumps the geometry epoch and discards the reply anyway, so the
-	// scheme is sound on direct terminals too. Tags are never expired; a late
-	// reply to a dead tag is stripped and discarded by column.
+	// On direct terminals only a width-change rewrap invalidates a reply's row;
+	// its geometry epoch already discards that reply. Multiplexers can answer
+	// while applying the current height, so #resolveResizeAnchor additionally
+	// validates the row against the old and current grids. Dead tags remain
+	// live only to strip their eventual replies by column.
 	#cprColumnTags = new Map<number, number>();
 	#cprProbeSeq = 0;
 	// Prepared rows painted by the previous provider frame, for row diffing.
@@ -825,6 +829,7 @@ export class TUI extends Container {
 	setFrameProvider(provider: TerminalFrameProvider | undefined): void {
 		this.#frameProvider = provider;
 		this.#providerWindow = [];
+		this.#multiplexerResizeReplayLimit = undefined;
 		this.#resizeReplaySize = undefined;
 		this.requestRender(true);
 	}
@@ -1285,40 +1290,31 @@ export class TUI extends Container {
 				: reportedRow - this.#reflowedRowCount(probe.window, 0, probe.offset, width);
 		let top: number;
 		if (isInsideTerminalMultiplexer()) {
-			if (reportedRow !== undefined) {
-				// The parked cursor's reply is exact under multiplexer clipping:
-				// discards leave the cursor in place, pushes only occur after
-				// everything below it is discarded (the bottom row IS the
-				// attached position), and grow pull-down rides it down. It
-				// therefore also reflects intermediate geometries that SIGWINCH
-				// coalescing hid from the burst tracker, and always outranks the
-				// clip model. The `height - staleRows` bound must NOT apply here:
-				// it encodes bottom-preserving rewrap, but a multiplexer shrink
-				// may have discarded stale rows below the cursor instead of
-				// pushing the top ones. Frame-size clamping happens when the
-				// settled plan frame is emitted.
+			const reportedInsideGrid = reportedRow !== undefined && reportedRow < height;
+			const previousParkedRow =
+				this.#providerViewportTop +
+				this.#reflowedRowCount(probe.window, 0, probe.offset, Math.max(1, this.#previousWidth));
+			const reportedFromPreviousGrid = reportedRow === previousParkedRow;
+			if (reportedInsideGrid && !(this.#resizeBurstGrew && reportedFromPreviousGrid)) {
+				// A column tag attributes the reply to this probe, but the row can
+				// still describe tmux's pre-resize grid. A grow reply that remains
+				// on the exact previous hardware-cursor row is stale-low: trusting
+				// it would repaint over history just pulled into the viewport.
 				top = Math.max(0, reportedTop);
 			} else if (height < this.#previousHeight && !this.#resizeBurstGrew) {
-				// Last resort after the retry: model the clip deterministically
-				// from the saved parked cursor. Rows strictly below the cursor
-				// are discarded first (even non-blank ones — measured against
-				// real tmux), and only the remainder of the shrink pushes top
-				// rows into scrollback; across an observed burst the totals
-				// telescope from pre-burst state. SIGWINCH coalescing can hide a
-				// grow from this model, which is why a reply always wins above.
+				// An out-of-grid CPR reports the pre-resize pane and is no more
+				// trustworthy than a timeout. Model a monotonic shrink from the
+				// saved parked cursor: rows below it are discarded before top
+				// rows enter scrollback.
 				const parkedRow = this.#providerViewportTop + this.#reflowedRowCount(probe.window, 0, probe.offset, width);
 				const shrink = this.#previousHeight - height;
 				const discardedBelow = Math.min(shrink, Math.max(0, this.#previousHeight - 1 - parkedRow));
 				const pushed = Math.max(0, shrink - discardedBelow);
 				top = Math.max(0, this.#providerViewportTop - pushed);
 			} else {
-				// CPR-less grow or reversed burst: the pre-resize top is
-				// stale-low, every grow step already pulled scrollback down.
-				// Anchor at the conservative upper bound — pull never exceeds
-				// the burst's accumulated growth, and pushes/discards only lower
-				// the top. Exact when scrollback covers the pull; when it does
-				// not, the repaint lands below the real viewport and leaves
-				// stale rows above rather than overwriting committed ones.
+				// A grow, reversed burst, or out-of-grid reply cannot establish a
+				// smaller safe anchor. Pull never exceeds accumulated growth, and
+				// pushes/discards only lower the real top.
 				top = Math.max(0, this.#providerViewportTop + this.#resizeBurstPull);
 			}
 		} else {
@@ -2240,7 +2236,13 @@ export class TUI extends Container {
 			return;
 		}
 		if (this.#resizeScrollbackMode === "rebuild") {
-			this.#prepareForcedRender(true);
+			if (isInsideTerminalMultiplexer()) {
+				this.#multiplexerResizeReplayLimit = Math.max(0, this.#previousHeight);
+				provider.beginHistoryReplay();
+				this.#forceViewportRepaintOnNextRender = true;
+			} else {
+				this.#prepareForcedRender(true);
+			}
 			return;
 		}
 		if (width === this.#previousWidth || this.#resizeScrollbackMode === "preserve") return;
@@ -2268,9 +2270,13 @@ export class TUI extends Container {
 		const history = offered !== undefined && offered.id > this.#acceptedHistoryBatchId ? offered : undefined;
 		if (offered !== undefined && offered.id <= this.#acceptedHistoryBatchId) provider?.acknowledgeHistory(offered.id);
 
-		let historyRows = history?.rows ?? [];
+		const resizeRepair = history?.kind === "replay" && this.#multiplexerResizeReplayLimit !== undefined;
+		let historyRows =
+			resizeRepair && this.#multiplexerResizeReplayLimit !== undefined
+				? history.rows.slice(-this.#multiplexerResizeReplayLimit)
+				: (history?.rows ?? []);
 		let replayViewportRows = 0;
-		if (history?.kind === "replay") {
+		if (history?.kind === "replay" && !resizeRepair) {
 			// Providers may omit unused leading rows from a short viewport. Make
 			// that logical space explicit before the bottom-first replay split.
 			while (viewport.length < height) viewport.unshift("");
@@ -2352,10 +2358,17 @@ export class TUI extends Container {
 		} else {
 			const pushed = Math.max(0, startTop + preparedHistory.length + rows - height);
 			const seedReplacement =
-				!destructiveReset && history?.kind !== "replay" && historyRows.length > 0 && pushed > 0;
+				!destructiveReset && (history?.kind !== "replay" || resizeRepair) && historyRows.length > 0 && pushed > 0;
 			if (!seedReplacement && pushed > this.#providerViewportTop && this.#providerWindow.length > 0) {
-				// Clear stale rows when no physical seed replaces them first.
-				buffer += `\x1b[${this.#providerViewportTop + 1};1H\x1b[J`;
+				// tmux implements a preserved full-screen ED0 by scrolling the
+				// live viewport into pane history. Clear row one with EL, then
+				// erase below from row two so mutable rows never become history.
+				if (this.#providerViewportTop === 0) {
+					buffer += "\x1b[1;1H\x1b[2K";
+					if (height > 1) buffer += "\x1b[2;1H\x1b[J";
+				} else {
+					buffer += `\x1b[${this.#providerViewportTop + 1};1H\x1b[J`;
+				}
 			}
 			const replacementRows = [...preparedHistory, ...prepared];
 			if (seedReplacement) {
@@ -2439,6 +2452,7 @@ export class TUI extends Container {
 		this.#forceViewportRepaintOnNextRender = false;
 		this.#hasEverRendered = true;
 		this.#resizeReplaySize = undefined;
+		if (resizeRepair) this.#multiplexerResizeReplayLimit = undefined;
 		if (history !== undefined) {
 			this.#acceptedHistoryBatchId = history.id;
 			provider?.acknowledgeHistory(history.id);

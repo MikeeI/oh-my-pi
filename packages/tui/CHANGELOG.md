@@ -4,6 +4,7 @@
 ### Fixed
 
 - Fixed blank rows entering tmux scrollback during live pane resizes.
+- Fixed finalized transcript rows disappearing across mixed tmux pane resize cycles.
 
 ## [18.0.6] - 2026-08-26
 

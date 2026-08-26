@@ -1,6 +1,7 @@
 import { afterEach, beforeEach, describe, expect, it } from "bun:test";
 import {
 	CURSOR_MARKER,
+	type HistoryBatch,
 	type TerminalFramePlan,
 	type TerminalFrameProvider,
 	Text,
@@ -9,21 +10,24 @@ import {
 } from "@oh-my-pi/pi-tui";
 import { VirtualTerminal } from "./virtual-terminal";
 
-// Regression coverage for tmux pane zoom corrupting scrollback (duplication and
-// committed-row loss). Multiplexers re-lay the pane on their own schedule
-// relative to SIGWINCH delivery and do not keep the parked cursor attached
-// through a height shrink, so:
-// - the SIGWINCH-side erase must not run (it races the re-layout and blanks
-//   pulled-back committed rows, destroying popped scrollback), and
-// - the settled anchor must come from the deterministic clip model (blank rows
-//   below the viewport clip first, then top rows push, moving the viewport up
-//   by exactly the pushed count) instead of CPR-relative math.
+// Regression coverage for tmux pane zoom corrupting scrollback through
+// duplication and committed-row loss. Multiplexers re-lay the pane on their
+// own schedule relative to SIGWINCH delivery and can report the old grid to a
+// current probe, so:
+// - the SIGWINCH-side erase must not race the re-layout and blank pulled-back
+//   committed rows,
+// - invalid CPR geometry must fall back to the conservative clip/pull model,
+// - valid current-grid CPR remains authoritative, and
+// - rebuild repair must replay no more than the old screen's committed tail.
 
 class FullFrameProvider implements TerminalFrameProvider {
-	history: { id: number; rows: string[] } | undefined;
+	history: HistoryBatch | undefined;
+	historyLedger: readonly string[] = [];
 	markerRow: number | undefined;
 	liveRows = 8;
 	rowPad = 0;
+	replayCount = 0;
+	#nextHistoryId = 2;
 
 	renderFrame(viewport: ViewportSize): TerminalFramePlan {
 		const rows = Array.from({ length: this.liveRows }, (_, i) =>
@@ -42,13 +46,23 @@ class FullFrameProvider implements TerminalFrameProvider {
 	acknowledgeHistory(): void {
 		this.history = undefined;
 	}
+	beginHistoryReplay(): void {
+		this.history = {
+			id: this.#nextHistoryId++,
+			rows: this.historyLedger,
+			kind: "replay",
+		};
+		this.replayCount++;
+	}
 }
 
 function startRig(markerRow?: number) {
 	const terminal = new VirtualTerminal(40, 12);
 	const provider = new FullFrameProvider();
 	provider.markerRow = markerRow;
-	provider.history = { id: 1, rows: Array.from({ length: 3 }, (_, i) => `committed-${i}`) };
+	const committed = Array.from({ length: 3 }, (_, i) => `committed-${i}`);
+	provider.historyLedger = committed;
+	provider.history = { id: 1, rows: committed };
 	const renderScheduler = new ResizeScheduler();
 	const tui = new TUI(terminal, undefined, { renderScheduler });
 	const writes: string[] = [];
@@ -183,12 +197,11 @@ describe("resize anchoring inside a terminal multiplexer", () => {
 
 	it("lets the settled CPR outrank the clip model on a shrink", () => {
 		// SIGWINCH coalescing can hide an intermediate grow entirely, so an
-		// observed-monotonic shrink is not proof of monotonicity. The parked
-		// cursor's reply IS exact — discards leave it in place, pushes only
-		// occur after everything below it is discarded, and hidden grows ride
-		// it down — so a reply reporting row 5 must anchor there (CUP row 6)
-		// even though the clip model would keep the anchor at the pre-burst
-		// top 3 and overwrite the two pulled-back rows.
+		// observed-monotonic shrink is not proof of monotonicity. This in-grid
+		// reply moved away from the previous parked row and therefore reflects
+		// the current layout: row 5 must anchor at CUP row 6 even though the clip
+		// model would keep the anchor at pre-burst top 3 and overwrite the two
+		// pulled-back rows.
 		const { terminal, tui, renderScheduler, writes } = startRig();
 		terminal.resize(40, 6);
 		renderScheduler.settle(); // exit the resize alt borrow, start the CPR probe
@@ -198,6 +211,53 @@ describe("resize anchoring inside a terminal multiplexer", () => {
 		const cup = repaint.match(/\x1b\[(\d+);1H/);
 		expect(cup).not.toBeNull();
 		expect(Number(cup![1])).toBe(6);
+		tui.stop();
+	});
+
+	it("rejects a CPR row outside the resized multiplexer grid", () => {
+		const { terminal, tui, renderScheduler, writes } = startRig();
+		terminal.resize(40, 6);
+		renderScheduler.settle();
+		writes.length = 0;
+
+		terminal.sendInput("\x1b[12;17R");
+
+		const cup = writes.join("").match(/\x1b\[(\d+);1H/);
+		expect(cup).not.toBeNull();
+		expect(Number(cup![1])).toBe(4);
+		tui.stop();
+	});
+
+	it("does not let a stale-low grow CPR undercut the conservative pull bound", () => {
+		const { terminal, tui, renderScheduler, writes } = startRig();
+		terminal.resize(40, 20);
+		renderScheduler.settle();
+		writes.length = 0;
+
+		terminal.sendInput("\x1b[4;17R");
+
+		const cup = writes.join("").match(/\x1b\[(\d+);1H/);
+		expect(cup).not.toBeNull();
+		expect(Number(cup![1])).toBe(12);
+		tui.stop();
+	});
+
+	it("repairs only the old screen tail after a multiplexer rebuild resize", () => {
+		const { terminal, tui, provider, renderScheduler, writes } = startRig();
+		provider.historyLedger = Array.from({ length: 20 }, (_, index) => `ledger-${String(index).padStart(3, "0")}`);
+		tui.setResizeScrollback("rebuild");
+		terminal.resize(40, 6);
+		renderScheduler.settle();
+		writes.length = 0;
+
+		terminal.sendInput("\x1b[4;17R");
+
+		const repaint = writes.join("");
+		expect(provider.replayCount).toBe(1);
+		expect(repaint).not.toContain("ledger-007");
+		for (let index = 8; index < 20; index++) {
+			expect(repaint).toContain(`ledger-${String(index).padStart(3, "0")}`);
+		}
 		tui.stop();
 	});
 

@@ -15,6 +15,8 @@ const TRANSIENT_MARKER = "TRANSIENT-ONLY";
 const HISTORY_FILLER_COUNT = 25;
 const REFLOW_COLUMNS = 96;
 const FINAL_Q_ROWS = ["FINAL-Q1", "FINAL-Q2", "FINAL-Q3", "FINAL-Q4"] as const;
+const INCIDENT_INITIAL_SIZE = [80, 46] as const;
+const INCIDENT_RESIZES = [[110, 19], INCIDENT_INITIAL_SIZE] as const;
 const WIDE_ROW_START = "WIDE-ROW-START";
 const WIDE_ROW_END = "WIDE-ROW-END";
 const RESIZE_MODES = ["rebuild", "append", "preserve"] as const;
@@ -146,6 +148,8 @@ type ResizeScenario = {
 	mode: (typeof RESIZE_MODES)[number];
 	resizes: readonly (readonly [number, number])[];
 	waitForResizeCount?: number;
+	finalizeBeforeResize?: boolean;
+	initialSize?: readonly [number, number];
 };
 
 type ResizeScenarioResult = {
@@ -160,13 +164,14 @@ async function runResizeScenario(scenario: ResizeScenario): Promise<ResizeScenar
 	let capture = "";
 	let paneState = "";
 	try {
+		const [initialColumns, initialRows] = scenario.initialSize ?? [PANE_COLUMNS, PANE_ROWS];
 		await runTmux([
 			"new-session",
 			"-d",
 			"-x",
-			String(PANE_COLUMNS),
+			String(initialColumns),
 			"-y",
-			String(PANE_ROWS),
+			String(initialRows),
 			"-s",
 			scenario.sessionName,
 		]);
@@ -175,11 +180,15 @@ async function runResizeScenario(scenario: ResizeScenario): Promise<ResizeScenar
 			"TMUX_SCROLLBACK_WAIT_FOR_RESIZE=1",
 			`TMUX_SCROLLBACK_RESIZE_COUNT=${scenario.waitForResizeCount ?? 1}`,
 			`TMUX_SCROLLBACK_MODE=${scenario.mode}`,
+			...(scenario.finalizeBeforeResize ? ["TMUX_SCROLLBACK_FINALIZE_BEFORE_RESIZE=1"] : []),
 		].join(" ");
 		const paneCommand = `${environment} ${shellQuote(process.execPath)} ${shellQuote(driverPath)} && echo ${shellQuote(DRIVER_EXIT_MARKER)}`;
 		await runTmux(["respawn-pane", "-k", "-t", paneTarget, paneCommand]);
 
-		liveFrame = await waitForPaneOutput(paneTarget, TRANSIENT_MARKER);
+		liveFrame = await waitForPaneOutput(
+			paneTarget,
+			scenario.finalizeBeforeResize ? FINAL_Q_ROWS.at(-1)! : TRANSIENT_MARKER,
+		);
 		for (const [columns, rows] of scenario.resizes) {
 			await runTmux(["resize-window", "-x", String(columns), "-y", String(rows), "-t", `${scenario.sessionName}:0`]);
 			// tmux delivers SIGWINCH asynchronously; let each real resize reach the pane before the next burst step.
@@ -292,6 +301,21 @@ describe.skipIf(process.platform === "win32" || !tmuxPath)("tmux scrollback exac
 				1,
 			);
 		}
+		expectFinalSuffix(capture, false);
+	}, 15_000);
+
+	it("retains a finalized Assistant suffix across the observed mixed-geometry cycle", async () => {
+		const { liveFrame, paneState, capture } = await runResizeScenario({
+			sessionName: "post-finalize-mixed-resize",
+			mode: "rebuild",
+			initialSize: INCIDENT_INITIAL_SIZE,
+			resizes: INCIDENT_RESIZES,
+			waitForResizeCount: INCIDENT_RESIZES.length,
+			finalizeBeforeResize: true,
+		});
+		expect(liveFrame).toContain(FINAL_Q_ROWS.at(-1)!);
+		expect(paneState, `pane did not exit; captured pane:\n${capture}`).toBe("1");
+		expect(countOccurrences(capture, TRANSIENT_MARKER), capture).toBe(0);
 		expectFinalSuffix(capture, false);
 	}, 15_000);
 

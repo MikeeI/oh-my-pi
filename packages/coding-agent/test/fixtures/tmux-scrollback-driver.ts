@@ -3,6 +3,7 @@ import { AssistantMessageComponent } from "@oh-my-pi/pi-coding-agent/modes/compo
 import { TranscriptContainer } from "@oh-my-pi/pi-coding-agent/modes/components/transcript-container";
 import { initTheme } from "@oh-my-pi/pi-coding-agent/modes/theme/theme";
 import {
+	CURSOR_MARKER,
 	ProcessTerminal,
 	type TerminalFramePlan,
 	type TerminalStartOptions,
@@ -16,11 +17,13 @@ const FRAME_SETTLE_MS = 250;
 const HISTORY_FILLER_COUNT = 25;
 const MARKER_COUNT = 36;
 const WAIT_FOR_RESIZE = Bun.env.TMUX_SCROLLBACK_WAIT_FOR_RESIZE === "1";
+const FINALIZE_BEFORE_RESIZE = Bun.env.TMUX_SCROLLBACK_FINALIZE_BEFORE_RESIZE === "1";
 const TRANSIENT_MARKER = "TRANSIENT-ONLY";
 const FINAL_Q_ROWS = ["FINAL-Q1", "FINAL-Q2", "FINAL-Q3", "FINAL-Q4"] as const;
 const WIDE_ROW_START = "WIDE-ROW-START";
 const WIDE_ROW_END = "WIDE-ROW-END";
 const WIDE_ROW = `${WIDE_ROW_START}-${"x".repeat(110)}-${WIDE_ROW_END}`;
+const POST_RESIZE_SETTLE_MS = 500;
 const configuredResizeMode = Bun.env.TMUX_SCROLLBACK_MODE;
 const RESIZE_SCROLLBACK_MODE =
 	configuredResizeMode === "append" || configuredResizeMode === "preserve" || configuredResizeMode === "rebuild"
@@ -112,13 +115,18 @@ async function main(): Promise<void> {
 			renderFrame(viewport: ViewportSize): TerminalFramePlan {
 				const width = Math.max(1, viewport.columns);
 				const rows = Math.max(0, viewport.rows);
+				const chrome = FINALIZE_BEFORE_RESIZE ? ["DRIVER-STATUS", `DRIVER-EDITOR${CURSOR_MARKER}`] : [];
+				const transcriptRows = Math.max(0, rows - chrome.length);
 				const now = Date.now();
 				return {
-					history: transcript.peekFinalizedBatch(width, rows),
-					viewport: transcript.renderViewport(width, rows, {
-						now,
-						tick: Math.floor(now / 80),
-					}),
+					history: transcript.peekFinalizedBatch(width, transcriptRows),
+					viewport: [
+						...transcript.renderViewport(width, transcriptRows, {
+							now,
+							tick: Math.floor(now / 80),
+						}),
+						...chrome,
+					],
 				};
 			},
 			acknowledgeHistory(id: number): void {
@@ -149,12 +157,21 @@ async function main(): Promise<void> {
 
 		assistant.updateContent(makeMsg(unresolved), { transient: true });
 		await renderFrame(tui);
-		if (resizeGate !== undefined) await resizeGate.promise;
-		assistant.updateContent(makeMsg(resolved), { transient: true });
-		await renderFrame(tui);
-		assistant.updateContent(makeMsg(resolved), { transient: false });
-		assistant.markTranscriptBlockFinalized();
-		await renderFrame(tui);
+		if (FINALIZE_BEFORE_RESIZE) {
+			assistant.updateContent(makeMsg(resolved), { transient: false });
+			assistant.markTranscriptBlockFinalized();
+			await renderFrame(tui);
+			if (resizeGate !== undefined) await resizeGate.promise;
+			await Bun.sleep(POST_RESIZE_SETTLE_MS);
+			await renderFrame(tui);
+		} else {
+			if (resizeGate !== undefined) await resizeGate.promise;
+			assistant.updateContent(makeMsg(resolved), { transient: true });
+			await renderFrame(tui);
+			assistant.updateContent(makeMsg(resolved), { transient: false });
+			assistant.markTranscriptBlockFinalized();
+			await renderFrame(tui);
+		}
 	} finally {
 		tui?.stop();
 		setTerminalHeadless(previousHeadless);

@@ -362,10 +362,11 @@ Each entry names its disposition, observable behavior, implementation owner, and
 - Contract: global expansion, tool-visibility, and image-visibility changes preserve already accepted presentation.
 - Contract: pre-existing pane history survives.
 - Contract: multiplexer rendering never emits ED3 or invokes `clear-history`, including configured rebuilds.
+- Contract: replay stale-cell clearing never scrolls the mutable viewport into preserved tmux history.
 - Owner: current upstream `src/modes/components/transcript-container.ts` owns semantic retirement, replay, and acknowledgement.
 - Owner: `src/modes/components/transcript-container.ts#markAcceptedTapeDrifted` owns global presentation-drift latching.
 - Owner: current upstream `packages/tui/src/tui.ts#TUI.#emitPlanFrame` owns the sole physical history write.
-- Required action: retain MOMP's minimal non-destructive multiplexer reset and exactness integration at those owners.
+- Required action: retain MOMP's minimal non-destructive reset and preserved-clear integration at that owner.
 - Proof: `test/modes/components/transcript-container.test.ts`.
 - Proof: `packages/tui/test/history-frame-plan.test.ts`.
 - Proof: `test/tmux-scrollback-exactness.test.ts`.
@@ -382,14 +383,15 @@ Each entry names its disposition, observable behavior, implementation owner, and
 #### `MOMP-MUX-RESIZE` — Native multiplexer resize preservation
 
 - Disposition: `UPSTREAM-INTEGRIERT`.
-- Contract: height-only multiplexer resizes never lose finalized transcript rows or pre-existing pane history.
+- Contract: mixed multiplexer geometry cycles never lose finalized transcript rows or pre-existing pane history.
 - Contract: height-only `append` resizes never replay current-width application history.
+- Contract: rebuild repairs replay at most the old screen's committed tail, never the complete application ledger.
 - Contract: tmux-native mutable-row duplication is accepted when geometry changes; full application-ledger replay is not.
 - Contract: the `MOMP-SCROLLBACK` exact-once guarantee applies only while mutable output retains stable pane geometry.
 - Owner: current upstream `TUI.#beginResizeAltPaint` owns resize-burst geometry tracking and alternate-buffer borrowing.
 - Owner: current upstream `TUI.#beginResizeAnchorProbe` and `TUI.#resolveResizeAnchor` own anchor recovery.
 - Owner: current upstream `TUI.#doRender` owns fullscreen-exit anchor recovery.
-- Owner: current upstream `TUI.#prepareResizeReplay` owns width-sensitive replay policy.
+- Owner: current upstream `TUI.#prepareResizeReplay` owns bounded multiplexer repair and width-sensitive replay policy.
 - Required action: retain these upstream owners and never use ED3 or `clear-history` to repair native history.
 - Proof: `packages/tui/test/history-frame-plan.test.ts`.
 - Proof: `packages/tui/test/resize-multiplexer-anchor.test.ts`.
