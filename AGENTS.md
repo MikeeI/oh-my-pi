@@ -204,7 +204,8 @@ Each entry names its disposition, observable behavior, implementation owner, and
 
 - Disposition: `MOMP-EIGEN`, designed for upstream.
 - Contract: before each Read, the model collects every bounded target already required for the current step.
-- Contract: all independent known targets use one semicolon-joined call instead of one assistant turn per target.
+- Contract: all independent known non-HTTP(S) targets use one semicolon-joined Read call.
+- Contract: independent external HTTP(S) URLs use sibling Read calls in one turn and are never semicolon-joined.
 - Contract: another Read is reserved for targets discovered by results or targets that failed or were truncated.
 - Owner: `src/prompts/tools/read.md` owns model-visible batching guidance.
 - Proof: batching-description cases in `test/tools/read-guidance.test.ts`.

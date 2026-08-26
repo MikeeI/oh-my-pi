@@ -18,7 +18,9 @@ describe("Read guidance", () => {
 		const description = new ReadTool(createSession()).description;
 
 		expect(description).toContain("Before each `read`, collect every bounded target");
-		expect(description).toContain("Batch all independent known targets in one call");
+		expect(description).toContain("independent known non-HTTP(S) targets");
+		expect(description).toContain("HTTP(S) URLs as sibling `read` calls");
+		expect(description).toContain("NEVER semicolon-join them");
 		expect(description).toContain("NEVER read those targets one per assistant turn");
 		expect(description).toContain("Read again only for a target discovered by a result");
 		expect(description).toContain("skill://skill-momp;package.json;src/main.ts:1-200");

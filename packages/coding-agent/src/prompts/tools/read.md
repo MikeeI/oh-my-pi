@@ -2,7 +2,8 @@ Read files, directories, archives, SQLite, images, documents, internal resources
 
 <instruction>
 - Before each `read`, collect every bounded target already required for the current step.
-- Batch all independent known targets in one call by joining complete `path[:selector]` targets with `;`.
+- Batch independent known non-HTTP(S) targets in one call with semicolon-joined complete `path[:selector]` targets.
+- Batch independent HTTP(S) URLs as sibling `read` calls in one turn; NEVER semicolon-join them in one `path`.
 - NEVER read those targets one per assistant turn; each extra turn adds a model roundtrip.
 - Read again only for a target discovered by a result or for a failed or truncated target.
 - Known range ≤{{DEFAULT_MAX_LINES}} lines → request the complete range once.
