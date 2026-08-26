@@ -1,6 +1,9 @@
 # Changelog
 
 ## [Unreleased]
+### Fixed
+
+- Fixed blank rows entering tmux scrollback during live pane resizes.
 
 ## [18.0.6] - 2026-08-26
 

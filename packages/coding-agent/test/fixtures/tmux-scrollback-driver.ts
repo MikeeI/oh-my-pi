@@ -15,9 +15,20 @@ const HISTORY_SETTLE_MS = 50;
 const FRAME_SETTLE_MS = 250;
 const HISTORY_FILLER_COUNT = 25;
 const MARKER_COUNT = 36;
+const WAIT_FOR_RESIZE = Bun.env.TMUX_SCROLLBACK_WAIT_FOR_RESIZE === "1";
+const TRANSIENT_MARKER = "TRANSIENT-ONLY";
+const configuredResizeMode = Bun.env.TMUX_SCROLLBACK_MODE;
+const RESIZE_SCROLLBACK_MODE =
+	configuredResizeMode === "append" || configuredResizeMode === "preserve" || configuredResizeMode === "rebuild"
+		? configuredResizeMode
+		: "rebuild";
+const configuredResizeCount = Number(Bun.env.TMUX_SCROLLBACK_RESIZE_COUNT ?? "1");
+const RESIZE_EVENT_COUNT =
+	Number.isInteger(configuredResizeCount) && configuredResizeCount > 0 ? configuredResizeCount : 1;
 
 class DriverTerminal extends ProcessTerminal {
 	#resizesEnabled = false;
+	#resizeListener: (() => void) | undefined;
 
 	override start(
 		onInput: (data: string) => void,
@@ -28,7 +39,9 @@ class DriverTerminal extends ProcessTerminal {
 		super.start(
 			onInput,
 			() => {
-				if (this.#resizesEnabled) onResize();
+				if (!this.#resizesEnabled) return;
+				onResize();
+				this.#resizeListener?.();
 			},
 			onDisconnect,
 			options,
@@ -37,6 +50,9 @@ class DriverTerminal extends ProcessTerminal {
 
 	enableResizes(): void {
 		this.#resizesEnabled = true;
+	}
+	setResizeListener(listener: () => void): void {
+		this.#resizeListener = listener;
 	}
 }
 
@@ -80,9 +96,10 @@ async function main(): Promise<void> {
 	const previousHeadless = setTerminalHeadless(false);
 	let tui: TUI | undefined;
 	try {
+		const resizeGate = WAIT_FOR_RESIZE ? Promise.withResolvers<void>() : undefined;
 		const terminal = new DriverTerminal();
 		tui = new TUI(terminal);
-		tui.setResizeScrollback("rebuild");
+		tui.setResizeScrollback(RESIZE_SCROLLBACK_MODE);
 		const transcript = new TranscriptContainer();
 		const assistant = new AssistantMessageComponent();
 		transcript.addChild(assistant);
@@ -111,17 +128,24 @@ async function main(): Promise<void> {
 		tui.start();
 		// Let the real terminal finish its startup resize/alternate-buffer transaction before streaming content.
 		await renderFrame(tui);
+		let resizeEvents = 0;
+		terminal.setResizeListener(() => {
+			resizeEvents++;
+			if (resizeEvents >= RESIZE_EVENT_COUNT) resizeGate?.resolve();
+		});
 		terminal.enableResizes();
 
 		const markers = Array.from(
 			{ length: MARKER_COUNT },
 			(_value, index) => `- [MARK-${String(index).padStart(3, "0")}][marker]`,
 		).join("\n");
-		const unresolved = `STABLE-PREFACE\n\n${markers}`;
-		const resolved = `${unresolved}\n\n[marker]: https://example.com`;
+		const stable = `STABLE-PREFACE\n\n${markers}`;
+		const unresolved = `${stable}\n\n${TRANSIENT_MARKER}`;
+		const resolved = `${stable}\n\n[marker]: https://example.com`;
 
 		assistant.updateContent(makeMsg(unresolved), { transient: true });
 		await renderFrame(tui);
+		if (resizeGate !== undefined) await resizeGate.promise;
 		assistant.updateContent(makeMsg(resolved), { transient: true });
 		await renderFrame(tui);
 		assistant.updateContent(makeMsg(resolved), { transient: false });

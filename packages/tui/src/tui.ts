@@ -797,6 +797,7 @@ export class TUI extends Container {
 	#suppressResizeUntil = 0;
 	#resizeScrollbackMode: ResizeScrollbackMode = TUI.#initialResizeScrollbackMode();
 	#resizeReplaySize: string | undefined;
+	#resizeHistoryRepairPending = false;
 	// Holds an alternate-screen exit until its replacement full paint can emit it
 	// atomically. It must survive a deferred Ghostty image frame.
 	#pendingAltExit = "";
@@ -826,6 +827,7 @@ export class TUI extends Container {
 		this.#frameProvider = provider;
 		this.#providerWindow = [];
 		this.#resizeReplaySize = undefined;
+		this.#resizeHistoryRepairPending = false;
 		this.requestRender(true);
 	}
 
@@ -1102,6 +1104,7 @@ export class TUI extends Container {
 		if (!this.#resizeAltActive) {
 			this.#resizeAltActive = true;
 			setAltScreenActive(true);
+			this.#resizeHistoryRepairPending = isInsideTerminalMultiplexer();
 			this.#altPreviousLines = [];
 			this.#forgetHardwareCursorState();
 			this.#recordHardwareCursorHidden();
@@ -1558,6 +1561,7 @@ export class TUI extends Container {
 		this.#resizeSettleTimer?.cancel();
 		this.#resizeSettleTimer = undefined;
 		this.#cancelResizeProbe();
+		this.#resizeHistoryRepairPending = false;
 		if (this.#resizeAltActive) {
 			this.#resizeAltActive = false;
 			this.terminal.write(`${this.#keyboardEnhancementExit()}\x1b[?1049l`);
@@ -2285,6 +2289,7 @@ export class TUI extends Container {
 		const prepared = this.#prepareLinesArray(viewport, width);
 		const preparedHistory = this.#prepareLinesArray(historyRows, width);
 		const rows = prepared.length;
+		const resizeHistoryRepairActive = this.#resizeHistoryRepairPending && historyRows.length > 0;
 		// Destructive reset (session replace, /tree, explicit clear, or a settled
 		// resize in rebuild mode): erase native history and the viewport,
 		// then repaint from row zero.
@@ -2345,12 +2350,8 @@ export class TUI extends Container {
 				buffer += `\x1b[${newTop + rows + 1};1H\x1b[J`;
 			}
 		} else {
-			// This write scrolls when history + viewport overflow the screen; the
-			// terminal pushes the physical top rows into scrollback. Rows above the
-			// old viewport are committed history (correct to push), but old live
-			// viewport rows are not — erase them first so a scroll can only push
-			// committed rows and blanks, never an unfinished frame.
-			if (historyRows.length > 0 && this.#providerWindow.length > 0) {
+			const pushed = Math.max(0, startTop + preparedHistory.length + rows - height);
+			if (historyRows.length > 0 && this.#providerWindow.length > 0 && !resizeHistoryRepairActive) {
 				// tmux can retain cells erased by ED2 as the next write scrolls the
 				// viewport, so overwrite every stale live row with blanks first.
 				const blankRow = " ".repeat(width);
@@ -2361,9 +2362,31 @@ export class TUI extends Container {
 					buffer += `\x1b[${screenRow + 1};1H${this.#lineRewriteSequence(blankRow, width, screenRow)}`;
 				}
 			}
-			const pushed = Math.max(0, startTop + preparedHistory.length + rows - height);
 			if (pushed > this.#providerViewportTop && this.#providerWindow.length > 0) {
+				// Clear the stale viewport before the atomic replacement.
 				buffer += `\x1b[${this.#providerViewportTop + 1};1H\x1b[J`;
+			}
+			if (historyRows.length > 0 && this.#providerWindow.length > 0 && resizeHistoryRepairActive && pushed > 0) {
+				// Rows that scroll into history must already contain the exact
+				// replacement sequence; otherwise tmux preserves blank live rows.
+				const staleTop = Math.max(0, Math.min(this.#providerViewportTop, height - 1));
+				const staleRows = Math.min(this.#providerWindow.length, height - staleTop);
+				const replacementRows = [...preparedHistory, ...prepared];
+				const seedStart = Math.max(0, staleTop - startTop);
+				const seedEnd = Math.min(pushed, replacementRows.length, staleTop + staleRows - startTop);
+				for (let index = seedStart; index < seedEnd; index++) {
+					const screenRow = startTop + index;
+					const sourceRows = index < preparedHistory.length ? preparedHistory : prepared;
+					const sourceIndex = index < preparedHistory.length ? index : index - preparedHistory.length;
+					buffer += `\x1b[${screenRow + 1};1H${this.#lineRewriteSequence(
+						replacementRows[index] ?? "",
+						width,
+						screenRow,
+						-1,
+						-1,
+						this.#osc66SpacerGlyphWidth(sourceRows, sourceIndex),
+					)}`;
+				}
 			}
 			buffer += `\x1b[${startTop + 1};1H`;
 			let screenRow = startTop;
@@ -2426,6 +2449,7 @@ export class TUI extends Container {
 		this.#forceViewportRepaintOnNextRender = false;
 		this.#hasEverRendered = true;
 		this.#resizeReplaySize = undefined;
+		if (resizeHistoryRepairActive) this.#resizeHistoryRepairPending = false;
 		if (history !== undefined) {
 			this.#acceptedHistoryBatchId = history.id;
 			provider?.acknowledgeHistory(history.id);

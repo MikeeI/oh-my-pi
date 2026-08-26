@@ -11,6 +11,15 @@ const LIVE_FRAME_POLL_ATTEMPTS = 1000;
 const LIVE_FRAME_POLL_MS = 5;
 const RESIZED_PANE_ROWS = 13;
 const MARKER_COUNT = 36;
+const TRANSIENT_MARKER = "TRANSIENT-ONLY";
+const HISTORY_FILLER_COUNT = 25;
+const REFLOW_COLUMNS = 96;
+const RESIZE_MODES = ["rebuild", "append", "preserve"] as const;
+const BURST_RESIZES = [
+	[120, 13],
+	[164, 25],
+	[96, 15],
+] as const;
 const SESSION_NAME = "exactness";
 const PANE_TARGET = `${SESSION_NAME}:0.0`;
 const DRIVER_EXIT_MARKER = "TMUX-DRIVER-EXIT-0";
@@ -33,6 +42,18 @@ function shellQuote(value: string): string {
 
 function countOccurrences(text: string, needle: string): number {
 	return text.split(needle).length - 1;
+}
+
+function countLeadingBlankRowsAfter(text: string, marker: string): number {
+	const rows = text.split(/\r?\n/u);
+	const start = rows.findIndex(row => row.includes(marker));
+	if (start < 0) return -1;
+	let blankRows = 0;
+	for (const row of rows.slice(start + 1)) {
+		if (row.trim().length > 0) break;
+		blankRows++;
+	}
+	return blankRows;
 }
 
 async function runTmux(args: readonly string[], allowFailure = false): Promise<TmuxResult> {
@@ -95,6 +116,57 @@ async function killTmuxServer(): Promise<void> {
 		// Best-effort cleanup: primary assertion failures must remain visible.
 	}
 }
+type ResizeScenario = {
+	sessionName: string;
+	mode: (typeof RESIZE_MODES)[number];
+	resizes: readonly (readonly [number, number])[];
+	waitForResizeCount?: number;
+};
+
+type ResizeScenarioResult = {
+	liveFrame: string;
+	paneState: string;
+	capture: string;
+};
+
+async function runResizeScenario(scenario: ResizeScenario): Promise<ResizeScenarioResult> {
+	const paneTarget = `${scenario.sessionName}:0.0`;
+	let liveFrame = "";
+	let capture = "";
+	let paneState = "";
+	try {
+		await runTmux([
+			"new-session",
+			"-d",
+			"-x",
+			String(PANE_COLUMNS),
+			"-y",
+			String(PANE_ROWS),
+			"-s",
+			scenario.sessionName,
+		]);
+		await runTmux(["set-option", "-w", "-t", `${scenario.sessionName}:0`, "remain-on-exit", "on"]);
+		const environment = [
+			"TMUX_SCROLLBACK_WAIT_FOR_RESIZE=1",
+			`TMUX_SCROLLBACK_RESIZE_COUNT=${scenario.waitForResizeCount ?? 1}`,
+			`TMUX_SCROLLBACK_MODE=${scenario.mode}`,
+		].join(" ");
+		const paneCommand = `${environment} ${shellQuote(process.execPath)} ${shellQuote(driverPath)} && echo ${shellQuote(DRIVER_EXIT_MARKER)}`;
+		await runTmux(["respawn-pane", "-k", "-t", paneTarget, paneCommand]);
+
+		liveFrame = await waitForPaneOutput(paneTarget, TRANSIENT_MARKER);
+		for (const [columns, rows] of scenario.resizes) {
+			await runTmux(["resize-window", "-x", String(columns), "-y", String(rows), "-t", `${scenario.sessionName}:0`]);
+			// tmux delivers SIGWINCH asynchronously; let each real resize reach the pane before the next burst step.
+			await Bun.sleep(100);
+		}
+		paneState = await waitForPaneDeath(paneTarget);
+		capture = await waitForPaneTranscript(paneTarget);
+		return { liveFrame, paneState, capture };
+	} finally {
+		await killTmuxServer();
+	}
+}
 
 describe.skipIf(process.platform === "win32" || !tmuxPath)("tmux scrollback exactness", () => {
 	it("records one exact final assistant answer without erasing prior pane history", async () => {
@@ -123,41 +195,96 @@ describe.skipIf(process.platform === "win32" || !tmuxPath)("tmux scrollback exac
 	}, 15_000);
 
 	it("retains pane history during a configured rebuild on live tmux resize", async () => {
-		const sessionName = "resize";
-		const paneTarget = `${sessionName}:0.0`;
-		let capture = "";
-		try {
-			await runTmux(["new-session", "-d", "-x", String(PANE_COLUMNS), "-y", String(PANE_ROWS), "-s", sessionName]);
-			await runTmux(["set-option", "-w", "-t", `${sessionName}:0`, "remain-on-exit", "on"]);
-			const paneCommand = `${shellQuote(process.execPath)} ${shellQuote(driverPath)} && echo ${shellQuote(DRIVER_EXIT_MARKER)}`;
-			await runTmux(["respawn-pane", "-k", "-t", paneTarget, paneCommand]);
+		const { liveFrame, paneState, capture } = await runResizeScenario({
+			sessionName: "resize",
+			mode: "rebuild",
+			resizes: [[PANE_COLUMNS, RESIZED_PANE_ROWS]],
+		});
+		expect(liveFrame).toContain(TRANSIENT_MARKER);
+		expect(countLeadingBlankRowsAfter(liveFrame, "HISTORY-FILLER-024")).toBe(0);
+		expect(paneState, `pane did not exit; captured pane:\n${capture}`).toBe("1");
+		expect(countOccurrences(capture, TRANSIENT_MARKER), capture).toBe(0);
+		expect(countLeadingBlankRowsAfter(capture, "HISTORY-FILLER-024"), capture).toBe(0);
+		expect(countOccurrences(capture, DRIVER_EXIT_MARKER), capture).toBe(1);
+		expect(countOccurrences(capture, "PREEXISTING-HISTORY"), capture).toBe(1);
+		for (let index = 0; index < HISTORY_FILLER_COUNT; index++) {
+			const marker = `HISTORY-FILLER-${String(index).padStart(3, "0")}`;
+			expect(countOccurrences(capture, marker), `${marker} was lost or duplicated; captured pane:\n${capture}`).toBe(
+				1,
+			);
+		}
+		for (let index = 0; index < MARKER_COUNT; index++) {
+			const marker = `MARK-${String(index).padStart(3, "0")}`;
+			expect(
+				countOccurrences(capture, marker),
+				`${marker} vanished after resize; captured pane:\n${capture}`,
+			).toBeGreaterThanOrEqual(1);
+		}
+	}, 15_000);
+	it("retains transient and finalized content across a real width reflow", async () => {
+		const { liveFrame, paneState, capture } = await runResizeScenario({
+			sessionName: "width-reflow",
+			mode: "rebuild",
+			resizes: [[REFLOW_COLUMNS, PANE_ROWS]],
+		});
+		expect(liveFrame).toContain(TRANSIENT_MARKER);
+		expect(countLeadingBlankRowsAfter(liveFrame, "HISTORY-FILLER-024")).toBe(0);
+		expect(paneState, `pane did not exit; captured pane:\n${capture}`).toBe("1");
+		expect(countOccurrences(capture, TRANSIENT_MARKER), capture).toBe(0);
+		expect(countLeadingBlankRowsAfter(capture, "HISTORY-FILLER-024"), capture).toBe(0);
+		expect(countOccurrences(capture, "PREEXISTING-HISTORY"), capture).toBe(1);
+		for (let index = 0; index < HISTORY_FILLER_COUNT; index++) {
+			const marker = `HISTORY-FILLER-${String(index).padStart(3, "0")}`;
+			expect(countOccurrences(capture, marker), `${marker} was lost or duplicated; captured pane:\n${capture}`).toBe(
+				1,
+			);
+		}
+		for (let index = 0; index < MARKER_COUNT; index++) {
+			const marker = `MARK-${String(index).padStart(3, "0")}`;
+			expect(
+				countOccurrences(capture, marker),
+				`${marker} vanished after width reflow; captured pane:\n${capture}`,
+			).toBeGreaterThanOrEqual(1);
+		}
+	}, 15_000);
 
-			const liveFrame = await waitForPaneOutput(paneTarget, "STABLE-PREFACE");
-			expect(liveFrame, "streaming frame did not become visible before resize").toContain("STABLE-PREFACE");
-			await runTmux([
-				"resize-window",
-				"-x",
-				String(PANE_COLUMNS),
-				"-y",
-				String(RESIZED_PANE_ROWS),
-				"-t",
-				`${sessionName}:0`,
-			]);
-
-			const paneState = await waitForPaneDeath(paneTarget);
-			capture = await waitForPaneTranscript(paneTarget);
+	for (const mode of RESIZE_MODES) {
+		it(`retains exact scrollback in ${mode} mode during resize`, async () => {
+			const { paneState, capture } = await runResizeScenario({
+				sessionName: `mode-${mode}`,
+				mode,
+				resizes: [[PANE_COLUMNS, RESIZED_PANE_ROWS]],
+			});
 			expect(paneState, `pane did not exit; captured pane:\n${capture}`).toBe("1");
-			expect(countOccurrences(capture, DRIVER_EXIT_MARKER), capture).toBe(1);
+			expect(countOccurrences(capture, TRANSIENT_MARKER), capture).toBe(0);
+			expect(countLeadingBlankRowsAfter(capture, "HISTORY-FILLER-024"), capture).toBe(0);
 			expect(countOccurrences(capture, "PREEXISTING-HISTORY"), capture).toBe(1);
-			for (let index = 0; index < MARKER_COUNT; index++) {
-				const marker = `MARK-${String(index).padStart(3, "0")}`;
+			for (let index = 0; index < HISTORY_FILLER_COUNT; index++) {
+				const marker = `HISTORY-FILLER-${String(index).padStart(3, "0")}`;
 				expect(
 					countOccurrences(capture, marker),
-					`${marker} vanished after resize; captured pane:\n${capture}`,
-				).toBeGreaterThanOrEqual(1);
+					`${marker} was lost or duplicated in ${mode} mode; captured pane:\n${capture}`,
+				).toBe(1);
 			}
-		} finally {
-			await killTmuxServer();
+		}, 15_000);
+	}
+
+	it("keeps scrollback stable across a coalesced resize burst", async () => {
+		const { paneState, capture } = await runResizeScenario({
+			sessionName: "resize-burst",
+			mode: "rebuild",
+			resizes: BURST_RESIZES,
+			waitForResizeCount: 1,
+		});
+		expect(paneState, `pane did not exit; captured pane:\n${capture}`).toBe("1");
+		expect(countOccurrences(capture, TRANSIENT_MARKER), capture).toBe(0);
+		expect(countLeadingBlankRowsAfter(capture, "HISTORY-FILLER-024"), capture).toBe(0);
+		expect(countOccurrences(capture, "PREEXISTING-HISTORY"), capture).toBe(1);
+		for (let index = 0; index < HISTORY_FILLER_COUNT; index++) {
+			const marker = `HISTORY-FILLER-${String(index).padStart(3, "0")}`;
+			expect(countOccurrences(capture, marker), `${marker} was lost or duplicated; captured pane:\n${capture}`).toBe(
+				1,
+			);
 		}
 	}, 15_000);
 
