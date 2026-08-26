@@ -209,6 +209,16 @@ Each entry names its disposition, observable behavior, implementation owner, and
 - Owner: `src/prompts/tools/read.md` owns model-visible batching guidance.
 - Proof: batching-description cases in `test/tools/read-guidance.test.ts`.
 
+#### `MOMP-WEB-SEARCH-PARALLEL` — Provider-roundtrip-efficient searches
+
+- Disposition: `MOMP-EIGEN`, designed for upstream.
+- Contract: before searching, the model collects all independent queries required for the current step.
+- Contract: independent queries prefer parallel sibling `web_search` calls in one assistant turn.
+- Contract: sequential searches are reserved for queries determined by prior results.
+- Owner: `src/prompts/tools/web-search.md` owns model-visible search scheduling guidance.
+- Owner: upstream `packages/agent/src/agent-loop.ts#executeToolCalls` owns shared sibling-tool concurrency.
+- Proof: scheduling-description cases in `test/web/search/guidance.test.ts`.
+
 #### `MOMP-TREE-COMPACT` — Token-efficient directory context
 
 - Disposition: `MOMP-EIGEN`; compact Read metadata spacing and metadata-free prompt-tree rendering are designed for upstream.
