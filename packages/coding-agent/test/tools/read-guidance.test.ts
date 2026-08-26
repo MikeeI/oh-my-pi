@@ -14,6 +14,16 @@ function createSession(): ToolSession {
 }
 
 describe("Read guidance", () => {
+	it("requires one call for independent known targets before another assistant turn", () => {
+		const description = new ReadTool(createSession()).description;
+
+		expect(description).toContain("Before each `read`, collect every bounded target");
+		expect(description).toContain("Batch all independent known targets in one call");
+		expect(description).toContain("NEVER read those targets one per assistant turn");
+		expect(description).toContain("Read again only for a target discovered by a result");
+		expect(description).toContain("skill://skill-momp;package.json;src/main.ts:1-200");
+	});
+
 	it("describes raw output as source-specific instead of universal byte access", () => {
 		const description = new ReadTool(createSession()).description;
 

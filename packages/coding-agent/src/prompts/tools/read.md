@@ -1,13 +1,15 @@
 Read files, directories, archives, SQLite, images, documents, internal resources, and web URLs via `path`.
 
 <instruction>
-- Bounded known targets → one `read` call; join complete `path[:selector]` targets with `;`.
+- Before each `read`, collect every bounded target already required for the current step.
+- Batch all independent known targets in one call by joining complete `path[:selector]` targets with `;`.
+- NEVER read those targets one per assistant turn; each extra turn adds a model roundtrip.
+- Read again only for a target discovered by a result or for a failed or truncated target.
 - Known range ≤{{DEFAULT_MAX_LINES}} lines → request the complete range once.
 - Larger known range set → repeat its path with ≤{{DEFAULT_MAX_LINES}}-line selectors.
 - Unknown extent → discover once, then batch every known missing range in the next call.
 - A failed or truncated target means retrieval is incomplete.
-- Example: `src/main.ts:1-200;src/config.ts:40-120;large.md:1-3000;large.md:3001-3418`.
-- NEVER split a bounded pre-planned batch across turns; retry only failed or truncated targets.
+- Example: `skill://skill-momp;package.json;src/main.ts:1-200;large.md:1-3000;large.md:3001-3418`.
 - SHOULD use `read` (not browser) for web content; browser only when `read` can't deliver.
 </instruction>
 
