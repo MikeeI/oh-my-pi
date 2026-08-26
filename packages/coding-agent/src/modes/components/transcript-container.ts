@@ -80,7 +80,7 @@ interface AcceptedTapeVersion {
 
 interface AcceptedTapeChunk {
 	readonly rows: readonly string[];
-	readonly offerWidth: number;
+	readonly reservedTrailingSeparator: boolean;
 	readonly versions: readonly AcceptedTapeVersion[];
 }
 
@@ -91,14 +91,12 @@ type Offered =
 			kind: "append";
 			entry: number;
 			emittedEnd: number;
-			offerWidth: number;
 			versions: readonly AcceptedTapeVersion[];
 	  }
 	| {
 			batch: HistoryBatch;
 			kind: "commit";
 			end: number;
-			offerWidth: number;
 			versions: readonly AcceptedTapeVersion[];
 	  }
 	| { batch: HistoryBatch; kind: "replay" };
@@ -192,9 +190,19 @@ export class TranscriptContainer extends Container {
 		this.#acceptedTapeChunks = [];
 		this.#acceptedTapeDrifted = false;
 	}
+	/**
+	 * Preserve accepted terminal presentation before a global UI mutation.
+	 * A pending non-replay offer may already be in the writer transaction.
+	 */
+	markAcceptedTapeDrifted(): void {
+		if (this.#acceptedTapeChunks.length > 0 || (this.#offered !== undefined && this.#offered.kind !== "replay")) {
+			this.#acceptedTapeDrifted = true;
+		}
+	}
 
 	setToolActivityVisible(visible: boolean): void {
 		if (this.#toolActivityVisible === visible) return;
+		this.markAcceptedTapeDrifted();
 		this.#toolActivityVisible = visible;
 		for (const child of this.children) {
 			if (isToolActivityComponent(child)) child.setToolActivityVisible(visible);
@@ -416,7 +424,6 @@ export class TranscriptContainer extends Container {
 				kind: "append",
 				entry: this.#frontier,
 				emittedEnd,
-				offerWidth: width,
 				versions: this.#captureVersions(this.#frontier, this.#frontier + 1),
 			};
 			return batch;
@@ -446,7 +453,6 @@ export class TranscriptContainer extends Container {
 			batch,
 			end,
 			kind: "commit",
-			offerWidth: width,
 			versions: this.#captureVersions(this.#frontier, end),
 		};
 		return batch;
@@ -472,7 +478,7 @@ export class TranscriptContainer extends Container {
 			if (this.#versionsDrifted(offered.versions)) this.#acceptedTapeDrifted = true;
 			this.#acceptedTapeChunks.push({
 				rows: offered.batch.rows.slice(),
-				offerWidth: offered.offerWidth,
+				reservedTrailingSeparator: offered.kind === "commit" && offered.batch.rows.at(-1) === "",
 				versions: offered.versions,
 			});
 		}
@@ -490,11 +496,18 @@ export class TranscriptContainer extends Container {
 		const cap = Math.max(0, Math.trunc(maxRows));
 		if (cap === 0) return EMPTY_ROWS;
 		this.#refreshAcceptedTapeDrift();
-		const rows = this.#acceptedTapeDrifted ? this.#renderAcceptedTape(width) : [];
-		const start = this.#acceptedTapeDrifted ? this.#frontier : 0;
-		if (this.#acceptedTapeDrifted && rows.at(-1) === "") rows.pop();
-		const live = this.#renderRange(start, this.#entries.length, width, false);
-		if (live.length > 0) rows.push(...live);
+		if (!this.#acceptedTapeDrifted) {
+			return this.#renderTailRange(0, this.#entries.length, width, cap, false);
+		}
+
+		const live = this.#renderTailRange(this.#frontier, this.#entries.length, width, cap, true);
+		if (live.length >= cap) return live;
+
+		const finalChunk = this.#acceptedTapeChunks.at(-1);
+		const removeTerminalSeparator = live.length === 0 && finalChunk?.reservedTrailingSeparator === true;
+		const tape = this.#renderAcceptedTapeTail(width, cap - live.length + (removeTerminalSeparator ? 1 : 0));
+		if (removeTerminalSeparator && tape.at(-1) === "") tape.pop();
+		const rows = [...tape, ...live];
 		return rows.length > cap ? rows.slice(rows.length - cap) : rows;
 	}
 
@@ -599,6 +612,34 @@ export class TranscriptContainer extends Container {
 			rows.push(...reflowHardRows(chunk.rows, width));
 		}
 		return rows;
+	}
+	#renderAcceptedTapeTail(width: number, maxRows: number): string[] {
+		const rows: string[] = [];
+		for (let index = this.#acceptedTapeChunks.length - 1; index >= 0; index--) {
+			rows.unshift(...reflowHardRows(this.#acceptedTapeChunks[index]!.rows, width));
+			if (rows.length >= maxRows) break;
+		}
+		return rows.length > maxRows ? rows.slice(rows.length - maxRows) : rows;
+	}
+
+	#renderTailRange(start: number, end: number, width: number, maxRows: number, excludeEmittedHead: boolean): string[] {
+		const rows: string[] = [];
+		for (let index = end - 1; index >= start; index--) {
+			const entry = this.#entries[index]!;
+			this.#setAllocation(entry.component, Number.MAX_SAFE_INTEGER, this.#lastFrame);
+			const rendered =
+				excludeEmittedHead && index === start
+					? this.#renderEntry(entry, width)
+					: trimBlankEdges(entry.component.render(width));
+			const emittedRows =
+				excludeEmittedHead && index === start ? this.#renderStablePrefix(entry, entry.emitted, width).length : 0;
+			const block = rendered.slice(emittedRows);
+			if (block.length === 0) continue;
+			if (rows.length > 0) rows.unshift("");
+			rows.unshift(...block);
+			if (rows.length >= maxRows) break;
+		}
+		return rows.length > maxRows ? rows.slice(rows.length - maxRows) : rows;
 	}
 
 	#captureVersions(start: number, end: number): AcceptedTapeVersion[] {

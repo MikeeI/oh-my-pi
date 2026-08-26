@@ -358,9 +358,11 @@ Each entry names its disposition, observable behavior, implementation owner, and
 - Contract: finalized Assistant tails remain reachable while ordered retirement is blocked by active predecessors.
 - Contract: with stable pane geometry, final Assistant content enters pane history exactly once.
 - Contract: accepted terminal bytes remain immutable when later component state changes semantic rendering.
+- Contract: global expansion, tool-visibility, and image-visibility changes preserve already accepted presentation.
 - Contract: pre-existing pane history survives.
 - Contract: multiplexer rendering never emits ED3 or invokes `clear-history`, including configured rebuilds.
 - Owner: current upstream `src/modes/components/transcript-container.ts` owns semantic retirement, replay, and acknowledgement.
+- Owner: `src/modes/components/transcript-container.ts#markAcceptedTapeDrifted` owns global presentation-drift latching.
 - Owner: current upstream `packages/tui/src/tui.ts#TUI.#emitPlanFrame` owns the sole physical history write.
 - Required action: retain MOMP's minimal non-destructive multiplexer reset and exactness integration at those owners.
 - Proof: `test/modes/components/transcript-container.test.ts`.

@@ -2136,14 +2136,16 @@ export class InputController {
 	}
 
 	setToolsExpanded(expanded: boolean): void {
+		if (this.ctx.toolOutputExpanded === expanded) return;
+		this.ctx.chatContainer.markAcceptedTapeDrifted();
 		this.ctx.toolOutputExpanded = expanded;
 		for (const child of this.ctx.chatContainer.children) {
 			if (isExpandable(child)) {
 				child.setExpanded(expanded);
 			}
 		}
-		// Toggling expansion mutates every live block; blocks already committed to
-		// terminal history stay at their committed presentation.
+		// Semantic exports adopt the new presentation; accepted terminal history
+		// remains on the tape selected above.
 		this.ctx.ui.requestRender(true);
 	}
 

@@ -8,9 +8,10 @@ describe("InputController tool output expansion", () => {
 		const expandable = { setExpanded: vi.fn() };
 		const inert = { render: vi.fn(() => []) };
 		const requestRender = vi.fn();
+		const markAcceptedTapeDrifted = vi.fn();
 		const ctx = {
 			toolOutputExpanded: false,
-			chatContainer: { children: [expandable, inert] },
+			chatContainer: { children: [expandable, inert], markAcceptedTapeDrifted },
 			ui: { requestRender },
 		} as unknown as InteractiveModeContext;
 
@@ -18,6 +19,7 @@ describe("InputController tool output expansion", () => {
 
 		expect(ctx.toolOutputExpanded).toBe(true);
 		expect(expandable.setExpanded).toHaveBeenCalledWith(true);
+		expect(markAcceptedTapeDrifted).toHaveBeenCalledTimes(1);
 		// Expansion mutates every live block; the forced repaint re-renders them
 		// at their new heights in the same frame.
 		expect(requestRender).toHaveBeenCalledTimes(1);

@@ -18,3 +18,22 @@ describe("SelectorController prompt-affecting settings", () => {
 		expect(ctx.showError).not.toHaveBeenCalled();
 	});
 });
+
+describe("SelectorController transcript presentation settings", () => {
+	it("marks accepted history before changing image visibility", () => {
+		const markAcceptedTapeDrifted = vi.fn();
+		const requestRender = vi.fn();
+		const ctx = {
+			chatContainer: { children: [], markAcceptedTapeDrifted },
+			ui: { clearInlineImages: vi.fn(), requestRender },
+		} as unknown as InteractiveModeContext;
+		const controller = new SelectorController(ctx);
+
+		controller.handleSettingChange("showImages", false);
+
+		expect(markAcceptedTapeDrifted).toHaveBeenCalledTimes(1);
+		expect(markAcceptedTapeDrifted.mock.invocationCallOrder[0]).toBeLessThan(
+			requestRender.mock.invocationCallOrder[0],
+		);
+	});
+});

@@ -47,6 +47,26 @@ class VersionedBlock extends Block {
 		return this.#version;
 	}
 }
+class CountingBlock extends Block {
+	renderCount = 0;
+
+	override render(): readonly string[] {
+		this.renderCount++;
+		return super.render();
+	}
+}
+
+class VisibilityBlock extends Block {
+	#visible = true;
+
+	setToolActivityVisible(visible: boolean): void {
+		this.#visible = visible;
+	}
+
+	override render(): readonly string[] {
+		return [this.#visible ? "visible" : "hidden"];
+	}
+}
 
 /** A live block the container recognizes as dynamic tool-activity. */
 class ToolBlock extends Block {
@@ -84,6 +104,17 @@ class AppendBlock extends Block {
 
 	renderTranscriptStableRows(count: number, _width: number): readonly string[] {
 		return this.#stableRender.slice(0, count);
+	}
+}
+class VersionedAppendBlock extends AppendBlock {
+	#version = 0;
+
+	mutate(): void {
+		this.#version++;
+	}
+
+	getTranscriptBlockVersion(): number {
+		return this.#version;
 	}
 }
 
@@ -481,6 +512,62 @@ describe("TranscriptContainer", () => {
 		expect(transcript.renderTail(80, 10).filter(row => row === "FINAL-TRAILING-Q4")).toHaveLength(1);
 		expect(transcript.render(80)).toEqual(["shortened after acknowledgement"]);
 	});
+	it("preserves the accepted separator between committed and live blocks after drift", () => {
+		const transcript = new TranscriptContainer();
+		const committed = new VersionedBlock(["accepted"], true);
+		transcript.addChild(committed);
+		transcript.acknowledgeFinalizedBatch(transcript.peekFlushBatch(80)!.id);
+		transcript.addChild(new Block(["active"], false));
+
+		committed.mutate(["changed"]);
+		expect(transcript.renderTail(80, 10)).toEqual(["accepted", "", "active"]);
+	});
+
+	it("preserves a genuine blank append row before the live suffix", () => {
+		const transcript = new TranscriptContainer();
+		const block = new VersionedAppendBlock(["accepted", "", "tail"], ["accepted", ""]);
+		transcript.addChild(block);
+		transcript.acknowledgeFinalizedBatch(transcript.peekFinalizedBatch(80, 0)!.id);
+		transcript.acknowledgeFinalizedBatch(transcript.peekFinalizedBatch(80, 0)!.id);
+
+		block.mutate();
+		expect(transcript.renderTail(80, 10)).toEqual(["accepted", "", "tail"]);
+	});
+
+	it("retains accepted presentation after a global visibility mutation", () => {
+		const transcript = new TranscriptContainer();
+		const block = new VisibilityBlock(["ignored"], true);
+		transcript.addChild(block);
+		transcript.acknowledgeFinalizedBatch(transcript.peekFlushBatch(80)!.id);
+
+		transcript.setToolActivityVisible(false);
+		transcript.beginReplay();
+		expect(transcript.peekReplayBatch(80)?.rows).toEqual(["visible", ""]);
+		expect(transcript.render(80)).toEqual(["hidden"]);
+	});
+
+	it("retains a pending offer across an unversioned visibility mutation", () => {
+		const transcript = new TranscriptContainer();
+		const block = new VisibilityBlock(["ignored"], true);
+		transcript.addChild(block);
+		const offered = transcript.peekFlushBatch(80)!;
+
+		transcript.setToolActivityVisible(false);
+		transcript.acknowledgeFinalizedBatch(offered.id);
+		transcript.beginReplay();
+		expect(transcript.peekReplayBatch(80)?.rows).toEqual(["visible", ""]);
+	});
+
+	it("preserves accepted hard-row boundaries after drift and width growth", () => {
+		const transcript = new TranscriptContainer();
+		const block = new VersionedBlock(["abcd", "efgh"], true);
+		transcript.addChild(block);
+		transcript.acknowledgeFinalizedBatch(transcript.peekFlushBatch(4)!.id);
+
+		block.mutate(["abcdefgh"]);
+		transcript.beginReplay();
+		expect(transcript.peekReplayBatch(8)?.rows).toEqual(["abcd", "efgh", ""]);
+	});
 
 	it("versions Assistant thinking visibility changes but not equal assignments", () => {
 		const assistant = new AssistantMessageComponent(finalAnswer);
@@ -530,6 +617,17 @@ describe("TranscriptContainer", () => {
 			expect(transcript.renderTail(80, cap)).toEqual(full.slice(-Math.min(cap, full.length)));
 		}
 		expect(transcript.renderTail(80, 0)).toEqual([]);
+	});
+	it("stops rendering once the requested semantic tail is complete", () => {
+		const transcript = new TranscriptContainer();
+		const old = new CountingBlock(["old"], true);
+		const latest = new CountingBlock(["latest"], false);
+		transcript.addChild(old);
+		transcript.addChild(latest);
+
+		expect(transcript.renderTail(80, 1)).toEqual(["latest"]);
+		expect(old.renderCount).toBe(0);
+		expect(latest.renderCount).toBe(1);
 	});
 
 	it("cancels a pending replay so shutdown flush emits only un-retired rows", () => {
