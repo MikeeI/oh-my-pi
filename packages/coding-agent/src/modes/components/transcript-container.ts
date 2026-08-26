@@ -1,6 +1,7 @@
 import type { Component, HistoryBatch } from "@oh-my-pi/pi-tui";
 import { Container } from "@oh-my-pi/pi-tui";
 import { logger } from "@oh-my-pi/pi-utils";
+import { reflowHardRows } from "../utils/terminal-row-reflow";
 import { isToolActivityComponent } from "./tool-activity";
 
 /** Shared animation time supplied by the constrained transcript root. */
@@ -43,8 +44,10 @@ export interface AppendOnlyTranscriptBlock {
 
 interface FinalizableBlock {
 	isTranscriptBlockFinalized?(): boolean;
-	/** Render the row that must remain represented under emergency viewport pressure. */
-	renderTranscriptBlockEmergencyRow?(width: number): string | undefined;
+	/** Monotonic drift signal for bytes already accepted by the terminal. */
+	getTranscriptBlockVersion?(): number;
+	/** Render the final rows that must remain represented under emergency viewport pressure. */
+	renderTranscriptBlockEmergencyRows?(width: number, maxRows: number): readonly string[] | undefined;
 }
 
 /**
@@ -70,11 +73,34 @@ interface TranscriptEntry {
 	 */
 	stableFrozen: boolean;
 }
+interface AcceptedTapeVersion {
+	readonly component: Component & FinalizableBlock;
+	readonly version: number;
+}
+
+interface AcceptedTapeChunk {
+	readonly rows: readonly string[];
+	readonly offerWidth: number;
+	readonly versions: readonly AcceptedTapeVersion[];
+}
 
 type RetirementPolicy = "pressure" | "flush";
 type Offered =
-	| { batch: HistoryBatch; kind: "append"; entry: number; emittedEnd: number }
-	| { batch: HistoryBatch; kind: "commit"; end: number }
+	| {
+			batch: HistoryBatch;
+			kind: "append";
+			entry: number;
+			emittedEnd: number;
+			offerWidth: number;
+			versions: readonly AcceptedTapeVersion[];
+	  }
+	| {
+			batch: HistoryBatch;
+			kind: "commit";
+			end: number;
+			offerWidth: number;
+			versions: readonly AcceptedTapeVersion[];
+	  }
 	| { batch: HistoryBatch; kind: "replay" };
 
 const MAX_LIVE_BLOCKS = 256;
@@ -132,6 +158,8 @@ export class TranscriptContainer extends Container {
 	#replayRequested = false;
 	#toolActivityVisible = true;
 	#lastFrame: AnimationFrame = { tick: 0, now: 0 };
+	#acceptedTapeChunks: AcceptedTapeChunk[] = [];
+	#acceptedTapeDrifted = false;
 
 	override addChild(component: Component): void {
 		if (isToolActivityComponent(component)) component.setToolActivityVisible(this.#toolActivityVisible);
@@ -161,6 +189,8 @@ export class TranscriptContainer extends Container {
 		this.#offered = undefined;
 		this.#replayPending = false;
 		this.#replayRequested = false;
+		this.#acceptedTapeChunks = [];
+		this.#acceptedTapeDrifted = false;
 	}
 
 	setToolActivityVisible(visible: boolean): void {
@@ -381,7 +411,14 @@ export class TranscriptContainer extends Container {
 				rows: after.slice(before.length),
 				kind: "append",
 			};
-			this.#offered = { batch, kind: "append", entry: this.#frontier, emittedEnd };
+			this.#offered = {
+				batch,
+				kind: "append",
+				entry: this.#frontier,
+				emittedEnd,
+				offerWidth: width,
+				versions: this.#captureVersions(this.#frontier, this.#frontier + 1),
+			};
 			return batch;
 		}
 
@@ -405,7 +442,13 @@ export class TranscriptContainer extends Container {
 			rows: this.#renderRange(this.#frontier, end, width, true),
 			kind: "append",
 		};
-		this.#offered = { batch, end, kind: "commit" };
+		this.#offered = {
+			batch,
+			end,
+			kind: "commit",
+			offerWidth: width,
+			versions: this.#captureVersions(this.#frontier, end),
+		};
 		return batch;
 	}
 
@@ -425,6 +468,14 @@ export class TranscriptContainer extends Container {
 			}
 			this.#frontier = offered.end;
 		}
+		if (offered.kind !== "replay") {
+			if (this.#versionsDrifted(offered.versions)) this.#acceptedTapeDrifted = true;
+			this.#acceptedTapeChunks.push({
+				rows: offered.batch.rows.slice(),
+				offerWidth: offered.offerWidth,
+				versions: offered.versions,
+			});
+		}
 		this.#offered = undefined;
 		if (this.#replayRequested) this.#startReplay();
 	}
@@ -438,16 +489,12 @@ export class TranscriptContainer extends Container {
 		this.#syncEntries();
 		const cap = Math.max(0, Math.trunc(maxRows));
 		if (cap === 0) return EMPTY_ROWS;
-		const rows: string[] = [];
-		for (let index = this.#entries.length - 1; index >= 0; index--) {
-			const entry = this.#entries[index]!;
-			this.#setAllocation(entry.component, Number.MAX_SAFE_INTEGER, this.#lastFrame);
-			const block = trimBlankEdges(entry.component.render(width));
-			if (block.length === 0) continue;
-			if (rows.length > 0) rows.unshift("");
-			rows.unshift(...block);
-			if (rows.length >= cap) break;
-		}
+		this.#refreshAcceptedTapeDrift();
+		const rows = this.#acceptedTapeDrifted ? this.#renderAcceptedTape(width) : [];
+		const start = this.#acceptedTapeDrifted ? this.#frontier : 0;
+		if (this.#acceptedTapeDrifted && rows.at(-1) === "") rows.pop();
+		const live = this.#renderRange(start, this.#entries.length, width, false);
+		if (live.length > 0) rows.push(...live);
 		return rows.length > cap ? rows.slice(rows.length - cap) : rows;
 	}
 
@@ -534,6 +581,8 @@ export class TranscriptContainer extends Container {
 	}
 
 	#renderReplay(width: number): readonly string[] {
+		this.#refreshAcceptedTapeDrift();
+		if (this.#acceptedTapeDrifted) return this.#renderAcceptedTape(width);
 		const rows = Array.from(this.#renderRange(0, this.#frontier, width, true));
 		const head = this.#entries[this.#frontier];
 		if (head?.mode === "appendOnly" && head.emitted > 0) {
@@ -542,6 +591,37 @@ export class TranscriptContainer extends Container {
 			rows.push(...this.#renderStablePrefix(head, head.emitted, width));
 		}
 		return rows;
+	}
+
+	#renderAcceptedTape(width: number): string[] {
+		const rows: string[] = [];
+		for (const chunk of this.#acceptedTapeChunks) {
+			rows.push(...reflowHardRows(chunk.rows, width));
+		}
+		return rows;
+	}
+
+	#captureVersions(start: number, end: number): AcceptedTapeVersion[] {
+		const versions: AcceptedTapeVersion[] = [];
+		for (let index = start; index < end; index++) {
+			const component = this.#entries[index]?.component as Component & FinalizableBlock;
+			const version = component.getTranscriptBlockVersion?.();
+			if (version !== undefined) versions.push({ component, version });
+		}
+		return versions;
+	}
+
+	#versionsDrifted(versions: readonly AcceptedTapeVersion[]): boolean {
+		return versions.some(({ component, version }) => component.getTranscriptBlockVersion?.() !== version);
+	}
+
+	#refreshAcceptedTapeDrift(): void {
+		if (this.#acceptedTapeDrifted) return;
+		for (const chunk of this.#acceptedTapeChunks) {
+			if (!this.#versionsDrifted(chunk.versions)) continue;
+			this.#acceptedTapeDrifted = true;
+			return;
+		}
 	}
 
 	#completeFullyEmittedHeads(width: number): void {
@@ -570,39 +650,44 @@ export class TranscriptContainer extends Container {
 		rows: number,
 		frame: AnimationFrame,
 	): readonly string[] {
+		const active = shown.filter(candidate => candidate.entry.state === "active");
+		const newestActive = active.at(-1);
+		const settled = shown.findLast(candidate => {
+			if (candidate.entry.state !== "settled") return false;
+			const block = candidate.entry.component as Component & FinalizableBlock;
+			return block.renderTranscriptBlockEmergencyRows !== undefined;
+		});
+		if (settled) {
+			const block = settled.entry.component as Component & FinalizableBlock;
+			const activeRows = newestActive ? 1 : 0;
+			const hiddenActive = Math.max(0, active.length - activeRows);
+			const summaryRows = hiddenActive > 0 && rows - activeRows >= 2 ? 1 : 0;
+			const settledCapacity = Math.max(0, rows - activeRows - summaryRows);
+			const settledRows = block.renderTranscriptBlockEmergencyRows?.(width, settledCapacity);
+			if (settledRows && settledRows.length > 0) {
+				const output = summaryRows > 0 ? [`${hiddenActive} more transcript blocks active`] : [];
+				output.push(...settledRows.slice(-settledCapacity));
+				if (newestActive) {
+					this.#setAllocation(newestActive.entry.component, 1, frame);
+					const rendered = this.#renderEntry(newestActive.entry, width).slice(
+						this.#projectedEmitted(newestActive.entry, newestActive.index, width),
+					);
+					output.push(rendered[0] ?? "");
+				}
+				return output.slice(-rows);
+			}
+		}
+
 		let visibleRows = rows;
 		let visible: { entry: TranscriptEntry; index: number }[] = [];
-		let emergencyCandidate: { entry: TranscriptEntry; index: number } | undefined;
-		let emergencyRow: string | undefined;
 		let hiddenActive = 0;
 		for (let attempt = 0; attempt < 2; attempt++) {
 			visible = visibleRows > 0 ? shown.slice(-visibleRows) : [];
-			emergencyCandidate = undefined;
-			emergencyRow = undefined;
-			const visibleStart = shown.length - visibleRows;
-			for (let index = visibleStart - 1; index >= 0; index--) {
-				const candidate = shown[index]!;
-				const block = candidate.entry.component as Component & FinalizableBlock;
-				const row =
-					candidate.entry.state === "settled" ? block.renderTranscriptBlockEmergencyRow?.(width) : undefined;
-				if (row === undefined) continue;
-				emergencyCandidate = candidate;
-				emergencyRow = row;
-				visible = [candidate, ...visible.slice(1)];
-				break;
-			}
-
-			let activeTotal = 0;
-			for (const candidate of shown) {
-				if (candidate.entry.state === "active") activeTotal++;
-			}
-			hiddenActive = activeTotal;
+			hiddenActive = active.length;
 			for (const candidate of visible) {
 				if (candidate.entry.state === "active") hiddenActive--;
 			}
-			// The summary row itself represents the newest active block when no
-			// active row fits beside it; report only the additional backlog.
-			if (hiddenActive === activeTotal && hiddenActive > 0) hiddenActive--;
+			if (hiddenActive === active.length && hiddenActive > 0) hiddenActive--;
 			if (attempt === 0 && hiddenActive > 0) {
 				visibleRows = Math.max(0, rows - 1);
 				continue;
@@ -612,10 +697,6 @@ export class TranscriptContainer extends Container {
 
 		const output = hiddenActive > 0 ? [`${hiddenActive} more transcript blocks active`] : [];
 		for (const candidate of visible) {
-			if (candidate === emergencyCandidate) {
-				output.push(emergencyRow ?? "");
-				continue;
-			}
 			this.#setAllocation(candidate.entry.component, 1, frame);
 			const rendered = this.#renderEntry(candidate.entry, width).slice(
 				this.#projectedEmitted(candidate.entry, candidate.index, width),

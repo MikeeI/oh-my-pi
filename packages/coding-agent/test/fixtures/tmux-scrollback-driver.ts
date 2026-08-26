@@ -17,6 +17,10 @@ const HISTORY_FILLER_COUNT = 25;
 const MARKER_COUNT = 36;
 const WAIT_FOR_RESIZE = Bun.env.TMUX_SCROLLBACK_WAIT_FOR_RESIZE === "1";
 const TRANSIENT_MARKER = "TRANSIENT-ONLY";
+const FINAL_Q_ROWS = ["FINAL-Q1", "FINAL-Q2", "FINAL-Q3", "FINAL-Q4"] as const;
+const WIDE_ROW_START = "WIDE-ROW-START";
+const WIDE_ROW_END = "WIDE-ROW-END";
+const WIDE_ROW = `${WIDE_ROW_START}-${"x".repeat(110)}-${WIDE_ROW_END}`;
 const configuredResizeMode = Bun.env.TMUX_SCROLLBACK_MODE;
 const RESIZE_SCROLLBACK_MODE =
 	configuredResizeMode === "append" || configuredResizeMode === "preserve" || configuredResizeMode === "rebuild"
@@ -141,7 +145,7 @@ async function main(): Promise<void> {
 		).join("\n");
 		const stable = `STABLE-PREFACE\n\n${markers}`;
 		const unresolved = `${stable}\n\n${TRANSIENT_MARKER}`;
-		const resolved = `${stable}\n\n[marker]: https://example.com`;
+		const resolved = `${stable}\n\n[marker]: https://example.com\n\n${FINAL_Q_ROWS.join("  \n")}\n\n${WIDE_ROW}`;
 
 		assistant.updateContent(makeMsg(unresolved), { transient: true });
 		await renderFrame(tui);

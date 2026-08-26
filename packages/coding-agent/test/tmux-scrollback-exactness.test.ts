@@ -14,6 +14,9 @@ const MARKER_COUNT = 36;
 const TRANSIENT_MARKER = "TRANSIENT-ONLY";
 const HISTORY_FILLER_COUNT = 25;
 const REFLOW_COLUMNS = 96;
+const FINAL_Q_ROWS = ["FINAL-Q1", "FINAL-Q2", "FINAL-Q3", "FINAL-Q4"] as const;
+const WIDE_ROW_START = "WIDE-ROW-START";
+const WIDE_ROW_END = "WIDE-ROW-END";
 const RESIZE_MODES = ["rebuild", "append", "preserve"] as const;
 const BURST_RESIZES = [
 	[120, 13],
@@ -77,7 +80,7 @@ async function runTmux(args: readonly string[], allowFailure = false): Promise<T
 async function waitForPaneOutput(target: string, marker: string): Promise<string> {
 	let capture = "";
 	for (let attempt = 0; attempt < LIVE_FRAME_POLL_ATTEMPTS; attempt++) {
-		capture = (await runTmux(["capture-pane", "-p", "-S", "-", "-t", target])).stdout;
+		capture = (await runTmux(["capture-pane", "-p", "-t", target])).stdout;
 		if (capture.includes(marker)) return capture;
 		// tmux is an external integration, so fake timers cannot advance pane output.
 		await Bun.sleep(LIVE_FRAME_POLL_MS);
@@ -116,6 +119,28 @@ async function killTmuxServer(): Promise<void> {
 		// Best-effort cleanup: primary assertion failures must remain visible.
 	}
 }
+function expectFinalSuffix(capture: string, exact: boolean): void {
+	expect(countOccurrences(capture, DRIVER_EXIT_MARKER), capture).toBe(1);
+	const ordered = [
+		...Array.from({ length: MARKER_COUNT }, (_value, index) => `MARK-${String(index).padStart(3, "0")}`),
+		...FINAL_Q_ROWS,
+		WIDE_ROW_START,
+		WIDE_ROW_END,
+	];
+	let previous = -1;
+	for (const marker of ordered) {
+		const count = countOccurrences(capture, marker);
+		if (exact) {
+			expect(count, `${marker} count was not exact; captured pane:\n${capture}`).toBe(1);
+			const position = capture.indexOf(marker);
+			expect(position, `${marker} was out of order; captured pane:\n${capture}`).toBeGreaterThan(previous);
+			previous = position;
+		} else {
+			expect(count, `${marker} vanished; captured pane:\n${capture}`).toBeGreaterThanOrEqual(1);
+		}
+	}
+}
+
 type ResizeScenario = {
 	sessionName: string;
 	mode: (typeof RESIZE_MODES)[number];
@@ -180,15 +205,10 @@ describe.skipIf(process.platform === "win32" || !tmuxPath)("tmux scrollback exac
 			const paneState = await waitForPaneDeath(PANE_TARGET);
 			capture = await waitForPaneTranscript(PANE_TARGET);
 			expect(paneState, `pane did not exit; captured pane:\n${capture}`).toBe("1");
-			expect(countOccurrences(capture, DRIVER_EXIT_MARKER), capture).toBe(1);
 			expect(countOccurrences(capture, "PREEXISTING-HISTORY"), capture).toBe(1);
 			expect(countOccurrences(capture, "STABLE-PREFACE"), capture).toBe(1);
-			for (let index = 0; index < MARKER_COUNT; index++) {
-				const marker = `MARK-${String(index).padStart(3, "0")}`;
-				expect(countOccurrences(capture, marker), `${marker} count was not exact; captured pane:\n${capture}`).toBe(
-					1,
-				);
-			}
+			expect(countLeadingBlankRowsAfter(capture, "HISTORY-FILLER-024"), capture).toBe(0);
+			expectFinalSuffix(capture, true);
 		} finally {
 			await killTmuxServer();
 		}
@@ -201,11 +221,9 @@ describe.skipIf(process.platform === "win32" || !tmuxPath)("tmux scrollback exac
 			resizes: [[PANE_COLUMNS, RESIZED_PANE_ROWS]],
 		});
 		expect(liveFrame).toContain(TRANSIENT_MARKER);
-		expect(countLeadingBlankRowsAfter(liveFrame, "HISTORY-FILLER-024")).toBe(0);
 		expect(paneState, `pane did not exit; captured pane:\n${capture}`).toBe("1");
 		expect(countOccurrences(capture, TRANSIENT_MARKER), capture).toBe(0);
 		expect(countLeadingBlankRowsAfter(capture, "HISTORY-FILLER-024"), capture).toBe(0);
-		expect(countOccurrences(capture, DRIVER_EXIT_MARKER), capture).toBe(1);
 		expect(countOccurrences(capture, "PREEXISTING-HISTORY"), capture).toBe(1);
 		for (let index = 0; index < HISTORY_FILLER_COUNT; index++) {
 			const marker = `HISTORY-FILLER-${String(index).padStart(3, "0")}`;
@@ -213,13 +231,7 @@ describe.skipIf(process.platform === "win32" || !tmuxPath)("tmux scrollback exac
 				1,
 			);
 		}
-		for (let index = 0; index < MARKER_COUNT; index++) {
-			const marker = `MARK-${String(index).padStart(3, "0")}`;
-			expect(
-				countOccurrences(capture, marker),
-				`${marker} vanished after resize; captured pane:\n${capture}`,
-			).toBeGreaterThanOrEqual(1);
-		}
+		expectFinalSuffix(capture, false);
 	}, 15_000);
 	it("retains transient and finalized content across a real width reflow", async () => {
 		const { liveFrame, paneState, capture } = await runResizeScenario({
@@ -228,7 +240,6 @@ describe.skipIf(process.platform === "win32" || !tmuxPath)("tmux scrollback exac
 			resizes: [[REFLOW_COLUMNS, PANE_ROWS]],
 		});
 		expect(liveFrame).toContain(TRANSIENT_MARKER);
-		expect(countLeadingBlankRowsAfter(liveFrame, "HISTORY-FILLER-024")).toBe(0);
 		expect(paneState, `pane did not exit; captured pane:\n${capture}`).toBe("1");
 		expect(countOccurrences(capture, TRANSIENT_MARKER), capture).toBe(0);
 		expect(countLeadingBlankRowsAfter(capture, "HISTORY-FILLER-024"), capture).toBe(0);
@@ -239,13 +250,7 @@ describe.skipIf(process.platform === "win32" || !tmuxPath)("tmux scrollback exac
 				1,
 			);
 		}
-		for (let index = 0; index < MARKER_COUNT; index++) {
-			const marker = `MARK-${String(index).padStart(3, "0")}`;
-			expect(
-				countOccurrences(capture, marker),
-				`${marker} vanished after width reflow; captured pane:\n${capture}`,
-			).toBeGreaterThanOrEqual(1);
-		}
+		expectFinalSuffix(capture, false);
 	}, 15_000);
 
 	for (const mode of RESIZE_MODES) {
@@ -266,6 +271,7 @@ describe.skipIf(process.platform === "win32" || !tmuxPath)("tmux scrollback exac
 					`${marker} was lost or duplicated in ${mode} mode; captured pane:\n${capture}`,
 				).toBe(1);
 			}
+			expectFinalSuffix(capture, false);
 		}, 15_000);
 	}
 
@@ -286,6 +292,7 @@ describe.skipIf(process.platform === "win32" || !tmuxPath)("tmux scrollback exac
 				1,
 			);
 		}
+		expectFinalSuffix(capture, false);
 	}, 15_000);
 
 	it("opens real tmux history on empty-editor PageUp without hijacking drafts", async () => {

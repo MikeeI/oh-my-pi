@@ -54,6 +54,15 @@ class WidthTranscriptBlock implements Component {
 		return [`block-${this.id}@${width}`];
 	}
 }
+class FinalRowsBlock implements Component {
+	isTranscriptBlockFinalized(): boolean {
+		return true;
+	}
+
+	render(): readonly string[] {
+		return ["Q1", "Q2", "Q3", "Q4"];
+	}
+}
 
 class TrackingTerminal extends VirtualTerminal {
 	readonly writes: string[] = [];
@@ -306,6 +315,37 @@ describe("composer welcome native-history resize", () => {
 		expect(resized.some(row => row.includes("@20"))).toBe(false);
 		expect(resized).toContain("block-0@30");
 		expect(resized).toContain("block-3@30");
+		composer.ui.stop();
+	});
+
+	it("retires every finalized Q row while preserving one editor rectangle", () => {
+		const terminal = new TrackingTerminal(40, 6);
+		const composer = new Composer({
+			terminal,
+			tuiOptions: { renderScheduler: new ResizeScheduler() },
+			preferences: { ...COMPOSER_DEFAULTS, quiet: true },
+		});
+		const offeredRows: string[][] = [];
+		const renderFrame = composer.renderFrame.bind(composer);
+		composer.renderFrame = viewport => {
+			const plan = renderFrame(viewport);
+			if (plan.history) offeredRows.push(Array.from(plan.history.rows));
+			return plan;
+		};
+		const transcript = new TranscriptContainer();
+		transcript.addChild(new FinalRowsBlock());
+		const tail = new MutableComposerTail();
+		composer.setRuntimeChildren([transcript, tail]);
+
+		composer.start({ playWelcomeIntro: false });
+
+		expect(offeredRows).toHaveLength(1);
+		expect(offeredRows[0]).toEqual(["Q1", "Q2", "Q3", "Q4", ""]);
+		expect(transcript.blockStates()).toEqual(["committed"]);
+		expectOneExactEditor(
+			terminal.getViewport().map(row => Bun.stripANSI(row)),
+			tail.status,
+		);
 		composer.ui.stop();
 	});
 

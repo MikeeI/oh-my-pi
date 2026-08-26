@@ -351,34 +351,46 @@ Each entry names its disposition, observable behavior, implementation owner, and
 - Proof: `packages/coding-agent/test/stats-cli-output.test.ts`.
 - Upstream action: retain provider-neutral `omp stats` behavior when preparing the upstream change.
 
-#### `MOMP-SCROLLBACK` — Multiplexer scrollback exactness and access
+#### `MOMP-SCROLLBACK` — Multiplexer scrollback exactness
 
-- Disposition: `MOMP-EIGEN`.
+- Disposition: `UPSTREAM-INTEGRIERT`.
 - Contract: unfinished Assistant live regions remain pinned inside recognized terminal multiplexers.
-- Contract: settled Markdown prefixes may commit while only the mutable suffix remains viewport-local.
+- Contract: finalized Assistant tails remain reachable while ordered retirement is blocked by active predecessors.
 - Contract: with stable pane geometry, final Assistant content enters pane history exactly once.
+- Contract: accepted terminal bytes remain immutable when later component state changes semantic rendering.
 - Contract: pre-existing pane history survives.
 - Contract: multiplexer rendering never emits ED3 or invokes `clear-history`, including configured rebuilds.
-- Contract: direct-terminal resize behavior remains controlled by `tui.resizeScrollback`.
-- Contract: PageUp on a focused empty editor opens tmux copy mode one page up so committed transcript remains reachable.
-- Contract: drafts, overlays, non-tmux sessions, and failed tmux commands retain existing PageUp handling.
-- Owner: `src/modes/components/transcript-container.ts` owns finalized-prefix batching.
-- Owner: `packages/tui/src/tui.ts#TUI.#emitPlanFrame` owns live-region blanking and terminal history append.
-- Owner: `packages/tui/src/tui.ts#TUI.#prepareForcedRender` owns destructive-reset attenuation in multiplexers.
-- Owner: `packages/tui` owns terminal rendering and autocomplete primitives.
-- Owner: `src/modes/controllers/input-controller.ts` owns the empty-editor PageUp bridge into tmux copy mode.
+- Owner: current upstream `src/modes/components/transcript-container.ts` owns semantic retirement, replay, and acknowledgement.
+- Owner: current upstream `packages/tui/src/tui.ts#TUI.#emitPlanFrame` owns the sole physical history write.
+- Required action: retain MOMP's minimal non-destructive multiplexer reset and exactness integration at those owners.
+- Proof: `test/modes/components/transcript-container.test.ts`.
+- Proof: `packages/tui/test/history-frame-plan.test.ts`.
 - Proof: `test/tmux-scrollback-exactness.test.ts`.
+
+#### `MOMP-TMUX-PAGEUP` — Tmux history access
+
+- Disposition: `MOMP-EIGEN`.
+- Contract: PageUp on a focused empty editor opens tmux copy mode one page up.
+- Contract: drafts, overlays, non-tmux sessions, and failed tmux commands retain existing PageUp handling.
+- Owner: `src/modes/controllers/input-controller.ts` owns the empty-editor PageUp bridge into tmux copy mode.
 - Proof: PageUp cases in `test/input-controller-keybindings.test.ts`.
+- Proof: the real tmux PageUp case in `test/tmux-scrollback-exactness.test.ts`.
 
 #### `MOMP-MUX-RESIZE` — Native multiplexer resize preservation
 
 - Disposition: `UPSTREAM-INTEGRIERT`.
 - Contract: height-only multiplexer resizes never lose finalized transcript rows or pre-existing pane history.
-- Contract: duplication is accepted when tmux pushes mutable viewport rows into opaque native history; loss is not.
+- Contract: height-only `append` resizes never replay current-width application history.
+- Contract: tmux-native mutable-row duplication is accepted when geometry changes; full application-ledger replay is not.
 - Contract: the `MOMP-SCROLLBACK` exact-once guarantee applies only while mutable output retains stable pane geometry.
-- Owner: current upstream `packages/tui/src/tui.ts#TUI.#doRender` owns multiplexer geometry tracking and fallback.
-- Required action: retain the upstream owner and never use ED3 or `clear-history` to repair native history.
-- Proof: the configured-rebuild height-shrink case in `test/tmux-scrollback-exactness.test.ts`.
+- Owner: current upstream `TUI.#beginResizeAltPaint` owns resize-burst geometry tracking and alternate-buffer borrowing.
+- Owner: current upstream `TUI.#beginResizeAnchorProbe` and `TUI.#resolveResizeAnchor` own anchor recovery.
+- Owner: current upstream `TUI.#doRender` owns fullscreen-exit anchor recovery.
+- Owner: current upstream `TUI.#prepareResizeReplay` owns width-sensitive replay policy.
+- Required action: retain these upstream owners and never use ED3 or `clear-history` to repair native history.
+- Proof: `packages/tui/test/history-frame-plan.test.ts`.
+- Proof: `packages/tui/test/resize-multiplexer-anchor.test.ts`.
+- Proof: resize cases in `test/tmux-scrollback-exactness.test.ts`.
 
 #### `MOMP-PACKAGE-IDENTITY` — Side-by-side fork identity and update safety
 

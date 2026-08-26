@@ -797,7 +797,6 @@ export class TUI extends Container {
 	#suppressResizeUntil = 0;
 	#resizeScrollbackMode: ResizeScrollbackMode = TUI.#initialResizeScrollbackMode();
 	#resizeReplaySize: string | undefined;
-	#resizeHistoryRepairPending = false;
 	// Holds an alternate-screen exit until its replacement full paint can emit it
 	// atomically. It must survive a deferred Ghostty image frame.
 	#pendingAltExit = "";
@@ -827,7 +826,6 @@ export class TUI extends Container {
 		this.#frameProvider = provider;
 		this.#providerWindow = [];
 		this.#resizeReplaySize = undefined;
-		this.#resizeHistoryRepairPending = false;
 		this.requestRender(true);
 	}
 
@@ -1059,7 +1057,11 @@ export class TUI extends Container {
 					this.#beginResizeAltPaint(true);
 					return;
 				}
-				if (this.#renderScheduler.now() < this.#suppressResizeUntil) {
+				if (
+					this.#renderScheduler.now() < this.#suppressResizeUntil &&
+					this.terminal.columns === this.#previousWidth &&
+					this.terminal.rows === this.#previousHeight
+				) {
 					this.requestRender(true);
 					return;
 				}
@@ -1092,19 +1094,18 @@ export class TUI extends Container {
 	 * to keep the good stash.
 	 */
 	#beginResizeAltPaint(restartingProbe = false): void {
-		if (this.#altActive) {
-			this.requestRender(true);
-			return;
-		}
 		const burstLastHeight = this.#resizeBurstLastHeight ?? this.#previousHeight;
 		if (this.terminal.rows > burstLastHeight) this.#resizeBurstGrew = true;
 		this.#resizeBurstLastHeight = this.terminal.rows;
 		this.#resizeBurstPull += Math.max(0, this.terminal.rows - burstLastHeight);
 		this.#geometryEpoch++;
+		if (this.#altActive) {
+			this.requestRender(true);
+			return;
+		}
 		if (!this.#resizeAltActive) {
 			this.#resizeAltActive = true;
 			setAltScreenActive(true);
-			this.#resizeHistoryRepairPending = isInsideTerminalMultiplexer();
 			this.#altPreviousLines = [];
 			this.#forgetHardwareCursorState();
 			this.#recordHardwareCursorHidden();
@@ -1561,7 +1562,6 @@ export class TUI extends Container {
 		this.#resizeSettleTimer?.cancel();
 		this.#resizeSettleTimer = undefined;
 		this.#cancelResizeProbe();
-		this.#resizeHistoryRepairPending = false;
 		if (this.#resizeAltActive) {
 			this.#resizeAltActive = false;
 			this.terminal.write(`${this.#keyboardEnhancementExit()}\x1b[?1049l`);
@@ -2228,8 +2228,7 @@ export class TUI extends Container {
 		if (
 			!this.#hasEverRendered ||
 			(this.#previousWidth === width && this.#previousHeight === height) ||
-			this.#resizeReplaySize === size ||
-			this.#resizeScrollbackMode === "preserve"
+			this.#resizeReplaySize === size
 		) {
 			return;
 		}
@@ -2244,6 +2243,7 @@ export class TUI extends Container {
 			this.#prepareForcedRender(true);
 			return;
 		}
+		if (width === this.#previousWidth || this.#resizeScrollbackMode === "preserve") return;
 		provider.beginHistoryReplay();
 		this.#forceViewportRepaintOnNextRender = true;
 	}
@@ -2289,7 +2289,6 @@ export class TUI extends Container {
 		const prepared = this.#prepareLinesArray(viewport, width);
 		const preparedHistory = this.#prepareLinesArray(historyRows, width);
 		const rows = prepared.length;
-		const resizeHistoryRepairActive = this.#resizeHistoryRepairPending && historyRows.length > 0;
 		// Destructive reset (session replace, /tree, explicit clear, or a settled
 		// resize in rebuild mode): erase native history and the viewport,
 		// then repaint from row zero.
@@ -2334,6 +2333,7 @@ export class TUI extends Container {
 			!this.#forceViewportRepaintOnNextRender &&
 			!destructiveReset &&
 			this.#providerWindow.length > 0;
+		let prewrite = "";
 		if (diffable) {
 			for (let index = 0; index < rows; index++) {
 				if (this.#providerWindow[index] === prepared[index]) continue;
@@ -2351,34 +2351,23 @@ export class TUI extends Container {
 			}
 		} else {
 			const pushed = Math.max(0, startTop + preparedHistory.length + rows - height);
-			if (historyRows.length > 0 && this.#providerWindow.length > 0 && !resizeHistoryRepairActive) {
-				// tmux can retain cells erased by ED2 as the next write scrolls the
-				// viewport, so overwrite every stale live row with blanks first.
-				const blankRow = " ".repeat(width);
-				const staleTop = Math.max(0, Math.min(this.#providerViewportTop, height - 1));
-				const staleRows = Math.min(this.#providerWindow.length, height - staleTop);
-				for (let index = 0; index < staleRows; index++) {
-					const screenRow = staleTop + index;
-					buffer += `\x1b[${screenRow + 1};1H${this.#lineRewriteSequence(blankRow, width, screenRow)}`;
-				}
-			}
-			if (pushed > this.#providerViewportTop && this.#providerWindow.length > 0) {
-				// Clear the stale viewport before the atomic replacement.
+			const seedReplacement =
+				!destructiveReset && history?.kind !== "replay" && historyRows.length > 0 && pushed > 0;
+			if (!seedReplacement && pushed > this.#providerViewportTop && this.#providerWindow.length > 0) {
+				// Clear stale rows when no physical seed replaces them first.
 				buffer += `\x1b[${this.#providerViewportTop + 1};1H\x1b[J`;
 			}
-			if (historyRows.length > 0 && this.#providerWindow.length > 0 && resizeHistoryRepairActive && pushed > 0) {
-				// Rows that scroll into history must already contain the exact
-				// replacement sequence; otherwise tmux preserves blank live rows.
-				const staleTop = Math.max(0, Math.min(this.#providerViewportTop, height - 1));
-				const staleRows = Math.min(this.#providerWindow.length, height - staleTop);
-				const replacementRows = [...preparedHistory, ...prepared];
-				const seedStart = Math.max(0, staleTop - startTop);
-				const seedEnd = Math.min(pushed, replacementRows.length, staleTop + staleRows - startTop);
-				for (let index = seedStart; index < seedEnd; index++) {
+			const replacementRows = [...preparedHistory, ...prepared];
+			if (seedReplacement) {
+				// Seed every row that the complete replacement is about to push into
+				// native history. tmux otherwise preserves whichever stale cells
+				// occupied those physical rows before the atomic stream.
+				const seedCount = Math.min(pushed, replacementRows.length, height - startTop);
+				for (let index = 0; index < seedCount; index++) {
 					const screenRow = startTop + index;
 					const sourceRows = index < preparedHistory.length ? preparedHistory : prepared;
 					const sourceIndex = index < preparedHistory.length ? index : index - preparedHistory.length;
-					buffer += `\x1b[${screenRow + 1};1H${this.#lineRewriteSequence(
+					prewrite += `\x1b[${screenRow + 1};1H${this.#lineRewriteSequence(
 						replacementRows[index] ?? "",
 						width,
 						screenRow,
@@ -2388,6 +2377,7 @@ export class TUI extends Container {
 					)}`;
 				}
 			}
+			if (prewrite) this.terminal.write(prewrite);
 			buffer += `\x1b[${startTop + 1};1H`;
 			let screenRow = startTop;
 			for (let index = 0; index < preparedHistory.length; index++) {
@@ -2449,7 +2439,6 @@ export class TUI extends Container {
 		this.#forceViewportRepaintOnNextRender = false;
 		this.#hasEverRendered = true;
 		this.#resizeReplaySize = undefined;
-		if (resizeHistoryRepairActive) this.#resizeHistoryRepairPending = false;
 		if (history !== undefined) {
 			this.#acceptedHistoryBatchId = history.id;
 			provider?.acknowledgeHistory(history.id);
@@ -2506,10 +2495,13 @@ export class TUI extends Container {
 			this.#altActive = false;
 			this.#altMouseTrackingActive = false;
 			this.#altPreviousLines = [];
-			// The alt buffer restore put the pre-overlay normal screen back; a
-			// geometry change while covered invalidates the diff baseline and the
-			// writer's dimension check forces the full anchored rewrite.
 			if (width !== this.#altEnterWidth || height !== this.#altEnterHeight) {
+				if (this.#frameProvider !== undefined) {
+					this.#resizeProbeWindow = this.#providerWindow;
+					this.#resizeProbeOffset = this.#parkedViewportOffset;
+					this.#beginResizeAnchorProbe();
+					return;
+				}
 				this.#forceViewportRepaintOnNextRender = true;
 			}
 		} else if (wantMouseTracking !== this.#altMouseTrackingActive) {

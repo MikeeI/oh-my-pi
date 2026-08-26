@@ -356,10 +356,9 @@ export class ToolExecutionComponent extends Container {
 	#parkedBackground = false;
 	#resultVersion = 0;
 	// Post-finalize mutation counter (see FinalizableBlock.getTranscriptBlockVersion):
-	// a tool block can keep changing after isTranscriptBlockFinalized() first
-	// returns true — an async task's terminal result settlement, seal(), or an
-	// expansion toggle — and the transcript's width-epoch resolution and
-	// committed-render bypass must observe those mutations.
+	// async settlement, sealing, and expansion can change a tool block after
+	// terminal acceptance, so the transcript detects drift before replaying its
+	// immutable accepted tape.
 	#blockVersion = 0;
 	#lastDisplayKey: string | undefined;
 	// Bumped whenever a render input that #rebuildDisplay consumes but the memo

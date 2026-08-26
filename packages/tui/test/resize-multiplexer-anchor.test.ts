@@ -3,6 +3,7 @@ import {
 	CURSOR_MARKER,
 	type TerminalFramePlan,
 	type TerminalFrameProvider,
+	Text,
 	TUI,
 	type ViewportSize,
 } from "@oh-my-pi/pi-tui";
@@ -477,6 +478,64 @@ describe("resize anchoring inside a terminal multiplexer", () => {
 		const cup = repaint.match(/\x1b\[(\d+);1H/);
 		expect(cup).not.toBeNull();
 		expect(Number(cup![1])).toBe(12);
+		tui.stop();
+	});
+	for (const [label, rows] of [
+		["grow", 20],
+		["shrink", 6],
+	] as const) {
+		it(`probes the restored normal-buffer anchor after fullscreen ${label}`, () => {
+			const { terminal, tui, renderScheduler, writes } = startRig();
+			const overlay = tui.showOverlay(new Text("fullscreen", 0, 0), {
+				fullscreen: true,
+				width: "100%",
+				maxHeight: "100%",
+				margin: 0,
+			});
+			tui.requestRender(true);
+			terminal.resize(40, rows);
+			writes.length = 0;
+
+			overlay.hide();
+			tui.requestRender(true);
+
+			const exit = writes.join("");
+			expect(exit.indexOf("\x1b[?1049l")).toBeLessThan(exit.indexOf("\x1b[17G\x1b[6n\x1b[1G"));
+			expect(exit).not.toContain("live-0");
+			writes.length = 0;
+			terminal.sendInput("\x1b[4;17R");
+
+			const restored = terminal.getScrollBuffer().map(row => Bun.stripANSI(row).trimEnd());
+			expect(restored).toContain("committed-0");
+			expect(restored).toContain("live-7");
+			renderScheduler.settle();
+			tui.stop();
+		});
+	}
+
+	it("starts another resize transaction for changed suppressed geometry", () => {
+		const { terminal, tui, renderScheduler, writes } = startRig();
+		terminal.resize(40, 11);
+		renderScheduler.settle();
+		terminal.sendInput("\x1b[4;17R");
+		writes.length = 0;
+
+		terminal.resize(40, 10);
+
+		expect(writes.join("")).toContain("\x1b[?1049h");
+		tui.stop();
+	});
+
+	it("suppresses an equal-dimension callback during the settle window", () => {
+		const { terminal, tui, renderScheduler, writes } = startRig();
+		terminal.resize(40, 11);
+		renderScheduler.settle();
+		terminal.sendInput("\x1b[4;17R");
+		writes.length = 0;
+
+		terminal.resize(40, 11);
+
+		expect(writes.join("")).not.toContain("\x1b[?1049h");
 		tui.stop();
 	});
 });

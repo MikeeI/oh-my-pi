@@ -10,6 +10,7 @@ class Provider implements TerminalFrameProvider {
 	plan: TerminalFramePlan;
 	resizeRows: readonly string[] | undefined;
 	acknowledged: number[] = [];
+	onAcknowledge: (() => void) | undefined;
 
 	constructor(plan: TerminalFramePlan) {
 		this.plan = plan;
@@ -23,6 +24,7 @@ class Provider implements TerminalFrameProvider {
 	}
 
 	acknowledgeHistory(id: number): void {
+		this.onAcknowledge?.();
 		this.acknowledged.push(id);
 		this.plan = { viewport: this.plan.viewport };
 	}
@@ -174,6 +176,37 @@ describe("terminal frame plans", () => {
 		expect(terminal.getViewport().map(row => row.trimEnd())).toEqual(["history two", "editor", "status"]);
 		tui.stop();
 	});
+	it("appends a finalized Q tail without blanking the existing viewport", () => {
+		const terminal = new CountingTerminal(20, 6);
+		const provider = new Provider({ viewport: ["editor top", "status", "editor bottom"] });
+		const tui = new TUI(terminal, undefined, { renderScheduler: scheduler });
+		tui.setFrameProvider(provider);
+		terminal.writes.length = 0;
+
+		provider.onAcknowledge = () => {
+			expect(terminal.writes).toHaveLength(2);
+			expect(terminal.writes.at(-1)).toContain("Q1");
+			expect(terminal.writes.at(-1)).toContain("Q4");
+		};
+		provider.plan = {
+			history: { id: 1, rows: ["Q1", "Q2", "Q3", "Q4"] },
+			viewport: ["editor top", "status", "editor bottom"],
+		};
+		tui.requestRender(true);
+
+		expect(provider.acknowledged).toEqual([1]);
+		expect(plainBuffer(terminal)).toEqual(["Q1", "Q2", "Q3", "Q4", "editor top", "status", "editor bottom"]);
+		expect(terminal.getViewport().map(row => row.trimEnd())).toEqual([
+			"Q2",
+			"Q3",
+			"Q4",
+			"editor top",
+			"status",
+			"editor bottom",
+		]);
+		tui.stop();
+	});
+
 	it("bottom-splits a complete replay and serializes it in one terminal write", () => {
 		const terminal = new CountingTerminal(20, 4);
 		const provider = new Provider({ viewport: ["live", "editor"] });
@@ -337,6 +370,51 @@ describe("terminal frame plans", () => {
 		expect(resized).toContain("history-one@20");
 		expect(resized).toContain("history-one@30");
 		expect(resized.slice(-2)).toEqual(["history-two@30", "editor@30"]);
+		tui.stop();
+	});
+
+	it("does not replay current-width history after an append-mode height grow", async () => {
+		const terminal = new VirtualTerminal(20, 2);
+		const provider = new WidthReplayProvider();
+		const renderScheduler = new VirtualRenderScheduler();
+		const tui = new TUI(terminal, undefined, { renderScheduler });
+		tui.setResizeScrollback("append");
+		tui.setFrameProvider(provider);
+		tui.start();
+		await renderScheduler.settle(terminal);
+
+		terminal.resize(20, 6);
+		await renderScheduler.advance(terminal, 160);
+
+		expect(provider.resetCount).toBe(0);
+		expect(plainBuffer(terminal).filter(row => row === "history-one@20")).toHaveLength(1);
+		expect(plainBuffer(terminal).filter(row => row === "history-two@20")).toHaveLength(1);
+		tui.stop();
+	});
+
+	it("seeds the first post-resize append when the provider window is empty", () => {
+		const terminal = new CountingTerminal(20, 2);
+		const provider = new Provider({ viewport: ["live", "editor"] });
+		const renderScheduler = new ResizeScheduler();
+		const tui = new TUI(terminal, undefined, { renderScheduler });
+		tui.setFrameProvider(provider);
+		tui.start();
+
+		terminal.resize(20, 5);
+		provider.plan = {
+			history: { id: 1, rows: ["Q1", "Q2", "Q3", "Q4"] },
+			viewport: ["live", "editor"],
+		};
+		renderScheduler.settle();
+		terminal.writes.length = 0;
+		provider.onAcknowledge = () => {
+			expect(terminal.writes).toHaveLength(2);
+			expect(terminal.writes.at(-1)).toContain("Q4");
+		};
+		terminal.sendInput("\x1b[1;17R");
+
+		expect(provider.acknowledged).toEqual([1]);
+		expect(plainBuffer(terminal)).toContain("Q4");
 		tui.stop();
 	});
 

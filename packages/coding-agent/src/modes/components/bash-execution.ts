@@ -57,9 +57,8 @@ export class BashExecutionComponent extends Container {
 	#truncation?: TruncationMeta;
 	#expanded = false;
 	// Post-finalize mutation counter (FinalizableBlock.getTranscriptBlockVersion):
-	// a completed command's block still mutates on expansion toggles, and the
-	// transcript's width-epoch resolution and committed-render bypass must
-	// observe that.
+	// expansion toggles can change a completed command after terminal acceptance,
+	// so the transcript detects drift before replaying its immutable accepted tape.
 	#blockVersion = 0;
 	#displayDirty = false;
 	#chunkGate = false;

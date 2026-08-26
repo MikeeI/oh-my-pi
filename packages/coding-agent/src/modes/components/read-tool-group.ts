@@ -349,9 +349,8 @@ export class ReadToolGroupComponent extends Container implements ToolExecutionHa
 	// completion) so no late result is coming. Set via `seal()`.
 	#sealed = false;
 	// Post-finalize mutation counter (FinalizableBlock.getTranscriptBlockVersion):
-	// a finalized group can still change — a late read result landing after the
-	// run broke, seal(), or an expansion toggle — and the transcript's
-	// width-epoch resolution and committed-render bypass must observe it.
+	// late results, sealing, and expansion can change a group after acceptance,
+	// so the transcript detects drift before replaying its immutable accepted tape.
 	#blockVersion = 0;
 
 	constructor(options: ReadToolGroupOptions = {}) {

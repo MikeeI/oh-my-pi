@@ -5,19 +5,18 @@ import {
 	ProcessTerminal,
 	type ResizeScrollbackMode,
 	Spacer,
-	sliceWithWidth,
 	type Terminal,
 	type TerminalFramePlan,
 	type TerminalFrameProvider,
 	TUI,
 	type TUIOptions,
 	type ViewportSize,
-	visibleWidth,
 } from "@oh-my-pi/pi-tui";
 import { CustomEditor } from "./components/custom-editor";
 import { type AnimationFrame, TranscriptContainer } from "./components/transcript-container";
 import { type LspServerInfo, type RecentSession, WelcomeComponent } from "./components/welcome";
 import { getEditorTheme, initThemeSync, theme } from "./theme/theme";
+import { reflowHardRows } from "./utils/terminal-row-reflow";
 
 const DOUBLE_INTERRUPT_MS = 500;
 
@@ -429,23 +428,7 @@ export class Composer implements TerminalFrameProvider {
 		const lines = this.#retiredHeaderRows;
 		if (!lines) return [];
 		if (isInsideTerminalMultiplexer()) return lines.slice(start);
-		const reflowed: string[] = [];
-		const columns = Math.max(1, width);
-		for (let index = start; index < lines.length; index++) {
-			const line = lines[index]!;
-			const lineWidth = visibleWidth(line);
-			if (lineWidth === 0) {
-				reflowed.push("");
-				continue;
-			}
-			for (let column = 0; column < lineWidth; ) {
-				let slice = sliceWithWidth(line, column, columns, true);
-				if (slice.width === 0) slice = sliceWithWidth(line, column, columns);
-				reflowed.push(slice.text);
-				column += Math.max(1, slice.width);
-			}
-		}
-		return reflowed;
+		return reflowHardRows(lines.slice(start), width);
 	}
 
 	/** Live editor whose draft survives startup and session adoption. */

@@ -35,6 +35,18 @@ class Block implements Component {
 		return this.#rows;
 	}
 }
+class VersionedBlock extends Block {
+	#version = 0;
+
+	mutate(rows: string[]): void {
+		this.#version++;
+		this.finalize(rows);
+	}
+
+	getTranscriptBlockVersion(): number {
+		return this.#version;
+	}
+}
 
 /** A live block the container recognizes as dynamic tool-activity. */
 class ToolBlock extends Block {
@@ -122,6 +134,10 @@ const finalAnswer: AssistantMessage = {
 		cost: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0, total: 0 },
 	},
 	timestamp: 1,
+};
+const finalTail: AssistantMessage = {
+	...finalAnswer,
+	content: [{ type: "text", text: "Q1  \nQ2  \nQ3  \nQ4" }],
 };
 
 const frame = { tick: 0, now: 0 };
@@ -360,18 +376,20 @@ describe("TranscriptContainer", () => {
 		expect(out).toEqual(["A3", "A4", "B1", "B2", "B3", "B4", "C1", "C2", "C3", "C4"]);
 	});
 
-	it("keeps a completed assistant answer visible behind an active prefix", () => {
+	it("keeps every completed Assistant tail row behind active backlog", () => {
 		const transcript = new TranscriptContainer();
-		transcript.addChild(new Block(["stale active"], false));
-		transcript.addChild(new AssistantMessageComponent(finalAnswer));
-		transcript.addChild(new Block(["continued turn"], false));
-		transcript.addChild(new Block(["task running"], false));
+		for (let index = 0; index < 5; index++) {
+			transcript.addChild(new Block([`active-${index}`], false));
+		}
+		transcript.addChild(new AssistantMessageComponent(finalTail));
+		transcript.addChild(new Block(["newest active"], false));
 
-		expect(transcript.peekFinalizedBatch(80, 3)).toBeUndefined();
-		const rows = transcript.renderViewport(80, 3, frame);
-		expect(rows[0]).toBe("2 more transcript blocks active");
-		expect(Bun.stripANSI(rows[1] ?? "").trim()).toBe("Implemented");
-		expect(rows[2]).toBe("task running");
+		expect(transcript.peekFinalizedBatch(80, 6)).toBeUndefined();
+		const rows = transcript.renderViewport(80, 6, frame).map(row => Bun.stripANSI(row).trim());
+		expect(rows).toEqual(["5 more transcript blocks active", "Q1", "Q2", "Q3", "Q4", "newest active"]);
+
+		const narrow = transcript.renderViewport(80, 4, frame).map(row => Bun.stripANSI(row).trim());
+		expect(narrow).toEqual(["5 more transcript blocks active", "Q3", "Q4", "newest active"]);
 	});
 
 	it("gives surplus rows to assistant text before a growing tool card (issue 9718)", () => {
@@ -428,6 +446,57 @@ describe("TranscriptContainer", () => {
 		transcript.acknowledgeFinalizedBatch(replay!.id);
 		expect(transcript.blockStates()).toEqual(["committed"]);
 		expect(transcript.peekFinalizedBatch(80, 0)).toBeUndefined();
+	});
+	it("retains accepted rows when a component drifts before acknowledgement", () => {
+		const transcript = new TranscriptContainer();
+		const block = new VersionedBlock(["FINAL-TRAILING-Q4"], true);
+		transcript.addChild(block);
+		const offered = transcript.peekFlushBatch(80)!;
+
+		block.mutate(["shortened before acknowledgement"]);
+		transcript.acknowledgeFinalizedBatch(offered.id);
+		transcript.beginReplay();
+		const replay = transcript.peekReplayBatch(80)!;
+		expect(replay.rows.filter(row => row === "FINAL-TRAILING-Q4")).toHaveLength(1);
+		expect(transcript.renderTail(80, 10).filter(row => row === "FINAL-TRAILING-Q4")).toHaveLength(1);
+		expect(transcript.render(80)).toEqual(["shortened before acknowledgement"]);
+	});
+
+	it("retains accepted rows after later drift without recording replay copies", () => {
+		const transcript = new TranscriptContainer();
+		const block = new VersionedBlock(["FINAL-TRAILING-Q4"], true);
+		transcript.addChild(block);
+		const offered = transcript.peekFlushBatch(80)!;
+		transcript.acknowledgeFinalizedBatch(offered.id);
+
+		block.mutate(["shortened after acknowledgement"]);
+		transcript.beginReplay();
+		const firstReplay = transcript.peekReplayBatch(80)!;
+		expect(firstReplay.rows.filter(row => row === "FINAL-TRAILING-Q4")).toHaveLength(1);
+		transcript.acknowledgeFinalizedBatch(firstReplay.id);
+
+		transcript.beginReplay();
+		const secondReplay = transcript.peekReplayBatch(80)!;
+		expect(secondReplay.rows.filter(row => row === "FINAL-TRAILING-Q4")).toHaveLength(1);
+		expect(transcript.renderTail(80, 10).filter(row => row === "FINAL-TRAILING-Q4")).toHaveLength(1);
+		expect(transcript.render(80)).toEqual(["shortened after acknowledgement"]);
+	});
+
+	it("versions Assistant thinking visibility changes but not equal assignments", () => {
+		const assistant = new AssistantMessageComponent(finalAnswer);
+		const initialVersion = assistant.getTranscriptBlockVersion();
+		const initialRows = assistant.render(80);
+
+		assistant.setHideThinkingBlock(true);
+		expect(assistant.getTranscriptBlockVersion()).toBe(initialVersion + 1);
+		expect(assistant.render(80)).not.toEqual(initialRows);
+		assistant.setHideThinkingBlock(true);
+		expect(assistant.getTranscriptBlockVersion()).toBe(initialVersion + 1);
+
+		assistant.setProseOnlyThinking(false);
+		expect(assistant.getTranscriptBlockVersion()).toBe(initialVersion + 2);
+		assistant.setProseOnlyThinking(false);
+		expect(assistant.getTranscriptBlockVersion()).toBe(initialVersion + 2);
 	});
 
 	it("flushes a finalized prefix without viewport pressure", () => {
