@@ -564,6 +564,23 @@ describe("tool path arrays", () => {
 		}
 	});
 
+	it("unescapes semicolons inside filenames within an explicit batch", async () => {
+		await Bun.write(path.join(tempDir, "escaped;target.txt"), "escaped semicolon target\n");
+		const tools = await createTools(createTestSession(tempDir));
+		const tool = tools.find(entry => entry.name === "read");
+		expect(tool).toBeDefined();
+		if (!tool) throw new Error("Missing read tool");
+
+		const result = await tool.execute("read-escaped-semicolon-batch", {
+			path: "escaped\\;target.txt;packages/grep.txt",
+		});
+		const text = getText(result);
+
+		expect(text).toContain("Note: interpreted as 2 paths: escaped;target.txt, packages/grep.txt");
+		expect(text).toContain("escaped semicolon target");
+		expect(text).toContain("shared-needle packages");
+	});
+
 	it("splits an explicit semicolon batch before an overlong joined path can reach stat", async () => {
 		const names = Array.from({ length: 20 }, (_, index) => `batch-target-${index.toString().padStart(2, "0")}.txt`);
 		for (const [index, name] of names.entries()) {
@@ -583,6 +600,27 @@ describe("tool path arrays", () => {
 		for (let index = 0; index < names.length; index++) {
 			expect(text).toContain(`batch marker ${index}`);
 		}
+	});
+
+	it("preserves selectors on suffix-resolved batch display targets", async () => {
+		const resolvedDir = path.join(tempDir, "resolved", "missing");
+		await fs.mkdir(resolvedDir, { recursive: true });
+		await Bun.write(
+			path.join(resolvedDir, "suffix-selector.ts"),
+			Array.from({ length: 70 }, (_, index) => `selector line ${index + 1}`).join("\n"),
+		);
+		const tools = await createTools(createTestSession(tempDir));
+		const tool = tools.find(entry => entry.name === "read");
+		expect(tool).toBeDefined();
+		if (!tool) throw new Error("Missing read tool");
+
+		const result = await tool.execute("read-suffix-selector-batch", {
+			path: "missing/suffix-selector.ts:50-60;packages/grep.txt",
+		});
+		const details = result.details as { displayReadTargets?: string[] } | undefined;
+
+		expect(getText(result)).toContain("selector line 50");
+		expect(details?.displayReadTargets).toEqual(["resolved/missing/suffix-selector.ts:50-60", "packages/grep.txt"]);
 	});
 	it("preserves exact archive members containing semicolons", async () => {
 		const archivePath = path.join(tempDir, "semicolon-member.zip");

@@ -860,6 +860,22 @@ function isDelimitedPathSeparator(ch: string, mode: DelimitedPathSplitMode): boo
 	return ch === "," || ch === ";" || TOP_LEVEL_WHITESPACE_RE.test(ch);
 }
 
+function unescapeSemicolonPathSeparator(part: string, mode: DelimitedPathSplitMode): string {
+	if (mode !== "semicolon" && mode !== "mixed") return part;
+	let unescaped = "";
+	for (let index = 0; index < part.length; index++) {
+		const char = part[index];
+		const next = part[index + 1];
+		if (char === "\\" && next === ";") {
+			unescaped += next;
+			index++;
+			continue;
+		}
+		unescaped += char;
+	}
+	return unescaped;
+}
+
 function hasTopLevelPathDelimiter(entry: string): boolean {
 	let braceDepth = 0;
 	for (let i = 0; i < entry.length; i++) {
@@ -902,10 +918,10 @@ function splitTopLevelDelimitedPath(entry: string, mode: DelimitedPathSplitMode)
 			continue;
 		}
 		if (braceDepth !== 0 || !isDelimitedPathSeparator(ch, mode)) continue;
-		parts.push(entry.slice(start, i));
+		parts.push(unescapeSemicolonPathSeparator(entry.slice(start, i), mode));
 		start = i + 1;
 	}
-	parts.push(entry.slice(start));
+	parts.push(unescapeSemicolonPathSeparator(entry.slice(start), mode));
 	return parts;
 }
 
@@ -926,6 +942,12 @@ function normalizeDelimitedPathParts(rawParts: string[]): string[] | null {
  */
 export function splitSemicolonPathTargets(entry: string): string[] | null {
 	return normalizeDelimitedPathParts(splitTopLevelDelimitedPath(normalizePathLikeInput(entry), "semicolon"));
+}
+
+export function preservePathSelector(originalPath: string, resolvedPath: string): string {
+	const originalSelector = splitPathAndSel(originalPath).sel;
+	if (!originalSelector || splitPathAndSel(resolvedPath).sel) return resolvedPath;
+	return `${resolvedPath}:${originalSelector}`;
 }
 
 async function delimitedPathPartResolves(entry: string, cwd: string, splitter: PathEntrySplitter): Promise<boolean> {

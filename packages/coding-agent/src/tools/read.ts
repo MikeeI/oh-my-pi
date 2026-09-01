@@ -78,6 +78,7 @@ import {
 	isReadableUrlPath,
 	type LineRange,
 	pathTargetsSsh,
+	preservePathSelector,
 	probeLiteralPathExists,
 	resolveReadPath,
 	splitDelimitedPathEntry,
@@ -812,7 +813,8 @@ export class ReadTool implements AgentTool<typeof readSchema, ReadToolDetails> {
 				appendText(`[${outcome.errorNote}]`);
 				continue;
 			}
-			displayReadTargets.push(outcome.result.details?.suffixResolution?.to ?? outcome.part);
+			const resolvedTarget = outcome.result.details?.suffixResolution?.to;
+			displayReadTargets.push(resolvedTarget ? preservePathSelector(outcome.part, resolvedTarget) : outcome.part);
 			for (const block of outcome.result.content) {
 				if (block.type === "text") {
 					appendText(block.text);

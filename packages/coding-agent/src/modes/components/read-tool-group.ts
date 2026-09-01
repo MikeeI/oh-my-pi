@@ -6,6 +6,7 @@ import { InternalUrlRouter, XD_URL_PREFIX } from "../../internal-urls";
 import { getLanguageFromPath, theme } from "../../modes/theme/theme";
 import {
 	parseLineRanges,
+	preservePathSelector,
 	selectorLineRanges,
 	splitPathAndSel,
 	splitSemicolonPathTargets,
@@ -176,9 +177,7 @@ function getDisplayReadTargets(details: ReadToolResultDetails | undefined): stri
 }
 
 function displayPathWithSuffixResolution(currentPath: string, suffixResolution: ReadToolSuffixResolution): string {
-	const currentSelector = splitPathAndSel(currentPath).sel;
-	if (!currentSelector || splitPathAndSel(suffixResolution.to).sel) return suffixResolution.to;
-	return `${suffixResolution.to}:${currentSelector}`;
+	return preservePathSelector(currentPath, suffixResolution.to);
 }
 
 function readSourceFsPath(details: ReadToolResultDetails | undefined): string | undefined {
