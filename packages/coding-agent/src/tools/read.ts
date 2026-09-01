@@ -1180,7 +1180,8 @@ export class ReadTool implements AgentTool<typeof readSchema, ReadToolDetails> {
 				: null;
 		const preserveSqliteInput =
 			preflightSqlitePath !== null &&
-			(hasQuotedSqliteSemicolon(preflightSqlitePath.queryString) ||
+			(new URLSearchParams(preflightSqlitePath.queryString).has("q") ||
+				hasQuotedSqliteSemicolon(preflightSqlitePath.queryString) ||
 				SQLITE_STATEMENT_AFTER_SEMICOLON_RE.test(preflightSqlitePath.sqliteSubPath) ||
 				(preflightSqlitePath.sqliteSubPath.includes(";") &&
 					(await hasExactSqliteSelector(preflightSqlitePath, signal))));

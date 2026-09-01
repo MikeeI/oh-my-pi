@@ -405,6 +405,16 @@ describe("SQLite tool support", () => {
 		expect(text).toContain("sqlite query batch peer");
 	});
 
+	it("preserves semicolon terminators in raw SQLite queries", async () => {
+		const result = await readTool.execute("sqlite-raw-semicolon", {
+			path: `${sqlitePath}?q=SELECT+name+FROM+users+WHERE+id=1;`,
+		});
+		const text = getText(result);
+
+		expect(text).toContain("Alice");
+		expect(text).not.toContain("Note: interpreted as");
+	});
+
 	it("rejects SQLite where clauses that try to override pagination control syntax", async () => {
 		await expect(
 			readTool.execute("sqlite-where-pagination-bypass", {
