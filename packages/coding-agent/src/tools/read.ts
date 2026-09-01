@@ -1162,20 +1162,23 @@ export class ReadTool implements AgentTool<typeof readSchema, ReadToolDetails> {
 		// resolution share misses instead of re-globbing the workspace.
 		const suffixCache: SuffixMatchCache = new Map();
 		const semicolonTargets = splitSemicolonPathTargets(readPath);
+		// A parsed HTTP(S) target owns the complete scalar because raw semicolons are valid URL data.
+		// Mixed URL inputs use separate sibling Read calls rather than the path batch grammar.
+		const parsedUrlTarget = parseReadUrlTarget(readPath);
 		const internalRouter = InternalUrlRouter.instance();
 		const firstSemicolonTarget = semicolonTargets?.[0];
 		const startsWithInternalTarget =
 			firstSemicolonTarget !== undefined &&
 			(isInternalUrlPath(firstSemicolonTarget) || internalRouter.canResolve(firstSemicolonTarget));
 		const preflightArchivePath =
-			semicolonTargets && !startsWithInternalTarget
+			semicolonTargets && !startsWithInternalTarget && !parsedUrlTarget
 				? await resolveArchiveReadPath(this.session, readPath, suffixCache, signal)
 				: null;
 		const preserveArchiveInput =
 			preflightArchivePath?.archiveSubPath.includes(";") &&
 			(await hasExactArchiveMember(preflightArchivePath, signal));
 		const preflightSqlitePath =
-			semicolonTargets && !startsWithInternalTarget
+			semicolonTargets && !startsWithInternalTarget && !parsedUrlTarget
 				? await resolveSqliteReadPath(this.session, readPath, suffixCache, signal)
 				: null;
 		const preserveSqliteInput =
@@ -1186,24 +1189,7 @@ export class ReadTool implements AgentTool<typeof readSchema, ReadToolDetails> {
 				(preflightSqlitePath.sqliteSubPath.includes(";") &&
 					(await hasExactSqliteSelector(preflightSqlitePath, signal))));
 
-		let preserveStandaloneHttpUrl = false;
-		if (semicolonTargets && parseReadUrlTarget(readPath)) {
-			const siblingStates = await Promise.all(
-				semicolonTargets.slice(1).map(async target => {
-					if (isReadableUrlPath(target) || internalRouter.canResolve(target) || parseConflictUri(target))
-						return true;
-					if ((await probeLiteralPathExists(splitPathAndSel(target).path, this.session.cwd)) === "exists")
-						return true;
-					return (
-						(await resolveArchiveReadPath(this.session, target, suffixCache, signal)) !== null ||
-						(await resolveSqliteReadPath(this.session, target, suffixCache, signal)) !== null
-					);
-				}),
-			);
-			preserveStandaloneHttpUrl = siblingStates.every(state => !state);
-		}
-
-		if (semicolonTargets && !preserveArchiveInput && !preserveSqliteInput && !preserveStandaloneHttpUrl) {
+		if (semicolonTargets && !parsedUrlTarget && !preserveArchiveInput && !preserveSqliteInput) {
 			const routesThroughMcp =
 				internalRouter.canResolve(readPath) &&
 				(readPath.toLowerCase().startsWith("mcp://") || !internalRouter.canHandle(readPath));
@@ -1227,7 +1213,6 @@ export class ReadTool implements AgentTool<typeof readSchema, ReadToolDetails> {
 		}
 		const displayMode = resolveFileDisplayMode(this.session);
 
-		const parsedUrlTarget = parseReadUrlTarget(readPath);
 		if (parsedUrlTarget) {
 			if (!this.session.settings.get("fetch.enabled")) {
 				throw new ToolError("URL reads are disabled by settings.");

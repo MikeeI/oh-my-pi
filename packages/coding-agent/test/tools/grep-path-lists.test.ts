@@ -602,11 +602,21 @@ describe("tool path arrays", () => {
 		expect(text).not.toContain("Note: interpreted as");
 	});
 
-	it("rejects HTTP URLs in either position of a multi-target Read call", async () => {
+	it("rejects an HTTP URL after a filesystem batch target", async () => {
 		const tools = await createTools(createTestSession(tempDir));
 		const tool = tools.find(entry => entry.name === "read");
 		expect(tool).toBeDefined();
 		if (!tool) throw new Error("Missing read tool");
+
+		await expect(
+			tool.execute("read-mixed-http-batch", {
+				path: "apps/grep.txt;https://example.com/reference",
+			}),
+		).rejects.toThrow("cannot be included in a multi-target Read call");
+	});
+
+	it("preserves HTTP-first scalars as URLs independently of cwd contents", async () => {
+		await Bun.write(path.join(tempDir, "active"), "URL suffix collision\n");
 		const archivePath = path.join(tempDir, "http-sibling.zip");
 		await writeArchive(archivePath, "zip", [["README.md", "archive sibling\n"]]);
 		const sqlitePath = path.join(tempDir, "http-sibling.sqlite");
@@ -614,20 +624,6 @@ describe("tool path arrays", () => {
 		db.run("CREATE TABLE users (id INTEGER PRIMARY KEY)");
 		db.close();
 
-		for (const readPath of [
-			"apps/grep.txt;https://example.com/reference",
-			"https://example.com/reference;apps/grep.txt",
-			"https://a.example/doc;https://b.example/doc",
-			`https://example.com/reference;${archivePath}:README.md`,
-			`https://example.com/reference;${sqlitePath}:users`,
-		]) {
-			await expect(tool.execute("read-mixed-http-batch", { path: readPath })).rejects.toThrow(
-				"cannot be included in a multi-target Read call",
-			);
-		}
-	});
-
-	it("preserves standalone HTTP URLs containing raw semicolons", async () => {
 		const tools = await createTools(
 			createTestSession(tempDir, { settings: Settings.isolated({ "fetch.enabled": false }) }),
 		);
@@ -635,7 +631,14 @@ describe("tool path arrays", () => {
 		expect(tool).toBeDefined();
 		if (!tool) throw new Error("Missing read tool");
 
-		for (const readPath of ["https://example.com/items;active", "https://example.com/?a=1;b=2"]) {
+		for (const readPath of [
+			"https://example.com/items;active",
+			"https://example.com/?a=1;b=2",
+			"https://example.com/reference;apps/grep.txt",
+			"https://a.example/doc;https://b.example/doc",
+			`https://example.com/reference;${archivePath}:README.md`,
+			`https://example.com/reference;${sqlitePath}:users`,
+		]) {
 			await expect(tool.execute("read-http-semicolon", { path: readPath })).rejects.toThrow(
 				"URL reads are disabled by settings",
 			);
