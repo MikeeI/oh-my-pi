@@ -585,7 +585,7 @@ const REPEAT_READ_TRACKER_CAP = 64;
 const DELIMITED_READ_MAX_CONCURRENCY = 8;
 /** Preserve SQLite statement-like selectors so its parser rejects them instead of treating them as path batches. */
 const SQLITE_STATEMENT_AFTER_SEMICOLON_RE =
-	/;\s*(?:alter|attach|create|delete|detach|drop|insert|pragma|reindex|replace|select|update|vacuum)\b/i;
+	/;\s*(?:alter|attach|create|delete|detach|drop|insert|pragma|reindex|replace|select|update|vacuum)(?=\s|$)/i;
 function hasQuotedSqliteSemicolon(queryString: string): boolean {
 	let quote: "'" | '"' | undefined;
 	for (let index = 0; index < queryString.length; index++) {
@@ -1164,7 +1164,9 @@ export class ReadTool implements AgentTool<typeof readSchema, ReadToolDetails> {
 		const semicolonTargets = splitSemicolonPathTargets(readPath);
 		const internalRouter = InternalUrlRouter.instance();
 		const firstSemicolonTarget = semicolonTargets?.[0];
-		const startsWithInternalTarget = firstSemicolonTarget !== undefined && isInternalUrlPath(firstSemicolonTarget);
+		const startsWithInternalTarget =
+			firstSemicolonTarget !== undefined &&
+			(isInternalUrlPath(firstSemicolonTarget) || internalRouter.canResolve(firstSemicolonTarget));
 		const preflightArchivePath =
 			semicolonTargets && !startsWithInternalTarget
 				? await resolveArchiveReadPath(this.session, readPath, suffixCache, signal)
@@ -1195,7 +1197,6 @@ export class ReadTool implements AgentTool<typeof readSchema, ReadToolDetails> {
 
 		if (semicolonTargets && !preserveArchiveInput && !preserveSqliteInput && !preserveStandaloneHttpUrl) {
 			const routesThroughMcp =
-				startsWithInternalTarget &&
 				internalRouter.canResolve(readPath) &&
 				(readPath.toLowerCase().startsWith("mcp://") || !internalRouter.canHandle(readPath));
 			const exactMcpResource = routesThroughMcp && (await hasExactMcpResource(parseInternalUrl(readPath)));

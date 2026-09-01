@@ -358,6 +358,17 @@ describe("SQLite tool support", () => {
 		expect(text).toContain("Alice");
 		expect(text).toContain("sqlite batch peer");
 	});
+	it("splits a SQLite-first batch when the peer starts with a SQL verb", async () => {
+		await Bun.write(path.join(tmpDir, "select.md"), "SQL-named peer\n");
+		const result = await readTool.execute("sqlite-sql-named-peer", {
+			path: `${sqlitePath}:users;select.md`,
+		});
+		const text = getText(result);
+
+		expect(text).toContain("Note: interpreted as 2 paths:");
+		expect(text).toContain("Alice");
+		expect(text).toContain("SQL-named peer");
+	});
 	it("splits a batch after a SQLite query selector", async () => {
 		const siblingPath = path.join(tmpDir, "sqlite-query-batch-peer.txt");
 		await Bun.write(siblingPath, "sqlite query batch peer\n");

@@ -158,29 +158,29 @@ describe("McpProtocolHandler", () => {
 		expect(output.text.match(/catalog item/g)).toHaveLength(2);
 	});
 
-	it("lets read consume a native URI advertised by an MCP server", async () => {
+	it("lets read consume an exact native MCP URI containing a semicolon", async () => {
+		const uri = "ags://capabilities/current;host";
 		const resources = new Map<string, { resources: MCPResource[]; templates: MCPResourceTemplate[] }>();
 		resources.set("ags", {
-			resources: [{ uri: "ags://capabilities/current-host", name: "current-host" }],
+			resources: [{ uri, name: "current-host" }],
 			templates: [],
 		});
 		const manager = createMockManager({
 			servers: ["ags"],
 			resources,
 			readResult: {
-				contents: [{ uri: "ags://capabilities/current-host", text: "host capabilities" }],
+				contents: [{ uri, text: "host capabilities" }],
 			},
 		});
 		MCPManager.setInstance(manager);
 
-		const result = await new ReadTool(createToolSession()).execute("read-ags-resource", {
-			path: "ags://capabilities/current-host",
-		});
+		const result = await new ReadTool(createToolSession()).execute("read-ags-resource", { path: uri });
 		const output = result.content.find(block => block.type === "text");
 
 		expect(output?.type).toBe("text");
 		if (output?.type !== "text") throw new Error("Expected text output");
 		expect(output.text).toContain("host capabilities");
+		expect(output.text).not.toContain("interpreted as");
 	});
 
 	it("waits for the MCP resource catalog before rejecting a native URI", async () => {
