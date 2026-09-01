@@ -90,6 +90,41 @@ export async function resolveSqliteReadPath(
 
 	return null;
 }
+export async function hasExactSqliteSelector(
+	resolvedSqlitePath: ResolvedSqliteReadPath,
+	signal?: AbortSignal,
+): Promise<boolean> {
+	throwIfAborted(signal);
+	const selector = parseSqliteSelector(resolvedSqlitePath.sqliteSubPath, resolvedSqlitePath.queryString);
+	let db: Database | null = null;
+	try {
+		db = await openSqliteReadConnection(resolvedSqlitePath.absolutePath);
+		throwIfAborted(signal);
+		switch (selector.kind) {
+			case "schema":
+			case "query":
+				getTableSchema(db, selector.table);
+				return true;
+			case "row": {
+				const lookup = resolveTableRowLookup(db, selector.table);
+				return (
+					(lookup.kind === "pk"
+						? getRowByKey(db, selector.table, lookup, selector.key)
+						: getRowByRowId(db, selector.table, selector.key)) !== null
+				);
+			}
+			case "list":
+			case "raw":
+				return false;
+		}
+	} catch (error) {
+		if (error instanceof ToolError) return false;
+		throw error;
+	} finally {
+		db?.close();
+	}
+	return false;
+}
 export async function readSqlite(
 	resolvedSqlitePath: ResolvedSqliteReadPath,
 	signal?: AbortSignal,

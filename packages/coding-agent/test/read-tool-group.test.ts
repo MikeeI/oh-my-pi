@@ -381,6 +381,10 @@ describe("readArgsCollapseIntoGroup", () => {
 		expect(readArgsCollapseIntoGroup({ path: "skill://my-skill;./local.txt" })).toBe(false);
 	});
 
+	it("keeps custom MCP scheme batches as full tool executions", () => {
+		expect(readArgsCollapseIntoGroup({ path: "ags://capabilities/current-host;./local.txt" })).toBe(false);
+	});
+
 	it.each([
 		[path.resolve("/tmp/example.ts")],
 		["./relative/path.md"],

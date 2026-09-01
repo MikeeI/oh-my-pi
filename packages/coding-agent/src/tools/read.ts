@@ -117,7 +117,7 @@ import {
 } from "./read-path-resolution";
 import { type PdfImageReadTarget, renderPdfPageScreenshot, splitPdfImageReadPath } from "./read-pdf";
 import { isMultiRange, isRawSelector, type ParsedSelector, parseSel, selToOffsetLimit } from "./read-selector";
-import { readSqlite, resolveSqliteReadPath } from "./read-sqlite";
+import { hasExactSqliteSelector, readSqlite, resolveSqliteReadPath } from "./read-sqlite";
 import { isProseSummaryPath, renderSummary, routeReadThroughBridge, trySummarize } from "./read-summary";
 import { formatBytes, shortenPath } from "./render-utils";
 import { REPORT_ISSUE_DEVICE_NAME, reportIssueDeviceUsage } from "./report-tool-issue";
@@ -1181,7 +1181,9 @@ export class ReadTool implements AgentTool<typeof readSchema, ReadToolDetails> {
 		const preserveSqliteInput =
 			preflightSqlitePath !== null &&
 			(hasQuotedSqliteSemicolon(preflightSqlitePath.queryString) ||
-				SQLITE_STATEMENT_AFTER_SEMICOLON_RE.test(preflightSqlitePath.sqliteSubPath));
+				SQLITE_STATEMENT_AFTER_SEMICOLON_RE.test(preflightSqlitePath.sqliteSubPath) ||
+				(preflightSqlitePath.sqliteSubPath.includes(";") &&
+					(await hasExactSqliteSelector(preflightSqlitePath, signal))));
 
 		let preserveStandaloneHttpUrl = false;
 		if (semicolonTargets && parseReadUrlTarget(readPath)) {

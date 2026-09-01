@@ -369,6 +369,29 @@ describe("SQLite tool support", () => {
 		expect(text).toContain("Alice");
 		expect(text).toContain("SQL-named peer");
 	});
+
+	it("preserves semicolons in exact SQLite table names and row keys", async () => {
+		const exactDbPath = path.join(tmpDir, "semicolon-identifiers.sqlite");
+		const db = new Database(exactDbPath);
+		try {
+			db.run('CREATE TABLE "users;active" (id INTEGER PRIMARY KEY, name TEXT NOT NULL)');
+			db.run("CREATE TABLE slugs (slug TEXT PRIMARY KEY, title TEXT NOT NULL)");
+			db.prepare('INSERT INTO "users;active" (name) VALUES (?)').run("Semicolon table");
+			db.prepare("INSERT INTO slugs (slug, title) VALUES (?, ?)").run("legal;terms", "Semicolon key");
+		} finally {
+			db.close();
+		}
+
+		const tableResult = await readTool.execute("sqlite-semicolon-table", {
+			path: `${exactDbPath}:users;active`,
+		});
+		expect(getText(tableResult)).toContain("Semicolon table");
+
+		const rowResult = await readTool.execute("sqlite-semicolon-row", {
+			path: `${exactDbPath}:slugs:legal;terms`,
+		});
+		expect(getText(rowResult)).toContain("title: Semicolon key");
+	});
 	it("splits a batch after a SQLite query selector", async () => {
 		const siblingPath = path.join(tmpDir, "sqlite-query-batch-peer.txt");
 		await Bun.write(siblingPath, "sqlite query batch peer\n");

@@ -46,7 +46,7 @@ export function readArgsCollapseIntoGroup(args: unknown): boolean {
 	if (target === undefined) return false;
 	const router = InternalUrlRouter.instance();
 	const targets = splitSemicolonPathTargets(target) ?? [target];
-	return targets.every(candidate => candidate.startsWith(XD_URL_PREFIX) || !router.canHandle(candidate));
+	return targets.every(candidate => candidate.startsWith(XD_URL_PREFIX) || !router.canResolve(candidate));
 }
 
 /**
