@@ -1116,8 +1116,20 @@ export class ReadTool implements AgentTool<typeof readSchema, ReadToolDetails> {
 			readPath = attachment.sourcePath;
 		}
 
+		// One suffix-glob memo per read call — archive, SQLite, and plain-path
+		// resolution share misses instead of re-globbing the workspace.
+		const suffixCache: SuffixMatchCache = new Map();
+		const hasSemicolon = readPath.includes(";");
+		const preflightArchivePath = hasSemicolon
+			? await resolveArchiveReadPath(this.session, readPath, suffixCache, signal)
+			: null;
+		const preflightSqlitePath =
+			hasSemicolon && !preflightArchivePath
+				? await resolveSqliteReadPath(this.session, readPath, suffixCache, signal)
+				: null;
+
 		const internalRouter = InternalUrlRouter.instance();
-		if (readPath.includes(";")) {
+		if (hasSemicolon && !preflightArchivePath && !preflightSqlitePath) {
 			const routesThroughMcp =
 				internalRouter.canResolve(readPath) &&
 				(readPath.toLowerCase().startsWith("mcp://") || !internalRouter.canHandle(readPath));
@@ -1217,10 +1229,6 @@ export class ReadTool implements AgentTool<typeof readSchema, ReadToolDetails> {
 			}
 		}
 
-		// One suffix-glob memo per read call — archive, sqlite, and plain-path
-		// resolution share misses instead of re-globbing the workspace.
-		const suffixCache: SuffixMatchCache = new Map();
-
 		// Prefer a literal filesystem match over selector interpretation so real
 		// POSIX filenames containing selector-looking suffixes win over structured
 		// archive / sqlite / unsupported PDF-image dispatch. A selector promoted from local://
@@ -1237,7 +1245,8 @@ export class ReadTool implements AgentTool<typeof readSchema, ReadToolDetails> {
 		let pdfImageRead: PdfImageReadTarget | null = null;
 
 		if (!rawPathIsLiteral) {
-			const archivePath = await resolveArchiveReadPath(this.session, readPath, suffixCache, signal);
+			const archivePath =
+				preflightArchivePath ?? (await resolveArchiveReadPath(this.session, readPath, suffixCache, signal));
 			if (archivePath) {
 				const archiveSubPath =
 					promotedSelector === undefined
@@ -1253,7 +1262,8 @@ export class ReadTool implements AgentTool<typeof readSchema, ReadToolDetails> {
 				);
 			}
 
-			const sqlitePath = await resolveSqliteReadPath(this.session, readPath, suffixCache, signal);
+			const sqlitePath =
+				preflightSqlitePath ?? (await resolveSqliteReadPath(this.session, readPath, suffixCache, signal));
 			if (sqlitePath) {
 				return readSqlite(sqlitePath, signal);
 			}
