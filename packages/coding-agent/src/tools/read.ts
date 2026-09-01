@@ -74,6 +74,7 @@ import { type OutputMeta, resolveOutputMaxColumns } from "./output-meta";
 import {
 	expandPath,
 	formatPathRelativeToCwd,
+	isInternalUrlPath,
 	isReadableUrlPath,
 	type LineRange,
 	pathTargetsSsh,
@@ -85,7 +86,7 @@ import {
 	splitPathAndSelPreferringLiteral,
 	splitSemicolonPathTargets,
 } from "./path-utils";
-import { readArchive, resolveArchiveReadPath } from "./read-archive";
+import { hasExactArchiveMember, readArchive, resolveArchiveReadPath } from "./read-archive";
 import {
 	BRACKET_CONTEXT_ELLIPSIS,
 	buildInMemoryMultiRangeResult,
@@ -585,6 +586,24 @@ const DELIMITED_READ_MAX_CONCURRENCY = 8;
 /** Preserve SQLite statement-like selectors so its parser rejects them instead of treating them as path batches. */
 const SQLITE_STATEMENT_AFTER_SEMICOLON_RE =
 	/;\s*(?:alter|attach|create|delete|detach|drop|insert|pragma|reindex|replace|select|update|vacuum)\b/i;
+function hasQuotedSqliteSemicolon(queryString: string): boolean {
+	let quote: "'" | '"' | undefined;
+	for (let index = 0; index < queryString.length; index++) {
+		const char = queryString[index];
+		if (quote === undefined) {
+			if (char === "'" || char === '"') quote = char;
+			continue;
+		}
+		if (char === ";") return true;
+		if (char !== quote) continue;
+		if (queryString[index + 1] === quote) {
+			index++;
+			continue;
+		}
+		quote = undefined;
+	}
+	return false;
+}
 
 const kRepeatReadTracker = Symbol("read.repeatTracker");
 
@@ -1145,15 +1164,21 @@ export class ReadTool implements AgentTool<typeof readSchema, ReadToolDetails> {
 		const semicolonTargets = splitSemicolonPathTargets(readPath);
 		const internalRouter = InternalUrlRouter.instance();
 		const firstSemicolonTarget = semicolonTargets?.[0];
-		const startsWithInternalTarget =
-			firstSemicolonTarget !== undefined && internalRouter.canResolve(firstSemicolonTarget);
+		const startsWithInternalTarget = firstSemicolonTarget !== undefined && isInternalUrlPath(firstSemicolonTarget);
+		const preflightArchivePath =
+			semicolonTargets && !startsWithInternalTarget
+				? await resolveArchiveReadPath(this.session, readPath, suffixCache, signal)
+				: null;
+		const preserveArchiveInput =
+			preflightArchivePath?.archiveSubPath.includes(";") &&
+			(await hasExactArchiveMember(preflightArchivePath, signal));
 		const preflightSqlitePath =
 			semicolonTargets && !startsWithInternalTarget
 				? await resolveSqliteReadPath(this.session, readPath, suffixCache, signal)
 				: null;
 		const preserveSqliteInput =
 			preflightSqlitePath !== null &&
-			(preflightSqlitePath.queryString.includes(";") ||
+			(hasQuotedSqliteSemicolon(preflightSqlitePath.queryString) ||
 				SQLITE_STATEMENT_AFTER_SEMICOLON_RE.test(preflightSqlitePath.sqliteSubPath));
 
 		let preserveStandaloneHttpUrl = false;
@@ -1168,7 +1193,7 @@ export class ReadTool implements AgentTool<typeof readSchema, ReadToolDetails> {
 			preserveStandaloneHttpUrl = siblingStates.every(state => !state);
 		}
 
-		if (semicolonTargets && !preserveSqliteInput && !preserveStandaloneHttpUrl) {
+		if (semicolonTargets && !preserveArchiveInput && !preserveSqliteInput && !preserveStandaloneHttpUrl) {
 			const routesThroughMcp =
 				startsWithInternalTarget &&
 				internalRouter.canResolve(readPath) &&
@@ -1285,7 +1310,8 @@ export class ReadTool implements AgentTool<typeof readSchema, ReadToolDetails> {
 		let pdfImageRead: PdfImageReadTarget | null = null;
 
 		if (!rawPathIsLiteral) {
-			const archivePath = await resolveArchiveReadPath(this.session, readPath, suffixCache, signal);
+			const archivePath =
+				preflightArchivePath ?? (await resolveArchiveReadPath(this.session, readPath, suffixCache, signal));
 			if (archivePath) {
 				const archiveSubPath =
 					promotedSelector === undefined

@@ -1,6 +1,7 @@
 import type { AgentToolResult } from "@oh-my-pi/pi-agent-core";
 import type { TextContent } from "@oh-my-pi/pi-ai";
 import {
+	ArchiveError,
 	type ArchiveReader,
 	formatArchiveEntryLines,
 	openArchive,
@@ -29,7 +30,7 @@ import { formatBytes } from "./render-utils";
 import { ToolError, throwIfAborted } from "./tool-errors";
 import { toolResult } from "./tool-result";
 
-interface ResolvedArchiveReadPath {
+export interface ResolvedArchiveReadPath {
 	absolutePath: string;
 	archiveSubPath: string;
 	suffixResolution?: { from: string; to: string };
@@ -79,6 +80,21 @@ export async function resolveArchiveReadPath(
 	}
 
 	return null;
+}
+export async function hasExactArchiveMember(
+	resolvedArchivePath: ResolvedArchiveReadPath,
+	signal?: AbortSignal,
+): Promise<boolean> {
+	if (resolvedArchivePath.archiveSubPath.length === 0) return false;
+	throwIfAborted(signal);
+	try {
+		const archive = await openArchive(resolvedArchivePath.absolutePath);
+		throwIfAborted(signal);
+		return archive.getNode(resolvedArchivePath.archiveSubPath) !== undefined;
+	} catch (error) {
+		if (error instanceof ArchiveError) return false;
+		throw error;
+	}
 }
 async function readArchiveDirectory(
 	archive: ArchiveReader,

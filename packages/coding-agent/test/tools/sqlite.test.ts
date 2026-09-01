@@ -358,6 +358,18 @@ describe("SQLite tool support", () => {
 		expect(text).toContain("Alice");
 		expect(text).toContain("sqlite batch peer");
 	});
+	it("splits a batch after a SQLite query selector", async () => {
+		const siblingPath = path.join(tmpDir, "sqlite-query-batch-peer.txt");
+		await Bun.write(siblingPath, "sqlite query batch peer\n");
+		const result = await readTool.execute("sqlite-query-first-batch", {
+			path: `${sqlitePath}:users?limit=5;${siblingPath}`,
+		});
+		const text = getText(result);
+
+		expect(text).toContain("Note: interpreted as 2 paths:");
+		expect(text).toContain("Alice");
+		expect(text).toContain("sqlite query batch peer");
+	});
 
 	it("rejects SQLite where clauses that try to override pagination control syntax", async () => {
 		await expect(

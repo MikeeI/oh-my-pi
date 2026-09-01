@@ -21,6 +21,7 @@ import { ToolChoiceQueue } from "@oh-my-pi/pi-coding-agent/session/tool-choice-q
 import { createTools, type ToolSession } from "@oh-my-pi/pi-coding-agent/tools";
 import type { Text } from "@oh-my-pi/pi-tui";
 import { removeWithRetries } from "@oh-my-pi/pi-utils";
+import { writeArchive } from "@oh-my-pi/pi-utils/ar";
 import { grepToolRenderer } from "../../src/tools/grep";
 
 function createTestSession(cwd: string, overrides: Partial<ToolSession> = {}): ToolSession {
@@ -581,6 +582,23 @@ describe("tool path arrays", () => {
 		for (let index = 0; index < names.length; index++) {
 			expect(text).toContain(`batch marker ${index}`);
 		}
+	});
+	it("preserves exact archive members containing semicolons", async () => {
+		const archivePath = path.join(tempDir, "semicolon-member.zip");
+		const member = "docs/reference;guide.md";
+		await writeArchive(archivePath, "zip", [[member, "archive semicolon member\n"]]);
+		const tools = await createTools(createTestSession(tempDir));
+		const tool = tools.find(entry => entry.name === "read");
+		expect(tool).toBeDefined();
+		if (!tool) throw new Error("Missing read tool");
+
+		const result = await tool.execute("read-archive-semicolon-member", {
+			path: `${archivePath}:${member}`,
+		});
+		const text = getText(result);
+
+		expect(text).toContain("archive semicolon member");
+		expect(text).not.toContain("Note: interpreted as");
 	});
 
 	it("rejects HTTP URLs in either position of a multi-target Read call", async () => {
