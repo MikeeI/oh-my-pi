@@ -358,6 +358,19 @@ describe("SQLite tool support", () => {
 		expect(text).toContain("Alice");
 		expect(text).toContain("sqlite batch peer");
 	});
+
+	it("splits a SQLite-first batch when a sibling filename contains a question mark", async () => {
+		const siblingPath = path.join(tmpDir, "notes.txt?draft");
+		await Bun.write(siblingPath, "question-mark sibling\n");
+		const result = await readTool.execute("sqlite-question-mark-sibling", {
+			path: `${sqlitePath}:users;${siblingPath}`,
+		});
+		const text = getText(result);
+
+		expect(text).toContain("Note: interpreted as 2 paths:");
+		expect(text).toContain("Alice");
+		expect(text).toContain("question-mark sibling");
+	});
 	it("splits a SQLite-first batch when the peer starts with a SQL verb", async () => {
 		await Bun.write(path.join(tmpDir, "select.md"), "SQL-named peer\n");
 		const result = await readTool.execute("sqlite-sql-named-peer", {

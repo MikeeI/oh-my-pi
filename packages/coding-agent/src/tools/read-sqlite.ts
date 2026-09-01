@@ -95,9 +95,9 @@ export async function hasExactSqliteSelector(
 	signal?: AbortSignal,
 ): Promise<boolean> {
 	throwIfAborted(signal);
-	const selector = parseSqliteSelector(resolvedSqlitePath.sqliteSubPath, resolvedSqlitePath.queryString);
 	let db: Database | null = null;
 	try {
+		const selector = parseSqliteSelector(resolvedSqlitePath.sqliteSubPath, resolvedSqlitePath.queryString);
 		db = await openSqliteReadConnection(resolvedSqlitePath.absolutePath);
 		throwIfAborted(signal);
 		switch (selector.kind) {
