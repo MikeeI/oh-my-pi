@@ -102,6 +102,7 @@ describe("skill:// resolution honors skills.customDirectories (#7190)", () => {
 		await fs.mkdir(skillDir, { recursive: true });
 		await Bun.write(path.join(skillDir, "SKILL.md"), makeSkillMd("mixed-skill", tempDir));
 		await Bun.write(path.join(skillDir, "reference;guide.md"), "encoded semicolon resource\n");
+		await Bun.write(path.join(skillDir, "reference.zip"), "internal zip-shaped resource\n");
 
 		const localFile = path.join(tempDir, "local.txt");
 		await Bun.write(localFile, "local file content\n");
@@ -143,9 +144,29 @@ describe("skill:// resolution honors skills.customDirectories (#7190)", () => {
 
 		expect(encodedText).toContain("encoded semicolon resource");
 		expect(encodedText).not.toContain("Note: interpreted as");
+
+		const archiveShapedInternalResult = await readTool.execute("read-archive-shaped-internal-first", {
+			path: `skill://mixed-skill/reference.zip:raw;${localFile}`,
+		});
+		const archiveShapedInternalText = archiveShapedInternalResult.content
+			.flatMap(block => (block.type === "text" ? [block.text] : []))
+			.join("\n");
+		expect(archiveShapedInternalText).toContain("internal zip-shaped resource");
+		expect(archiveShapedInternalText).toContain("local file content");
+
+		const invalidArchivePath = path.join(tempDir, "docs.zip");
+		await Bun.write(invalidArchivePath, "not an archive");
+		const archiveFirstResult = await readTool.execute("read-archive-first-batch", {
+			path: `${invalidArchivePath}:README.md;${localFile}`,
+		});
+		const archiveFirstText = archiveFirstResult.content
+			.flatMap(block => (block.type === "text" ? [block.text] : []))
+			.join("\n");
+		expect(archiveFirstText).toContain("Note: interpreted as 2 paths:");
+		expect(archiveFirstText).toContain("local file content");
 	});
 
-	it("starts independent routed reads concurrently while preserving target order", async () => {
+	it("bounds concurrent routed reads while preserving target order", async () => {
 		const tempDir = await fs.mkdtemp(path.join(os.tmpdir(), "pi-parallel-delimited-"));
 		tempDirs.push(tempDir);
 		const releaseReads = Promise.withResolvers<void>();
@@ -178,8 +199,12 @@ describe("skill:// resolution honors skills.customDirectories (#7190)", () => {
 				getSessionSpawns: () => "*",
 				settings: Settings.isolated(),
 			};
+			const targets = Array.from(
+				{ length: 12 },
+				(_, index) => `parallel-read-test://target-${String(index).padStart(2, "0")}`,
+			);
 			const execution = new ReadTool(session).execute("read-parallel-delimited", {
-				path: "parallel-read-test://first;parallel-read-test://second",
+				path: targets.join(";"),
 			});
 			await firstReadStarted.promise;
 			const activeBeforeRelease = maxActive;
@@ -187,8 +212,9 @@ describe("skill:// resolution honors skills.customDirectories (#7190)", () => {
 			const result = await execution;
 			const text = result.content.flatMap(block => (block.type === "text" ? [block.text] : [])).join("\n");
 
-			expect(activeBeforeRelease).toBe(2);
-			expect(text.indexOf("resolved first")).toBeLessThan(text.indexOf("resolved second"));
+			expect(activeBeforeRelease).toBeGreaterThan(1);
+			expect(activeBeforeRelease).toBeLessThan(targets.length);
+			expect(text.indexOf("resolved target-00")).toBeLessThan(text.indexOf("resolved target-11"));
 		} finally {
 			releaseReads.resolve();
 			router.unregister("parallel-read-test");

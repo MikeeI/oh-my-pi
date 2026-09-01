@@ -599,6 +599,21 @@ describe("tool path arrays", () => {
 		}
 	});
 
+	it("preserves standalone HTTP URLs containing raw semicolons", async () => {
+		const tools = await createTools(
+			createTestSession(tempDir, { settings: Settings.isolated({ "fetch.enabled": false }) }),
+		);
+		const tool = tools.find(entry => entry.name === "read");
+		expect(tool).toBeDefined();
+		if (!tool) throw new Error("Missing read tool");
+
+		for (const readPath of ["https://example.com/items;active", "https://example.com/?a=1;b=2"]) {
+			await expect(tool.execute("read-http-semicolon", { path: readPath })).rejects.toThrow(
+				"URL reads are disabled by settings",
+			);
+		}
+	});
+
 	it("read keeps readable delimited paths when peers are missing", async () => {
 		const tools = await createTools(createTestSession(tempDir));
 		const tool = tools.find(entry => entry.name === "read");

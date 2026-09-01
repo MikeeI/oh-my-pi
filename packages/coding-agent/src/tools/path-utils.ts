@@ -862,10 +862,22 @@ function isDelimitedPathSeparator(ch: string, mode: DelimitedPathSplitMode): boo
 
 function hasTopLevelPathDelimiter(entry: string): boolean {
 	let braceDepth = 0;
+	let quote: "'" | '"' | null = null;
 	for (let i = 0; i < entry.length; i++) {
 		const ch = entry[i];
 		if (ch === "\\" && i + 1 < entry.length) {
 			i++;
+			continue;
+		}
+		if (quote) {
+			if (ch === quote) {
+				if (entry[i + 1] === quote) i++;
+				else quote = null;
+			}
+			continue;
+		}
+		if (ch === "'" || ch === '"') {
+			quote = ch;
 			continue;
 		}
 		if (ch === "{") {
@@ -887,10 +899,22 @@ function splitTopLevelDelimitedPath(entry: string, mode: DelimitedPathSplitMode)
 	const parts: string[] = [];
 	let braceDepth = 0;
 	let start = 0;
+	let quote: "'" | '"' | null = null;
 	for (let i = 0; i < entry.length; i++) {
 		const ch = entry[i];
 		if (ch === "\\" && i + 1 < entry.length) {
 			i++;
+			continue;
+		}
+		if (quote) {
+			if (ch === quote) {
+				if (entry[i + 1] === quote) i++;
+				else quote = null;
+			}
+			continue;
+		}
+		if (ch === "'" || ch === '"') {
+			quote = ch;
 			continue;
 		}
 		if (ch === "{") {

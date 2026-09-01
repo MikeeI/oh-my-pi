@@ -42,6 +42,7 @@ import {
 	truncateHeadBytes,
 	truncateLine,
 } from "../session/streaming-output";
+import { mapWithConcurrencyLimit } from "../task/parallel";
 import { buildLineEntriesWithBlockContext, lineEntriesToPlainText } from "../utils/block-context";
 import { isCpuProfilePath, renderCpuProfile } from "../utils/cpuprofile";
 import { resolveFileDisplayMode } from "../utils/file-display-mode";
@@ -82,6 +83,7 @@ import {
 	splitInternalUrlSel,
 	splitPathAndSel,
 	splitPathAndSelPreferringLiteral,
+	splitSemicolonPathTargets,
 } from "./path-utils";
 import { readArchive, resolveArchiveReadPath } from "./read-archive";
 import {
@@ -578,6 +580,11 @@ type ReadParams = ReadToolInput;
 const REPEAT_READ_HINT_THRESHOLD = 3;
 /** Per-session cap on tracked read keys; the map resets when exceeded. */
 const REPEAT_READ_TRACKER_CAP = 64;
+/** Bound fan-out so large model-generated batches cannot exhaust descriptors or remote connections. */
+const DELIMITED_READ_MAX_CONCURRENCY = 8;
+/** Preserve SQLite statement-like selectors so its parser rejects them instead of treating them as path batches. */
+const SQLITE_STATEMENT_AFTER_SEMICOLON_RE =
+	/;\s*(?:alter|attach|create|delete|detach|drop|insert|pragma|reindex|replace|select|update|vacuum)\b/i;
 
 const kRepeatReadTracker = Symbol("read.repeatTracker");
 
@@ -759,20 +766,27 @@ export class ReadTool implements AgentTool<typeof readSchema, ReadToolDetails> {
 			pendingText = pendingText.length > 0 ? `${pendingText}\n\n${text}` : text;
 		};
 
-		const outcomes = await Promise.all(
-			parts.map(async part => {
+		const { results } = await mapWithConcurrencyLimit(
+			parts,
+			DELIMITED_READ_MAX_CONCURRENCY,
+			async (part, _index, workerSignal) => {
 				try {
-					const result = await this.execute("read-delimited-part", { path: part }, signal);
+					const result = await this.execute("read-delimited-part", { path: part }, workerSignal);
 					return { ok: true as const, part, result };
 				} catch (error) {
-					if (error instanceof ToolAbortError || signal?.aborted) throw error;
+					if (error instanceof ToolAbortError || workerSignal.aborted) throw error;
 					const message = error instanceof Error ? error.message : String(error);
 					return { ok: false as const, part, errorNote: `Could not read ${part}: ${message}` };
 				}
-			}),
+			},
+			signal,
 		);
+		throwIfAborted(signal);
 
-		for (const outcome of outcomes) {
+		for (const outcome of results) {
+			if (!outcome) {
+				throw new ToolError("Batched Read execution stopped before every target completed.");
+			}
 			if (!outcome.ok) {
 				notes.push(outcome.errorNote);
 				displayReadTargets.push(outcome.part);
@@ -1128,18 +1142,34 @@ export class ReadTool implements AgentTool<typeof readSchema, ReadToolDetails> {
 		// One suffix-glob memo per read call — archive, SQLite, and plain-path
 		// resolution share misses instead of re-globbing the workspace.
 		const suffixCache: SuffixMatchCache = new Map();
-		const hasSemicolon = readPath.includes(";");
-		const preflightArchivePath = hasSemicolon
-			? await resolveArchiveReadPath(this.session, readPath, suffixCache, signal)
-			: null;
+		const semicolonTargets = splitSemicolonPathTargets(readPath);
+		const internalRouter = InternalUrlRouter.instance();
+		const firstSemicolonTarget = semicolonTargets?.[0];
+		const startsWithInternalTarget =
+			firstSemicolonTarget !== undefined && internalRouter.canResolve(firstSemicolonTarget);
 		const preflightSqlitePath =
-			hasSemicolon && !preflightArchivePath
+			semicolonTargets && !startsWithInternalTarget
 				? await resolveSqliteReadPath(this.session, readPath, suffixCache, signal)
 				: null;
+		const preserveSqliteInput =
+			preflightSqlitePath !== null &&
+			(preflightSqlitePath.queryString.includes(";") ||
+				SQLITE_STATEMENT_AFTER_SEMICOLON_RE.test(preflightSqlitePath.sqliteSubPath));
 
-		const internalRouter = InternalUrlRouter.instance();
-		if (hasSemicolon && !preflightArchivePath && !preflightSqlitePath) {
+		let preserveStandaloneHttpUrl = false;
+		if (semicolonTargets && parseReadUrlTarget(readPath)) {
+			const siblingStates = await Promise.all(
+				semicolonTargets.slice(1).map(async target => {
+					if (internalRouter.canResolve(target) || parseConflictUri(target)) return true;
+					return (await probeLiteralPathExists(splitPathAndSel(target).path, this.session.cwd)) === "exists";
+				}),
+			);
+			preserveStandaloneHttpUrl = siblingStates.every(state => !state);
+		}
+
+		if (semicolonTargets && !preserveSqliteInput && !preserveStandaloneHttpUrl) {
 			const routesThroughMcp =
+				startsWithInternalTarget &&
 				internalRouter.canResolve(readPath) &&
 				(readPath.toLowerCase().startsWith("mcp://") || !internalRouter.canHandle(readPath));
 			const exactMcpResource = routesThroughMcp && (await hasExactMcpResource(parseInternalUrl(readPath)));
@@ -1254,8 +1284,7 @@ export class ReadTool implements AgentTool<typeof readSchema, ReadToolDetails> {
 		let pdfImageRead: PdfImageReadTarget | null = null;
 
 		if (!rawPathIsLiteral) {
-			const archivePath =
-				preflightArchivePath ?? (await resolveArchiveReadPath(this.session, readPath, suffixCache, signal));
+			const archivePath = await resolveArchiveReadPath(this.session, readPath, suffixCache, signal);
 			if (archivePath) {
 				const archiveSubPath =
 					promotedSelector === undefined
