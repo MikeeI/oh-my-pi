@@ -1189,7 +1189,12 @@ export class ReadTool implements AgentTool<typeof readSchema, ReadToolDetails> {
 				semicolonTargets.slice(1).map(async target => {
 					if (isReadableUrlPath(target) || internalRouter.canResolve(target) || parseConflictUri(target))
 						return true;
-					return (await probeLiteralPathExists(splitPathAndSel(target).path, this.session.cwd)) === "exists";
+					if ((await probeLiteralPathExists(splitPathAndSel(target).path, this.session.cwd)) === "exists")
+						return true;
+					return (
+						(await resolveArchiveReadPath(this.session, target, suffixCache, signal)) !== null ||
+						(await resolveSqliteReadPath(this.session, target, suffixCache, signal)) !== null
+					);
 				}),
 			);
 			preserveStandaloneHttpUrl = siblingStates.every(state => !state);

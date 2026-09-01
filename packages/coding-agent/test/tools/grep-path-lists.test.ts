@@ -1,3 +1,4 @@
+import { Database } from "bun:sqlite";
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from "bun:test";
 import * as fs from "node:fs/promises";
 import * as os from "node:os";
@@ -606,11 +607,19 @@ describe("tool path arrays", () => {
 		const tool = tools.find(entry => entry.name === "read");
 		expect(tool).toBeDefined();
 		if (!tool) throw new Error("Missing read tool");
+		const archivePath = path.join(tempDir, "http-sibling.zip");
+		await writeArchive(archivePath, "zip", [["README.md", "archive sibling\n"]]);
+		const sqlitePath = path.join(tempDir, "http-sibling.sqlite");
+		const db = new Database(sqlitePath);
+		db.run("CREATE TABLE users (id INTEGER PRIMARY KEY)");
+		db.close();
 
 		for (const readPath of [
 			"apps/grep.txt;https://example.com/reference",
 			"https://example.com/reference;apps/grep.txt",
 			"https://a.example/doc;https://b.example/doc",
+			`https://example.com/reference;${archivePath}:README.md`,
+			`https://example.com/reference;${sqlitePath}:users`,
 		]) {
 			await expect(tool.execute("read-mixed-http-batch", { path: readPath })).rejects.toThrow(
 				"cannot be included in a multi-target Read call",
