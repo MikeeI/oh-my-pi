@@ -138,7 +138,7 @@ describe("McpProtocolHandler", () => {
 				{ uri: "catalog://first", name: "first" },
 				{ uri: "catalog://second", name: "second" },
 			],
-			templates: [],
+			templates: [{ uriTemplate: "catalog://{id}", name: "catalog-item" }],
 		});
 		const manager = createMockManager({
 			servers: ["catalog"],

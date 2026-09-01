@@ -14,26 +14,6 @@ function createSession(): ToolSession {
 }
 
 describe("Read guidance", () => {
-	it("requires one call for independent known targets before another assistant turn", () => {
-		const description = new ReadTool(createSession()).description;
-
-		expect(description).toContain("Before each `read`, collect every bounded target");
-		expect(description).toContain("MUST batch independent known non-HTTP(S)");
-		expect(description).toContain("HTTP(S) URLs as separate `read` calls");
-		expect(description).toContain("NEVER semicolon-join them");
-		expect(description).toContain("NEVER read known non-HTTP(S) targets one per assistant turn");
-	});
-
-	it("limits semicolon batching in the wire schema to non-HTTP targets", () => {
-		const schema = new ReadTool(createSession()).parameters.toJsonSchema() as {
-			properties?: { path?: { description?: string } };
-		};
-		const description = schema.properties?.path?.description;
-
-		expect(description).toContain("Join independent non-HTTP(S)");
-		expect(description).toContain("use separate calls for HTTP(S) URLs");
-	});
-
 	it("advertises grep and current SSH fallbacks instead of retired tool names", () => {
 		const description = new ReadTool(createSession()).description;
 

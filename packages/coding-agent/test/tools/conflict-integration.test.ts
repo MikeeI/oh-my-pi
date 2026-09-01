@@ -187,6 +187,23 @@ describe("read surfaces conflicts as a warning footer", () => {
 		expect(text).not.toContain("⚠");
 	});
 
+	it("reads conflict-first semicolon batches before parsing a single conflict URI", async () => {
+		await Bun.write(path.join(tempDir, "batch-conflict.ts"), TWO_WAY);
+		await Bun.write(path.join(tempDir, "batch-peer.txt"), "batch peer\n");
+		const session = createTestSession(tempDir);
+		const read = await getTool(session, "read");
+
+		await read.execute("read-batch-conflict-init", { path: "batch-conflict.ts" });
+		const result = await read.execute("read-conflict-first-batch", {
+			path: "conflict://1;batch-peer.txt",
+		});
+		const text = getText(result);
+
+		expect(text).toContain("Note: interpreted as 2 paths: conflict://1, batch-peer.txt");
+		expect(text).toContain("oldApi(x)");
+		expect(text).toContain("batch peer");
+	});
+
 	it("renders only the theirs body via reads of `conflict://<N>/theirs`", async () => {
 		const filePath = path.join(tempDir, "theirs.ts");
 		await Bun.write(filePath, TWO_WAY);

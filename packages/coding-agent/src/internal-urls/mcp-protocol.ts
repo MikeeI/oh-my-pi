@@ -2,13 +2,6 @@ import { MCPManager } from "../mcp/manager";
 import type { MCPResourceReadResult } from "../mcp/types";
 import type { InternalResource, InternalUrl, ProtocolHandler } from "./types";
 
-export class McpResourceNotFoundError extends Error {
-	constructor(uri: string, availableResources: string) {
-		super(`No MCP server has resource "${uri}".\n\nAvailable resources:\n${availableResources}`);
-		this.name = "McpResourceNotFoundError";
-	}
-}
-
 function escapeRegex(text: string): string {
 	return text.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
 }
@@ -47,15 +40,18 @@ function extractResourceUri(url: InternalUrl): string {
 	return uri;
 }
 
-function resolveTargetServer(mcpManager: MCPManager, uri: string): string | undefined {
-	const servers = mcpManager.getConnectedServers();
-	for (const name of servers) {
+function resolveConcreteTargetServer(mcpManager: MCPManager, uri: string): string | undefined {
+	for (const name of mcpManager.getConnectedServers()) {
 		const serverResources = mcpManager.getServerResources(name);
-		if (serverResources?.resources.some(r => r.uri === uri)) {
-			return name;
-		}
+		if (serverResources?.resources.some(resource => resource.uri === uri)) return name;
 	}
+	return undefined;
+}
 
+function resolveTargetServer(mcpManager: MCPManager, uri: string): string | undefined {
+	const concreteTarget = resolveConcreteTargetServer(mcpManager, uri);
+	if (concreteTarget) return concreteTarget;
+	const servers = mcpManager.getConnectedServers();
 	let bestTemplateMatch:
 		| {
 				serverName: string;
@@ -99,6 +95,26 @@ function resolveTargetServer(mcpManager: MCPManager, uri: string): string | unde
 	return bestTemplateMatch?.serverName;
 }
 
+/**
+ * Whether an advertised concrete MCP resource exactly owns this URL.
+ *
+ * Template matches are deliberately excluded: a broad template can also match
+ * a semicolon-joined batch, but only a concrete URI proves the semicolon is
+ * resource data rather than the Read batch delimiter.
+ */
+export async function hasExactMcpResource(url: InternalUrl): Promise<boolean> {
+	const mcpManager = MCPManager.instance();
+	if (!mcpManager) return false;
+
+	const uri = extractResourceUri(url);
+	let targetServer = resolveConcreteTargetServer(mcpManager, uri);
+	if (!targetServer) {
+		await Promise.allSettled(mcpManager.getConnectedServers().map(name => mcpManager.ensureServerResources(name)));
+		targetServer = resolveConcreteTargetServer(mcpManager, uri);
+	}
+	return targetServer !== undefined;
+}
+
 function formatAvailableResources(mcpManager: MCPManager): string {
 	const available = mcpManager
 		.getConnectedServers()
@@ -137,7 +153,9 @@ export class McpProtocolHandler implements ProtocolHandler {
 			targetServer = resolveTargetServer(mcpManager, uri);
 		}
 		if (!targetServer) {
-			throw new McpResourceNotFoundError(uri, formatAvailableResources(mcpManager));
+			throw new Error(
+				`No MCP server has resource "${uri}".\n\nAvailable resources:\n${formatAvailableResources(mcpManager)}`,
+			);
 		}
 
 		let result: MCPResourceReadResult | undefined;

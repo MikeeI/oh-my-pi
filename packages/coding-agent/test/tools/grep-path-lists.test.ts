@@ -562,17 +562,41 @@ describe("tool path arrays", () => {
 		}
 	});
 
-	it("rejects HTTP URLs inside multi-target read calls", async () => {
+	it("splits an explicit semicolon batch before an overlong joined path can reach stat", async () => {
+		const names = Array.from({ length: 20 }, (_, index) => `batch-target-${index.toString().padStart(2, "0")}.txt`);
+		for (const [index, name] of names.entries()) {
+			await Bun.write(path.join(tempDir, name), `batch marker ${index}\n`);
+		}
 		const tools = await createTools(createTestSession(tempDir));
 		const tool = tools.find(entry => entry.name === "read");
 		expect(tool).toBeDefined();
 		if (!tool) throw new Error("Missing read tool");
 
-		await expect(
-			tool.execute("read-mixed-http-batch", {
-				path: "apps/grep.txt;https://example.com/reference",
-			}),
-		).rejects.toThrow("HTTP(S) URL 'https://example.com/reference' cannot be included in a multi-target Read call");
+		const joinedPath = names.join(";");
+		expect(joinedPath.length).toBeGreaterThan(255);
+		const result = await tool.execute("read-overlong-semicolon-batch", { path: joinedPath });
+		const text = getText(result);
+
+		expect(text).toContain(`Note: interpreted as ${names.length} paths:`);
+		for (let index = 0; index < names.length; index++) {
+			expect(text).toContain(`batch marker ${index}`);
+		}
+	});
+
+	it("rejects HTTP URLs in either position of a multi-target Read call", async () => {
+		const tools = await createTools(createTestSession(tempDir));
+		const tool = tools.find(entry => entry.name === "read");
+		expect(tool).toBeDefined();
+		if (!tool) throw new Error("Missing read tool");
+
+		for (const readPath of [
+			"apps/grep.txt;https://example.com/reference",
+			"https://example.com/reference;apps/grep.txt",
+		]) {
+			await expect(tool.execute("read-mixed-http-batch", { path: readPath })).rejects.toThrow(
+				"cannot be included in a multi-target Read call",
+			);
+		}
 	});
 
 	it("read keeps readable delimited paths when peers are missing", async () => {

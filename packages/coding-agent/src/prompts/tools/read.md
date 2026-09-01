@@ -22,9 +22,12 @@ Read files, directories, archives, SQLite, images, documents, internal resources
 - Archives (`.zip` family incl. `.jar`/`.apk`/`.whl`, `.tar` incl. `.tar.{gz,bz2,xz,zst}`, `.rar`, `.7z`, `.iso`, `.cab`, `.deb`/`.rpm`/`.cpio`/`.ar`/`.a`, `.lzh`/`.arj`, `.asar`; single-stream `.gz`/`.bz2`/`.xz`/`.zst`): `archive.ext:path/inside/archive` reads a member.
 - Documents → extracted text. Notebooks → editable cells. Images → {{#if INSPECT_IMAGE_ENABLED}}metadata; call `inspect_image`{{else}}decoded inline{{/if}}. SVGs read as text unless `:img` is specified. `:raw` bypasses converters.
 - URLs → reader-mode clean text/markdown; `:raw` → untouched HTML. Bare `host:port` needs trailing slash.
-- Internal URIs — all schemes take selectors. `artifact://<id>` recovers spilled output; page with `:N-M`/`:raw:N-M`.
-- `ssh://host/<path>` reads remote file/dir (UTF-8, ≤1 MiB); bare `ssh://` lists hosts; writable with `write` and searchable with `grep`.
-  Literal `:`, `?`, `#` → percent-encode (`%3A`/`%3F`/`%23`). Requires a verified POSIX shell on the remote host. For Windows or other unsupported hosts, use `bash` with a remote SSH command or mount with `sshfs`.
+- Internal URIs — all schemes take selectors.
+- `artifact://<id>` recovers spilled output; page with `:N-M`/`:raw:N-M`.
+- Literal `;`, `:`, `?`, `#` in internal URIs → percent-encode as `%3B`, `%3A`, `%3F`, `%23`.
+- `ssh://host/<path>` reads remote file/dir (UTF-8, ≤1 MiB); bare `ssh://` lists hosts.
+- SSH URLs are writable with `write` and searchable with `grep`; they require a verified POSIX shell.
+- On Windows or another unsupported host, use `bash` with a remote SSH command or mount with `sshfs`.
 
 <critical>
 Summary footer names elided ranges? Re-issue ONLY those ranges. NEVER guess `..`/`…` content.
