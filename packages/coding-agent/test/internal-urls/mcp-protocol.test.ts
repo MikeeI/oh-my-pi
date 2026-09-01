@@ -131,6 +131,33 @@ describe("McpProtocolHandler", () => {
 		expect(output.text).not.toContain("interpreted as");
 	});
 
+	it("falls back to semicolon batching when no exact MCP resource matches", async () => {
+		const resources = new Map<string, { resources: MCPResource[]; templates: MCPResourceTemplate[] }>();
+		resources.set("catalog", {
+			resources: [
+				{ uri: "catalog://first", name: "first" },
+				{ uri: "catalog://second", name: "second" },
+			],
+			templates: [],
+		});
+		const manager = createMockManager({
+			servers: ["catalog"],
+			resources,
+			readResult: { contents: [{ uri: "catalog://item", text: "catalog item" }] },
+		});
+		MCPManager.setInstance(manager);
+
+		const result = await new ReadTool(createToolSession()).execute("read-semicolon-batch", {
+			path: "mcp://catalog://first;mcp://catalog://second",
+		});
+		const output = result.content.find(block => block.type === "text");
+
+		expect(output?.type).toBe("text");
+		if (output?.type !== "text") throw new Error("Expected text output");
+		expect(output.text).toContain("Note: interpreted as 2 paths: mcp://catalog://first, mcp://catalog://second");
+		expect(output.text.match(/catalog item/g)).toHaveLength(2);
+	});
+
 	it("lets read consume a native URI advertised by an MCP server", async () => {
 		const resources = new Map<string, { resources: MCPResource[]; templates: MCPResourceTemplate[] }>();
 		resources.set("ags", {

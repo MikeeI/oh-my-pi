@@ -2,6 +2,13 @@ import { MCPManager } from "../mcp/manager";
 import type { MCPResourceReadResult } from "../mcp/types";
 import type { InternalResource, InternalUrl, ProtocolHandler } from "./types";
 
+export class McpResourceNotFoundError extends Error {
+	constructor(uri: string, availableResources: string) {
+		super(`No MCP server has resource "${uri}".\n\nAvailable resources:\n${availableResources}`);
+		this.name = "McpResourceNotFoundError";
+	}
+}
+
 function escapeRegex(text: string): string {
 	return text.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
 }
@@ -130,9 +137,7 @@ export class McpProtocolHandler implements ProtocolHandler {
 			targetServer = resolveTargetServer(mcpManager, uri);
 		}
 		if (!targetServer) {
-			throw new Error(
-				`No MCP server has resource "${uri}".\n\nAvailable resources:\n${formatAvailableResources(mcpManager)}`,
-			);
+			throw new McpResourceNotFoundError(uri, formatAvailableResources(mcpManager));
 		}
 
 		let result: MCPResourceReadResult | undefined;

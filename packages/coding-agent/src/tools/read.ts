@@ -28,7 +28,12 @@ import {
 } from "../edit/file-snapshot-store";
 import { normalizeToLF } from "../edit/normalize";
 import { isNotebookPath, readEditableNotebookText } from "../edit/notebook";
-import { InternalUrlRouter, resolveLocalUrlToFile, resolveLocalUrlToPath } from "../internal-urls";
+import {
+	InternalUrlRouter,
+	McpResourceNotFoundError,
+	resolveLocalUrlToFile,
+	resolveLocalUrlToPath,
+} from "../internal-urls";
 import { type ResolvedArtifactFile, resolveArtifactFile } from "../internal-urls/artifact-protocol";
 import { parseInternalUrl } from "../internal-urls/parse";
 import type { InternalUrl } from "../internal-urls/types";
@@ -1165,6 +1170,20 @@ export class ReadTool implements AgentTool<typeof readSchema, ReadToolDetails> {
 
 		// Handle native OMP URLs and custom-scheme resources advertised by MCP servers.
 		const internalRouter = InternalUrlRouter.instance();
+		// MCP resource URIs are opaque and may contain literal semicolons.
+		// Preserve an advertised exact resource; only a genuine MCP miss may fall
+		// through to the documented multi-target delimiter grammar.
+		if (
+			readPath.includes(";") &&
+			internalRouter.canResolve(readPath) &&
+			(readPath.toLowerCase().startsWith("mcp://") || !internalRouter.canHandle(readPath))
+		) {
+			try {
+				return await this.#handleInternalUrl(readPath, parseSel(undefined), signal);
+			} catch (error) {
+				if (!(error instanceof McpResourceNotFoundError)) throw error;
+			}
+		}
 		const delimitedInternalResult = internalRouter.canResolve(readPath)
 			? await this.#tryReadDelimitedPaths(readPath, signal, {
 					splitInternalUrlSemicolons: true,
