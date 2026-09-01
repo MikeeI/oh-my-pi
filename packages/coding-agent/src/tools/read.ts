@@ -759,25 +759,34 @@ export class ReadTool implements AgentTool<typeof readSchema, ReadToolDetails> {
 			pendingText = pendingText.length > 0 ? `${pendingText}\n\n${text}` : text;
 		};
 
-		for (const part of parts) {
-			try {
-				const result = await this.execute("read-delimited-part", { path: part }, signal);
-				displayReadTargets.push(result.details?.suffixResolution?.to ?? part);
-				for (const block of result.content) {
-					if (block.type === "text") {
-						appendText(block.text);
-						continue;
-					}
-					flushText();
-					content.push(block);
+		const outcomes = await Promise.all(
+			parts.map(async part => {
+				try {
+					const result = await this.execute("read-delimited-part", { path: part }, signal);
+					return { ok: true as const, part, result };
+				} catch (error) {
+					if (error instanceof ToolAbortError || signal?.aborted) throw error;
+					const message = error instanceof Error ? error.message : String(error);
+					return { ok: false as const, part, errorNote: `Could not read ${part}: ${message}` };
 				}
-			} catch (error) {
-				if (error instanceof ToolAbortError || signal?.aborted) throw error;
-				const message = error instanceof Error ? error.message : String(error);
-				const errorNote = `Could not read ${part}: ${message}`;
-				notes.push(errorNote);
-				displayReadTargets.push(part);
-				appendText(`[${errorNote}]`);
+			}),
+		);
+
+		for (const outcome of outcomes) {
+			if (!outcome.ok) {
+				notes.push(outcome.errorNote);
+				displayReadTargets.push(outcome.part);
+				appendText(`[${outcome.errorNote}]`);
+				continue;
+			}
+			displayReadTargets.push(outcome.result.details?.suffixResolution?.to ?? outcome.part);
+			for (const block of outcome.result.content) {
+				if (block.type === "text") {
+					appendText(block.text);
+					continue;
+				}
+				flushText();
+				content.push(block);
 			}
 		}
 		flushText();

@@ -376,6 +376,11 @@ describe("readArgsCollapseIntoGroup", () => {
 		expect(readArgsCollapseIntoGroup({ file_path: target })).toBe(false);
 	});
 
+	it("keeps mixed filesystem and internal batches as full tool executions", () => {
+		expect(readArgsCollapseIntoGroup({ path: "./local.txt;skill://my-skill" })).toBe(false);
+		expect(readArgsCollapseIntoGroup({ path: "skill://my-skill;./local.txt" })).toBe(false);
+	});
+
 	it.each([
 		[path.resolve("/tmp/example.ts")],
 		["./relative/path.md"],

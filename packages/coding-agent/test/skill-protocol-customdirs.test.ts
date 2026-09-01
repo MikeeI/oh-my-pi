@@ -5,6 +5,7 @@ import * as path from "node:path";
 import { Settings } from "@oh-my-pi/pi-coding-agent/config/settings";
 import { loadSkills, resetActiveSkillsForTests, setActiveSkills } from "@oh-my-pi/pi-coding-agent/extensibility/skills";
 import { parseInternalUrl } from "@oh-my-pi/pi-coding-agent/internal-urls/parse";
+import { InternalUrlRouter } from "@oh-my-pi/pi-coding-agent/internal-urls/router";
 import { SkillProtocolHandler } from "@oh-my-pi/pi-coding-agent/internal-urls/skill-protocol";
 import type { ToolSession } from "@oh-my-pi/pi-coding-agent/tools";
 import { ReadTool } from "@oh-my-pi/pi-coding-agent/tools/read";
@@ -142,6 +143,56 @@ describe("skill:// resolution honors skills.customDirectories (#7190)", () => {
 
 		expect(encodedText).toContain("encoded semicolon resource");
 		expect(encodedText).not.toContain("Note: interpreted as");
+	});
+
+	it("starts independent routed reads concurrently while preserving target order", async () => {
+		const tempDir = await fs.mkdtemp(path.join(os.tmpdir(), "pi-parallel-delimited-"));
+		tempDirs.push(tempDir);
+		const releaseReads = Promise.withResolvers<void>();
+		const firstReadStarted = Promise.withResolvers<void>();
+		let active = 0;
+		let maxActive = 0;
+		const router = InternalUrlRouter.instance();
+		router.register({
+			scheme: "parallel-read-test",
+			immutable: true,
+			async resolve(url) {
+				active++;
+				maxActive = Math.max(maxActive, active);
+				firstReadStarted.resolve();
+				await releaseReads.promise;
+				active--;
+				return {
+					url: url.rawHref ?? url.href,
+					content: `resolved ${url.rawHost}`,
+					contentType: "text/plain",
+				};
+			},
+		});
+
+		try {
+			const session: ToolSession = {
+				cwd: tempDir,
+				hasUI: false,
+				getSessionFile: () => null,
+				getSessionSpawns: () => "*",
+				settings: Settings.isolated(),
+			};
+			const execution = new ReadTool(session).execute("read-parallel-delimited", {
+				path: "parallel-read-test://first;parallel-read-test://second",
+			});
+			await firstReadStarted.promise;
+			const activeBeforeRelease = maxActive;
+			releaseReads.resolve();
+			const result = await execution;
+			const text = result.content.flatMap(block => (block.type === "text" ? [block.text] : [])).join("\n");
+
+			expect(activeBeforeRelease).toBe(2);
+			expect(text.indexOf("resolved first")).toBeLessThan(text.indexOf("resolved second"));
+		} finally {
+			releaseReads.resolve();
+			router.unregister("parallel-read-test");
+		}
 	});
 
 	it("keeps first-wins across multiple custom directories", async () => {

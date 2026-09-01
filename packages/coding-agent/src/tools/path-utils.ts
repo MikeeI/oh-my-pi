@@ -909,6 +909,25 @@ function splitTopLevelDelimitedPath(entry: string, mode: DelimitedPathSplitMode)
 	return parts;
 }
 
+function normalizeDelimitedPathParts(rawParts: string[]): string[] | null {
+	if (rawParts.length < 2) return null;
+	const parts = rawParts.map(normalizePathLikeInput).filter(part => part.length > 0);
+	if (parts.length === 0) return null;
+	if (parts.length < 2 && rawParts.length === parts.length) return null;
+	return parts;
+}
+
+/**
+ * Syntactically split the documented semicolon batch grammar.
+ *
+ * Callers that execute paths must still apply literal-resource precedence.
+ * Display routing uses this conservative form so any internal target keeps the
+ * full result visible before asynchronous path resolution completes.
+ */
+export function splitSemicolonPathTargets(entry: string): string[] | null {
+	return normalizeDelimitedPathParts(splitTopLevelDelimitedPath(normalizePathLikeInput(entry), "semicolon"));
+}
+
 async function delimitedPathPartResolves(entry: string, cwd: string, splitter: PathEntrySplitter): Promise<boolean> {
 	if (isInternalUrlPath(entry)) return true;
 	const peeled = splitPathAndSel(entry).path;
@@ -942,12 +961,8 @@ async function tryDelimitedPathSplit(
 	mode: DelimitedPathSplitMode,
 	requirement: DelimitedResolveRequirement,
 ): Promise<string[] | null> {
-	const rawParts = splitTopLevelDelimitedPath(entry, mode);
-	if (rawParts.length < 2) return null;
-
-	const parts = rawParts.map(normalizePathLikeInput).filter(part => part.length > 0);
-	if (parts.length === 0) return null;
-	if (parts.length < 2 && rawParts.length === parts.length) return null;
+	const parts = normalizeDelimitedPathParts(splitTopLevelDelimitedPath(entry, mode));
+	if (!parts) return null;
 
 	if (requirement !== "none") {
 		const resolved = await Promise.all(parts.map(part => delimitedPathPartResolves(part, cwd, splitter)));

@@ -4,7 +4,12 @@ import type { Component } from "@oh-my-pi/pi-tui";
 import { Container, Text } from "@oh-my-pi/pi-tui";
 import { InternalUrlRouter, XD_URL_PREFIX } from "../../internal-urls";
 import { getLanguageFromPath, theme } from "../../modes/theme/theme";
-import { parseLineRanges, selectorLineRanges, splitPathAndSel } from "../../tools/path-utils";
+import {
+	parseLineRanges,
+	selectorLineRanges,
+	splitPathAndSel,
+	splitSemicolonPathTargets,
+} from "../../tools/path-utils";
 import { PREVIEW_LIMITS, shortenPath } from "../../tools/render-utils";
 import { fileHyperlink, renderCodeCell, tryResolveInternalUrlSync } from "../../tui";
 import { canonicalizeMessage } from "../../utils/thinking-display";
@@ -39,7 +44,9 @@ export function readArgsHaveTarget(args: unknown): boolean {
 export function readArgsCollapseIntoGroup(args: unknown): boolean {
 	const target = readArgsTarget(args);
 	if (target === undefined) return false;
-	return target.startsWith(XD_URL_PREFIX) || !InternalUrlRouter.instance().canHandle(target);
+	const router = InternalUrlRouter.instance();
+	const targets = splitSemicolonPathTargets(target) ?? [target];
+	return targets.every(candidate => candidate.startsWith(XD_URL_PREFIX) || !router.canHandle(candidate));
 }
 
 /**
