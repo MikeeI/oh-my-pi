@@ -9,7 +9,6 @@ import {
 	parseFindPattern,
 	resolveToolSearchScope,
 	splitDelimitedPathEntry,
-	splitSemicolonPathTargets,
 } from "@oh-my-pi/pi-coding-agent/tools/path-utils";
 import type { Component } from "@oh-my-pi/pi-tui";
 import { removeWithRetries } from "@oh-my-pi/pi-utils";
@@ -86,9 +85,10 @@ describe("delimited path expansion", () => {
 		expect(await splitDelimitedPathEntry("folder\\ with\\ spaces/file.txt packages/b.txt", tempDir)).toBeNull();
 	});
 
-	it("does not split semicolons inside quoted selector values", () => {
-		expect(splitSemicolonPathTargets("data.sqlite:notes?where=body LIKE '%;%'&limit=5")).toBeNull();
-		expect(splitSemicolonPathTargets('data.sqlite:notes?where=body = "a;b"&limit=5')).toBeNull();
+	it("splits existing filesystem targets containing apostrophes", async () => {
+		await Bun.write(path.join(tempDir, "john's.txt"), "john\n");
+		await Bun.write(path.join(tempDir, "peer.txt"), "peer\n");
+		expect(await splitDelimitedPathEntry("john's.txt;peer.txt", tempDir)).toEqual(["john's.txt", "peer.txt"]);
 	});
 
 	it("uses strong delimiters leniently and whitespace delimiters conservatively", async () => {

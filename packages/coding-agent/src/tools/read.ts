@@ -1160,7 +1160,8 @@ export class ReadTool implements AgentTool<typeof readSchema, ReadToolDetails> {
 		if (semicolonTargets && parseReadUrlTarget(readPath)) {
 			const siblingStates = await Promise.all(
 				semicolonTargets.slice(1).map(async target => {
-					if (internalRouter.canResolve(target) || parseConflictUri(target)) return true;
+					if (isReadableUrlPath(target) || internalRouter.canResolve(target) || parseConflictUri(target))
+						return true;
 					return (await probeLiteralPathExists(splitPathAndSel(target).path, this.session.cwd)) === "exists";
 				}),
 			);

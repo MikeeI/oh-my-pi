@@ -592,6 +592,7 @@ describe("tool path arrays", () => {
 		for (const readPath of [
 			"apps/grep.txt;https://example.com/reference",
 			"https://example.com/reference;apps/grep.txt",
+			"https://a.example/doc;https://b.example/doc",
 		]) {
 			await expect(tool.execute("read-mixed-http-batch", { path: readPath })).rejects.toThrow(
 				"cannot be included in a multi-target Read call",
