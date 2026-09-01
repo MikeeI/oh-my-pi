@@ -1,7 +1,10 @@
 Read files, directories, archives, SQLite, images, documents, internal resources, and web URLs via `path`.
 
 <instruction>
-- SHOULD parallelize independent reads.
+- Before each `read`, collect every bounded target already required for the current step.
+- MUST batch independent known non-HTTP(S) complete `path[:selector]` targets in one semicolon-joined call.
+- Issue independent HTTP(S) URLs as separate `read` calls; NEVER semicolon-join them.
+- NEVER read known non-HTTP(S) targets one per assistant turn.
 - SHOULD use `read` (not browser) for web content; browser only when `read` can't deliver.
 </instruction>
 

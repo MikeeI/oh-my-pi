@@ -18,6 +18,7 @@
 - Disabled hashline editing for Kimi, Mimo, DeepSeek Flash, and Stepfun models for improved stability.
 - Reworked transcript navigation with a fullscreen rewind selector opened by double-Escape, supporting rendered-item navigation, user-turn jumps, branching rewinds, and alternate session-tree branch selection.
 - Updated `/copy` to use the fullscreen transcript selector, allowing users to copy a turn or navigate into nested content such as code, quotes, commands, and tool output.
+- Read now batches known non-HTTP targets in one tool call instead of requesting them across model turns.
 
 ### Fixed
 
@@ -55,6 +56,7 @@
 - Prevented browser `app.path` from terminating existing same-executable applications when no reusable CDP endpoint is available.
 - Fixed top-level errors overwriting the active composer before terminal restoration.
 - Fixed Enter being ignored during the first turn when omp starts with an initial prompt.
+- Fixed semicolon-delimited Read calls failing when an internal URI is combined with filesystem targets.
 
 ## [18.0.11] - 2026-08-29
 

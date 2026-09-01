@@ -562,6 +562,19 @@ describe("tool path arrays", () => {
 		}
 	});
 
+	it("rejects HTTP URLs inside multi-target read calls", async () => {
+		const tools = await createTools(createTestSession(tempDir));
+		const tool = tools.find(entry => entry.name === "read");
+		expect(tool).toBeDefined();
+		if (!tool) throw new Error("Missing read tool");
+
+		await expect(
+			tool.execute("read-mixed-http-batch", {
+				path: "apps/grep.txt;https://example.com/reference",
+			}),
+		).rejects.toThrow("HTTP(S) URL 'https://example.com/reference' cannot be included in a multi-target Read call");
+	});
+
 	it("read keeps readable delimited paths when peers are missing", async () => {
 		const tools = await createTools(createTestSession(tempDir));
 		const tool = tools.find(entry => entry.name === "read");

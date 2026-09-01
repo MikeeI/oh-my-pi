@@ -73,6 +73,7 @@ import { type OutputMeta, resolveOutputMaxColumns } from "./output-meta";
 import {
 	expandPath,
 	formatPathRelativeToCwd,
+	isReadableUrlPath,
 	type LineRange,
 	pathTargetsSsh,
 	probeLiteralPathExists,
@@ -529,12 +530,14 @@ const MAX_IMAGE_SIZE = MAX_IMAGE_INPUT_BYTES;
 
 const readSchema = type({
 	path: type("string").describe(
-		"Local path, internal URI (e.g. memory://, skill://), or URL. Inline selectors are supported.",
+		"Local path, internal URI (e.g. memory://, skill://), or URL. Join independent non-HTTP(S) `path[:selector]` targets with `;`; use separate calls for HTTP(S) URLs.",
 	),
 });
 
 const readSchemaWithoutMemory = type({
-	path: type("string").describe("Local path, internal URI (e.g. skill://), or URL. Inline selectors are supported."),
+	path: type("string").describe(
+		"Local path, internal URI (e.g. skill://), or URL. Join independent non-HTTP(S) `path[:selector]` targets with `;`; use separate calls for HTTP(S) URLs.",
+	),
 });
 
 export type ReadToolInput = typeof readSchema.infer;
@@ -725,10 +728,22 @@ export class ReadTool implements AgentTool<typeof readSchema, ReadToolDetails> {
 	async #tryReadDelimitedPaths(
 		readPath: string,
 		signal?: AbortSignal,
-		routedUrlPredicate?: (entry: string) => boolean,
+		options: {
+			splitInternalUrlSemicolons?: boolean;
+		} = {},
 	): Promise<AgentToolResult<ReadToolDetails> | null> {
-		const parts = await splitDelimitedPathEntry(readPath, this.session.cwd, { routedUrlPredicate });
+		const parts = await splitDelimitedPathEntry(readPath, this.session.cwd, {
+			splitInternalUrlSemicolons: options.splitInternalUrlSemicolons,
+		});
 		if (!parts) return null;
+		// Raw semicolons are valid URL data, so treating them as batch delimiters is ambiguous.
+		// HTTP(S) targets therefore use sibling calls instead of the path batch grammar.
+		const httpTarget = parts.find(isReadableUrlPath);
+		if (httpTarget) {
+			throw new ToolError(
+				`HTTP(S) URL '${httpTarget}' cannot be included in a multi-target Read call. Issue separate sibling read calls for HTTP(S) URLs.`,
+			);
+		}
 
 		const notice = `Note: interpreted as ${parts.length} paths: ${parts.join(", ")}`;
 		const notes = [notice];
@@ -1151,7 +1166,9 @@ export class ReadTool implements AgentTool<typeof readSchema, ReadToolDetails> {
 		// Handle native OMP URLs and custom-scheme resources advertised by MCP servers.
 		const internalRouter = InternalUrlRouter.instance();
 		const delimitedInternalResult = internalRouter.canResolve(readPath)
-			? await this.#tryReadDelimitedPaths(readPath, signal, entry => internalRouter.canResolve(entry))
+			? await this.#tryReadDelimitedPaths(readPath, signal, {
+					splitInternalUrlSemicolons: true,
+				})
 			: null;
 		if (delimitedInternalResult) return delimitedInternalResult;
 
