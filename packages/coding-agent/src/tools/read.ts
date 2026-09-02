@@ -74,6 +74,7 @@ import {
 	expandPath,
 	formatPathRelativeToCwd,
 	type LineRange,
+	isReadableUrlPath,
 	pathTargetsSsh,
 	probeLiteralPathExists,
 	resolveReadPath,
@@ -761,8 +762,13 @@ export class ReadTool implements AgentTool<typeof readSchema, ReadToolDetails> {
 
 		for (const part of parts) {
 			try {
-				const result = await this.execute("read-delimited-part", { path: part }, signal);
-				displayReadTargets.push(result.details?.suffixResolution?.to ?? part);
+				const isUrlShapedLocalPath =
+					!part.includes("://") &&
+					isReadableUrlPath(part) &&
+					(await probeLiteralPathExists(part, this.session.cwd)) === "exists";
+				const executionPath = isUrlShapedLocalPath ? path.resolve(this.session.cwd, part) : part;
+				const result = await this.execute("read-delimited-part", { path: executionPath }, signal);
+				displayReadTargets.push(isUrlShapedLocalPath ? part : (result.details?.suffixResolution?.to ?? part));
 				for (const block of result.content) {
 					if (block.type === "text") {
 						appendText(block.text);
@@ -1148,6 +1154,17 @@ export class ReadTool implements AgentTool<typeof readSchema, ReadToolDetails> {
 			return this.#readConflictRegion(conflictUri.id, conflictUri.scope);
 		}
 		const displayMode = resolveFileDisplayMode(this.session);
+		if (readPath.includes(";")) {
+			const firstTarget = readPath.slice(0, readPath.indexOf(";"));
+			const startsWithUrlShapedLocalPath =
+				!firstTarget.includes("://") &&
+				isReadableUrlPath(firstTarget) &&
+				(await probeLiteralPathExists(firstTarget, this.session.cwd)) === "exists";
+			if (startsWithUrlShapedLocalPath) {
+				const delimitedResult = await this.#tryReadDelimitedPaths(readPath, signal);
+				if (delimitedResult) return delimitedResult;
+			}
+		}
 
 		const parsedUrlTarget = parseReadUrlTarget(readPath);
 		if (parsedUrlTarget) {

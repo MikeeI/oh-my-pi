@@ -87,6 +87,20 @@ describe("read attachment URLs", () => {
 		expect(result.details?.displayReadTargets).toEqual([firstUrl, secondUrl]);
 	});
 
+	it("reads a URL-shaped local first target before URL dispatch", async () => {
+		await Bun.write(path.join(testDir, "www.example"), "local domain path\n");
+		await Bun.write(path.join(testDir, "second.txt"), "second file\n");
+
+		const result = await new ReadTool(createSession(testDir, imagePath)).execute("read-local-url-shaped-batch", {
+			path: "www.example;second.txt",
+		});
+		const text = result.content.flatMap(block => (block.type === "text" ? [block.text] : [])).join("\n");
+
+		expect(text).toContain("local domain path");
+		expect(text).toContain("second file");
+		expect(result.details?.displayReadTargets).toEqual(["www.example", "second.txt"]);
+	});
+
 	it("reports unknown attachment URLs with the available URIs", async () => {
 		const tool = new ReadTool(createSession(testDir, imagePath));
 
