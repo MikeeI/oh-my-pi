@@ -946,28 +946,26 @@ async function tryDelimitedPathSplit(
 	if (rawParts.length < 2) return null;
 
 	const parts = rawParts.map(normalizePathLikeInput).filter(part => part.length > 0);
-	if (parts.some(isReadableUrlPath)) return null;
 	const internalRouter = InternalUrlRouter.instance();
 	// Unregistered schemes may be MCP-advertised opaque resources whose payload
 	// includes later semicolons. Reject the tentative batch rather than corrupting
-	// the URI, while preserving custom protocol handlers registered in this process.
-	if (
-		parts.some(part => {
-			const scheme = extractUriScheme(part);
-			if (scheme === undefined) return false;
-			if (scheme === "mcp") return true;
-			if (
-				scheme === "attachment" ||
-				scheme === "conflict" ||
-				scheme === "file" ||
-				INTERNAL_SCHEMES_WITH_SELECTORS[scheme] === true
-			) {
-				return false;
-			}
-			return !internalRouter.canHandle(part);
-		})
-	) {
-		return null;
+	// the URI, while preserving registered handlers and existing POSIX names that
+	// merely resemble scheme-less or opaque URLs.
+	for (const part of parts) {
+		const readableUrl = isReadableUrlPath(part);
+		const scheme = extractUriScheme(part);
+		if (!readableUrl && scheme === undefined) continue;
+		if (!part.includes("://") && (await probeLiteralPathExists(part, cwd)) !== "missing") continue;
+		if (readableUrl || scheme === "mcp") return null;
+		if (
+			scheme === "attachment" ||
+			scheme === "conflict" ||
+			scheme === "file" ||
+			(scheme !== undefined && INTERNAL_SCHEMES_WITH_SELECTORS[scheme] === true)
+		) {
+			continue;
+		}
+		if (!internalRouter.canHandle(part)) return null;
 	}
 	if (parts.length === 0) return null;
 	if (parts.length < 2 && rawParts.length === parts.length) return null;

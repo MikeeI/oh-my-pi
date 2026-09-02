@@ -40,9 +40,11 @@ describe("delimited path expansion", () => {
 		await fs.mkdir(path.join(tempDir, "packages"), { recursive: true });
 		await fs.mkdir(path.join(tempDir, "src"), { recursive: true });
 		await fs.mkdir(path.join(tempDir, "folder with spaces"), { recursive: true });
+		await fs.mkdir(path.join(tempDir, "www.example"), { recursive: true });
 		await Bun.write(path.join(tempDir, "apps", "a.txt"), "apps\n");
 		await Bun.write(path.join(tempDir, "packages", "b.txt"), "packages\n");
 		await Bun.write(path.join(tempDir, "folder with spaces", "file.txt"), "spaces\n");
+		await Bun.write(path.join(tempDir, "notes:detail"), "colon\n");
 	});
 
 	afterEach(async () => {
@@ -78,6 +80,17 @@ describe("delimited path expansion", () => {
 				splitInternalUrlSemicolons: true,
 			}),
 		).toEqual(["xd://resolve", "packages/b.txt"]);
+	});
+
+	it("keeps URL-shaped existing local children batchable", async () => {
+		expect(await splitDelimitedPathEntry("www.example;packages/b.txt", tempDir)).toEqual([
+			"www.example",
+			"packages/b.txt",
+		]);
+		expect(await splitDelimitedPathEntry("notes:detail;packages/b.txt", tempDir)).toEqual([
+			"notes:detail",
+			"packages/b.txt",
+		]);
 	});
 
 	it("keeps an existing path with spaces intact", async () => {
