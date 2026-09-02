@@ -1089,6 +1089,10 @@ export class ReadTool implements AgentTool<typeof readSchema, ReadToolDetails> {
 		_toolContext?: AgentToolContext,
 	): Promise<AgentToolResult<ReadToolDetails>> {
 		let { path: readPath } = params;
+		if (readPath.startsWith("file://") && readPath.includes(";")) {
+			const delimitedResult = await this.#tryReadDelimitedPaths(readPath, signal);
+			if (delimitedResult) return delimitedResult;
+		}
 		if (readPath.startsWith("file://")) {
 			readPath = expandPath(readPath);
 		}

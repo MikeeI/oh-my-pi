@@ -2,6 +2,7 @@ import { afterEach, beforeEach, describe, expect, it } from "bun:test";
 import * as fs from "node:fs";
 import * as os from "node:os";
 import * as path from "node:path";
+import * as url from "node:url";
 import type { ImageContent } from "@oh-my-pi/pi-ai";
 import { Settings } from "@oh-my-pi/pi-coding-agent/config/settings";
 import type { ToolSession } from "@oh-my-pi/pi-coding-agent/tools";
@@ -66,6 +67,24 @@ describe("read attachment URLs", () => {
 		expect(text).toContain("Note: interpreted as 2 paths: attachment://1, attachment://2");
 		expect(images).toHaveLength(2);
 		expect(result.details?.displayReadTargets).toEqual(["attachment://1", "attachment://2"]);
+	});
+
+	it("splits file URL batches before decoding encoded semicolons", async () => {
+		const firstPath = path.join(testDir, "first;file.txt");
+		const secondPath = path.join(testDir, "second.txt");
+		await Bun.write(firstPath, "first file\n");
+		await Bun.write(secondPath, "second file\n");
+		const firstUrl = url.pathToFileURL(firstPath).href.replace(";", "%3B");
+		const secondUrl = url.pathToFileURL(secondPath).href;
+
+		const result = await new ReadTool(createSession(testDir, imagePath)).execute("read-file-url-batch", {
+			path: `${firstUrl};${secondUrl}`,
+		});
+		const text = result.content.flatMap(block => (block.type === "text" ? [block.text] : [])).join("\n");
+
+		expect(text).toContain("first file");
+		expect(text).toContain("second file");
+		expect(result.details?.displayReadTargets).toEqual([firstUrl, secondUrl]);
 	});
 
 	it("reports unknown attachment URLs with the available URIs", async () => {
