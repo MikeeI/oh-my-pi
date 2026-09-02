@@ -64,6 +64,14 @@ describe("delimited path expansion", () => {
 		]);
 	});
 
+	it("rejects HTTP children from internal semicolon batches", async () => {
+		expect(
+			await splitDelimitedPathEntry("artifact://abc123;https://example.com/a;b", tempDir, {
+				splitInternalUrlSemicolons: true,
+			}),
+		).toBeNull();
+	});
+
 	it("keeps an existing path with spaces intact", async () => {
 		expect(await splitDelimitedPathEntry("folder with spaces/file.txt", tempDir)).toBeNull();
 		expect(await expandDelimitedPathEntries(["folder with spaces/file.txt"], tempDir)).toEqual([

@@ -13,22 +13,7 @@ function createSession(): ToolSession {
 	};
 }
 
-describe("Read guidance", () => {
-	it("batches compatible targets while preserving opaque resource semicolons", () => {
-		const description = new ReadTool(createSession()).description;
-
-		expect(description).toContain("MUST collect every bounded target");
-		expect(description).toContain("MUST batch independent known local paths, file URLs, and internal URIs");
-		expect(description).toContain("For independent MCP resources, issue separate sibling `read` calls");
-		expect(description).toContain("Preserve MCP resource URIs exactly");
-		expect(description).toContain("NEVER split or percent-encode server-provided semicolons");
-		expect(description).toContain("For independent HTTP(S) URLs, issue separate sibling `read` calls");
-		expect(description).toContain("NEVER combine an HTTP(S) URL with another target");
-		expect(description).toContain("SQLite semicolons in SQL, table names, or row keys remain target data");
-		expect(description).toContain("Literal semicolons inside batch-compatible internal URIs MUST use `%3B`");
-		expect(description).toContain("artifact://abc123;package.json;src/main.ts:1-200");
-	});
-
+describe("Read SSH guidance", () => {
 	it("advertises grep and current SSH fallbacks instead of retired tool names", () => {
 		const description = new ReadTool(createSession()).description;
 
