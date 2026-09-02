@@ -154,7 +154,7 @@ describe("McpProtocolHandler", () => {
 		expect(output.text).not.toContain("interpreted as");
 	});
 
-	it.each(["attachment://doc;view", "conflict://doc;view"])(
+	it.each(["attachment://1;view", "conflict://1;view"])(
 		"preserves an exact MCP resource using the %s pseudo-scheme",
 		async uri => {
 			const resources = new Map<string, { resources: MCPResource[]; templates: MCPResourceTemplate[] }>();

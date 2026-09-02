@@ -1,5 +1,6 @@
 import { MCPManager } from "../mcp/manager";
 import type { MCPResourceReadResult } from "../mcp/types";
+import { parseInternalUrl } from "./parse";
 import type { InternalResource, InternalUrl, ProtocolHandler } from "./types";
 
 function escapeRegex(text: string): string {
@@ -90,6 +91,17 @@ function resolveTargetServer(mcpManager: MCPManager, uri: string): string | unde
 	}
 
 	return bestTemplateMatch?.serverName;
+}
+
+/** Whether current MCP catalogs claim this exact native URI or a matching template. */
+export function hasMatchingMcpResource(input: string): boolean {
+	const mcpManager = MCPManager.instance();
+	if (!mcpManager) return false;
+	try {
+		return resolveTargetServer(mcpManager, extractResourceUri(parseInternalUrl(input))) !== undefined;
+	} catch {
+		return false;
+	}
 }
 
 function formatAvailableResources(mcpManager: MCPManager): string {
