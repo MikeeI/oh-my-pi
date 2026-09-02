@@ -101,6 +101,21 @@ describe("read attachment URLs", () => {
 		expect(text).not.toContain("interpreted as");
 	});
 
+	it("preserves a selected file URL containing a literal semicolon", async () => {
+		const filePath = path.join(testDir, "selected;file.txt");
+		await Bun.write(filePath, "selected file\nsecond line\n");
+		const fileUrl = `${url.pathToFileURL(filePath).href}:1-1`;
+
+		const result = await new ReadTool(createSession(testDir, imagePath)).execute("read-selected-file-url", {
+			path: fileUrl,
+		});
+		const text = result.content.flatMap(block => (block.type === "text" ? [block.text] : [])).join("\n");
+
+		expect(text).toContain("selected file");
+		expect(text).toContain("[selected;file.txt#");
+		expect(text).not.toContain("interpreted as");
+	});
+
 	it("reads a URL-shaped local first target before URL dispatch", async () => {
 		await Bun.write(path.join(testDir, "www.example"), "local domain path\n");
 		await Bun.write(path.join(testDir, "second.txt"), "second file\n");
