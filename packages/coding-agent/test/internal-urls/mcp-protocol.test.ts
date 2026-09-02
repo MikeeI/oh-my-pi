@@ -179,6 +179,81 @@ describe("McpProtocolHandler", () => {
 		},
 	);
 
+	it("awaits the MCP catalog before classifying a pseudo-scheme URI", async () => {
+		const uri = "attachment://1;view";
+		const resources = new Map<string, { resources: MCPResource[]; templates: MCPResourceTemplate[] }>();
+		let catalogLoaded = false;
+		const manager = createMockManager({
+			servers: ["pseudo"],
+			resources,
+			ensureResources: async name => {
+				catalogLoaded = true;
+				resources.set(name, {
+					resources: [{ uri, name: "pseudo-resource" }],
+					templates: [],
+				});
+			},
+			readResult: { contents: [{ uri, text: "loaded pseudo payload" }] },
+		});
+		MCPManager.setInstance(manager);
+
+		const result = await new ReadTool(createToolSession()).execute("read-loading-pseudo-resource", { path: uri });
+		const output = result.content.find(block => block.type === "text");
+
+		expect(catalogLoaded).toBeTrue();
+		expect(output?.type).toBe("text");
+		if (output?.type !== "text") throw new Error("Expected text output");
+		expect(output.text).toContain("loaded pseudo payload");
+		expect(output.text).not.toContain("interpreted as");
+	});
+
+	it("does not let a broad MCP template swallow a valid pseudo-URI batch", async () => {
+		const resources = new Map<string, { resources: MCPResource[]; templates: MCPResourceTemplate[] }>();
+		resources.set("pseudo", {
+			resources: [],
+			templates: [{ uriTemplate: "attachment://{id}", name: "attachment-template" }],
+		});
+		const manager = createMockManager({
+			servers: ["pseudo"],
+			resources,
+			readResult: { contents: [{ uri: "attachment://1;attachment://2", text: "template payload" }] },
+		});
+		MCPManager.setInstance(manager);
+
+		const result = await new ReadTool(createToolSession()).execute("read-pseudo-batch", {
+			path: "attachment://1;attachment://2",
+		});
+		const output = result.content.find(block => block.type === "text");
+
+		expect(output?.type).toBe("text");
+		if (output?.type !== "text") throw new Error("Expected text output");
+		expect(output.text).toContain("interpreted as 2 paths");
+		expect(output.text).not.toContain("template payload");
+	});
+
+	it("preserves a pseudo-scheme template URI whose semicolon is literal", async () => {
+		const uri = "attachment://1;view";
+		const resources = new Map<string, { resources: MCPResource[]; templates: MCPResourceTemplate[] }>();
+		resources.set("pseudo", {
+			resources: [],
+			templates: [{ uriTemplate: "attachment://{id};view", name: "pseudo-template" }],
+		});
+		const manager = createMockManager({
+			servers: ["pseudo"],
+			resources,
+			readResult: { contents: [{ uri, text: "literal template payload" }] },
+		});
+		MCPManager.setInstance(manager);
+
+		const result = await new ReadTool(createToolSession()).execute("read-pseudo-template", { path: uri });
+		const output = result.content.find(block => block.type === "text");
+
+		expect(output?.type).toBe("text");
+		if (output?.type !== "text") throw new Error("Expected text output");
+		expect(output.text).toContain("literal template payload");
+		expect(output.text).not.toContain("interpreted as");
+	});
+
 	it("lets read consume a native URI advertised by an MCP server", async () => {
 		const resources = new Map<string, { resources: MCPResource[]; templates: MCPResourceTemplate[] }>();
 		resources.set("ags", {

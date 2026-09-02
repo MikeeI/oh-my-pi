@@ -30,7 +30,7 @@ import { normalizeToLF } from "../edit/normalize";
 import { isNotebookPath, readEditableNotebookText } from "../edit/notebook";
 import { InternalUrlRouter, resolveLocalUrlToFile, resolveLocalUrlToPath } from "../internal-urls";
 import { type ResolvedArtifactFile, resolveArtifactFile } from "../internal-urls/artifact-protocol";
-import { hasMatchingMcpResource } from "../internal-urls/mcp-protocol";
+import { hasUnambiguousMcpResourceMatch } from "../internal-urls/mcp-protocol";
 import { parseInternalUrl } from "../internal-urls/parse";
 import type { InternalUrl } from "../internal-urls/types";
 import readDescription from "../prompts/tools/read.md" with { type: "text" };
@@ -1135,7 +1135,7 @@ export class ReadTool implements AgentTool<typeof readSchema, ReadToolDetails> {
 		if (
 			readPath.includes(";") &&
 			(readPath.startsWith("attachment://") || readPath.startsWith("conflict://")) &&
-			hasMatchingMcpResource(readPath)
+			(await hasUnambiguousMcpResourceMatch(readPath))
 		) {
 			return this.#handleInternalUrl(readPath, parseSel(undefined), signal);
 		}
