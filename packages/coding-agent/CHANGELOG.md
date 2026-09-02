@@ -4,7 +4,7 @@
 
 ### Changed
 
-- Known local and internal Read targets now share one semicolon-delimited call while HTTP URLs stay separate.
+- Read batches known local, file-URL, and non-MCP internal targets while keeping HTTP and opaque MCP resources separate.
 
 ## [18.1.3] - 2026-09-02
 

@@ -11,7 +11,7 @@ import { removeSyncWithRetries } from "@oh-my-pi/pi-utils";
 const TINY_PNG_BASE64 =
 	"iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8DwHwAFBQIAX8jx0gAAAABJRU5ErkJggg==";
 
-function createSession(cwd: string, sourcePath: string): ToolSession {
+function createSession(cwd: string, sourcePath: string, attachmentCount = 1): ToolSession {
 	const image: ImageContent = { type: "image", data: TINY_PNG_BASE64, mimeType: "image/png" };
 	return {
 		cwd,
@@ -19,7 +19,13 @@ function createSession(cwd: string, sourcePath: string): ToolSession {
 		getSessionFile: () => null,
 		getSessionSpawns: () => "*",
 		settings: Settings.isolated({ "images.autoResize": false, "inspect_image.enabled": false }),
-		getImageAttachments: () => [{ label: "Image #1", uri: "attachment://1", image, sourcePath }],
+		getImageAttachments: () =>
+			Array.from({ length: attachmentCount }, (_, index) => ({
+				label: `Image #${index + 1}`,
+				uri: `attachment://${index + 1}`,
+				image,
+				sourcePath,
+			})),
 	};
 }
 
@@ -48,6 +54,18 @@ describe("read attachment URLs", () => {
 			data: TINY_PNG_BASE64,
 			mimeType: "image/png",
 		});
+	});
+
+	it("reads several attachment URLs from one semicolon-delimited path", async () => {
+		const result = await new ReadTool(createSession(testDir, imagePath, 2)).execute("read-attachment-batch", {
+			path: "attachment://1;attachment://2",
+		});
+		const text = result.content.flatMap(block => (block.type === "text" ? [block.text] : [])).join("\n");
+		const images = result.content.filter(block => block.type === "image");
+
+		expect(text).toContain("Note: interpreted as 2 paths: attachment://1, attachment://2");
+		expect(images).toHaveLength(2);
+		expect(result.details?.displayReadTargets).toEqual(["attachment://1", "attachment://2"]);
 	});
 
 	it("reports unknown attachment URLs with the available URIs", async () => {

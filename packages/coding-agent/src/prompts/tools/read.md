@@ -2,15 +2,18 @@ Read files, directories, archives, SQLite, images, documents, internal resources
 
 <instruction>
 - MUST collect every bounded target already required for the current step before calling `read`.
-- MUST batch independent known local paths and internal URIs in one semicolon-delimited call.
+- MUST batch independent known local paths, file URLs, and internal URIs in one semicolon-delimited call.
 - Join complete `path[:selector]` targets with `;`; keep each target otherwise unchanged.
-- NEVER read known independent targets one per assistant turn.
+- NEVER spread known independent targets across assistant turns.
 - Read again only for a target discovered by a result or for a failed or truncated target.
-- For independent HTTP(S) URLs, issue one separate `read` call per URL in the same assistant turn.
+- For independent MCP resources, issue separate sibling `read` calls in the same assistant turn.
+- MCP resources include `mcp://` and MCP-advertised custom URIs.
+- Preserve MCP resource URIs exactly; NEVER split or percent-encode server-provided semicolons.
+- For independent HTTP(S) URLs, issue separate sibling `read` calls in the same assistant turn.
 - NEVER combine an HTTP(S) URL with another target in a semicolon-delimited `path`.
 - SQLite semicolons in SQL, table names, or row keys remain target data.
-- Ambiguous literal semicolons → use separate calls instead of corrupting a target.
-- Literal semicolons inside authored internal URIs must be percent-encoded as `%3B`; pass advertised MCP resource URIs exactly.
+- Ambiguous literal semicolons → use separate sibling calls instead of corrupting a target.
+- Literal semicolons inside batch-compatible internal URIs MUST use `%3B`.
 - Example: `artifact://abc123;package.json;src/main.ts:1-200`.
 - SHOULD use `read` (not browser) for web content; browser only when `read` can't deliver.
 </instruction>
