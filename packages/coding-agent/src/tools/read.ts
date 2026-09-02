@@ -767,7 +767,7 @@ export class ReadTool implements AgentTool<typeof readSchema, ReadToolDetails> {
 				const isUrlShapedLocalPath =
 					!part.includes("://") &&
 					isReadableUrlPath(part) &&
-					(await probeLiteralPathExists(part, this.session.cwd)) === "exists";
+					(await probeLiteralPathOrSelectorBase(part, this.session.cwd)) === "exists";
 				const executionPath = isUrlShapedLocalPath ? path.resolve(this.session.cwd, part) : part;
 				const result = await this.execute("read-delimited-part", { path: executionPath }, signal);
 				displayReadTargets.push(isUrlShapedLocalPath ? part : (result.details?.suffixResolution?.to ?? part));
@@ -1172,7 +1172,7 @@ export class ReadTool implements AgentTool<typeof readSchema, ReadToolDetails> {
 			const startsWithUrlShapedLocalPath =
 				!firstTarget.includes("://") &&
 				isReadableUrlPath(firstTarget) &&
-				(await probeLiteralPathExists(firstTarget, this.session.cwd)) === "exists";
+				(await probeLiteralPathOrSelectorBase(firstTarget, this.session.cwd)) === "exists";
 			if (startsWithUrlShapedLocalPath) {
 				const delimitedResult = await this.#tryReadDelimitedPaths(readPath, signal);
 				if (delimitedResult) return delimitedResult;

@@ -983,7 +983,7 @@ async function tryDelimitedPathSplit(
 			const readableUrl = isReadableUrlPath(part);
 			const scheme = extractUriScheme(part);
 			if (!readableUrl && scheme === undefined) continue;
-			if (!part.includes("://") && (await probeLiteralPathExists(part, cwd)) !== "missing") continue;
+			if (!part.includes("://") && (await probeLiteralPathOrSelectorBase(part, cwd)) !== "missing") continue;
 			if (readableUrl || scheme === "mcp") return null;
 			if (scheme === "attachment" || scheme === "conflict") {
 				if (isBatchablePseudoUrl?.(part)) continue;
