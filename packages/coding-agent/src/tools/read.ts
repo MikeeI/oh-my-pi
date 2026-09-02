@@ -1107,7 +1107,11 @@ export class ReadTool implements AgentTool<typeof readSchema, ReadToolDetails> {
 	): Promise<AgentToolResult<ReadToolDetails>> {
 		let { path: readPath } = params;
 		const isFileUrl = readPath.toLowerCase().startsWith("file://");
-		if (isFileUrl && readPath.includes(";")) {
+		if (
+			isFileUrl &&
+			readPath.includes(";") &&
+			(await probeLiteralPathExists(readPath, this.session.cwd)) === "missing"
+		) {
 			const delimitedResult = await this.#tryReadDelimitedPaths(readPath, signal);
 			if (delimitedResult) return delimitedResult;
 		}
