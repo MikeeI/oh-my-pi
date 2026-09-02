@@ -207,6 +207,21 @@ describe("McpProtocolHandler", () => {
 		expect(output.text).not.toContain("interpreted as");
 	});
 
+	it("rejects a sibling target after an MCP-owned pseudo-URI prefix", async () => {
+		const uri = "attachment://1;view";
+		const resources = new Map<string, { resources: MCPResource[]; templates: MCPResourceTemplate[] }>();
+		resources.set("pseudo", {
+			resources: [{ uri, name: "pseudo-resource" }],
+			templates: [],
+		});
+		MCPManager.setInstance(createMockManager({ servers: ["pseudo"], resources }));
+
+		await expect(
+			new ReadTool(createToolSession()).execute("read-pseudo-resource-batch", {
+				path: `${uri};package.json`,
+			}),
+		).rejects.toThrow(`Cannot batch MCP resource "${uri}" with other targets`);
+	});
 	it("does not let a broad MCP template swallow a valid pseudo-URI batch", async () => {
 		const resources = new Map<string, { resources: MCPResource[]; templates: MCPResourceTemplate[] }>();
 		resources.set("pseudo", {

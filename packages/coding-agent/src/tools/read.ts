@@ -30,7 +30,7 @@ import { normalizeToLF } from "../edit/normalize";
 import { isNotebookPath, readEditableNotebookText } from "../edit/notebook";
 import { InternalUrlRouter, resolveLocalUrlToFile, resolveLocalUrlToPath } from "../internal-urls";
 import { type ResolvedArtifactFile, resolveArtifactFile } from "../internal-urls/artifact-protocol";
-import { hasUnambiguousMcpResourceMatch } from "../internal-urls/mcp-protocol";
+import { findUnambiguousMcpResourceMatch } from "../internal-urls/mcp-protocol";
 import { parseInternalUrl } from "../internal-urls/parse";
 import type { InternalUrl } from "../internal-urls/types";
 import readDescription from "../prompts/tools/read.md" with { type: "text" };
@@ -1132,12 +1132,16 @@ export class ReadTool implements AgentTool<typeof readSchema, ReadToolDetails> {
 			}
 			readPath = attachment.sourcePath;
 		}
-		if (
-			readPath.includes(";") &&
-			(readPath.startsWith("attachment://") || readPath.startsWith("conflict://")) &&
-			(await hasUnambiguousMcpResourceMatch(readPath))
-		) {
+		const hasPseudoScheme = readPath.startsWith("attachment://") || readPath.startsWith("conflict://");
+		const mcpPseudoResource =
+			readPath.includes(";") && hasPseudoScheme ? await findUnambiguousMcpResourceMatch(readPath) : undefined;
+		if (mcpPseudoResource === readPath) {
 			return this.#handleInternalUrl(readPath, parseSel(undefined), signal);
+		}
+		if (mcpPseudoResource) {
+			throw new ToolError(
+				`Cannot batch MCP resource "${mcpPseudoResource}" with other targets. Issue separate sibling Read calls.`,
+			);
 		}
 		if (readPath.startsWith("attachment://") && readPath.includes(";")) {
 			const firstTarget = readPath.slice(0, readPath.indexOf(";"));

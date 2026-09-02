@@ -105,20 +105,30 @@ function resolveTargetServer(
 }
 
 /**
- * Whether loaded MCP catalogs unambiguously claim this exact native URI.
+ * Find the longest unambiguous MCP resource at the start of this input.
  *
  * Template expressions that capture semicolons are excluded because the same
- * input may instead be a valid semicolon-delimited Read batch.
+ * input may instead be a valid semicolon-delimited Read batch. Prefix
+ * candidates must themselves contain a semicolon so a broad template such as
+ * `attachment://{id}` cannot claim built-in `attachment://1`.
  */
-export async function hasUnambiguousMcpResourceMatch(input: string): Promise<boolean> {
+export async function findUnambiguousMcpResourceMatch(input: string): Promise<string | undefined> {
 	const mcpManager = MCPManager.instance();
-	if (!mcpManager) return false;
+	if (!mcpManager) return undefined;
 	try {
-		const uri = extractResourceUri(parseInternalUrl(input));
 		await Promise.allSettled(mcpManager.getConnectedServers().map(name => mcpManager.ensureServerResources(name)));
-		return resolveTargetServer(mcpManager, uri, match => !match.expressionContainsSemicolon) !== undefined;
+		const candidates = [input];
+		for (let delimiter = input.lastIndexOf(";"); delimiter > 0; delimiter = input.lastIndexOf(";", delimiter - 1)) {
+			const prefix = input.slice(0, delimiter);
+			if (prefix.includes(";")) candidates.push(prefix);
+		}
+		for (const candidate of candidates) {
+			const uri = extractResourceUri(parseInternalUrl(candidate));
+			if (resolveTargetServer(mcpManager, uri, match => !match.expressionContainsSemicolon)) return candidate;
+		}
+		return undefined;
 	} catch {
-		return false;
+		return undefined;
 	}
 }
 
