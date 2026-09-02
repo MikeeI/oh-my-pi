@@ -28,7 +28,7 @@ import {
 } from "../edit/file-snapshot-store";
 import { normalizeToLF } from "../edit/normalize";
 import { isNotebookPath, readEditableNotebookText } from "../edit/notebook";
-import { InternalUrlRouter, resolveLocalUrlToFile, resolveLocalUrlToPath } from "../internal-urls";
+import { hasExactMcpResource, InternalUrlRouter, resolveLocalUrlToFile, resolveLocalUrlToPath } from "../internal-urls";
 import { type ResolvedArtifactFile, resolveArtifactFile } from "../internal-urls/artifact-protocol";
 import { parseInternalUrl } from "../internal-urls/parse";
 import type { InternalUrl } from "../internal-urls/types";
@@ -725,9 +725,13 @@ export class ReadTool implements AgentTool<typeof readSchema, ReadToolDetails> {
 	async #tryReadDelimitedPaths(
 		readPath: string,
 		signal?: AbortSignal,
-		routedUrlPredicate?: (entry: string) => boolean,
+		options: {
+			splitInternalUrlSemicolons?: boolean;
+		} = {},
 	): Promise<AgentToolResult<ReadToolDetails> | null> {
-		const parts = await splitDelimitedPathEntry(readPath, this.session.cwd, { routedUrlPredicate });
+		const parts = await splitDelimitedPathEntry(readPath, this.session.cwd, {
+			splitInternalUrlSemicolons: options.splitInternalUrlSemicolons,
+		});
 		if (!parts) return null;
 
 		const notice = `Note: interpreted as ${parts.length} paths: ${parts.join(", ")}`;
@@ -1150,14 +1154,22 @@ export class ReadTool implements AgentTool<typeof readSchema, ReadToolDetails> {
 
 		// Handle native OMP URLs and custom-scheme resources advertised by MCP servers.
 		const internalRouter = InternalUrlRouter.instance();
-		const delimitedInternalResult = internalRouter.canResolve(readPath)
-			? await this.#tryReadDelimitedPaths(readPath, signal, entry => internalRouter.canResolve(entry))
-			: null;
+		const canResolveInternal = internalRouter.canResolve(readPath);
+		const routesThroughMcp =
+			canResolveInternal && (readPath.toLowerCase().startsWith("mcp://") || !internalRouter.canHandle(readPath));
+		const exactMcpResource =
+			routesThroughMcp && readPath.includes(";") && (await hasExactMcpResource(parseInternalUrl(readPath)));
+		const delimitedInternalResult =
+			canResolveInternal && !exactMcpResource
+				? await this.#tryReadDelimitedPaths(readPath, signal, {
+						splitInternalUrlSemicolons: true,
+					})
+				: null;
 		if (delimitedInternalResult) return delimitedInternalResult;
 
 		// Peel malformed selectors through the internal-URL-aware parser before routing.
 		let promotedSelector: string | undefined;
-		if (internalRouter.canResolve(readPath)) {
+		if (canResolveInternal) {
 			const internalTarget = splitInternalUrlSel(readPath);
 			const parsed = parseSel(internalTarget.sel);
 			if (internalTarget.sel !== undefined && parsed.kind === "none") {

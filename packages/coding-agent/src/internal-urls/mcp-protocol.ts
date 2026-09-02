@@ -24,7 +24,7 @@ function extractResourceUri(url: InternalUrl): string {
 	const scheme = url.protocol.replace(/:$/, "").toLowerCase();
 	if (scheme !== "mcp") {
 		// Server-advertised native URI (hierarchical or opaque). Preserve the
-		// input byte-for-byte: `resolveTargetServer` matches by exact string
+		// input byte-for-byte: `resolveConcreteTargetServer` matches by exact string
 		// equality, so e.g. `catalog://root/` must keep its trailing slash.
 		return url.rawHref ?? url.href;
 	}
@@ -40,14 +40,18 @@ function extractResourceUri(url: InternalUrl): string {
 	return uri;
 }
 
-function resolveTargetServer(mcpManager: MCPManager, uri: string): string | undefined {
-	const servers = mcpManager.getConnectedServers();
-	for (const name of servers) {
+function resolveConcreteTargetServer(mcpManager: MCPManager, uri: string): string | undefined {
+	for (const name of mcpManager.getConnectedServers()) {
 		const serverResources = mcpManager.getServerResources(name);
-		if (serverResources?.resources.some(r => r.uri === uri)) {
-			return name;
-		}
+		if (serverResources?.resources.some(resource => resource.uri === uri)) return name;
 	}
+	return undefined;
+}
+
+function resolveTargetServer(mcpManager: MCPManager, uri: string): string | undefined {
+	const concreteTarget = resolveConcreteTargetServer(mcpManager, uri);
+	if (concreteTarget) return concreteTarget;
+	const servers = mcpManager.getConnectedServers();
 
 	let bestTemplateMatch:
 		| {
@@ -90,6 +94,26 @@ function resolveTargetServer(mcpManager: MCPManager, uri: string): string | unde
 	}
 
 	return bestTemplateMatch?.serverName;
+}
+
+/**
+ * Whether an advertised concrete MCP resource exactly owns this URL.
+ *
+ * Template matches are deliberately excluded: a broad template can also match
+ * a semicolon-joined batch, but only a concrete URI proves the semicolon is
+ * resource data rather than the Read batch delimiter.
+ */
+export async function hasExactMcpResource(url: InternalUrl): Promise<boolean> {
+	const mcpManager = MCPManager.instance();
+	if (!mcpManager) return false;
+
+	const uri = extractResourceUri(url);
+	let targetServer = resolveConcreteTargetServer(mcpManager, uri);
+	if (!targetServer) {
+		await Promise.allSettled(mcpManager.getConnectedServers().map(name => mcpManager.ensureServerResources(name)));
+		targetServer = resolveConcreteTargetServer(mcpManager, uri);
+	}
+	return targetServer !== undefined;
 }
 
 function formatAvailableResources(mcpManager: MCPManager): string {

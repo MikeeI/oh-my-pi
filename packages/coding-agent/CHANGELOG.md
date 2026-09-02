@@ -2,6 +2,10 @@
 
 ## [Unreleased]
 
+### Changed
+
+- Known local and internal Read targets now share one semicolon-delimited call while HTTP URLs stay separate.
+
 ## [18.1.3] - 2026-09-02
 
 ### Changed
