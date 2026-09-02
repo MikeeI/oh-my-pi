@@ -74,8 +74,8 @@ describe("read attachment URLs", () => {
 		const secondPath = path.join(testDir, "second.txt");
 		await Bun.write(firstPath, "first file\n");
 		await Bun.write(secondPath, "second file\n");
-		const firstUrl = url.pathToFileURL(firstPath).href.replace(";", "%3B");
-		const secondUrl = url.pathToFileURL(secondPath).href;
+		const firstUrl = url.pathToFileURL(firstPath).href.replace("file:", "FILE:").replace(";", "%3B");
+		const secondUrl = url.pathToFileURL(secondPath).href.replace("file:", "FILE:");
 
 		const result = await new ReadTool(createSession(testDir, imagePath)).execute("read-file-url-batch", {
 			path: `${firstUrl};${secondUrl}`,

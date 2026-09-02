@@ -154,6 +154,31 @@ describe("McpProtocolHandler", () => {
 		expect(output.text).not.toContain("interpreted as");
 	});
 
+	it.each(["attachment://doc;view", "conflict://doc;view"])(
+		"preserves an exact MCP resource using the %s pseudo-scheme",
+		async uri => {
+			const resources = new Map<string, { resources: MCPResource[]; templates: MCPResourceTemplate[] }>();
+			resources.set("pseudo", {
+				resources: [{ uri, name: "pseudo-resource" }],
+				templates: [],
+			});
+			const manager = createMockManager({
+				servers: ["pseudo"],
+				resources,
+				readResult: { contents: [{ uri, text: "pseudo payload" }] },
+			});
+			MCPManager.setInstance(manager);
+
+			const result = await new ReadTool(createToolSession()).execute("read-pseudo-resource", { path: uri });
+			const output = result.content.find(block => block.type === "text");
+
+			expect(output?.type).toBe("text");
+			if (output?.type !== "text") throw new Error("Expected text output");
+			expect(output.text).toContain("pseudo payload");
+			expect(output.text).not.toContain("interpreted as");
+		},
+	);
+
 	it("lets read consume a native URI advertised by an MCP server", async () => {
 		const resources = new Map<string, { resources: MCPResource[]; templates: MCPResourceTemplate[] }>();
 		resources.set("ags", {

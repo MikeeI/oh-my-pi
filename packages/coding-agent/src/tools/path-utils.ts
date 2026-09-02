@@ -942,6 +942,7 @@ async function tryDelimitedPathSplit(
 	mode: DelimitedPathSplitMode,
 	requirement: DelimitedResolveRequirement,
 	rejectExternalOrOpaqueUrlChildren: boolean,
+	isBatchablePseudoUrl: ((value: string) => boolean) | undefined,
 ): Promise<string[] | null> {
 	const rawParts = splitTopLevelDelimitedPath(entry, mode);
 	if (rawParts.length < 2) return null;
@@ -959,12 +960,11 @@ async function tryDelimitedPathSplit(
 			if (!readableUrl && scheme === undefined) continue;
 			if (!part.includes("://") && (await probeLiteralPathExists(part, cwd)) !== "missing") continue;
 			if (readableUrl || scheme === "mcp") return null;
-			if (
-				scheme === "attachment" ||
-				scheme === "conflict" ||
-				scheme === "file" ||
-				(scheme !== undefined && INTERNAL_SCHEMES_WITH_SELECTORS[scheme] === true)
-			) {
+			if (scheme === "attachment" || scheme === "conflict") {
+				if (isBatchablePseudoUrl?.(part)) continue;
+				return null;
+			}
+			if (scheme === "file" || (scheme !== undefined && INTERNAL_SCHEMES_WITH_SELECTORS[scheme] === true)) {
 				continue;
 			}
 			if (!internalRouter.canHandle(part)) return null;
@@ -997,6 +997,7 @@ export async function splitDelimitedPathEntry(
 		splitter?: PathEntrySplitter;
 		splitInternalUrlSemicolons?: boolean;
 		rejectExternalOrOpaqueUrlChildren?: boolean;
+		isBatchablePseudoUrl?: (value: string) => boolean;
 	} = {},
 ): Promise<string[] | null> {
 	const normalizedEntry = normalizePathLikeInput(entry);
@@ -1011,6 +1012,7 @@ export async function splitDelimitedPathEntry(
 			"semicolon",
 			"none",
 			options.rejectExternalOrOpaqueUrlChildren ?? false,
+			options.isBatchablePseudoUrl,
 		);
 	}
 	// A real POSIX file may contain the delimiter and a selector-shaped tail
@@ -1032,6 +1034,7 @@ export async function splitDelimitedPathEntry(
 			"semicolon",
 			"none",
 			options.rejectExternalOrOpaqueUrlChildren ?? false,
+			options.isBatchablePseudoUrl,
 		)) ??
 		(await tryDelimitedPathSplit(
 			normalizedEntry,
@@ -1040,6 +1043,7 @@ export async function splitDelimitedPathEntry(
 			"comma",
 			"some",
 			options.rejectExternalOrOpaqueUrlChildren ?? false,
+			options.isBatchablePseudoUrl,
 		)) ??
 		(await tryDelimitedPathSplit(
 			normalizedEntry,
@@ -1048,6 +1052,7 @@ export async function splitDelimitedPathEntry(
 			"whitespace",
 			"all",
 			options.rejectExternalOrOpaqueUrlChildren ?? false,
+			options.isBatchablePseudoUrl,
 		)) ??
 		(await tryDelimitedPathSplit(
 			normalizedEntry,
@@ -1056,6 +1061,7 @@ export async function splitDelimitedPathEntry(
 			"mixed",
 			"all",
 			options.rejectExternalOrOpaqueUrlChildren ?? false,
+			options.isBatchablePseudoUrl,
 		))
 	);
 }

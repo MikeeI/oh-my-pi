@@ -524,6 +524,15 @@ async function streamLinesFromFile(
 
 const IMAGE_ATTACHMENT_URI_REGEX = /^attachment:\/\/[1-9]\d*$/;
 
+function isBatchableReadPseudoUrl(value: string): boolean {
+	if (IMAGE_ATTACHMENT_URI_REGEX.test(value)) return true;
+	try {
+		return parseConflictUri(value) !== null;
+	} catch {
+		return false;
+	}
+}
+
 // Maximum image file size (20MB) - larger images will be rejected to prevent OOM during serialization
 const MAX_IMAGE_SIZE = MAX_IMAGE_INPUT_BYTES;
 
@@ -732,6 +741,7 @@ export class ReadTool implements AgentTool<typeof readSchema, ReadToolDetails> {
 		const parts = await splitDelimitedPathEntry(readPath, this.session.cwd, {
 			splitInternalUrlSemicolons: options.splitInternalUrlSemicolons,
 			rejectExternalOrOpaqueUrlChildren: true,
+			isBatchablePseudoUrl: isBatchableReadPseudoUrl,
 		});
 		if (!parts) return null;
 
@@ -1090,11 +1100,12 @@ export class ReadTool implements AgentTool<typeof readSchema, ReadToolDetails> {
 		_toolContext?: AgentToolContext,
 	): Promise<AgentToolResult<ReadToolDetails>> {
 		let { path: readPath } = params;
-		if (readPath.startsWith("file://") && readPath.includes(";")) {
+		const isFileUrl = readPath.toLowerCase().startsWith("file://");
+		if (isFileUrl && readPath.includes(";")) {
 			const delimitedResult = await this.#tryReadDelimitedPaths(readPath, signal);
 			if (delimitedResult) return delimitedResult;
 		}
-		if (readPath.startsWith("file://")) {
+		if (isFileUrl) {
 			readPath = expandPath(readPath);
 		}
 
@@ -1110,11 +1121,19 @@ export class ReadTool implements AgentTool<typeof readSchema, ReadToolDetails> {
 			readPath = attachment.sourcePath;
 		}
 		if (readPath.startsWith("attachment://") && readPath.includes(";")) {
+			const firstTarget = readPath.slice(0, readPath.indexOf(";"));
+			if (!isBatchableReadPseudoUrl(firstTarget)) {
+				return this.#handleInternalUrl(readPath, parseSel(undefined), signal);
+			}
 			const delimitedResult = await this.#tryReadDelimitedPaths(readPath, signal);
 			if (delimitedResult) return delimitedResult;
 		}
 
 		if (readPath.startsWith("conflict://") && readPath.includes(";")) {
+			const firstTarget = readPath.slice(0, readPath.indexOf(";"));
+			if (!isBatchableReadPseudoUrl(firstTarget)) {
+				return this.#handleInternalUrl(readPath, parseSel(undefined), signal);
+			}
 			const delimitedResult = await this.#tryReadDelimitedPaths(readPath, signal);
 			if (delimitedResult) return delimitedResult;
 		}
