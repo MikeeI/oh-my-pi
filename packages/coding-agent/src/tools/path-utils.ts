@@ -12,7 +12,7 @@ import {
 	windowsPathToWslMount,
 } from "@oh-my-pi/pi-utils";
 import type { Skill } from "../extensibility/skills";
-import { InternalUrlRouter, type LocalProtocolOptions } from "../internal-urls";
+import { extractUriScheme, InternalUrlRouter, type LocalProtocolOptions } from "../internal-urls";
 import { ToolAbortError, ToolError } from "./tool-errors";
 
 const UNICODE_SPACES = /[\u00A0\u2000-\u200A\u202F\u205F\u3000]/g;
@@ -953,7 +953,7 @@ async function tryDelimitedPathSplit(
 	// the URI, while preserving custom protocol handlers registered in this process.
 	if (
 		parts.some(part => {
-			const scheme = INTERNAL_URL_SCHEME_RE.exec(part)?.[1]?.toLowerCase();
+			const scheme = extractUriScheme(part);
 			if (scheme === undefined) return false;
 			if (scheme === "mcp") return true;
 			if (

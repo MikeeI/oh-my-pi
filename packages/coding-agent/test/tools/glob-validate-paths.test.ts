@@ -69,6 +69,15 @@ describe("delimited path expansion", () => {
 		expect(await splitDelimitedPathEntry("artifact://abc123;https://example.com/a;b", tempDir, options)).toBeNull();
 		expect(await splitDelimitedPathEntry("conflict://1;https://example.com/a", tempDir, options)).toBeNull();
 		expect(await splitDelimitedPathEntry("artifact://abc123;catalog://items;active", tempDir, options)).toBeNull();
+		expect(await splitDelimitedPathEntry("artifact://abc123;urn:example;view", tempDir, options)).toBeNull();
+	});
+
+	it("keeps registered device URIs batchable", async () => {
+		expect(
+			await splitDelimitedPathEntry("xd://resolve;packages/b.txt", tempDir, {
+				splitInternalUrlSemicolons: true,
+			}),
+		).toEqual(["xd://resolve", "packages/b.txt"]);
 	});
 
 	it("keeps an existing path with spaces intact", async () => {
