@@ -947,18 +947,24 @@ async function tryDelimitedPathSplit(
 
 	const parts = rawParts.map(normalizePathLikeInput).filter(part => part.length > 0);
 	if (parts.some(isReadableUrlPath)) return null;
-	// Unknown schemes may be MCP-advertised opaque resources whose payload includes
-	// later semicolons. Reject the tentative batch rather than corrupting the URI.
+	const internalRouter = InternalUrlRouter.instance();
+	// Unregistered schemes may be MCP-advertised opaque resources whose payload
+	// includes later semicolons. Reject the tentative batch rather than corrupting
+	// the URI, while preserving custom protocol handlers registered in this process.
 	if (
 		parts.some(part => {
 			const scheme = INTERNAL_URL_SCHEME_RE.exec(part)?.[1]?.toLowerCase();
-			return (
-				scheme !== undefined &&
-				scheme !== "attachment" &&
-				scheme !== "conflict" &&
-				scheme !== "file" &&
-				INTERNAL_SCHEMES_WITH_SELECTORS[scheme] !== true
-			);
+			if (scheme === undefined) return false;
+			if (scheme === "mcp") return true;
+			if (
+				scheme === "attachment" ||
+				scheme === "conflict" ||
+				scheme === "file" ||
+				INTERNAL_SCHEMES_WITH_SELECTORS[scheme] === true
+			) {
+				return false;
+			}
+			return !internalRouter.canHandle(part);
 		})
 	) {
 		return null;
