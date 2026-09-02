@@ -946,6 +946,7 @@ async function tryDelimitedPathSplit(
 	if (rawParts.length < 2) return null;
 
 	const parts = rawParts.map(normalizePathLikeInput).filter(part => part.length > 0);
+	if (parts.some(isReadableUrlPath)) return null;
 	if (parts.length === 0) return null;
 	if (parts.length < 2 && rawParts.length === parts.length) return null;
 
@@ -979,8 +980,7 @@ export async function splitDelimitedPathEntry(
 	const splitter = options.splitter ?? parseSearchPath;
 	if (isInternalUrlPath(normalizedEntry)) {
 		if (!options.splitInternalUrlSemicolons) return null;
-		const parts = await tryDelimitedPathSplit(normalizedEntry, cwd, splitter, "semicolon", "none");
-		return parts?.some(isReadableUrlPath) ? null : parts;
+		return tryDelimitedPathSplit(normalizedEntry, cwd, splitter, "semicolon", "none");
 	}
 	// A real POSIX file may contain the delimiter and a selector-shaped tail
 	// (`a;b:1-2`, `a b:1-2`). Preserve the raw entry whenever the full literal

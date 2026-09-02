@@ -64,12 +64,10 @@ describe("delimited path expansion", () => {
 		]);
 	});
 
-	it("rejects HTTP children from internal semicolon batches", async () => {
-		expect(
-			await splitDelimitedPathEntry("artifact://abc123;https://example.com/a;b", tempDir, {
-				splitInternalUrlSemicolons: true,
-			}),
-		).toBeNull();
+	it("rejects HTTP children from every semicolon batch route", async () => {
+		const options = { splitInternalUrlSemicolons: true };
+		expect(await splitDelimitedPathEntry("artifact://abc123;https://example.com/a;b", tempDir, options)).toBeNull();
+		expect(await splitDelimitedPathEntry("conflict://1;https://example.com/a", tempDir, options)).toBeNull();
 	});
 
 	it("keeps an existing path with spaces intact", async () => {
