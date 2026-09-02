@@ -947,6 +947,22 @@ async function tryDelimitedPathSplit(
 
 	const parts = rawParts.map(normalizePathLikeInput).filter(part => part.length > 0);
 	if (parts.some(isReadableUrlPath)) return null;
+	// Unknown schemes may be MCP-advertised opaque resources whose payload includes
+	// later semicolons. Reject the tentative batch rather than corrupting the URI.
+	if (
+		parts.some(part => {
+			const scheme = INTERNAL_URL_SCHEME_RE.exec(part)?.[1]?.toLowerCase();
+			return (
+				scheme !== undefined &&
+				scheme !== "attachment" &&
+				scheme !== "conflict" &&
+				scheme !== "file" &&
+				INTERNAL_SCHEMES_WITH_SELECTORS[scheme] !== true
+			);
+		})
+	) {
+		return null;
+	}
 	if (parts.length === 0) return null;
 	if (parts.length < 2 && rawParts.length === parts.length) return null;
 
