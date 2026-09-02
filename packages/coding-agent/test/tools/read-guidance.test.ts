@@ -13,7 +13,18 @@ function createSession(): ToolSession {
 	};
 }
 
-describe("Read SSH guidance", () => {
+describe("Read guidance", () => {
+	it("batches known local and internal targets while isolating URL and SQLite semicolons", () => {
+		const description = new ReadTool(createSession()).description;
+
+		expect(description).toContain("MUST collect every bounded target");
+		expect(description).toContain("MUST batch independent known local paths and internal URIs in one call with `;`");
+		expect(description).toContain("For independent HTTP(S) URLs, issue one separate `read` call per URL");
+		expect(description).toContain("NEVER combine an HTTP(S) URL with another target");
+		expect(description).toContain("SQLite semicolons in SQL, table names, or row keys remain target data");
+		expect(description).toContain("skill://skill-momp;package.json;src/main.ts:1-200");
+	});
+
 	it("advertises grep and current SSH fallbacks instead of retired tool names", () => {
 		const description = new ReadTool(createSession()).description;
 
