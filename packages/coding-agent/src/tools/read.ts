@@ -731,6 +731,7 @@ export class ReadTool implements AgentTool<typeof readSchema, ReadToolDetails> {
 	): Promise<AgentToolResult<ReadToolDetails> | null> {
 		const parts = await splitDelimitedPathEntry(readPath, this.session.cwd, {
 			splitInternalUrlSemicolons: options.splitInternalUrlSemicolons,
+			rejectExternalOrOpaqueUrlChildren: true,
 		});
 		if (!parts) return null;
 

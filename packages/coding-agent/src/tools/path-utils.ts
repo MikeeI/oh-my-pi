@@ -941,31 +941,34 @@ async function tryDelimitedPathSplit(
 	splitter: PathEntrySplitter,
 	mode: DelimitedPathSplitMode,
 	requirement: DelimitedResolveRequirement,
+	rejectExternalOrOpaqueUrlChildren: boolean,
 ): Promise<string[] | null> {
 	const rawParts = splitTopLevelDelimitedPath(entry, mode);
 	if (rawParts.length < 2) return null;
 
 	const parts = rawParts.map(normalizePathLikeInput).filter(part => part.length > 0);
-	const internalRouter = InternalUrlRouter.instance();
-	// Unregistered schemes may be MCP-advertised opaque resources whose payload
-	// includes later semicolons. Reject the tentative batch rather than corrupting
-	// the URI, while preserving registered handlers and existing POSIX names that
-	// merely resemble scheme-less or opaque URLs.
-	for (const part of parts) {
-		const readableUrl = isReadableUrlPath(part);
-		const scheme = extractUriScheme(part);
-		if (!readableUrl && scheme === undefined) continue;
-		if (!part.includes("://") && (await probeLiteralPathExists(part, cwd)) !== "missing") continue;
-		if (readableUrl || scheme === "mcp") return null;
-		if (
-			scheme === "attachment" ||
-			scheme === "conflict" ||
-			scheme === "file" ||
-			(scheme !== undefined && INTERNAL_SCHEMES_WITH_SELECTORS[scheme] === true)
-		) {
-			continue;
+	if (rejectExternalOrOpaqueUrlChildren) {
+		const internalRouter = InternalUrlRouter.instance();
+		// Unregistered schemes may be MCP-advertised opaque resources whose payload
+		// includes later semicolons. Reject the tentative batch rather than corrupting
+		// the URI, while preserving registered handlers and existing POSIX names that
+		// merely resemble scheme-less or opaque URLs.
+		for (const part of parts) {
+			const readableUrl = isReadableUrlPath(part);
+			const scheme = extractUriScheme(part);
+			if (!readableUrl && scheme === undefined) continue;
+			if (!part.includes("://") && (await probeLiteralPathExists(part, cwd)) !== "missing") continue;
+			if (readableUrl || scheme === "mcp") return null;
+			if (
+				scheme === "attachment" ||
+				scheme === "conflict" ||
+				scheme === "file" ||
+				(scheme !== undefined && INTERNAL_SCHEMES_WITH_SELECTORS[scheme] === true)
+			) {
+				continue;
+			}
+			if (!internalRouter.canHandle(part)) return null;
 		}
-		if (!internalRouter.canHandle(part)) return null;
 	}
 	if (parts.length === 0) return null;
 	if (parts.length < 2 && rawParts.length === parts.length) return null;
@@ -993,6 +996,7 @@ export async function splitDelimitedPathEntry(
 	options: {
 		splitter?: PathEntrySplitter;
 		splitInternalUrlSemicolons?: boolean;
+		rejectExternalOrOpaqueUrlChildren?: boolean;
 	} = {},
 ): Promise<string[] | null> {
 	const normalizedEntry = normalizePathLikeInput(entry);
@@ -1000,7 +1004,14 @@ export async function splitDelimitedPathEntry(
 	const splitter = options.splitter ?? parseSearchPath;
 	if (isInternalUrlPath(normalizedEntry)) {
 		if (!options.splitInternalUrlSemicolons) return null;
-		return tryDelimitedPathSplit(normalizedEntry, cwd, splitter, "semicolon", "none");
+		return tryDelimitedPathSplit(
+			normalizedEntry,
+			cwd,
+			splitter,
+			"semicolon",
+			"none",
+			options.rejectExternalOrOpaqueUrlChildren ?? false,
+		);
 	}
 	// A real POSIX file may contain the delimiter and a selector-shaped tail
 	// (`a;b:1-2`, `a b:1-2`). Preserve the raw entry whenever the full literal
@@ -1014,10 +1025,38 @@ export async function splitDelimitedPathEntry(
 	}
 
 	return (
-		(await tryDelimitedPathSplit(normalizedEntry, cwd, splitter, "semicolon", "none")) ??
-		(await tryDelimitedPathSplit(normalizedEntry, cwd, splitter, "comma", "some")) ??
-		(await tryDelimitedPathSplit(normalizedEntry, cwd, splitter, "whitespace", "all")) ??
-		(await tryDelimitedPathSplit(normalizedEntry, cwd, splitter, "mixed", "all"))
+		(await tryDelimitedPathSplit(
+			normalizedEntry,
+			cwd,
+			splitter,
+			"semicolon",
+			"none",
+			options.rejectExternalOrOpaqueUrlChildren ?? false,
+		)) ??
+		(await tryDelimitedPathSplit(
+			normalizedEntry,
+			cwd,
+			splitter,
+			"comma",
+			"some",
+			options.rejectExternalOrOpaqueUrlChildren ?? false,
+		)) ??
+		(await tryDelimitedPathSplit(
+			normalizedEntry,
+			cwd,
+			splitter,
+			"whitespace",
+			"all",
+			options.rejectExternalOrOpaqueUrlChildren ?? false,
+		)) ??
+		(await tryDelimitedPathSplit(
+			normalizedEntry,
+			cwd,
+			splitter,
+			"mixed",
+			"all",
+			options.rejectExternalOrOpaqueUrlChildren ?? false,
+		))
 	);
 }
 

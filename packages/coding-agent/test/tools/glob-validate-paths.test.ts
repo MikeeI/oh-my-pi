@@ -67,7 +67,10 @@ describe("delimited path expansion", () => {
 	});
 
 	it("rejects external or opaque URL children from every semicolon batch route", async () => {
-		const options = { splitInternalUrlSemicolons: true };
+		const options = {
+			rejectExternalOrOpaqueUrlChildren: true,
+			splitInternalUrlSemicolons: true,
+		};
 		expect(await splitDelimitedPathEntry("artifact://abc123;https://example.com/a;b", tempDir, options)).toBeNull();
 		expect(await splitDelimitedPathEntry("conflict://1;https://example.com/a", tempDir, options)).toBeNull();
 		expect(await splitDelimitedPathEntry("artifact://abc123;catalog://items;active", tempDir, options)).toBeNull();
@@ -78,16 +81,18 @@ describe("delimited path expansion", () => {
 		expect(
 			await splitDelimitedPathEntry("xd://resolve;packages/b.txt", tempDir, {
 				splitInternalUrlSemicolons: true,
+				rejectExternalOrOpaqueUrlChildren: true,
 			}),
 		).toEqual(["xd://resolve", "packages/b.txt"]);
 	});
 
 	it("keeps URL-shaped existing local children batchable", async () => {
-		expect(await splitDelimitedPathEntry("www.example;packages/b.txt", tempDir)).toEqual([
+		const options = { rejectExternalOrOpaqueUrlChildren: true };
+		expect(await splitDelimitedPathEntry("www.example;packages/b.txt", tempDir, options)).toEqual([
 			"www.example",
 			"packages/b.txt",
 		]);
-		expect(await splitDelimitedPathEntry("notes:detail;packages/b.txt", tempDir)).toEqual([
+		expect(await splitDelimitedPathEntry("notes:detail;packages/b.txt", tempDir, options)).toEqual([
 			"notes:detail",
 			"packages/b.txt",
 		]);
