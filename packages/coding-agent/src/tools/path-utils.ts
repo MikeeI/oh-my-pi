@@ -383,6 +383,17 @@ export async function probeLiteralPathExists(filePath: string, cwd: string): Pro
 	}
 }
 
+/** Probe the literal target, then its selector-free base when it has a valid selector. */
+export async function probeLiteralPathOrSelectorBase(
+	filePath: string,
+	cwd: string,
+): Promise<"exists" | "missing" | "unknown"> {
+	const literal = await probeLiteralPathExists(filePath, cwd);
+	if (literal !== "missing") return literal;
+	const selected = splitPathAndSel(filePath);
+	return selected.sel === undefined ? "missing" : probeLiteralPathExists(selected.path, cwd);
+}
+
 /**
  * Async sibling of {@link splitPathAndSel} that prefers a literal filesystem
  * path over selector interpretation. Filenames whose tail matches the selector
@@ -935,6 +946,19 @@ async function delimitedPathPartResolves(entry: string, cwd: string, splitter: P
  */
 type DelimitedResolveRequirement = "all" | "some" | "none";
 
+async function hasLiteralSemicolonFileUrl(rawParts: readonly string[], cwd: string): Promise<boolean> {
+	for (const [index, rawPart] of rawParts.entries()) {
+		const firstPart = normalizePathLikeInput(rawPart);
+		if (extractUriScheme(firstPart) !== "file") continue;
+		let candidate = firstPart;
+		for (let tailIndex = index + 1; tailIndex < rawParts.length; tailIndex++) {
+			candidate += `;${normalizePathLikeInput(rawParts[tailIndex] ?? "")}`;
+			if ((await probeLiteralPathOrSelectorBase(candidate, cwd)) !== "missing") return true;
+		}
+	}
+	return false;
+}
+
 async function tryDelimitedPathSplit(
 	entry: string,
 	cwd: string,
@@ -947,6 +971,7 @@ async function tryDelimitedPathSplit(
 	const rawParts = splitTopLevelDelimitedPath(entry, mode);
 	if (rawParts.length < 2) return null;
 
+	if (rejectExternalOrOpaqueUrlChildren && (await hasLiteralSemicolonFileUrl(rawParts, cwd))) return null;
 	const parts = rawParts.map(normalizePathLikeInput).filter(part => part.length > 0);
 	if (rejectExternalOrOpaqueUrlChildren) {
 		const internalRouter = InternalUrlRouter.instance();

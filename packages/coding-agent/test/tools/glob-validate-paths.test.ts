@@ -2,6 +2,7 @@ import { afterEach, beforeAll, beforeEach, describe, expect, it } from "bun:test
 import * as fs from "node:fs/promises";
 import * as os from "node:os";
 import * as path from "node:path";
+import * as url from "node:url";
 import type { RenderResultOptions } from "@oh-my-pi/pi-coding-agent/extensibility/custom-tools/types";
 import { getThemeByName, initTheme, type Theme } from "@oh-my-pi/pi-coding-agent/modes/theme/theme";
 import {
@@ -75,6 +76,10 @@ describe("delimited path expansion", () => {
 		expect(await splitDelimitedPathEntry("conflict://1;https://example.com/a", tempDir, options)).toBeNull();
 		expect(await splitDelimitedPathEntry("artifact://abc123;catalog://items;active", tempDir, options)).toBeNull();
 		expect(await splitDelimitedPathEntry("artifact://abc123;urn:example;view", tempDir, options)).toBeNull();
+		const filePath = path.join(tempDir, "nested;file.txt");
+		await Bun.write(filePath, "nested\n");
+		const fileUrl = url.pathToFileURL(filePath).href;
+		expect(await splitDelimitedPathEntry(`artifact://abc123;${fileUrl}`, tempDir, options)).toBeNull();
 	});
 
 	it("keeps registered device URIs batchable", async () => {
