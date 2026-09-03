@@ -222,11 +222,13 @@ Each entry names its disposition, observable behavior, implementation owner, and
 
 - Disposition: `UPSTREAM-INTEGRIERT`.
 - Contract: before each Read, the model collects every bounded target required for the current step.
-- Contract: independent known local paths, file URLs, and non-MCP internal URIs use one semicolon-delimited Read call.
+- Contract: every collected target belongs to exactly one call group before scheduling.
+- Contract: HTTP(S) URLs and MCP resources are sibling-only targets and never use semicolon batching.
+- Contract: local paths, `file://` URLs, and non-MCP internal URIs share one semicolon-delimited batch group.
+- Contract: all resulting batch and sibling calls are emitted together in the same assistant turn.
 - Contract: mixed internal URI and local path orders route every target through the existing Read dispatcher.
 - Contract: registered `conflict://` and `attachment://` resources participate in semicolon-delimited Read calls.
-- Contract: independent MCP resources use sibling Read calls and preserve server-provided URI text exactly.
-- Contract: independent HTTP(S) URLs use separate Read calls in the same assistant turn.
+- Contract: every MCP resource uses its own Read call and preserves server-provided URI text exactly.
 - Contract: semicolons belonging to URLs, SQL, archive members, or filenames remain target data.
 - Contract: literal semicolons inside batch-compatible internal URIs use percent encoding.
 - Contract: ambiguous literal semicolons use separate calls instead of corrupting a target.
