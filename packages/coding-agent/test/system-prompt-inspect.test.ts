@@ -94,7 +94,6 @@ describe("system prompt inspect metadata", () => {
 				"tool-inventory",
 				"intent-tracing",
 				"secrets",
-				"images",
 				"tool-priority",
 				"ast-tools",
 				"eager-tasks",

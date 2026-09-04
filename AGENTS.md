@@ -174,7 +174,7 @@ Each entry names its disposition, observable behavior, implementation owner, and
 - Contract: task `effort` maps `lo`, `med`, and `hi` to the target model's lowest, middle, and highest levels.
 - Contract: omitting task `effort` preserves normal configured thinking selection; `task.maxEffort` remains the ceiling.
 - Contract: model switches select the target model's policy even when model identity is hidden.
-- Owner: upstream `src/task/prompt-policy.ts#usesCodexTaskPrompt` owns model classification.
+- Owner: upstream `src/task/prompt-policy.ts#sessionDelegationBias` owns model classification.
 - Owner: upstream `src/prompts/system/system-prompt.md#Delegation` owns bundled policy.
 - Owner: the active project-settings `SYSTEM.template.md` owns the live policy text.
 - Owner: upstream `src/prompts/tools/task.md` owns model-visible task-effort semantics.
@@ -582,7 +582,12 @@ Classify retained candidates during every full upgrade as `NICHT-CONTRACT-AKTIV`
 The closure includes scripts, prompts, workers, package commands, fixtures, generated output, and documentation.
 NEVER retain experimental code because it might become useful later.
 
-Current non-contract artifact states: none.
+Current non-contract artifact states:
+
+- `project/TEMP-CACHE-READ-COSTS.md`: `NICHT-CONTRACT-AKTIV`.
+- Consumer: `issues/ISSUE-020.md#Evidence` uses the snapshot for the active submitted Read regression investigation.
+- Required action: retain the snapshot while that investigation remains active and remove its complete citation closure afterward.
+- Proof: the issue record and https://github.com/can1357/oh-my-pi/pull/10578.
 
 ### Upstream Cutover and Delta Lifecycle
 

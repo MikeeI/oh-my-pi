@@ -876,7 +876,6 @@ const TOOL_PRIORITY_NAMES: Record<string, true> = {
 	bash: true,
 };
 const AST_TOOL_NAMES: Record<string, true> = { ast_grep: true, ast_edit: true };
-const IMAGE_TOOL_NAMES: Record<string, true> = { inspect_image: true };
 const TASK_TOOL_NAMES: Record<string, true> = { task: true };
 
 function withoutTools(data: prompt.TemplateContext, excluded: Readonly<Record<string, true>>): prompt.TemplateContext {
@@ -894,7 +893,6 @@ const SYSTEM_PROMPT_PART_PROBES: readonly CounterfactualPromptPartProbe[] = [
 	{ id: "tool-inventory", without: data => ({ ...data, toolInfo: [] }) },
 	{ id: "intent-tracing", without: data => ({ ...data, intentTracing: false }) },
 	{ id: "secrets", without: data => ({ ...data, secretsEnabled: false }) },
-	{ id: "images", without: data => withoutTools(data, IMAGE_TOOL_NAMES) },
 	{ id: "tool-priority", without: data => withoutTools(data, TOOL_PRIORITY_NAMES) },
 	{ id: "ast-tools", without: data => withoutTools(data, AST_TOOL_NAMES) },
 	{ id: "eager-tasks", without: data => withoutTools(data, TASK_TOOL_NAMES) },
