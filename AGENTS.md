@@ -1,5 +1,725 @@
 # Development Rules
 
+## Fork Identity
+
+MOMP is an opinionated personal fork of Oh My Pi.
+It adds deliberate workflow and behavior changes while staying as close as practical to `can1357/oh-my-pi`.
+Keep fork-specific changes small and isolated so `personal` can be repeatedly rebased onto current upstream releases.
+Align fork changes with upstream ownership boundaries to minimize rebase conflicts.
+Prefer upstream behavior when it already satisfies the fork contract; NEVER duplicate functionality already owned upstream.
+`main` mirrors `upstream/main` and MUST remain free of MOMP-only changes.
+`personal` is the MOMP development and release branch; it carries the minimal fork patchstack.
+When upstream implements a MOMP contract, remove the redundant fork patch instead of preserving its historical shape.
+
+### Fork Delta Decision
+
+Every MOMP-only delta MUST name the current observable contract that upstream does not satisfy.
+Observable contracts include CLI behavior, tool behavior, prompt behavior, runtime behavior, and operator workflows.
+Historical presence in the fork is not evidence that a delta is still required.
+An old integration commit is provenance, not an active product requirement.
+No current contract means no justified fork delta.
+
+Before adding or reapplying fork behavior, inspect the current upstream owner, callers, tests, and configuration.
+Treat earlier upgrade assessments and historical implementation assumptions as stale until current upstream confirms them.
+Reuse current upstream behavior whenever it satisfies the contract.
+Prefer an existing upstream setting, extension point, helper, or ownership boundary over new fork code.
+An upstream-owned file without an active MOMP contract SHOULD remain byte-identical to upstream.
+NEVER retain formatting, wording, aliases, or historical edits merely because they existed in an older MOMP release.
+
+Implement a necessary delta at the ownership boundary used by current upstream.
+NEVER add a MOMP wrapper, duplicate helper, or parallel policy beside an upstream owner that can be extended directly.
+Keep the delta's API surface, changed-file set, and dependency closure as small as the contract permits.
+Generic improvements SHOULD be designed as independently upstreamable changes.
+Publishing branches, pull requests, issues, or comments upstream requires explicit user instruction.
+Until upstream adopts a generic improvement, retain only the smallest necessary fork delta.
+
+Use this decision sequence for every proposed MOMP-only change:
+
+1. State the current observable contract.
+2. Identify the exact current upstream owner.
+3. Prove that current upstream does not already satisfy the contract.
+4. Prefer configuration or an existing extension point when it preserves the contract.
+5. Change the smallest complete ownership-aligned closure.
+6. Name the focused behavioral proof.
+7. Decide whether the result should remain MOMP-specific or be designed for upstream.
+
+Classify every active fork contract during an upstream assessment:
+
+- `UPSTREAM-GEDECKT`: Current upstream fully satisfies the contract; remove the redundant fork closure.
+- `UPSTREAM-INTEGRIERT`: A current upstream owner already makes this class of decision; retain only its minimal delta.
+- `MOMP-EIGEN`: MOMP adds a distinct capability or workflow with a new primary owner; retain its minimal closure.
+
+Integration call sites alone NEVER make a distinct MOMP capability `UPSTREAM-INTEGRIERT`.
+
+Classify every retained experimental, diagnostic, benchmark, fixture, or migration artifact outside the active inventory:
+
+- `NICHT-CONTRACT-AKTIV`: A current repeatable consumer exists; name it and retain only the complete closure.
+- `NICHT-CONTRACT-ENTFERNEN`: No current repeatable consumer exists; remove the complete closure during authorized cleanup.
+
+Active-contract dispositions and non-contract states are disjoint.
+NEVER place non-contract artifacts in the active inventory or use them to justify runtime retention.
+Every classification MUST name the owner, required action, and behavioral proof or repeatable consumer.
+
+### Current Active MOMP Contract Inventory
+
+This section is the authoritative SSOT for active MOMP source behavior and its source-facing index.
+A fork delta that cannot be assigned to an entry below is unqualified and MUST be investigated before retention.
+`project-momp-upgrader` consumes this inventory.
+It owns upgrade assessment, packaging, publishing, installation, and release smoke.
+Source behavior changes MUST update this inventory in the same source change.
+Upgrade workflow documentation and automation MUST reference entries instead of restating their contracts.
+Keep this inventory current when adding, removing, upstreaming, or reclassifying a contract.
+
+Each entry names its disposition, observable behavior, implementation owner, and focused proof.
+
+#### `MOMP-PROMPT-MAIN` — Main prompt customization
+
+- Disposition: `UPSTREAM-INTEGRIERT`.
+- Contract: `SYSTEM.template.md` enables Handlebars rendering without changing raw `SYSTEM.md` semantics.
+- Contract: raw `--system-prompt`, `SYSTEM.md`, `APPEND_SYSTEM.md`, and `--append-system-prompt` remain literal.
+- Contract: precedence is explicit raw prompt, project raw, project template, user raw, user template, built-in base.
+- Contract: raw and template siblings select raw and surface the suppression warning.
+- Contract: selected unreadable, empty, or invalid templates fail instead of silently falling back.
+- Contract: provider-facing base and project blocks remain separate and ordered.
+- Contract: ACP sessions resolve prompt sources from the target workspace rather than the launch directory.
+- Contract: runtime tool-registry rebuilds preserve the selected sources while refreshing dynamic tool state.
+- Owner: `src/system-prompt.ts` owns source discovery, precedence, loading, and rendering.
+- Owner: `src/main.ts` maps discovered sources into Main-session construction.
+- Required action: retain template discovery and rendering at the current upstream prompt-construction seams.
+- Proof: `test/system-prompt-templates.test.ts`.
+- Proof: prompt-source cases in `test/acp-mcp-isolation.test.ts`.
+- Proof: `test/agent-session-tool-rebuild-skip.test.ts`.
+
+#### `MOMP-WORKSTATION-CONTEXT` — Compact execution context
+
+- Disposition: `UPSTREAM-INTEGRIERT`.
+- Contract: workstation context identifies current execution as `user@host`.
+- Contract: OS context combines distribution, OS type and release, and architecture in one line.
+- Contract: workstation context surfaces the current IANA timezone.
+- Owner: current upstream `src/system-prompt.ts#getEnvironmentInfo` owns workstation context rendering.
+- Required action: extend that owner directly; never add a parallel fork prompt block.
+- Proof: `test/system-prompt-kernel.test.ts`.
+
+#### `MOMP-PROMPT-CHILD` — Fresh Child prompt composition
+
+- Disposition: `UPSTREAM-INTEGRIERT`.
+- Contract: fresh Child base precedence is project template, user template, then the upstream fallback.
+- Contract: wrapper precedence is project `SUBAGENT-SYSTEM.template.md`, user template, then bundled wrapper.
+- Contract: a selected Child base controls block zero and suppresses raw and append discovery for that fresh render.
+- Contract: Task, Eval, Vibe, and nested Children reload selections from their logical `cwd`.
+- Contract: live follow-ups retain the rendered prompt and cold revives retain persisted prompt bytes.
+- Contract: Children never inherit parent-selected raw, append, explicit, base-template, or wrapper-template state.
+- Contract: Children never inherit the Main conversation, rendered Main prompt, or full parent `AGENTS.md` context.
+- Owner: `src/system-prompt.ts` owns base and wrapper discovery.
+- Owner: `src/task/subagent-system-prompt.ts` owns wrapper rendering and provider-block insertion.
+- Owner: `src/task/executor.ts#runSubprocess` is the shared fresh-Child construction seam.
+- Required action: retain Child template composition at the current upstream fresh-Child construction seams.
+- Proof: `test/task/subagent-system-template.test.ts`.
+- Proof: `test/context-file-inheritance.test.ts`.
+
+#### `MOMP-PROMPT-OVERRIDES` — Process-scoped Main overrides
+
+- Disposition: `UPSTREAM-INTEGRIERT`.
+- Contract: `--system-template <path>` selects an explicit Handlebars Main template for this process.
+- Contract: `--agents-file <path>` replaces only user-level `AGENTS.md` while retaining project discovery.
+- Contract: both flags support spaced and equals syntax, relative paths, `~`, and regular-file symlinks.
+- Contract: explicit empty, missing, unreadable, and non-regular paths fail.
+- Contract: `--system-template` and `--system-prompt` are mutually exclusive.
+- Contract: overrides apply consistently to interactive, print, ACP, SDK, and Main inspection paths.
+- Contract: overrides never persist into settings, session headers, resume, continue, or fresh Children.
+- Contract: arbitrary `--agents-file` filenames remain semantically typed as AGENTS context.
+- Contract: override changes invalidate inherited provider prompt-cache affinity.
+- Owner: `src/cli/args.ts` and `src/cli/flag-tables.ts` own CLI parsing.
+- Owner: `src/system-prompt.ts` owns strict path resolution and context replacement.
+- Owner: `src/main.ts` and `src/sdk.ts` own process/session propagation.
+- Required action: retain process-only overrides at the current upstream CLI and prompt-resolution seams.
+- Proof: `test/cli-agents-file.test.ts`.
+- Proof: `test/system-prompt-templates.test.ts`.
+
+#### `MOMP-PROMPT-INSPECT` — Provider prompt inspection
+
+- Disposition: `MOMP-EIGEN`.
+- Contract: `momp system-prompt inspect` exposes provider blocks, dynamic parts, token breakdown, or Codex wire hashes.
+- Contract: `--provider`, `--dynamic-parts`, `--breakdown`, and `--codex-wire-hash` are mutually exclusive.
+- Contract: `--subagent <name>` previews a configured fresh top-level Child through runtime composition owners.
+- Contract: Child inspection reports configured-preview fidelity and omitted invocation-only state.
+- Contract: breakdown measures provider prompts, tool prompts, tool schemas, dynamic parts, and dynamic sources.
+- Contract: dynamic parts attribute the complete inline `xd://` protocol, built-in docs, schemas, and device catalog.
+- Contract: `--first-message <text>` is Main-only and requires `--breakdown` or `--codex-wire-hash`.
+- Contract: first-message inspection captures the final request after runtime message injection.
+- Contract: JSON breakdown output exposes exact request messages plus per-message and aggregate token measurements.
+- Contract: `--codex-wire-hash` hashes the actual transformed Main SSE body and cache-relevant components.
+- Contract: wire-hash output exposes no prompt text, tool schema, cache key, or credential.
+- Contract: first-message and wire-hash inspection perform no provider network call.
+- Usage: `momp system-prompt inspect --cwd <workspace> --first-message "<text>" --breakdown --json`.
+- Usage: `momp system-prompt inspect --model <codex-model> --first-message "<text>" --codex-wire-hash --json`.
+- Contract: large text and JSON outputs finish writing and remain complete before process exit.
+- Contract: Main inspection is not accepted as proof of Child loading.
+- Owner: `src/commands/system-prompt.ts` owns command grammar, measurement, and output.
+- Owner: `src/system-prompt.ts` owns opt-in counterfactual dynamic-fragment capture.
+- Owner: `src/task/subagent-system-prompt.ts` owns inspected Child composition.
+- Reason: current upstream has no provider-prompt inspection command or equivalent offline measurement workflow.
+- Required action: retain one MOMP inspection command using runtime prompt-composition owners.
+- Proof: `test/system-prompt-inspect.test.ts`.
+- Proof: `test/system-prompt-templates.test.ts`.
+
+#### `MOMP-TASK-POLICY` — Model-dependent delegation policy
+
+- Disposition: `UPSTREAM-INTEGRIERT`.
+- Contract: a custom `SYSTEM.template.md` carries task policy because it replaces the built-in Main template.
+- Contract: GPT-5.6 default mode requires user, `AGENTS.md`, or skill authorization before delegation.
+- Contract: GPT-5.6 eager mode allows proactive delegation.
+- Contract: other models retain current upstream eager/default delegation behavior.
+- Contract: fan-out, concurrency, IRC, and Hub instructions render from current upstream template inputs.
+- Contract: task `effort` maps `lo`, `med`, and `hi` to the target model's lowest, middle, and highest levels.
+- Contract: omitting task `effort` preserves normal configured thinking selection; `task.maxEffort` remains the ceiling.
+- Contract: model switches select the target model's policy even when model identity is hidden.
+- Owner: upstream `src/task/prompt-policy.ts#usesCodexTaskPrompt` owns model classification.
+- Owner: upstream `src/prompts/system/system-prompt.md#Delegation` owns bundled policy.
+- Owner: the active project-settings `SYSTEM.template.md` owns the live policy text.
+- Owner: upstream `src/prompts/tools/task.md` owns model-visible task-effort semantics.
+- Owner: `src/system-prompt.ts` owns the render inputs and template selection.
+- Required action: retain only model-policy and effort-semantics deltas at the named current upstream owners.
+- Proof: candidate prompt rendering through `momp system-prompt inspect`.
+- Proof: `test/system-prompt-templates.test.ts`.
+- Proof: effort-description cases in `test/task/task-schema.test.ts`.
+
+#### `MOMP-EVAL-OUTPUT` — Large owner-result preservation
+
+- Disposition: `UPSTREAM-INTEGRIERT`.
+- Contract: Eval keeps large raw tool results separate or passes handles instead of re-emitting them.
+- Contract: Legitimate Eval aggregation, tool orchestration, shell, and subprocess capabilities remain unchanged.
+- Owner: `src/prompts/tools/eval.md` owns model-visible result-handling guidance.
+- Required action: retain only the result-handling guidance delta at the current upstream Eval prompt owner.
+- Proof: result-handling description case in `test/tools/eval-description.test.ts`.
+
+#### `MOMP-EVAL-ROUTING` — Context-safe Eval orchestration
+
+- Disposition: `UPSTREAM-INTEGRIERT`.
+- Contract: native Read owns inspection unless Eval must compute over file contents.
+- Contract: in-cell concurrency uses `parallel(thunks)` instead of user-created execution contexts.
+- Contract: Eval treats tool results as unknown until their owner or inspected shape establishes a type.
+- Contract: Eval uses only state established by successful cells in the current live kernel.
+- Contract: ordinary `task` Children inherit Eval state, while Eval `agent()` Children use independent kernels.
+- Owner: `src/prompts/tools/eval.md` owns model-visible Eval routing and failure guidance.
+- Owner: upstream `src/task/structured-subagent.ts` and `src/eval/agent-bridge.ts` own the corresponding runtime split.
+- Required action: retain only routing guidance aligned with the current upstream Eval runtime split.
+- Proof: routing-description cases in `test/tools/eval-description.test.ts`.
+- Proof: runtime semantics in Eval workflow, bridge-policy, Python-prelude, and JavaScript-executor tests.
+- Proof: isolation-policy cases in `test/eval/agent-bridge-policy.test.ts`.
+
+#### `MOMP-READ-SKILL-COMPACT` — Compact skill-read display
+
+- Disposition: `UPSTREAM-INTEGRIERT`.
+- Contract: `read skill://` calls collapse into the compact grouped read view like `xd://` device reads.
+- Contract: collapsed skill loads stay expandable so their full resolved content remains visible.
+- Contract: the full skill body still reaches the model; collapsing is display-only and never trims load-bearing content.
+- Owner: `src/modes/components/read-tool-group.ts#readArgsCollapseIntoGroup` owns the collapse decision.
+- Required action: retain only the skill-URI collapse decision at the current upstream Read-group renderer.
+- Proof: `test/read-tool-group.test.ts`.
+
+#### `MOMP-READ-BATCH-GUIDANCE` — Provider-roundtrip-efficient reads
+
+- Disposition: `UPSTREAM-INTEGRIERT`.
+- Contract: before each Read, the model collects every bounded target required for the current step.
+- Contract: independent known local paths, file URLs, and non-MCP internal URIs use one semicolon-delimited Read call.
+- Contract: mixed internal URI and local path orders route every target through the existing Read dispatcher.
+- Contract: registered `conflict://` and `attachment://` resources participate in semicolon-delimited Read calls.
+- Contract: independent MCP resources use sibling Read calls and preserve server-provided URI text exactly.
+- Contract: independent HTTP(S) URLs use separate Read calls in the same assistant turn.
+- Contract: semicolons belonging to URLs, SQL, archive members, or filenames remain target data.
+- Contract: literal semicolons inside batch-compatible internal URIs use percent encoding.
+- Contract: ambiguous literal semicolons use separate calls instead of corrupting a target.
+- Owner: `src/prompts/tools/read.md` owns model-visible batching guidance.
+- Owner: `src/tools/read.ts` and `src/tools/path-utils.ts` own delimiter and opaque-resource routing.
+- Required action: retain mixed-target, conflict, attachment, opaque MCP, and guidance deltas at current upstream seams.
+- Proof: `test/tools/read-guidance.test.ts`.
+- Proof: conflict batching in `test/tools/conflict-integration.test.ts`.
+- Proof: attachment batching in `test/read-tool.test.ts`.
+- Proof: mixed-target cases in `test/skill-protocol-customdirs.test.ts`.
+- Proof: exact MCP resource cases in `test/internal-urls/mcp-protocol.test.ts`.
+
+#### `MOMP-READ-USER-AGENTS` — URL fetch identity fallback
+
+- Disposition: `UPSTREAM-INTEGRIERT`.
+- Contract: URL fetches try pinned-current Chrome, Googlebot Smartphone, then curl identities.
+- Contract: recognized bot blocks and transport failures advance to the next identity.
+- Contract: HTTP 429 retries retain the current identity.
+- Owner: `src/web/scrapers/types.ts#loadPage` owns request identity and fallback order.
+- Required action: retain the minimal identity-order delta at the current upstream fetch owner.
+- Proof: `test/web-scraper-user-agent.test.ts`.
+- Source: https://developers.google.com/crawling/docs/crawlers-fetchers/google-common-crawlers
+- Source: https://googlechromelabs.github.io/chrome-for-testing/last-known-good-versions.json
+- Source: https://curl.se/download.html
+
+#### `MOMP-WEB-SEARCH-PARALLEL` — Provider-roundtrip-efficient searches
+
+- Disposition: `UPSTREAM-INTEGRIERT`.
+- Contract: before searching, the model collects all independent queries required for the current step.
+- Contract: independent queries prefer parallel sibling `web_search` calls in one assistant turn.
+- Contract: sequential searches are reserved for queries determined by prior results.
+- Owner: `src/prompts/tools/web-search.md` owns model-visible search scheduling guidance.
+- Owner: upstream `packages/agent/src/agent-loop.ts#executeToolCalls` owns shared sibling-tool concurrency.
+- Required action: retain only scheduling guidance over current upstream sibling-tool concurrency.
+- Proof: scheduling-description cases in `test/web/search/guidance.test.ts`.
+
+#### `MOMP-GITHUB-ERRORS` — Actionable GitHub failure diagnostics
+
+- Disposition: `UPSTREAM-INTEGRIERT`.
+- Contract: failed structured GitHub commands retain the concise `gh` error and append unique API diagnostics.
+- Contract: message-free API field errors render their resource, field, and code.
+- Contract: failed `file_read` calls identify the requested repository, revision, and path.
+- Contract: file-read errors preserve GitHub's ambiguity between a missing repository, revision, and path.
+- Contract: GitHub guidance states that Boolean operators combine text terms rather than qualifiers.
+- Owner: upstream `src/utils/github.ts#github.json` owns structured GitHub error projection.
+- Owner: upstream `src/tools/gh.ts#executeFileRead` owns file-read request context.
+- Owner: upstream `src/prompts/tools/github.md` owns model-visible GitHub query guidance.
+- Reason: current upstream drops structured REST diagnostics when `gh` emits non-empty generic stderr.
+- Reason: current upstream file-read failures expose no repository, revision, or path context.
+- Required action: retain only error projection, file-read context, and the observed query rule at current upstream owners.
+- Proof: GitHub command-runner and file-read error cases in `test/tools/gh.test.ts`.
+- Proof: render and inspect the GitHub tool prompt.
+
+#### `MOMP-TREE-COMPACT` — Token-efficient directory context
+
+- Disposition: `UPSTREAM-INTEGRIERT`.
+- Contract: the system-prompt workspace tree omits size and mtime columns.
+- Contract: Read directory trees retain file sizes and relative mtimes with single-space separators.
+- Contract: both views retain names, hierarchy, ordering, depth, limits, and elision behavior.
+- Owner: `packages/coding-agent/src/workspace-tree.ts` owns both render modes.
+- Required action: retain both render-mode deltas at the current upstream workspace-tree owner.
+- Proof: `packages/coding-agent/test/workspace-tree.test.ts`.
+- Retention: active source and test deltas remain until upstream satisfies both contracts.
+
+#### `MOMP-ROUTINES` — User-defined sequential routines
+
+- Disposition: `MOMP-EIGEN`.
+- Contract: YAML routines discover as slash-style commands from the user routines directory.
+- Contract: TUI, ACP, RPC, and SDK session paths advertise and execute routines consistently.
+- Contract: names conflict-check against all built-in and discovered command namespaces.
+- Contract: rejected ACP or RPC routine reloads retain the previous valid command registry.
+- Contract: RPC clients surface reload rejection instead of silently accepting invalid candidate state.
+- Contract: duplicate or conflicting routines fail before command advertisement.
+- Contract: autocomplete shows the declared description without synthetic routine suffixes.
+- Contract: execution serializes active routine work and reports progress.
+- Contract: cancellation cleans routine lifecycle state.
+- Contract: routines never weaken file-command or prompt-template precedence.
+- Owner: `src/capability/routine.ts` owns the capability contract.
+- Owner: `src/discovery/routines.ts` owns discovery.
+- Owner: `src/extensibility/routines.ts` owns parsing, validation, planning, and progress formatting.
+- Owner: `src/session/agent-session.ts` owns execution and lifecycle serialization.
+- Reason: current upstream has no routine capability, routine registry, or sequential routine execution workflow.
+- Required action: retain one MOMP routine capability and its transport integrations.
+- Proof: `test/routines.test.ts`.
+- Proof: `test/agent-session-routine-lock.test.ts`.
+- Proof: `test/input-controller-routine.test.ts`.
+- Proof: `test/interactive-mode-routine-autocomplete.test.ts`.
+- Proof: routine cases in `test/rpc.test.ts` and ACP tests.
+
+#### `MOMP-COMMAND-UX` — Rename, argument completion, and slash-list display
+
+- Disposition: `UPSTREAM-INTEGRIERT`.
+- Contract: `/rename <title>` stores an explicit user-owned title.
+- Contract: blank `/rename` generates a title from recent user and Assistant transcript context.
+- Contract: generated title input omits tools, thinking, code fences, and irrelevant follow-up-question chatter.
+- Contract: blank manual `/rename` generation carries `AUTO:` while remaining replaceable; automatic first-input and replan titles remain replaceable without that marker.
+- Contract: `/rename` arguments keep `@` and `#` literal.
+- Contract: command-specific completion wins when it has a result.
+- Contract: absent command-specific completion falls through unless the command declares exclusive completion.
+- Contract: autocomplete and submission use one command-owned argument-completion mode.
+- Contract: slash-command autocomplete rows never display emojis or type-indicator icons, regardless of theme or symbol preset.
+- Owner: `src/utils/title-generator.ts` owns transcript title generation.
+- Owner: `src/slash-commands/types.ts` owns argument-completion semantics.
+- Owner: TUI, ACP, and RPC command routers own transport-specific invocation only.
+- Owner: `src/modes/interactive-mode.ts#refreshSlashCommandState` clears icons before provider construction.
+- Required action: retain only rename, argument-completion, and icon-policy deltas at current upstream command seams.
+- Proof: `test/title-generator.test.ts`.
+- Proof: `test/command-controller-rename.test.ts`.
+- Proof: rename cases in `test/acp-builtins.test.ts` and `test/slash-commands/rename.test.ts`.
+- Proof: `test/prompt-action-autocomplete.test.ts`.
+
+#### `MOMP-CONVERSATION-SEARCH` — Persisted conversation lookup
+
+- Disposition: `MOMP-EIGEN`.
+- Contract: `conversation_search` searches persisted Main conversations without model calls.
+- Contract: omitted scope and window search the current project over the last 10 days.
+- Contract: the active session, tool traffic, thinking, developer messages, and hidden synthetic inputs are excluded.
+- Contract: only visible human user and Assistant text participates in matching and excerpts.
+- Contract: all-term and phrase modes are deterministic and case-insensitive.
+- Contract: bounded text and JSON output returns newest matches with explicit partial-coverage diagnostics.
+- Contract: Children never receive the tool.
+- Contract: the local benchmark fixes a guaranteed-miss query, warmup count, measured runs, and corpus fingerprint.
+- Contract: incomplete coverage, changing files, changing visible-message counts, or unexpected matches invalidate a run.
+- Usage: `bun --cwd packages/coding-agent run bench:conversation-search -- --cwd <workspace>`.
+- Owner: `src/session/conversation-corpus.ts` owns visible transcript projection and journal discovery.
+- Owner: `src/session/conversation-search.ts` owns lexical matching, windowing, ranking, and coverage accounting.
+- Owner: `src/tools/conversation-search.ts` owns the tool boundary and Main-only exposure.
+- Owner: `src/tools/conversation-search-format.ts` owns output variants.
+- Owner: `scripts/bench-conversation-search.ts` owns the reproducible local evaluator and output.
+- Reason: current upstream has no persisted-conversation lexical search tool or equivalent benchmark.
+- Required action: retain one Main-only MOMP tool and its complete search closure.
+- Proof: `test/conversation-search.test.ts`.
+- Proof: `test/conversation-search-benchmark.test.ts`.
+
+#### `MOMP-RUNTIME-AUDIT` — Repeatable local performance evidence
+
+- Disposition: `MOMP-EIGEN`.
+- Contract: one local command captures CPU, heap lifecycle, test timing, and exact compiled-bundle evidence.
+- Contract: CPU scenarios cover cold pre-paint boot, the smoke path, and complete prompt inspection without provider calls.
+- Contract: the heap scenario repeatedly creates, fills, disposes, and garbage-collects real `AgentSession` instances.
+- Contract: lifecycle timings use a fixed test set and repetition count so runs remain directly comparable.
+- Contract: bundle evidence comes from the production compile owner with its plugins, defines, generated inputs, and externals.
+- Contract: outputs default to an absolute reports path outside the source tree and support an explicit output directory.
+- Contract: scenario failures stop the audit and retain captured stdout and stderr for diagnosis.
+- Usage: `bun --cwd=packages/coding-agent run profile:runtime`.
+- Owner: `packages/coding-agent/scripts/profile-runtime.ts` owns orchestration, parameters, manifest, and bundle summary.
+- Owner: `packages/coding-agent/scripts/profile-runtime-heap-scenario.ts` owns deterministic retained-heap exercise and sampling.
+- Owner: `packages/coding-agent/scripts/compile-binary.ts` owns optional exact bundle metadata collection.
+- Owner: `packages/coding-agent/scripts/build-binary.ts` owns production-build metadata emission.
+- Reason: current upstream has no aggregate local runtime-audit command or equivalent repeatable artifact contract.
+- Required action: retain one MOMP audit workflow using current production compile owners.
+- Proof: run the usage command and verify every artifact named by `manifest.json` exists after successful completion.
+
+#### `MOMP-CODEX-CACHE-PROBE` — Explicit breakpoint endpoint evidence
+
+- Disposition: `MOMP-EIGEN`.
+- Contract: `omp bench <model> --codex-cache-breakpoint-probe --json` is a synthetic provider capability probe.
+- Contract: the probe is not evidence of Main-session prompt-cache reuse.
+- Contract: each pair uses distinct provider session IDs, one stable cache key, and independent SSE requests.
+- Contract: the stable synthetic prefix remains identical while the variable suffix changes between requests.
+- Contract: both requests carry explicit GPT-5.6 cache options and a latest-stable-message breakpoint.
+- Contract: JSON reports endpoint acceptance, observed wire fields, cache usage, session distinctness, and failures.
+- Contract: probe output never emits the stable prefix, cache key, or suffix payload.
+- Owner: `packages/ai/src/providers/openai-shared.ts` owns shared Responses breakpoint placement.
+- Owner: `packages/ai/src/providers/openai-codex-responses.ts` owns Codex request construction.
+- Owner: `packages/coding-agent/src/cli/bench-cli.ts` owns probe execution and measurements.
+- Owner: `packages/coding-agent/src/commands/bench.ts` owns CLI exposure and usage.
+- Reason: current upstream has no explicit synthetic Codex cache-breakpoint capability probe.
+- Required action: retain one MOMP probe at the current provider request and bench-command seams.
+- Proof: `packages/ai/test/openai-codex-responses-lite.test.ts`.
+- Proof: `packages/coding-agent/test/bench-cache.test.ts`.
+- Usage: `omp bench openai-codex/gpt-5.6-luna --codex-cache-breakpoint-probe --json`.
+
+#### `MOMP-STATS-SUMMARY` — Multi-range CLI usage overview
+
+- Disposition: `MOMP-EIGEN`.
+- Contract: `momp stats --summary` renders mobile-safe rolling 24h, 7d, and 30d usage blocks.
+- Contract: each range shows requests, conversation tokens, cost, absolute errors, and error rate.
+- Contract: 24h details show aligned token and performance metrics plus agent usage.
+- Contract: overlong metric values continue on dedicated lines without truncation.
+- Contract: model and folder summaries show the top five conversation-token consumers with exact omitted counts.
+- Contract: model and folder ordering uses deterministic name tie-breakers.
+- Contract: complete model and folder names render on dedicated sanitized lines without truncation.
+- Contract: conversation tokens include uncached input, cache reads, cache writes, and output.
+- Contract: `momp stats --summary` and `momp stats --json` keep sync diagnostics on stderr.
+- Contract: the summary composer lives inside the published `@mikeei/momp` package.
+- Contract: the standalone `omp-stats` binary keeps upstream behavior and is not fork-published.
+- Owner: `packages/coding-agent/src/cli/stats-summary.ts` owns ranges, loading, ranking, sanitization, and rendering.
+- Owner: `packages/coding-agent/src/cli/stats-cli.ts` owns MOMP command integration.
+- Reason: current upstream has no MOMP package-local multi-range summary command.
+- Required action: retain one MOMP summary composer without changing standalone `omp-stats`.
+- Proof: `packages/coding-agent/test/stats-summary.test.ts`.
+- Proof: `packages/coding-agent/test/stats-cli-output.test.ts`.
+
+#### `MOMP-SCROLLBACK` — Accepted transcript and multiplexer history integrity
+
+- Disposition: `UPSTREAM-INTEGRIERT`.
+- Contract: accepted terminal rows remain immutable after a finalized component mutates.
+- Contract: unchanged components retain semantic replay and width reflow.
+- Contract: drifted components replay accepted physical rows without joining source rows on width growth.
+- Contract: finalized Assistant tails remain reachable while ordered retirement is blocked by active predecessors.
+- Contract: stable pane geometry records final transcript rows exactly once and preserves pre-existing pane history.
+- Contract: multiplexer rendering never emits ED3 or invokes `clear-history`.
+- Contract: changed geometry starts a new resize transaction during post-settle suppression.
+- Contract: fullscreen resizes preserve geometry epochs and burst state for normal-buffer recovery.
+- Contract: fullscreen exits recover the restored normal-buffer anchor before provider repaint.
+- Owner: upstream `TranscriptContainer` owns semantic retirement, replay, acknowledgement, and accepted-tape fallback.
+- Owner: upstream `TUI.#emitPlanFrame` owns the sole physical history write and pre-scroll replacement seed.
+- Owner: `AssistantMessageComponent` owns finalized emergency-tail rendering and versioned presentation mutations.
+- Owner: upstream `TUI.#beginResizeAltPaint` owns resize geometry epochs and burst accumulation.
+- Owner: upstream `TUI.#beginResizeAnchorProbe` and `TUI.#resolveResizeAnchor` own anchor recovery.
+- Owner: upstream `TUI.#doRender` owns fullscreen-exit probe initialization.
+- Required action: retain only accepted-transcript and resize deltas at the named current upstream owners.
+- Proof: `test/modes/components/transcript-container.test.ts`.
+- Proof: `packages/tui/test/history-frame-plan.test.ts`.
+- Proof: `packages/tui/test/resize-multiplexer-anchor.test.ts`.
+- Proof: `test/tmux-scrollback-exactness.test.ts`.
+
+#### `MOMP-TMUX-PAGEUP` — Native tmux history access
+
+- Disposition: `MOMP-EIGEN`.
+- Contract: PageUp on a focused empty editor opens tmux copy mode one page up.
+- Contract: drafts, pending images, overlays, non-tmux sessions, and failed tmux commands retain existing handling.
+- Owner: `src/modes/controllers/input-controller.ts` owns the empty-editor PageUp bridge.
+- Required action: retain only the empty-editor tmux bridge at the current upstream input-controller seam.
+- Reason: current upstream has no tmux copy-mode bridge; this fork-specific capability remains required.
+- Proof: PageUp cases in `test/input-controller-keybindings.test.ts`.
+- Proof: the real tmux PageUp case in `test/tmux-scrollback-exactness.test.ts`.
+
+#### `MOMP-PACKAGE-IDENTITY` — Side-by-side fork identity and update safety
+
+- Disposition: `MOMP-EIGEN`.
+- Contract: publish staging produces package `@mikeei/momp`, binary `momp`, and exact `MOMP_VERSION`.
+- Contract: the published CLI executes `dist/cli.js`, which bundles the complete fork workspace closure.
+- Contract: publish-time bundle identity is injected without changing source package metadata.
+- Contract: source `package.json` stays upstream-near; publish metadata is never hard-coded into source.
+- Contract: published `momp update` refuses self-installation.
+- Contract: the refusal prints `bun install -g @mikeei/momp@latest --force --minimum-release-age 0`.
+- Contract: `momp update --check` never installs or treats the upstream package as the fork package.
+- Contract: startup may check upstream availability but compares against the fork's base version.
+- Contract: legacy extension self-imports resolve against the installed package identity.
+- Owner: `src/app-version.ts` owns runtime identity and upstream-version comparison.
+- Owner: `scripts/bundle-dist.ts` embeds validated package identity overrides into the bundled CLI.
+- Owner: `src/cli/update-cli.ts` owns fork-safe update behavior.
+- Owner: `src/extensibility/plugins/legacy-pi-compat.ts` owns installed-package self-import compatibility.
+- Owner: `MOMP_VERSION` owns the source release version.
+- Reason: canonical upstream cannot own the `@mikeei/momp` package identity or its fork-safe update policy.
+- Required action: retain one MOMP identity owner and publish-time staging boundary.
+- Proof: `test/update-cli.test.ts`.
+- Proof: `test/extension-loader-self-import.test.ts`.
+- Proof: publish and smoke gates owned by `project-momp-upgrader`.
+
+#### `MOMP-SUBAGENT-LSP` — Child LSP capability
+
+- Disposition: `UPSTREAM-INTEGRIERT`.
+- Contract: bundled agent prompt definitions follow upstream; Scout retains the upstream read-only tool set.
+- Contract: `task.enableLsp` applies only to agent definitions that declare LSP.
+- Contract: parent capability and plan-mode restrictions still attenuate Child LSP.
+- Owner: upstream `src/task/structured-subagent.ts#resolveEffectiveSubagentPolicy` owns effective Child LSP policy.
+- Owner: `src/config/settings-schema.ts` owns the MOMP default and operator-facing setting.
+- Reason: current upstream owns the policy but defaults `task.enableLsp` to `false`; MOMP defaults it to `true`.
+- Required action: retain only the default delta at the current upstream settings and effective-policy owners.
+- Proof: `test/task/subagent-lsp.test.ts`.
+- Proof: `test/tools/task-agent-capabilities.test.ts`.
+
+#### `MOMP-AGENT-CONTEXT` — AGENTS-first generated-agent context
+
+- Disposition: `UPSTREAM-INTEGRIERT`.
+- Contract: generated-agent guidance consumes provided `AGENTS.md` and other supplied project context.
+- Contract: the architect never assumes `CLAUDE.md` is the sole project-instruction owner.
+- Owner: `src/prompts/system/agent-creation-architect.md`.
+- Required action: retain only AGENTS-first guidance at the current upstream agent-architect prompt owner.
+- Proof: render and inspect the agent-creation architect prompt.
+
+#### `MOMP-HUB-COMPACT` — Compact Hub guidance
+
+- Disposition: `UPSTREAM-INTEGRIERT`.
+- Contract: Hub guidance preserves peer messaging, job delivery, and supervised-process semantics without repetition.
+- Contract: Hub examples and schema hints disambiguate peer waiting, process defaults, and compound service readiness.
+- Contract: a frozen real-model benchmark scores exact Hub calls for all four retained routing examples.
+- Owner: `src/prompts/tools/hub.md` owns concise model-visible behavior guidance.
+- Owner: `src/tools/hub/index.ts#HubTool.examples` owns the minimal routing examples.
+- Owner: `scripts/bench-hub-routing.ts` owns benchmark models, prompts, scoring, safe execution, and output.
+- Required action: retain only compact guidance, examples, and their benchmark at current upstream Hub owners.
+- Proof: `test/hub-routing-benchmark.test.ts` and `bun run bench:hub-routing`.
+
+#### `MOMP-BASH-TOOL-CONTEXT` — Additional workstation utilities and timeout guidance
+
+- Disposition: `UPSTREAM-INTEGRIERT`.
+- Contract: the Bash tool prompt advertises `base32` with the upstream-owned auxiliary utilities.
+- Contract: the Bash tool prompt additionally advertises `duckdb`, `mlr`, `yq`, `jc`, `shellcheck`, and `shfmt`.
+- Contract: the Bash tool prompt additionally advertises `diffoscope-safe`, `dust`, `procs`, and `glab`.
+- Contract: every MOMP-only advertised executable MUST resolve on the supported workstation before publication.
+- Contract: `timeout` controls the job deadline, while `bash.autoBackground.thresholdMs` caps foreground waiting.
+- Contract: raising `timeout` never promises foreground execution beyond the configured auto-background threshold.
+- Owner: current upstream `src/prompts/tools/bash.md` owns model-visible Bash capability guidance.
+- Owner: current upstream `src/tools/bash.ts` owns the independent deadline and foreground-threshold runtime policy.
+- Required action: retain the minimal utility-list delta at that owner.
+- Required action: retain the minimal timeout-guidance delta until upstream integrates the contribution.
+- Proof: resolve every MOMP-only advertised executable through the workstation command lookup.
+- Proof: render the Bash tool prompt and verify the additional capability guidance.
+- Proof: guidance cases in `test/tool-guidance-efficiency.test.ts`.
+- Proof: threshold-saturation cases in `test/tools.test.ts`.
+
+#### `MOMP-LSP` — LSP extensions at upstream owners
+
+- Disposition: `UPSTREAM-INTEGRIERT`.
+- Contract: file-scoped symbol queries filter hierarchical and flat document-symbol results.
+- Contract: rename previews show bounded positions and replacement text and report omitted edits.
+- Owner: current upstream `src/lsp/tool.ts` and `src/lsp/utils.ts` own the behavior.
+- Required action: retain source, prompt, and proof deltas until current upstream satisfies both contracts.
+- Proof: document-symbol query and rename-preview cases in `test/tools/lsp-regressions.test.ts`.
+
+#### `MOMP-READ-TOKEN-COUNT` — Exact Read token totals
+
+- Disposition: `UPSTREAM-INTEGRIERT`.
+- Contract: completed Read groups show exact native-token totals as `Read (N) · 14,823 Read Tokens`.
+- Contract: totals count final sanitized text after TTSR once per executed Read call, never per rendered target row.
+- Contract: pending groups, unavailable counters, image-only results, and historic results without metadata omit the total.
+- Contract: Read totals stay visible regardless of `display.showTokenUsage` because they describe tool payload.
+- Contract: single-row, inline-preview, and full Read result titles place the total after the path.
+- Owner: `packages/agent/src/tokenizer.ts` owns exact native-count availability.
+- Owner: `src/session/agent-session.ts` owns final Read-result measurement and persisted metadata.
+- Owner: `src/modes/components/read-tool-group.ts` owns aggregation and display.
+- Owner: `src/tools/read-token.ts` owns the shared metadata shape and exact suffix formatting.
+- Owner: `src/tools/read-renderer.ts` and `src/tools/fetch.ts` own full-result display.
+- Required action: retain exact-only measurement and every compact and full Read rendering path at the named owners.
+- Proof: exact-count availability cases in `packages/agent/test/tokenizer.test.ts`.
+- Proof: post-TTSR measurement in `test/agent-session-message-pipeline.test.ts`.
+- Proof: aggregation and preview cases in `test/read-tool-group.test.ts`.
+- Proof: full-result paths in `test/tools/read-renderer.test.ts`.
+
+#### `MOMP-READ-RAW` — Source-specific raw Read representations
+
+- Disposition: `UPSTREAM-INTEGRIERT`.
+- Contract: `:raw` is a handler-specific representation, not universal byte access or converter bypass.
+- Contract: Documents may still use PDF/Markit conversion under `:raw`.
+- Contract: Notebooks return storage JSON, images retain decoded image-oriented output, and archives return decoded member text.
+- Contract: URLs return the response body without JSON, feed, or HTML text shaping after binary handling.
+- Owner: upstream `packages/coding-agent/src/prompts/tools/read.md` and source-kind Read handlers.
+- Required action: retain only source-specific raw guidance and behavior deltas at current upstream Read owners.
+- Proof: `test/tools/read-guidance.test.ts` and source-kind raw behavior tests.
+
+#### Experiments and non-contract artifacts
+
+Changelogs, formatting-only commits, test migrations, proposals, and experiments do not justify runtime retention.
+Probes, benchmarks, experiments, migration scaffolding, and diagnostic scripts MUST have a current repeatable consumer.
+Classify retained candidates during every full upgrade as `NICHT-CONTRACT-AKTIV` or `NICHT-CONTRACT-ENTFERNEN`.
+`NICHT-CONTRACT-AKTIV` requires an operator workflow, release gate, performance decision, or regression investigation.
+`NICHT-CONTRACT-ENTFERNEN` requires complete removal during the same full upgrade or authorized cleanup.
+The closure includes scripts, prompts, workers, package commands, fixtures, generated output, and documentation.
+NEVER retain experimental code because it might become useful later.
+
+Current non-contract artifact states: none.
+
+### Upstream Cutover and Delta Lifecycle
+
+`upstream` means the canonical `can1357/oh-my-pi` repository.
+`origin` means the user-owned fork.
+An upstream update preserves active MOMP contracts, not historical patch shapes.
+Upstream moved an ownership boundary? Reimplement the required contract at the new boundary.
+NEVER force obsolete hunks, wrappers, or file layouts onto current upstream structure.
+Resolve semantic overlap in favor of upstream unless an active MOMP contract requires a difference.
+
+Fetching, merging, or rebasing upstream does not itself remove obsolete fork behavior.
+Judge every resulting delta against current upstream content and active contracts.
+User requests a file be “upstream”? Use its exact current `upstream/main` content.
+
+Every retained delta MUST have one current owner and one observable contract.
+Removing a delta MUST remove or migrate its complete dependency closure.
+The closure includes code, imports, exports, callers, prompts, tests, configuration, and build wiring.
+It also includes generated artifacts, documentation, and changelog entries when applicable.
+Delete obsolete aliases, shims, fallback paths, and fork-side copies during the cutover.
+NEVER preserve an obsolete path solely to reduce the apparent removal.
+
+When upstream implements an equivalent contract:
+
+1. Verify upstream behavior against the MOMP contract.
+2. Replace fork-owned call sites with the upstream owner.
+3. Remove the redundant implementation and its complete closure.
+4. Remove or migrate fork tests that no longer defend a distinct contract.
+5. Verify upstream-owned files without remaining deltas against current upstream.
+
+A fork-only closure requires either the active contract or complete removal.
+NEVER leave broken imports, callers, tests, configuration, or documentation through a partial cutover.
+Prefer a surgical ownership-aligned cutover over reverting a broad integration commit.
+
+### Prompt Delta Policy
+
+Prompt files are upstream-owned by default.
+A MOMP prompt delta MUST defend a current observable model, tool-routing, or operator contract.
+Prompt wording history, personal preference, and token count alone do not justify a permanent delta.
+NEVER propose new progressive disclosure or progressive exposure for prompts, tools, schemas, or capabilities.
+The existing `xd://` catalog mode is the sole settled exception.
+`tools.xdevDocs="catalog"` is the settled MOMP baseline for this repository's use case.
+NEVER propose, require, or repeat `builtins`-versus-`catalog` comparison or A/B measurement unless the user explicitly reopens this decision.
+Keep prompt behavior in static `.md` owners and keep coupled runtime wiring and behavioral tests in the same closure.
+When removing a prompt delta, inspect imports, renderers, tool capability gates, consumers, and contract tests.
+NEVER set a prompt file to upstream while leaving fork runtime code that imports or depends on the removed prompt.
+
+Bundled prompt templates MUST remain byte-identical to upstream unless another active contract requires different model-visible text.
+Dynamic-part inspection uses opt-in counterfactual rendering over structured render data.
+NEVER add diagnostic-only markers to upstream-owned prompt templates.
+Runtime prompt construction keeps counterfactual capture disabled; inspection commands enable it explicitly.
+Render and inspect every behavior-bearing prompt change before completion.
+
+### Source and Release Ownership
+
+- Source: this repository owns MOMP source behavior and the `MOMP_VERSION` fact.
+- Release: `project-momp-upgrader` owns assessment, packaging, publication, installation, and release smoke.
+- Routing: NEVER duplicate the upgrader procedure here; route upgrade, publish, install, and deploy through its contract.
+- Versioning: source behavior changes and release-version bumps MUST remain separate changes.
+- Versioning: complete and verify source behavior before changing `MOMP_VERSION`.
+- Packaging: keep `packages/coding-agent/package.json` close to upstream source metadata.
+- Packaging: fork names, registry metadata, binaries, and publish versions belong to temporary publish staging.
+- Packaging: NEVER hard-code publish-stage identity into source metadata merely to identify a release artifact as MOMP.
+
+Request semantics:
+
+- Source-only change: modify and verify `personal`; do not infer a release or version bump.
+- Source push: publish only the requested source commit; do not infer package publication.
+- Upgrade: run upstream assessment and the full upgrader contract.
+- Publish, install, or deploy: run the full upgrader contract and its smoke gates.
+
+Fork-maintenance completion evidence:
+
+- Name every affected fork contract and disposition.
+- Name the exact upstream or MOMP owner after the change.
+- Report the focused behavioral proof for every retained or removed delta.
+- Prove upstream restoration against current `upstream/main`, not memory or an old commit.
+- NEVER report a cutover complete while orphaned closure elements remain.
+
+## Fork and Upstream Contribution Intent
+
+- Identity: official upstream is [can1357/oh-my-pi](https://github.com/can1357/oh-my-pi).
+- Identity: this checkout is the [MikeeI/oh-my-pi](https://github.com/MikeeI/oh-my-pi) fork.
+- Branches: `personal` owns fork-only agent context, the MOMP patchstack, and durable contribution tracking.
+- Branches: base clean upstream contribution branches on current `upstream/main`.
+- Boundary: keep `AGENTS.md`, `FORMAT.md`, `ISSUES.md`, `issues/`, and other fork-only state out of upstream diffs.
+
+Contribution selection:
+
+1. Prefer a bounded verified pull request when no active implementation owns the correction.
+2. Otherwise comment when a thread owns the same problem or root cause and new evidence advances it.
+3. Otherwise open an issue when durable maintainer discussion is useful.
+4. Otherwise keep the finding `Investigating`.
+
+- Value: support upstream with evidence-backed, high-ROI findings while preserving active MOMP contracts.
+- Value: prioritize bounded corrections with meaningful maintainer or user value and limited regression and review cost.
+- Research: search existing work, follow upstream templates and disclosure rules, and avoid weak or duplicate submissions.
+- Research: reproduce claimed bugs against current upstream and run the narrowest conclusive verification.
+- Scope: publish one coherent root cause per issue, comment, or pull request.
+- Scope: discuss major features and broad architecture or behavior changes in upstream Discord before implementation.
+
+Required skills and authorization:
+
+- Apply `skill-fork-contribution-tracking` for ledger, lifecycle, personal-branch, and upstream handoff work.
+- Apply `skill-maintainer-communication` before external issues, pull requests, reviews, comments, or discussions.
+- Apply `skill-semantic-compression-3-0` when authoring or restructuring tracking content.
+- Apply `skill-git-commit-format` while respecting this repository's commit and contribution conventions.
+- The user selects `Authorized-Work`; NEVER select it on the user's behalf.
+- `Research-and-Reporting` permits issues and comments but no source implementation.
+- `Pull-Request-Implementation` authorizes only the recorded scope.
+- It MAY implement that scope only after research resolves failure boundaries.
+- External publication follows `### External Publication Approval`; local tracking NEVER authorizes an external write.
+
+## Finding and Contribution Ledger
+
+- Intake: agents MUST read root `ISSUES.md` before repository work.
+- Index: `ISSUES.md` owns `Next-Finding-ID` and the compact cross-finding projection.
+- Record: each `issues/ISSUE-NNN.md` owns one root cause, evidence, Next-Action, drafts, and archive record.
+- Schema: `FORMAT.md` owns research, claim basis, lifecycle, drafting, implementation, and publication gates.
+- Allocation: search the index and relevant records for the same symptom and root cause before allocating.
+- Allocation: create the current permanent `ISSUE-NNN`, add its index row, and advance the allocator together.
+- Projection: update the issue record and index together after any projected field, Next-Action, or Archive change.
+- Initial state: use `State: Investigating`, `Authorized-Work: Not-Selected`, and `Publication-Target: Not-Selected`.
+- Initial reference: use `External-Reference: Not published.`.
+- Evidence: label material claims `[O]`, `[S]`, or `[A]` under `FORMAT.md`.
+- Evidence: preserve unmeasured boundaries as prose or an explicit Measurement-Status field.
+- Evidence: verify source claims against current upstream; reproduce user-visible bugs before claiming `[O]`.
+- Readiness: pull-request work MUST be verified, committed, pushed, and `PR-Ready` before external publication.
+- Validation: run the bundled read-only ledger validator after every ledger mutation.
+- Submission: record the final external URL in `External-Reference` immediately after publication.
+
+### External Publication Approval
+
+- Approval gates only external issues, comments, reviews, discussions, and pull request writes.
+- Local ledger creation and updates are not external publication.
+- Before publication, read current upstream policy and show the exact Publication-Target and Publication-Draft.
+- Publish only after the user explicitly approves that exact target and draft.
+- Any target or draft change invalidates prior approval.
+- Without that exact instruction, NEVER comment on GitHub or create a GitHub issue.
+
 ## Default Context
 
 This repo contains multiple packages, but **`packages/coding-agent/`** is the primary focus. Unless otherwise specified, assume work refers to this package.
@@ -25,10 +745,7 @@ This repo contains multiple packages, but **`packages/coding-agent/`** is the pr
 
 ## GitHub
 
-Unless user tells you exactly what to write:
-
-- **Never comment on GitHub** (issues, PRs, discussions).
-- **Never create issues on GitHub**.
+`### External Publication Approval` is the sole contract for GitHub writes.
 
 ## Code Quality
 

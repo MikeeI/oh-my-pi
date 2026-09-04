@@ -5,6 +5,8 @@ import { Container, Text } from "@oh-my-pi/pi-tui";
 import { InternalUrlRouter, XD_URL_PREFIX } from "../../internal-urls";
 import { getLanguageFromPath, theme } from "../../modes/theme/theme";
 import { parseLineRanges, selectorLineRanges, splitPathAndSel } from "../../tools/path-utils";
+import type { ReadToolDetails } from "../../tools/read";
+import { formatReadTokenSuffix } from "../../tools/read-token";
 import { PREVIEW_LIMITS, shortenPath } from "../../tools/render-utils";
 import { fileHyperlink, renderCodeCell, tryResolveInternalUrlSync } from "../../tui";
 import { canonicalizeMessage } from "../../utils/thinking-display";
@@ -32,14 +34,19 @@ export function readArgsHaveTarget(args: unknown): boolean {
 /**
  * Whether a read collapses into the compact {@link ReadToolGroupComponent}
  * rather than a full tool execution. Filesystem/external targets always
- * collapse; other internal URLs (`skill://`, `agent://`, …) render full so
- * their resolved content is visible. `xd://` device reads are the exception —
- * they list devices/docs and read better in the compact grouped view.
+ * collapse, as do `xd://` device-listing and `skill://` loads so they render
+ * compactly like a tool while staying expandable. Other internal URLs
+ * (`agent://`, `omp://`, …) render full so their resolved content stays
+ * visible.
  */
 export function readArgsCollapseIntoGroup(args: unknown): boolean {
 	const target = readArgsTarget(args);
 	if (target === undefined) return false;
-	return target.startsWith(XD_URL_PREFIX) || !InternalUrlRouter.instance().canHandle(target);
+	return (
+		target.startsWith(XD_URL_PREFIX) ||
+		target.startsWith("skill://") ||
+		!InternalUrlRouter.instance().canHandle(target)
+	);
 }
 
 /**
@@ -79,32 +86,11 @@ type ReadToolSuffixResolution = {
 	to: string;
 };
 
-type ReadToolResultDetails = {
-	resolvedPath?: string;
-	suffixResolution?: {
-		from?: string;
-		to?: string;
-	};
-	conflictCount?: number;
-	displayReadTargets?: unknown;
-	displayContent?: {
-		text?: string;
-		startLine?: number;
-		lineNumbers?: Array<number | null>;
-	};
-	meta?: {
-		source?: {
-			type?: string;
-			value?: string;
-		};
-	};
-};
-
 type ReadToolGroupOptions = {
 	showContentPreview?: boolean;
 };
 
-function getSuffixResolution(details: ReadToolResultDetails | undefined): ReadToolSuffixResolution | undefined {
+function getSuffixResolution(details: ReadToolDetails | undefined): ReadToolSuffixResolution | undefined {
 	if (typeof details?.suffixResolution?.from !== "string" || typeof details.suffixResolution.to !== "string") {
 		return undefined;
 	}
@@ -122,6 +108,7 @@ type ReadEntry = {
 	conflictCount?: number;
 	codeStartLine?: number;
 	codeLineNumbers?: Array<number | null>;
+	readTextTokens?: number;
 };
 
 type ReadUsageRow = {
@@ -159,7 +146,7 @@ const READ_STATUS_RANK: Record<ReadEntry["status"], number> = {
 
 const URL_LIKE_RE = /^[a-z][a-z0-9+.-]*:\/\//i;
 
-function getDisplayReadTargets(details: ReadToolResultDetails | undefined): string[] | undefined {
+function getDisplayReadTargets(details: ReadToolDetails | undefined): string[] | undefined {
 	if (!Array.isArray(details?.displayReadTargets)) return undefined;
 	const targets = details.displayReadTargets
 		.filter((target): target is string => typeof target === "string")
@@ -174,12 +161,12 @@ function displayPathWithSuffixResolution(currentPath: string, suffixResolution: 
 	return `${suffixResolution.to}:${currentSelector}`;
 }
 
-function readSourceFsPath(details: ReadToolResultDetails | undefined): string | undefined {
+function readSourceFsPath(details: ReadToolDetails | undefined): string | undefined {
 	const source = details?.meta?.source;
 	return source?.type === "path" && typeof source.value === "string" ? source.value : undefined;
 }
 
-function readResultLinkPath(details: ReadToolResultDetails | undefined): string | undefined {
+function readResultLinkPath(details: ReadToolDetails | undefined): string | undefined {
 	return typeof details?.resolvedPath === "string" ? details.resolvedPath : readSourceFsPath(details);
 }
 
@@ -345,9 +332,8 @@ export class ReadToolGroupComponent extends Container implements ToolExecutionHa
 	// completion) so no late result is coming. Set via `seal()`.
 	#sealed = false;
 	// Post-finalize mutation counter (FinalizableBlock.getTranscriptBlockVersion):
-	// a finalized group can still change — a late read result landing after the
-	// run broke, seal(), or an expansion toggle — and the transcript's
-	// width-epoch resolution and committed-render bypass must observe it.
+	// a finalized group can still change after a late result, seal(), or expansion
+	// toggle, so accepted-tape drift detection preserves bytes already in history.
 	#blockVersion = 0;
 
 	constructor(options: ReadToolGroupOptions = {}) {
@@ -377,6 +363,20 @@ export class ReadToolGroupComponent extends Container implements ToolExecutionHa
 			if (entry.status === "pending") return true;
 		}
 		return false;
+	}
+
+	#formatReadTokenSuffix(entries: Iterable<ReadEntry>): string {
+		if (this.#hasPendingEntries()) return "";
+		const uniqueEntries = new Map<string, ReadEntry>();
+		for (const entry of entries) uniqueEntries.set(entry.toolCallId, entry);
+		if (uniqueEntries.size === 0) return "";
+
+		let total = 0;
+		for (const entry of uniqueEntries.values()) {
+			if (entry.readTextTokens === undefined) return "";
+			total += entry.readTextTokens;
+		}
+		return formatReadTokenSuffix(total, theme);
 	}
 
 	finalize(): void {
@@ -448,7 +448,7 @@ export class ReadToolGroupComponent extends Container implements ToolExecutionHa
 		if (!entry) return;
 		if (isPartial) return;
 		this.#blockVersion++;
-		const details = result.details as ReadToolResultDetails | undefined;
+		const details = result.details as ReadToolDetails | undefined;
 		const suffixResolution = getSuffixResolution(details);
 		const displayPaths = getDisplayReadTargets(details);
 		entry.linkPath = readResultLinkPath(details);
@@ -463,6 +463,11 @@ export class ReadToolGroupComponent extends Container implements ToolExecutionHa
 		const conflictCount =
 			typeof details?.conflictCount === "number" && details.conflictCount > 0 ? details.conflictCount : undefined;
 		entry.conflictCount = conflictCount;
+		const readTextTokens = details?.readTextTokens;
+		entry.readTextTokens =
+			typeof readTextTokens === "number" && Number.isSafeInteger(readTextTokens) && readTextTokens >= 0
+				? readTextTokens
+				: undefined;
 		entry.status = result.isError ? "error" : suffixResolution ? "warning" : "success";
 		// Store clean display content for preview/expanded display when the read
 		// tool provides it; fall back to model-facing text for legacy results.
@@ -554,7 +559,10 @@ export class ReadToolGroupComponent extends Container implements ToolExecutionHa
 			if (!this.#shouldRenderPreviewRow(row)) {
 				const statusSymbol = this.#formatStatus(this.#statusForTargets(row.targets));
 				const pathDisplay = this.#formatRowPath(row);
-				const lines = [` ${statusSymbol} ${theme.fg("toolTitle", theme.bold("Read"))} ${pathDisplay}`.trimEnd()];
+				const tokenSuffix = this.#formatReadTokenSuffix(row.targets.map(target => target.entry));
+				const lines = [
+					` ${statusSymbol} ${theme.fg("toolTitle", theme.bold("Read"))} ${pathDisplay}${tokenSuffix}`.trimEnd(),
+				];
 				const usageRows = this.#usageRowsBySummaryRow(displayRows).get(0) ?? [];
 				this.#appendUsageRows(lines, usageRows, "   ");
 				this.#text.setText(lines.join("\n"));
@@ -567,7 +575,7 @@ export class ReadToolGroupComponent extends Container implements ToolExecutionHa
 			return;
 		}
 
-		const header = `${theme.fg("toolTitle", theme.bold("Read"))}${theme.fg("dim", ` (${displayRows.length})`)}`;
+		const header = `${theme.fg("toolTitle", theme.bold("Read"))}${theme.fg("dim", ` (${displayRows.length})`)}${this.#formatReadTokenSuffix(entries)}`;
 		const lines = [` ${theme.format.bullet} ${header}`];
 		const entriesWithoutPreview = entries.filter(entry => !this.#shouldRenderPreview(entry));
 		const summaryTargets = this.#displayTargetsForEntries(entriesWithoutPreview);
@@ -817,7 +825,9 @@ export class ReadToolGroupComponent extends Container implements ToolExecutionHa
 					linkPath: readTargetLinkPath(split.path, entry.linkPath),
 				})
 			: "";
-		const title = pathDisplay ? `Read ${pathDisplay}` : "Read";
+		const title = pathDisplay
+			? `Read ${pathDisplay}${this.#formatReadTokenSuffix([entry])}`
+			: `Read${this.#formatReadTokenSuffix([entry])}`;
 		let cachedWidth: number | undefined;
 		let cachedLines: string[] | undefined;
 		const expanded = this.#expanded;

@@ -31,11 +31,15 @@ export type SpecialHandler = (
 export const MAX_OUTPUT_CHARS = 500_000;
 export const MAX_BYTES = 50 * 1024 * 1024;
 
+const CHROME_MAJOR_VERSION = "152";
+const GOOGLEBOT_CHROME_VERSION = "152.0.7977.64";
+const CURL_VERSION = "8.21.0";
+
 const USER_AGENTS = [
-	"curl/8.0",
-	"Mozilla/5.0 (compatible; TextBot/1.0)",
-	"Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36",
-];
+	`Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/${CHROME_MAJOR_VERSION}.0.0.0 Safari/537.36`,
+	`Mozilla/5.0 (Linux; Android 6.0.1; Nexus 5X Build/MMB29P) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/${GOOGLEBOT_CHROME_VERSION} Mobile Safari/537.36 (compatible; Googlebot/2.1; +http://www.google.com/bot.html)`,
+	`curl/${CURL_VERSION}`,
+] as const;
 
 function isBotBlocked(status: number, content: string): boolean {
 	if (status === 403 || status === 503) {

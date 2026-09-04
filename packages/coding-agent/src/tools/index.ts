@@ -43,6 +43,7 @@ import { AstGrepTool } from "./ast-grep";
 import { BashTool } from "./bash";
 import { type BuiltinToolName, type HiddenToolName, normalizeToolNames } from "./builtin-names";
 import { type CheckpointState, CheckpointTool, type CompletedRewindState, RewindTool } from "./checkpoint";
+import { ConversationSearchTool } from "./conversation-search";
 import { DebugTool } from "./debug";
 import { EvalTool } from "./eval";
 import { resolveEvalBackends } from "./eval-backends";
@@ -80,6 +81,8 @@ export * from "./browser";
 export * from "./checkpoint";
 export * from "./computer";
 export * from "./computer/supervisor";
+export * from "./conversation-search";
+export * from "./conversation-search-format";
 export * from "./debug";
 export * from "./essential-tools";
 export * from "./eval";
@@ -116,6 +119,7 @@ export type ContextFileEntry = {
 	path: string;
 	content: string;
 	depth?: number;
+	kind?: "agents-md";
 };
 
 /** Image attachment handle exposed to tools for user-facing labels such as `Image #1`. */
@@ -469,6 +473,7 @@ export const BUILTIN_TOOLS: Record<BuiltinToolName, ToolFactory> = {
 	github: GithubTool.createIf,
 	glob: s => new GlobTool(s, { rootPathAlias: true }),
 	grep: s => new GrepTool(s),
+	conversation_search: ConversationSearchTool.createIf,
 	lsp: LspTool.createIf,
 	checkpoint: CheckpointTool.createIf,
 	rewind: RewindTool.createIf,
@@ -627,6 +632,7 @@ export async function createTools(session: ToolSession, toolNames?: string[]): P
 			return (!includeYield || session.prewalkArmed === true) && session.settings.get("todo.enabled");
 		if (name === "glob") return session.settings.get("glob.enabled");
 		if (name === "grep") return session.settings.get("grep.enabled");
+		if (name === "conversation_search") return (session.taskDepth ?? 0) === 0;
 		if (name === "github") return session.settings.get("github.enabled");
 		if (name === "ast_grep") return session.settings.get("astGrep.enabled");
 		if (name === "ast_edit") return session.settings.get("astEdit.enabled");

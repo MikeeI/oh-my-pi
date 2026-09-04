@@ -1,6 +1,21 @@
 # Changelog
 
 ## [Unreleased]
+### Added
+
+- Added offline Codex Main wire-request hashes and a separate synthetic GPT-5.6 breakpoint endpoint probe.
+- Added exact Read token totals to completed grouped headers, inline previews, and full result frames.
+
+### Changed
+
+- URL reads now try current Chrome, Googlebot, then curl identities when bot blocks require a fallback.
+- Read batches known local, file-URL, and non-MCP internal targets while keeping HTTP and opaque MCP resources separate.
+
+### Fixed
+
+- Fixed finalized Assistant tails disappearing after terminal acceptance or behind active transcript predecessors.
+- Restored PageUp access to native tmux history from a focused empty editor without intercepting drafts or overlays.
+- GitHub failures now retain structured API diagnostics, identify failed file reads, and clarify Boolean search syntax.
 
 ## [18.1.12] - 2026-09-06
 
@@ -933,6 +948,20 @@
 - `/retry` and `/handoff` now work over ACP, so editor clients (Zed) list them and can run them instead of sending the text to the model.
 - Added `qwenTemplateReasoningEffort` to the `models.yml` `compat` schema, so the auto-enabled Qwen 3.8+ template effort dialect (`chat_template_kwargs.reasoning_effort`) can be switched off per provider/model for strict local servers that reject unknown `chat_template_kwargs`.
 - Extensions can provide a normalized `usage` provider through `pi.registerProvider()`. Its reports now flow through AuthStorage caching, history, and usage displays, and the override is removed when the extension provider is unregistered.
+### Added
+
+- `bun --cwd packages/coding-agent run profile:runtime` captures repeatable CPU, heap, test-timing, and bundle evidence.
+
+### Changed
+
+- Eval guidance keeps inspection with Read and routes in-cell concurrency through context-safe helpers.
+- Hub guidance, schema hints, and examples use less repeated context while clarifying peer waits and process defaults.
+- `bun run bench:hub-routing` measures exact Hub call routing across five Codex GPT models.
+
+### Fixed
+
+- Fixed the Eval tool description implying that `agent()` children share parent kernel state; only `task` subagents inherit Eval state.
+- Fixed Bash tool guidance implying that raising the job timeout extends foreground waiting past the auto-background threshold.
 
 ## [17.4.0] - 2026-08-20
 
@@ -971,6 +1000,9 @@
 - Cancelled prompts during pre-stream turn setup restore the text and image attachments to the editor.
 - `top` builtin accepts single-dash macOS flags such as `-pid` and `-stats`.
 - GNU/BSD compat sweep across built-in shell utilities (`timeout`, `diff`, `find`, `date`, `tail`, `head`, `rg`, `stat`, `truncate`, `cksum`, `sleep`, `which`, `nohup`, `kill`).
+### Fixed
+
+- Corrected Read `:raw` guidance to describe source-specific representations instead of universal byte access.
 
 ## [17.3.8] - 2026-08-19
 
@@ -1053,6 +1085,16 @@
 ### Fixed
 
 - Fixed `omp stats` and `/stats` dashboards being unreachable from container hosts by accepting an explicit `--host` bind address while preserving the `127.0.0.1` default.
+### Added
+
+- Added `momp stats --summary` multi-range usage rendering, self-contained in the `momp` package so it survives global installs.
+- Added a reproducible local conversation-search benchmark with fixed evaluator inputs and corpus-stability guardrails.
+- Added Main-only `conversation_search` for lexical lookup across persisted user and Assistant text.
+  It defaults to the current project and last 10 days, excludes tool noise, and returns bounded text or JSON.
+
+### Changed
+
+- Collapsed `read skill://` calls into the compact grouped read view (like `xd://` device reads) instead of rendering full tool-execution cards, so loaded skill content displays compactly while remaining expandable.
 
 ## [17.3.5] - 2026-08-16
 
@@ -1150,6 +1192,14 @@
 - Fixed the parent TUI stalling after a subagent submits its result until terminal focus or resize wakes the event loop ([#8462](https://github.com/can1357/oh-my-pi/issues/8462)).
 - Fixed `omp update` misclassifying foreign npm/bun bin aliases while preserving package-manager ownership for globally linked checkouts ([#8468](https://github.com/can1357/oh-my-pi/issues/8468)).
 - Fixed `read` hashline headers collapsing nested in-workspace paths to the bare basename, which let a same-basename file at the session cwd capture a verbatim follow-up `edit` and deterministically reject it with `hash is not from this session`. Headers now retain the workspace-relative path (e.g. `[src/settings.json#0063]`) ([#8482](https://github.com/can1357/oh-my-pi/issues/8482)).
+### Changed
+
+- Expanded `omp stats --summary` with shared mobile-safe rolling 24-hour, 7-day, and 30-day usage blocks.
+- Added detailed agent, model, and folder consumption to the console summary.
+
+### Fixed
+
+- Kept stats sync diagnostics on stderr so `omp stats --json` emits only its JSON payload on stdout.
 
 ## [17.3.1] - 2026-08-13
 

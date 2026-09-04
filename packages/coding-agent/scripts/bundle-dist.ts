@@ -3,6 +3,7 @@
 import * as fs from "node:fs/promises";
 import * as path from "node:path";
 import { isEnoent } from "@oh-my-pi/pi-utils";
+import { bin, name, version } from "../package.json" with { type: "json" };
 import { buildDocsIndexPayload } from "./generate-docs-index";
 
 const packageDir = path.join(import.meta.dir, "..");
@@ -30,6 +31,21 @@ const ALWAYS_EXTERNAL = [
 // @ark/schema is patched, so it — and arktype, which pulls @ark/schema — stay
 // bundled).
 const RUNTIME_EXTERNAL = ["puppeteer-core", "@babel/parser"];
+const sourceBinaryName = Object.keys(bin)[0] ?? "omp";
+const bundleIdentityOverride = {
+	name: Bun.env.PI_BUNDLE_PACKAGE_NAME,
+	version: Bun.env.PI_BUNDLE_PACKAGE_VERSION,
+	binary: Bun.env.PI_BUNDLE_BINARY_NAME,
+};
+const configuredIdentityFields = Object.values(bundleIdentityOverride).filter(value => value !== undefined).length;
+if (configuredIdentityFields !== 0 && configuredIdentityFields !== 3) {
+	throw new Error(
+		"PI_BUNDLE_PACKAGE_NAME, PI_BUNDLE_PACKAGE_VERSION, and PI_BUNDLE_BINARY_NAME must be supplied together",
+	);
+}
+const bundlePackageName = bundleIdentityOverride.name ?? name;
+const bundlePackageVersion = bundleIdentityOverride.version ?? version;
+const bundleBinaryName = bundleIdentityOverride.binary ?? sourceBinaryName;
 
 async function runCommand(command: string[]): Promise<void> {
 	const proc = Bun.spawn(command, {
@@ -101,6 +117,9 @@ async function main(): Promise<void> {
 			external: [...ALWAYS_EXTERNAL, ...RUNTIME_EXTERNAL],
 			define: {
 				"process.env.PI_BUNDLED": JSON.stringify("true"),
+				"process.env.PI_BUNDLED_PACKAGE_NAME": JSON.stringify(bundlePackageName),
+				"process.env.PI_BUNDLED_PACKAGE_VERSION": JSON.stringify(bundlePackageVersion),
+				"process.env.PI_BUNDLED_BINARY_NAME": JSON.stringify(bundleBinaryName),
 				"process.env.PI_DOCS_EMBED": JSON.stringify(docsPayload.payload),
 			},
 			minify: {

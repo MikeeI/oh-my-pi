@@ -35,6 +35,31 @@ class Block implements Component {
 		return this.#rows;
 	}
 }
+class VersionedBlock implements Component {
+	#rows: string[];
+	#version = 0;
+
+	constructor(rows: string[]) {
+		this.#rows = rows;
+	}
+
+	isTranscriptBlockFinalized(): boolean {
+		return true;
+	}
+
+	getTranscriptBlockVersion(): number {
+		return this.#version;
+	}
+
+	setRows(rows: string[]): void {
+		this.#rows = rows;
+		this.#version++;
+	}
+
+	render(): readonly string[] {
+		return this.#rows;
+	}
+}
 
 /** A live block the container recognizes as dynamic tool-activity. */
 class ToolBlock extends Block {
@@ -117,7 +142,7 @@ const finalAnswer: AssistantMessage = {
 	role: "assistant",
 	content: [
 		{ type: "thinking", thinking: "Reasoning first" },
-		{ type: "text", text: "## Implemented" },
+		{ type: "text", text: "Q1\nQ2\nQ3\nQ4" },
 	],
 	api: "openai-codex-responses",
 	provider: "openai-codex",
@@ -358,7 +383,7 @@ describe("TranscriptContainer", () => {
 
 		expect(transcript.renderViewport(80, 2, frame)).toEqual(["first", "second"]);
 		expect(transcript.canAdmit(2)).toBe(false);
-		expect(transcript.renderViewport(80, 1, frame)).toEqual(["1 more transcript blocks active"]);
+		expect(transcript.renderViewport(80, 1, frame)).toEqual(["second"]);
 	});
 	it("does not report settled resume backlog as active", () => {
 		const transcript = new TranscriptContainer();
@@ -398,18 +423,27 @@ describe("TranscriptContainer", () => {
 		expect(out).toEqual(["A3", "A4", "B1", "B2", "B3", "B4", "C1", "C2", "C3", "C4"]);
 	});
 
-	it("keeps a completed assistant answer visible behind an active prefix", () => {
+	it("keeps the complete finalized Assistant tail reachable behind active predecessors", () => {
 		const transcript = new TranscriptContainer();
 		transcript.addChild(new Block(["stale active"], false));
 		transcript.addChild(new AssistantMessageComponent(finalAnswer));
 		transcript.addChild(new Block(["continued turn"], false));
 		transcript.addChild(new Block(["task running"], false));
 
-		expect(transcript.peekFinalizedBatch(80, 3)).toBeUndefined();
-		const rows = transcript.renderViewport(80, 3, frame);
-		expect(rows[0]).toBe("2 more transcript blocks active");
-		expect(Bun.stripANSI(rows[1] ?? "").trim()).toBe("Implemented");
-		expect(rows[2]).toBe("task running");
+		expect(transcript.peekFinalizedBatch(80, 6)).toBeUndefined();
+		expect(transcript.renderViewport(80, 6, frame).map(row => Bun.stripANSI(row).trim())).toEqual([
+			"2 more transcript blocks active",
+			"Q1",
+			"Q2",
+			"Q3",
+			"Q4",
+			"task running",
+		]);
+		expect(transcript.renderViewport(80, 3, frame).map(row => Bun.stripANSI(row).trim())).toEqual([
+			"2 more transcript blocks active",
+			"Q4",
+			"task running",
+		]);
 	});
 
 	it("gives surplus rows to assistant text before a growing tool card (issue 9718)", () => {
@@ -486,6 +520,28 @@ describe("TranscriptContainer", () => {
 		transcript.beginReplay();
 		expect(transcript.peekFinalizedBatch(80, 10)?.rows).toEqual(["committed", ""]);
 		expect(transcript.renderViewport(80, 10, frame)).toEqual(["active"]);
+	});
+
+	it("replays accepted bytes after pre-ack or post-ack component drift without duplicating replay", () => {
+		for (const mutationTiming of ["before-ack", "after-ack"] as const) {
+			const transcript = new TranscriptContainer();
+			const block = new VersionedBlock(["FINAL-TRAILING-Q4"]);
+			transcript.addChild(block);
+			const committed = transcript.peekFinalizedBatch(80, 0)!;
+			if (mutationTiming === "before-ack") block.setRows(["shortened"]);
+			transcript.acknowledgeFinalizedBatch(committed.id);
+			if (mutationTiming === "after-ack") block.setRows(["shortened"]);
+
+			expect(transcript.render(80)).toEqual(["shortened"]);
+			expect(transcript.renderTail(80, 5)).toEqual(["FINAL-TRAILING-Q4"]);
+			transcript.beginReplay();
+			const replay = transcript.peekReplayBatch(80)!;
+			expect(replay.rows).toEqual(["FINAL-TRAILING-Q4", ""]);
+			transcript.acknowledgeFinalizedBatch(replay.id);
+
+			transcript.beginReplay();
+			expect(transcript.peekReplayBatch(80)?.rows).toEqual(["FINAL-TRAILING-Q4", ""]);
+		}
 	});
 	it("renders exactly the trailing semantic rows without walking the full ledger", () => {
 		const transcript = new TranscriptContainer();

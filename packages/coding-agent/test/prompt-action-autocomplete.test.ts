@@ -4,6 +4,7 @@ import {
 	setKeyHintPlatform,
 } from "@oh-my-pi/pi-coding-agent/config/keybindings";
 import { createPromptActionAutocompleteProvider } from "@oh-my-pi/pi-coding-agent/modes/prompt-action-autocomplete";
+import { BUILTIN_SLASH_COMMAND_DEFS } from "@oh-my-pi/pi-coding-agent/slash-commands/builtin-registry";
 import { getSelectListTheme } from "@oh-my-pi/pi-coding-agent/modes/theme/theme";
 import { KeybindingsManager, SelectList, setKeybindings, TUI_KEYBINDINGS } from "@oh-my-pi/pi-tui";
 
@@ -119,9 +120,11 @@ describe("prompt action autocomplete", () => {
 		expect(suggestions).toBeNull();
 	});
 
-	it("treats # prompt-action tokens as literal text inside slash command arguments without completions", async () => {
+	it("uses the registered rename policy to keep # prompt-action tokens literal", async () => {
+		const rename = BUILTIN_SLASH_COMMAND_DEFS.find(command => command.name === "rename");
+		if (!rename) throw new Error("Expected registered /rename command");
 		const provider = createPromptActionAutocompleteProvider({
-			commands: [{ name: "rename", description: "Rename current session", allowArgs: true }],
+			commands: [rename],
 			basePath: "/tmp",
 			keybindings: AppKeybindingsManager.inMemory(),
 			copyCurrentLine: () => {},
@@ -137,6 +140,34 @@ describe("prompt action autocomplete", () => {
 		const suggestions = await provider.getSuggestions([line], 0, line.length);
 
 		expect(suggestions).toBeNull();
+	});
+
+	it("returns prompt actions inside prompt-producing slash command arguments", async () => {
+		const provider = createPromptActionAutocompleteProvider({
+			commands: [
+				{
+					name: "review",
+					description: "Review files",
+					allowArgs: true,
+					argumentCompletionMode: "prompt",
+				},
+			],
+			basePath: "/tmp",
+			keybindings: AppKeybindingsManager.inMemory(),
+			copyCurrentLine: () => {},
+			copyPrompt: () => {},
+			undo: () => {},
+			moveCursorToMessageEnd: () => {},
+			moveCursorToMessageStart: () => {},
+			moveCursorToLineStart: () => {},
+			moveCursorToLineEnd: () => {},
+		});
+
+		const line = "/review inspect #copy";
+		const suggestions = await provider.getSuggestions([line], 0, line.length);
+
+		expect(suggestions?.prefix).toBe("#copy");
+		expect(suggestions?.items.map(item => item.label)).toEqual(["Copy current line", "Copy whole prompt"]);
 	});
 
 	it("returns # prompt-action completions for matched slash commands that reject arguments", async () => {

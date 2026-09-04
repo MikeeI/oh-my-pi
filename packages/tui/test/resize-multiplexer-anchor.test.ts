@@ -482,6 +482,26 @@ describe("resize anchoring inside a terminal multiplexer", () => {
 		expect(Number(cup![1])).toBe(12);
 		tui.stop();
 	});
+
+	it("starts a new transaction for changed geometry during post-settle suppression", () => {
+		const { terminal, tui, renderScheduler, writes } = startRig();
+		terminal.resize(40, 16);
+		renderScheduler.settle();
+		renderScheduler.settle();
+		renderScheduler.settle();
+
+		writes.length = 0;
+		terminal.resize(40, 20);
+		expect(writes.join("")).toContain("\x1b[?1049h");
+
+		renderScheduler.settle();
+		renderScheduler.settle();
+		renderScheduler.settle();
+		writes.length = 0;
+		terminal.resize(40, 20);
+		expect(writes.join("")).not.toContain("\x1b[?1049h");
+		tui.stop();
+	});
 });
 
 // Regression coverage for the CPR probe's pre-erase stash on direct terminals:

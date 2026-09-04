@@ -1,0 +1,557 @@
+import { describe, expect, test } from "bun:test";
+import * as path from "node:path";
+import { countTokens, Encoding } from "@oh-my-pi/pi-natives";
+import { TempDir } from "@oh-my-pi/pi-utils";
+import type { CliConfig } from "@oh-my-pi/pi-utils/cli";
+import SystemPromptCommand, {
+	formatInspectOutput,
+	type SubagentInspectTarget,
+	type SystemPromptInspection,
+} from "../src/commands/system-prompt";
+import { buildSystemPrompt, type DynamicPromptPart, type SystemPromptToolMetadata } from "../src/system-prompt";
+
+const TEST_CONFIG: CliConfig = {
+	bin: "omp",
+	version: "0.0.0-test",
+	commands: new Map(),
+};
+
+const CLI_ENTRY = path.join(import.meta.dir, "..", "src", "cli.ts");
+const PIPE_BUFFER_BYTES = 64 * 1024;
+const LARGE_PROMPT_BYTES = PIPE_BUFFER_BYTES + 32 * 1024;
+
+const tools = new Map<string, SystemPromptToolMetadata>([
+	["read", { wireName: "read", label: "Read", description: "Read files" }],
+	["grep", { wireName: "grep", label: "Grep", description: "Search file contents" }],
+	["glob", { wireName: "glob", label: "Glob", description: "Find paths" }],
+	["lsp", { wireName: "lsp", label: "LSP", description: "Language server" }],
+	["ast_grep", { wireName: "ast_grep", label: "AST Grep", description: "Search syntax trees" }],
+	["ast_edit", { wireName: "ast_edit", label: "AST Edit", description: "Rewrite syntax trees" }],
+	["inspect_image", { wireName: "inspect_image", label: "Inspect Image", description: "Inspect images" }],
+	["task", { wireName: "task", label: "Task", description: "Subagents" }],
+]);
+
+function part(parts: DynamicPromptPart[], id: string): DynamicPromptPart {
+	const found = parts.find(p => p.id === id);
+	expect(found).toBeDefined();
+	return found!;
+}
+
+describe("system prompt inspect metadata", () => {
+	test("attributes every inspectable fragment to its provider block", async () => {
+		const result = await buildSystemPrompt({
+			cwd: "/tmp/inspect-project",
+			tools,
+			captureDynamicParts: true,
+			toolNames: ["read", "grep", "glob", "lsp", "ast_grep", "ast_edit", "inspect_image", "task"],
+			skills: [
+				{
+					name: "skill-a",
+					description: "Skill A",
+					filePath: "/tmp/skill-a/SKILL.md",
+					baseDir: "/tmp/skill-a",
+					source: "native:user",
+				},
+			],
+			rules: [{ name: "rule-a", description: "Rule A", path: "rule://rule-a", globs: ["**/*.ts"] }],
+			alwaysApplyRules: [{ name: "always-a", content: "Always rule body", path: "rule://always-a" }],
+			contextFiles: [{ path: "/tmp/inspect-project/AGENTS.md", content: "Agent context" }],
+			workspaceTree: {
+				rootPath: "/tmp/inspect-project",
+				rendered: ".\n  - package.json",
+				truncated: true,
+				totalLines: 2,
+				agentsMdFiles: ["nested/AGENTS.md"],
+			},
+			includeWorkspaceTree: true,
+			appendSystemPrompt: "Memory text\n\nMCP text\n\nAuto-learn text",
+			appendSystemPromptParts: [
+				{ id: "memory-instructions", source: "memory", text: "Memory text" },
+				{ id: "mcp-server-instructions", source: "mcp", text: "MCP text" },
+				{ id: "auto-learn-instructions", source: "auto-learn", text: "Auto-learn text" },
+			],
+			intentField: "i",
+			eagerTasks: true,
+			secretsEnabled: true,
+			renderMermaid: true,
+			xdevTools: [{ name: "inspect-device", summary: "Inspect device" }],
+			xdevDocs: "XDEV_INSPECT_DOCS",
+			activeRepoContext: {
+				cwd: "/tmp/inspect-project",
+				repoRoot: "/tmp/inspect-project/repo",
+				relativeRepoRoot: "repo",
+				source: "single-direct-child-repo",
+			},
+		});
+
+		expect(result.systemPrompt).toHaveLength(3);
+		expect(result.dynamicParts.map(promptPart => promptPart.id)).toEqual(
+			expect.arrayContaining([
+				"mermaid",
+				"skills",
+				"always-apply-rules",
+				"rules",
+				"tool-inventory",
+				"intent-tracing",
+				"secrets",
+				"images",
+				"tool-priority",
+				"ast-tools",
+				"eager-tasks",
+				"xdev-tools",
+				"workstation",
+				"context-files",
+				"dir-context",
+				"workspace-tree",
+				"append-prompt",
+				"memory-instructions",
+				"mcp-server-instructions",
+				"auto-learn-instructions",
+				"active-repo-context",
+			]),
+		);
+		expect(part(result.dynamicParts, "skills").text).toContain("skill-a: Skill A");
+		expect(part(result.dynamicParts, "rules").text).toContain("rule-a");
+		expect(part(result.dynamicParts, "always-apply-rules").text).toContain("Always rule body");
+		expect(part(result.dynamicParts, "context-files").text).toContain("Agent context");
+		expect(part(result.dynamicParts, "workspace-tree").text).toContain("use `glob`/`read` to drill in");
+		expect(part(result.dynamicParts, "tool-priority").text).toContain("Regex search/target location");
+		expect(part(result.dynamicParts, "tool-priority").text).toContain("Structure mapping/globbing");
+		expect(part(result.dynamicParts, "mermaid").text).toContain("```mermaid");
+		expect(part(result.dynamicParts, "xdev-tools").text).toContain("XDEV_INSPECT_DOCS");
+		expect(part(result.dynamicParts, "xdev-tools").text).toContain("# xd:// Tool Devices");
+		expect(part(result.dynamicParts, "memory-instructions")).toMatchObject({
+			source: "memory",
+			providerBlockIndex: 1,
+		});
+		expect(part(result.dynamicParts, "mcp-server-instructions")).toMatchObject({
+			source: "mcp",
+			providerBlockIndex: 1,
+		});
+		expect(part(result.dynamicParts, "auto-learn-instructions")).toMatchObject({
+			source: "auto-learn",
+			providerBlockIndex: 1,
+		});
+		expect(part(result.dynamicParts, "active-repo-context")).toMatchObject({
+			source: "active-repo-context.md",
+			providerBlockIndex: 2,
+		});
+		expect(
+			result.dynamicParts.every(promptPart =>
+				(promptPart.segments ?? [promptPart.text]).every(segment =>
+					result.systemPrompt[promptPart.providerBlockIndex]?.includes(segment),
+				),
+			),
+		).toBe(true);
+		expect(part(result.dynamicParts, "tool-priority").segments?.length).toBeGreaterThan(1);
+		expect(result.dynamicParts.every(promptPart => !promptPart.text.includes("You are a helpful assistant"))).toBe(
+			true,
+		);
+	});
+
+	test("skips counterfactual rendering outside diagnostic inspection", async () => {
+		const result = await buildSystemPrompt({
+			cwd: "/tmp/inspect-project",
+			tools,
+			toolNames: ["read", "task"],
+			contextFiles: [{ path: "/tmp/inspect-project/AGENTS.md", content: "Agent context" }],
+			skills: [],
+			activeRepoContext: null,
+		});
+
+		expect(result.systemPrompt.join("\n")).toContain("Agent context");
+		expect(result.dynamicParts).toEqual([]);
+		expect(result.systemPrompt.every(block => !block.includes("inspectPart"))).toBe(true);
+	});
+
+	test("does not attribute static custom prompt text as dynamic", async () => {
+		const result = await buildSystemPrompt({
+			cwd: "/tmp/inspect-project",
+			customPrompt: "Static custom SYSTEM body",
+			tools,
+			toolNames: ["read", "lsp"],
+			contextFiles: [],
+			skills: [],
+			workspaceTree: {
+				rootPath: "/tmp/inspect-project",
+				rendered: "",
+				truncated: false,
+				totalLines: 0,
+				agentsMdFiles: [],
+			},
+			activeRepoContext: null,
+		});
+
+		expect(result.systemPrompt[0]).toContain("Static custom SYSTEM body");
+		expect(result.dynamicParts.every(p => p.source !== "system-prompt.md")).toBe(true);
+		expect(result.dynamicParts.every(p => !p.text.includes("Static custom SYSTEM body"))).toBe(true);
+	});
+
+	test("attributes resolved custom-prompt append fragments to provider block zero", async () => {
+		const result = await buildSystemPrompt({
+			cwd: "/tmp/inspect-project",
+			captureDynamicParts: true,
+			resolvedCustomPrompt: "Static custom SYSTEM body",
+			resolvedAppendSystemPrompt: "Memory text",
+			appendSystemPromptParts: [{ id: "memory-instructions", source: "memory", text: "Memory text" }],
+			tools,
+			toolNames: ["read", "lsp"],
+			contextFiles: [],
+			skills: [],
+			workspaceTree: {
+				rootPath: "/tmp/inspect-project",
+				rendered: "",
+				truncated: false,
+				totalLines: 0,
+				agentsMdFiles: [],
+			},
+			activeRepoContext: null,
+		});
+
+		expect(result.systemPrompt).toHaveLength(2);
+		expect(result.systemPrompt[0]).toContain("Static custom SYSTEM body");
+		expect(result.systemPrompt[0]).toContain("Memory text");
+		expect(result.systemPrompt[1]).not.toContain("Memory text");
+		expect(part(result.dynamicParts, "append-prompt")).toMatchObject({
+			source: "custom-system-prompt.md",
+			providerBlockIndex: 0,
+		});
+		expect(part(result.dynamicParts, "memory-instructions")).toMatchObject({
+			source: "memory",
+			providerBlockIndex: 0,
+		});
+	});
+});
+
+describe("system-prompt inspect output", () => {
+	const result = {
+		systemPrompt: ["System block", "Project block"],
+		dynamicParts: [
+			{
+				id: "append-system-prompt",
+				source: "append-system-prompt" as const,
+				providerBlockIndex: 2,
+				text: "Append text",
+			},
+		],
+	};
+
+	const target: SubagentInspectTarget = {
+		kind: "subagent",
+		name: "scout",
+		source: "project",
+		filePath: "/tmp/project/.omp/agents/scout.md",
+		fidelity: "configured-preview",
+		baseTemplate: "/tmp/project/.omp/SYSTEM.template.md",
+		wrapperTemplate: "/tmp/project/.omp/SUBAGENT-SYSTEM.template.md",
+		omittedRuntimeInputs: [
+			"batch-context",
+			"plan-reference",
+			"worktree",
+			"irc-peers",
+			"parent-mcp-state",
+			"prewalk-handoff",
+		],
+	};
+
+	test("system-prompt inspect --json exposes provider blocks", () => {
+		const parsed = JSON.parse(formatInspectOutput("/tmp/project", result, { mode: "provider", json: true }));
+		expect(parsed).toEqual({
+			cwd: "/tmp/project",
+			mode: "provider",
+			blocks: [
+				{ index: 0, text: "System block" },
+				{ index: 1, text: "Project block" },
+			],
+		});
+		const subagentParsed = JSON.parse(
+			formatInspectOutput("/tmp/project", { ...result, target }, { mode: "provider", json: true }),
+		);
+		expect(subagentParsed.target).toEqual(target);
+		const subagentHuman = formatInspectOutput(
+			"/tmp/project",
+			{ ...result, target },
+			{ mode: "provider", json: false },
+		);
+		expect(subagentHuman).toContain("Target: subagent scout (project: /tmp/project/.omp/agents/scout.md)");
+		expect(subagentHuman).toContain(
+			"Templates: base=/tmp/project/.omp/SYSTEM.template.md, wrapper=/tmp/project/.omp/SUBAGENT-SYSTEM.template.md",
+		);
+		expect(subagentHuman).toContain(
+			"Omitted runtime inputs: batch-context, plan-reference, worktree, irc-peers, parent-mcp-state, prewalk-handoff",
+		);
+		expect(subagentHuman).toContain("\n\n--- provider block 0 ---\nSystem block");
+
+		const mainHuman = formatInspectOutput("/tmp/project", result, { mode: "provider", json: false });
+		expect(mainHuman).toBe("--- provider block 0 ---\nSystem block\n\n--- provider block 1 ---\nProject block\n");
+	});
+
+	test("system-prompt inspect --dynamic-parts --json exposes provider block indexes", () => {
+		const parsed = JSON.parse(formatInspectOutput("/tmp/project", result, { mode: "dynamic-parts", json: true }));
+		expect(parsed).toEqual({
+			cwd: "/tmp/project",
+			mode: "dynamic-parts",
+			blocks: result.dynamicParts,
+		});
+		const subagentParsed = JSON.parse(
+			formatInspectOutput("/tmp/project", { ...result, target }, { mode: "dynamic-parts", json: true }),
+		);
+		expect(subagentParsed.target).toEqual(target);
+	});
+
+	test("system-prompt inspect --breakdown --json separates prompt descriptions, examples, and schemas", () => {
+		const toolDescription = "Read files";
+		const toolExamples =
+			'\n\n<examples>\n# Read one file\n<example>\nread(path="README.md")\n</example>\n</examples>';
+		const toolPrompt = `${toolDescription}${toolExamples}`;
+		const inspection: SystemPromptInspection = {
+			...result,
+			providerMessages: [],
+			model: { provider: "openai-codex", id: "gpt-5.4" },
+			providerTools: [
+				{
+					name: "read",
+					description: toolPrompt,
+					examples: [{ caption: "Read one file", call: { path: "README.md" } }],
+					parameters: {
+						type: "object",
+						properties: { path: { type: "string" } },
+						required: ["path"],
+						additionalProperties: false,
+					},
+					customFormat: { syntax: "lark", definition: "start: PATH" },
+				},
+			],
+		};
+		const parsed = JSON.parse(formatInspectOutput("/tmp/project", inspection, { mode: "breakdown", json: true })) as {
+			mode: string;
+			tokenizer: { provider: string; encoding: string };
+			measurementScope: { includes: string[]; excludes: string[] };
+			totalMeasuredContextTokens: number;
+			categories: {
+				providerPrompt: { tokens: number; percentOfMeasuredContext: number };
+				toolPrompts: { tokens: number; percentOfMeasuredContext: number };
+				toolSchemas: { tokens: number; percentOfMeasuredContext: number };
+				requestMessages: { tokens: number; percentOfMeasuredContext: number };
+			};
+			requestMessages: Array<{ index: number; role: string; tokens: number; percentOfMeasuredContext: number }>;
+			dynamicParts: Array<{ id: string; source: string; tokens: number; percentOfMeasuredContext: number }>;
+			dynamicSources: Array<{ source: string; tokens: number; percentOfMeasuredContext: number }>;
+			dynamicPercentagesMayOverlap: boolean;
+			tools: Array<{
+				name: string;
+				description: { characters: number; tokens: number; percentOfMeasuredContext: number };
+				examples: { characters: number; tokens: number; percentOfMeasuredContext: number };
+				prompt: { characters: number; tokens: number; percentOfMeasuredContext: number };
+				schema: { tokens: number; percentOfMeasuredContext: number };
+			}>;
+		};
+		const providerTokens = countTokens(inspection.systemPrompt, Encoding.O200kBase);
+		const descriptionTokens = countTokens([toolDescription], Encoding.O200kBase);
+		const promptTokens = countTokens([toolPrompt], Encoding.O200kBase);
+		const exampleTokens = promptTokens - descriptionTokens;
+		const inspectedTool = inspection.providerTools[0];
+		const schemaTokens = countTokens(
+			[`${JSON.stringify(inspectedTool?.parameters ?? {})}\n${JSON.stringify(inspectedTool?.customFormat ?? {})}`],
+			Encoding.O200kBase,
+		);
+
+		expect(parsed).toMatchObject({
+			mode: "breakdown",
+			tokenizer: { provider: "openai", encoding: "o200k_base" },
+			measurementScope: {
+				includes: expect.arrayContaining(["tool parameter schemas and grammars"]),
+				excludes: expect.arrayContaining(["provider-specific request framing and control metadata"]),
+			},
+			totalMeasuredContextTokens: providerTokens + promptTokens + schemaTokens,
+			dynamicPercentagesMayOverlap: true,
+		});
+		expect(parsed).not.toHaveProperty("target");
+		const subagentParsed = JSON.parse(
+			formatInspectOutput("/tmp/project", { ...inspection, target }, { mode: "breakdown", json: true }),
+		);
+		expect(subagentParsed.target).toEqual(target);
+		expect(parsed.categories.providerPrompt.tokens).toBe(providerTokens);
+		expect(parsed.categories.toolPrompts.tokens).toBe(promptTokens);
+		expect(parsed.categories.toolSchemas.tokens).toBe(schemaTokens);
+		expect(parsed.categories.requestMessages.tokens).toBe(0);
+		expect(parsed.requestMessages).toEqual([]);
+		expect(parsed.dynamicParts).toEqual([
+			expect.objectContaining({
+				id: "append-system-prompt",
+				source: "append-system-prompt",
+				tokens: countTokens(["Append text"], Encoding.O200kBase),
+			}),
+		]);
+		expect(parsed.dynamicSources).toEqual([
+			expect.objectContaining({
+				source: "append-system-prompt",
+				tokens: countTokens(["Append text"], Encoding.O200kBase),
+			}),
+		]);
+		expect(parsed.tools).toEqual([
+			expect.objectContaining({
+				name: "read",
+				prompt: expect.objectContaining({ tokens: promptTokens }),
+				description: expect.objectContaining({ tokens: descriptionTokens }),
+				examples: expect.objectContaining({ characters: toolExamples.length, tokens: exampleTokens }),
+				schema: expect.objectContaining({ tokens: schemaTokens }),
+			}),
+		]);
+		const human = formatInspectOutput("/tmp/project", inspection, { mode: "breakdown", json: false });
+		expect(human).toContain(`description ${descriptionTokens} tokens`);
+		expect(human).toContain(`examples ${exampleTokens} tokens`);
+		const parsedTool = parsed.tools[0]!;
+		expect(parsedTool.description.characters + parsedTool.examples.characters).toBe(parsedTool.prompt.characters);
+		expect(parsedTool.description.tokens + parsedTool.examples.tokens).toBe(parsedTool.prompt.tokens);
+		expect(
+			parsed.categories.providerPrompt.percentOfMeasuredContext +
+				parsed.categories.toolPrompts.percentOfMeasuredContext +
+				parsed.categories.toolSchemas.percentOfMeasuredContext +
+				parsed.categories.requestMessages.percentOfMeasuredContext,
+		).toBeCloseTo(100, 1);
+		expect(parsed.dynamicParts[0]?.percentOfMeasuredContext).toBeGreaterThan(0);
+		expect(parsed.dynamicSources[0]?.percentOfMeasuredContext).toBeGreaterThan(0);
+	});
+});
+
+describe("system-prompt command", () => {
+	test("parses inspect flags", async () => {
+		const command = new SystemPromptCommand(
+			["inspect", "--cwd", "/tmp", "--subagent", "scout", "--dynamic-parts", "--json"],
+			TEST_CONFIG,
+		);
+		const parsed = await command.parse(SystemPromptCommand);
+		expect(parsed.args.action).toBe("inspect");
+		expect(parsed.flags.cwd).toBe("/tmp");
+		expect(parsed.flags.subagent).toBe("scout");
+		expect(parsed.flags["dynamic-parts"]).toBe(true);
+		expect(parsed.flags.json).toBe(true);
+	});
+
+	test("parses first-message breakdown flags", async () => {
+		const command = new SystemPromptCommand(
+			["inspect", "--first-message", "Implement the change", "--breakdown", "--json"],
+			TEST_CONFIG,
+		);
+		const parsed = await command.parse(SystemPromptCommand);
+		expect(parsed.flags["first-message"]).toBe("Implement the change");
+		expect(parsed.flags.breakdown).toBe(true);
+		expect(parsed.flags.json).toBe(true);
+	});
+
+	test("parses offline Codex wire-hash flags", async () => {
+		const command = new SystemPromptCommand(
+			["inspect", "--model", "openai-codex/gpt-5.6-luna", "--first-message", "Probe", "--codex-wire-hash", "--json"],
+			TEST_CONFIG,
+		);
+		const parsed = await command.parse(SystemPromptCommand);
+		expect(parsed.flags.model).toBe("openai-codex/gpt-5.6-luna");
+		expect(parsed.flags["first-message"]).toBe("Probe");
+		expect(parsed.flags["codex-wire-hash"]).toBe(true);
+		expect(parsed.flags.json).toBe(true);
+	});
+
+	test("writes provider JSON larger than the stdout pipe buffer completely", async () => {
+		const tempDir = TempDir.createSync("@omp-system-prompt-inspect-");
+		const marker = "large-provider-prompt-marker";
+		const projectDir = path.join(tempDir.path(), "project");
+		const agentDir = path.join(tempDir.path(), "agent");
+		try {
+			await Bun.write(path.join(projectDir, "AGENTS.md"), `${marker}\n${"x".repeat(LARGE_PROMPT_BYTES)}`);
+			await Bun.write(
+				path.join(agentDir, "settings.json"),
+				JSON.stringify({ modelRoles: { default: "anthropic/claude-sonnet-4-5" } }),
+			);
+			const proc = Bun.spawn(
+				[process.execPath, CLI_ENTRY, "system-prompt", "inspect", "--cwd", projectDir, "--provider", "--json"],
+				{
+					stdout: "pipe",
+					stderr: "pipe",
+					env: {
+						...process.env,
+						ANTHROPIC_API_KEY: "test-key",
+						NO_COLOR: "1",
+						PI_CODING_AGENT_DIR: agentDir,
+					},
+				},
+			);
+			const stdout = new Response(proc.stdout).text();
+			const stderr = new Response(proc.stderr).text();
+			const [exitCode, output, error] = await Promise.all([proc.exited, stdout, stderr]);
+
+			expect({ exitCode, error }).toEqual({ exitCode: 0, error: "" });
+			expect(output.length).toBeGreaterThan(PIPE_BUFFER_BYTES);
+			const parsed = JSON.parse(output) as { blocks: Array<{ text: string }> };
+			expect(parsed.blocks.some(block => block.text.includes(marker))).toBe(true);
+		} finally {
+			await tempDir.remove();
+		}
+	});
+
+	test("captures hidden first-message injections without calling a provider", async () => {
+		const tempDir = TempDir.createSync("@omp-system-prompt-first-message-");
+		const projectDir = path.join(tempDir.path(), "project");
+		const agentDir = path.join(tempDir.path(), "agent");
+		try {
+			await Bun.write(path.join(projectDir, ".keep"), "");
+			await Bun.write(
+				path.join(agentDir, "settings.json"),
+				JSON.stringify({
+					modelRoles: { default: "anthropic/claude-sonnet-4-5" },
+					todo: { enabled: true, eager: "preferred", reminders: false },
+				}),
+			);
+			const proc = Bun.spawn(
+				[
+					process.execPath,
+					CLI_ENTRY,
+					"system-prompt",
+					"inspect",
+					"--cwd",
+					projectDir,
+					"--first-message",
+					"Implement the requested change",
+					"--breakdown",
+					"--json",
+				],
+				{
+					stdout: "pipe",
+					stderr: "pipe",
+					env: {
+						...process.env,
+						ANTHROPIC_API_KEY: "test-key",
+						NO_COLOR: "1",
+						PI_CODING_AGENT_DIR: agentDir,
+					},
+				},
+			);
+			const [exitCode, output, error] = await Promise.all([
+				proc.exited,
+				new Response(proc.stdout).text(),
+				new Response(proc.stderr).text(),
+			]);
+			expect({ exitCode, error }).toEqual({ exitCode: 0, error: "" });
+			const parsed = JSON.parse(output) as {
+				firstMessage: string;
+				categories: { requestMessages: { tokens: number } };
+				requestMessages: Array<{ role: string; tokens: number; message: { content: Array<{ text?: string }> } }>;
+			};
+
+			expect(parsed.firstMessage).toBe("Implement the requested change");
+
+			expect(parsed.categories.requestMessages.tokens).toBeGreaterThan(0);
+			expect(parsed.requestMessages.map(message => message.role)).toEqual(["developer", "user"]);
+			expect(parsed.requestMessages[0]?.tokens).toBeGreaterThan(0);
+		} finally {
+			await tempDir.remove();
+		}
+	});
+
+	test("rejects combined output modes", async () => {
+		const command = new SystemPromptCommand(["inspect", "--provider", "--dynamic-parts"], TEST_CONFIG);
+		await expect(command.run()).rejects.toThrow(
+			"Use only one of --provider, --dynamic-parts, --breakdown, or --codex-wire-hash",
+		);
+	});
+});

@@ -60,6 +60,13 @@ class WidthTranscriptBlock implements Component {
 		return [`block-${this.id}@${width}`];
 	}
 }
+class RowsTranscriptBlock implements Component {
+	constructor(readonly rows: readonly string[]) {}
+
+	render(): readonly string[] {
+		return this.rows;
+	}
+}
 
 class TrackingTerminal extends VirtualTerminal {
 	readonly writes: string[] = [];
@@ -360,6 +367,43 @@ describe("composer welcome native-history resize", () => {
 			setCellDimensions(originalCellDimensions);
 			setKittyGraphics(originalGraphics);
 		}
+	});
+
+	it("retires every finalized Q row while preserving one editor rectangle", async () => {
+		const terminal = new VirtualTerminal(40, 6);
+		const scheduler = new VirtualRenderScheduler();
+		const composer = new Composer({
+			terminal,
+			tuiOptions: { renderScheduler: scheduler },
+			preferences: { ...COMPOSER_DEFAULTS, quiet: true },
+		});
+		const transcript = new TranscriptContainer();
+		transcript.addChild(new RowsTranscriptBlock(["Q1", "Q2", "Q3", "Q4"]));
+		const tail = new MutableComposerTail();
+		const offeredRows: string[][] = [];
+		const acknowledged: number[] = [];
+		const renderFrame = composer.renderFrame.bind(composer);
+		const acknowledgeHistory = composer.acknowledgeHistory.bind(composer);
+		composer.renderFrame = viewport => {
+			const plan = renderFrame(viewport);
+			if (plan.history) offeredRows.push([...plan.history.rows]);
+			return plan;
+		};
+		composer.acknowledgeHistory = id => {
+			acknowledged.push(id);
+			acknowledgeHistory(id);
+		};
+		composer.setRuntimeChildren([transcript, tail]);
+		composer.start({ playWelcomeIntro: false });
+		await scheduler.settle(terminal);
+
+		expect(offeredRows.flat().filter(row => /^Q[1-4]$/.test(row))).toEqual(["Q1", "Q2", "Q3", "Q4"]);
+		expect(acknowledged).toHaveLength(1);
+		expectOneExactEditor(
+			terminal.getViewport().map(row => Bun.stripANSI(row)),
+			tail.status,
+		);
+		composer.ui.stop();
 	});
 
 	it("flushes a roomy finalized transcript before composer shutdown", async () => {

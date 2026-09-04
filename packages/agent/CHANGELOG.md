@@ -24,6 +24,9 @@
 ### Fixed
 
 - Fixed preservation of Claude thinking/reasoning context when conversations are compacted or tool results are pruned.
+### Added
+
+- Added an exact native token-count API that reports unavailable counters instead of returning estimates.
 
 ## [18.0.11] - 2026-08-29
 

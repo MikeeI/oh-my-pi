@@ -107,6 +107,17 @@ describe("session title source persistence", () => {
 		expect(reopened.titleSource).toBe("auto");
 	});
 
+	it("adds the AUTO marker only to generated blank manual renames", async () => {
+		const session = SessionManager.inMemory(cwd);
+
+		await session.setSessionName("Generated title", "auto", "rename");
+		expect(session.getSessionName()).toBe("AUTO: Generated title");
+		expect(session.titleSource).toBe("auto");
+
+		await session.setSessionName("Refreshed title", "auto", "replan");
+		expect(session.getSessionName()).toBe("Refreshed title");
+	});
+
 	it("persists user title source across reopen", async () => {
 		const session = SessionManager.create(cwd);
 		session.appendMessage({ role: "user", content: "hello", timestamp: 1 });

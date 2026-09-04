@@ -30,6 +30,7 @@ import { applyListLimit } from "./list-limit";
 import { formatStyledArtifactReference, type OutputMeta } from "./output-meta";
 import { isReadableUrlPath, type LineRange, parseLineRanges, parseTailCount } from "./path-utils";
 import type { ParsedSelector } from "./read-selector";
+import { formatReadTokenSuffix, type ReadTokenDetails } from "./read-token";
 import { formatBytes, formatExpandHint, getDomain, replaceTabs } from "./render-utils";
 import { listTables, looksLikeSqlite, openSqliteReadConnection, renderTableList } from "./sqlite-reader";
 import { ToolAbortError, ToolError } from "./tool-errors";
@@ -1570,7 +1571,7 @@ async function renderUrl(
 // Tool Definition
 // =============================================================================
 
-export interface ReadUrlToolDetails {
+export interface ReadUrlToolDetails extends ReadTokenDetails {
 	kind: "url";
 	url: string;
 	finalUrl: string;
@@ -1819,8 +1820,10 @@ export function renderReadUrlResult(
 		const rawErrorText = result.content?.find(c => c.type === "text")?.text ?? "";
 		const errorText = (rawErrorText || "No response data").replace(/^Error:\s*/, "");
 		const urlText = details?.finalUrl ?? details?.url ?? "";
-		const description = urlText ? formatReadUrlDescription(urlText) : undefined;
-		const header = renderStatusLine({ icon: "error", title: "Read", description }, uiTheme);
+		const tokenSuffix = formatReadTokenSuffix(details?.readTextTokens, uiTheme);
+		const description = urlText ? `${formatReadUrlDescription(urlText)}${tokenSuffix}` : undefined;
+		const title = urlText ? "Read" : `Read${tokenSuffix}`;
+		const header = renderStatusLine({ icon: "error", title, description }, uiTheme);
 		const errorLines = errorText.split("\n").map(line => uiTheme.fg("error", replaceTabs(line)));
 		const outputBlock = new CachedOutputBlock();
 		return markFramedBlockComponent({
@@ -1830,7 +1833,7 @@ export function renderReadUrlResult(
 		});
 	}
 
-	const description = formatReadUrlDescription(details.finalUrl);
+	const description = `${formatReadUrlDescription(details.finalUrl)}${formatReadTokenSuffix(details.readTextTokens, uiTheme)}`;
 	const hasRedirect = details.url !== details.finalUrl;
 	const hasNotes = details.notes.length > 0;
 	const truncation = details.meta?.truncation;

@@ -3,7 +3,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "bun:test";
 import * as path from "node:path";
 import { Settings } from "@oh-my-pi/pi-coding-agent/config/settings";
 import { AgentStorage } from "@oh-my-pi/pi-coding-agent/session/agent-storage";
-import { createSubagentSettings } from "@oh-my-pi/pi-coding-agent/task/executor";
+import { createSubagentSettings } from "@oh-my-pi/pi-coding-agent/task/subagent-runtime-config";
 import { TempDir } from "@oh-my-pi/pi-utils";
 
 const MODEL_PERF_FLUSH_DELAY_MS = 100;

@@ -25,9 +25,7 @@ import {
 	resolveModelOverrideWithAuthFallback,
 } from "../config/model-resolver";
 import type { PromptTemplate } from "../config/prompt-templates";
-import { buildServiceTierByFamily, resolveSubagentServiceTier } from "../config/service-tier";
 import { Settings } from "../config/settings";
-import { SETTINGS_SCHEMA, type SettingPath } from "../config/settings-schema";
 import type { ToolPathWithSource } from "../extensibility/custom-tools";
 import type { CustomTool } from "../extensibility/custom-tools/types";
 import { runExtensionCompact, runExtensionSetModel } from "../extensibility/extensions/compact-handler";
@@ -41,7 +39,6 @@ import type { MCPManager } from "../mcp/manager";
 import type { MnemopiSessionState } from "../mnemopi/state";
 import { initializeExtensions } from "../modes/runtime-init";
 import subagentAsyncPendingTemplate from "../prompts/system/subagent-async-pending.md" with { type: "text" };
-import subagentSystemPromptTemplate from "../prompts/system/subagent-system-prompt.md" with { type: "text" };
 import submitReminderTemplate from "../prompts/system/subagent-yield-reminder.md" with { type: "text" };
 import { AgentLifecycleManager, type AgentReviver } from "../registry/agent-lifecycle";
 import { AgentRegistry, MAIN_AGENT_ID } from "../registry/agent-registry";
@@ -55,8 +52,7 @@ import { SKILL_PROMPT_MESSAGE_TYPE, USER_INTERRUPT_LABEL } from "../session/mess
 import { SessionManager } from "../session/session-manager";
 import { truncateTail } from "../session/streaming-output";
 import { type ConfiguredThinkingLevel, prewalkWouldBeNoop, resolveTaskEffortLevel, type TaskEffort } from "../thinking";
-import type { ContextFileEntry, ToolSession } from "../tools";
-import { resolveEvalBackends } from "../tools/eval-backends";
+import type { ContextFileEntry } from "../tools";
 import { isIrcEnabled } from "../tools/hub";
 import { LIST_STATUS_ORDER } from "../tools/hub/messaging";
 import { DEFAULT_HUB_LIST_LIMIT } from "../tools/hub/types";
@@ -72,6 +68,8 @@ import { generateTaskLabel } from "./label";
 import { resolveAgentPrewalkDefault } from "./prewalk";
 import { isReadOnlyAgent } from "./read-only-policy";
 import { formatTaskResultSummary } from "./result-summary";
+import { createSubagentSettings, resolveSubagentCapabilities } from "./subagent-runtime-config";
+import { resolveSubagentSystemPrompt, type SubagentIrcRoster } from "./subagent-system-prompt";
 import { subprocessToolRegistry } from "./subprocess-tool-registry";
 import type { WorkPoolYieldItem } from "./workpool-yield";
 import {
@@ -287,28 +285,11 @@ function installSubagentRetryFallbackChain(args: {
 	return role;
 }
 
-export interface IrcPeerRosterRow {
-	id: string;
-	displayName: string;
-	kind: string;
-	status: string;
-	activity?: string;
-}
-
-export interface IrcPeerRosterData {
-	/** Live (running+idle) peer rows, bounded at DEFAULT_HUB_LIST_LIMIT. */
-	peers: IrcPeerRosterRow[];
-	/** Current-root parked refs, counted but never named. */
-	parkedCount: number;
-	/** Live rows dropped by the bound; the prompt reports them truthfully. */
-	omittedCount: number;
-}
-
 export function collectIrcPeerRoster(
 	registry: AgentRegistry,
 	selfId: string,
 	rootSessionFile?: string,
-): IrcPeerRosterData {
+): SubagentIrcRoster {
 	// Same ordering as `hub list`: running before idle, then newest activity
 	// first — so the cap keeps the newest relevant siblings, not an
 	// insertion-order prefix.
@@ -936,53 +917,6 @@ export function createMCPProxyTools(mcpManager: MCPManager): CustomTool[] {
 			},
 		};
 	});
-}
-
-export function createSubagentSettings(
-	baseSettings: Settings,
-	overrides?: Partial<Record<SettingPath, unknown>>,
-	inheritedServiceTier?: ServiceTierByFamily | null,
-): Settings {
-	const snapshot: Partial<Record<SettingPath, unknown>> = {};
-	for (const key of Object.keys(SETTINGS_SCHEMA) as SettingPath[]) {
-		snapshot[key] = baseSettings.get(key);
-	}
-	// Resolve the subagent's per-family tiers from `tier.subagent` ("inherit" =
-	// match the parent's live tiers when a live session supplied them, else the
-	// subagent's own configured tier.* settings). The result is stamped back onto
-	// the snapshot so createAgentSession's tier.* reads pick it up.
-	const inheritedTiers =
-		inheritedServiceTier === undefined
-			? buildServiceTierByFamily(
-					baseSettings.get("tier.openai"),
-					baseSettings.get("tier.anthropic"),
-					baseSettings.get("tier.google"),
-				)
-			: (inheritedServiceTier ?? {});
-	const subagentTiers = resolveSubagentServiceTier(baseSettings.get("tier.subagent"), inheritedTiers);
-	snapshot["tier.openai"] = subagentTiers.openai ?? "none";
-	snapshot["tier.anthropic"] = subagentTiers.anthropic ?? "none";
-	snapshot["tier.google"] = subagentTiers.google ?? "none";
-	return Settings.isolated(
-		{
-			...snapshot,
-			// Async jobs and bash/eval auto-backgrounding are inherited from the parent:
-			// background jobs are owner-routed to the subagent's own session, and
-			// the run driver's quiescence barrier + teardown reap guarantee no
-			// owner job outlives the run, so worktree capture/cleanup stays
-			// race-free (previously both were force-disabled here).
-
-			// Subagents run headless — there is no UI to confirm prompts against, so
-			// the parent task approval is the authorization boundary. Use yolo mode
-			// to preserve unattended subagent execution. User `tools.approval` policies still apply.
-			"tools.approvalMode": "yolo",
-			// Subagents run unadvised by default; runSubprocess opts a spawn back in
-			// per agent (frontmatter `advisor` / `task.agentAdvisor`) via overrides.
-			"advisor.enabled": false,
-			...overrides,
-		},
-		{ storage: baseSettings.getStorage() },
-	);
 }
 
 export type AbortReason = "signal" | "shutdown" | "terminate" | "timeout" | "budget";
@@ -2984,7 +2918,17 @@ export async function runSubprocess(options: ExecutorOptions): Promise<SingleRes
 		},
 		options.parentServiceTier,
 	);
-	const maxRecursionDepth = settings.get("task.maxRecursionDepth") ?? 2;
+	const {
+		childDepth,
+		toolNames,
+		spawns: spawnsEnv,
+	} = resolveSubagentCapabilities(agent, subagentSettings, {
+		parentDepth: options.taskDepth,
+		restrictToolNames: options.restrictToolNames,
+	});
+	const ircEnabled = options.enableIrc !== false && isIrcEnabled(subagentSettings, childDepth);
+	const modelPatterns = normalizeModelPatterns(modelOverride ?? agent.model);
+	const sessionFile = subtaskSessionFile ?? null;
 	const maxRuntimeMs = Math.max(
 		0,
 		Math.trunc(Number(options.maxRuntimeMs ?? settings.get("task.maxRuntimeMs") ?? 0) || 0),
@@ -2998,46 +2942,6 @@ export async function runSubprocess(options: ExecutorOptions): Promise<SingleRes
 	);
 	const softRequestBudget = resolveSoftRequestBudget(agent.name, configuredDefaultBudget);
 	const softRequestBudgetNotice = settings.get("task.softRequestBudgetNotice") ?? false;
-	const parentDepth = options.taskDepth ?? 0;
-	const childDepth = parentDepth + 1;
-	const atMaxDepth = maxRecursionDepth >= 0 && childDepth >= maxRecursionDepth;
-	const ircEnabled = options.enableIrc !== false && isIrcEnabled(subagentSettings, childDepth);
-
-	// Add tools if specified
-	let toolNames: string[] | undefined;
-	if (agent.tools) {
-		toolNames = agent.tools;
-		// Auto-include task tool if spawns defined but task not in tools
-		if (agent.spawns !== undefined && !toolNames.includes("task") && !atMaxDepth) {
-			toolNames = [...toolNames, "task"];
-		}
-	}
-
-	if (atMaxDepth && toolNames?.includes("task")) {
-		toolNames = toolNames.filter(name => name !== "task");
-	}
-	// Ordinary agents retain the host's always-on collaboration capability.
-	// Restricted sessions must not widen their explicit host tool list with hub.
-	if (toolNames && !options.restrictToolNames && !toolNames.includes("hub")) {
-		toolNames = [...toolNames, "hub"];
-	}
-	if (toolNames?.includes("exec")) {
-		const backends = resolveEvalBackends({ settings } as ToolSession);
-		const expanded = toolNames.filter(name => name !== "exec");
-		if (backends.python || backends.js) expanded.push("eval");
-		expanded.push("bash");
-		toolNames = Array.from(new Set(expanded));
-	}
-
-	const modelPatterns = normalizeModelPatterns(modelOverride ?? agent.model);
-	const sessionFile = subtaskSessionFile ?? null;
-	const spawnsEnv = atMaxDepth
-		? ""
-		: agent.spawns === undefined
-			? ""
-			: agent.spawns === "*"
-				? "*"
-				: agent.spawns.join(",");
 
 	const lspEnabled = enableLsp ?? true;
 	const skipPythonPreflight = Array.isArray(toolNames) && !toolNames.includes("eval");
@@ -3315,10 +3219,22 @@ export async function runSubprocess(options: ExecutorOptions): Promise<SingleRes
 				});
 			}
 
-			const { normalized: normalizedOutputSchema } = normalizeSchema(outputSchema);
-			// Root resolved by the latest roster ensure; the prompt callback renders
-			// live peer rows scoped to it, so a session switch hides stale parked trees.
+			// Resolved by the latest roster ensure before each fresh session build.
+			// The prompt transform reads it lazily so parked peers from stale roots stay hidden.
 			let ircRootSessionFile: string | undefined;
+			const subagentSystemPrompt = await resolveSubagentSystemPrompt(effectiveCwd, {
+				agent: agent.systemPrompt,
+				context: options.context,
+				planReference: options.planReference,
+				worktree,
+				outputSchema,
+				outputSchemaOverridesAgent: options.outputSchemaOverridesAgent,
+				workPoolYieldItems: options.workPoolYieldItems,
+				ircRoster: ircEnabled
+					? () => collectIrcPeerRoster(AgentRegistry.global(), id, ircRootSessionFile)
+					: undefined,
+				ircSelfId: ircEnabled ? id : "",
+			});
 
 			// Captured by the lifecycle reviver: rebuilding an equivalent session from
 			// the same JSONL file re-invokes createAgentSession with the exact options
@@ -3358,28 +3274,8 @@ export async function runSubprocess(options: ExecutorOptions): Promise<SingleRes
 				preloadedExtensionPaths: restrictToolNames ? [] : options.preloadedExtensionPaths,
 				preloadedPreparedExtensions: restrictToolNames ? [] : options.preloadedPreparedExtensions,
 				preloadedCustomToolPaths: restrictToolNames ? [] : options.preloadedCustomToolPaths,
-				systemPrompt: defaultPrompt => {
-					const ircRoster = ircEnabled
-						? collectIrcPeerRoster(AgentRegistry.global(), id, ircRootSessionFile)
-						: undefined;
-					const subagentPrompt = prompt.render(subagentSystemPromptTemplate, {
-						agent: agent.systemPrompt,
-						context: options.context?.trim() ?? "",
-						planReference: options.planReference?.content ?? "",
-						planReferencePath: options.planReference?.path ?? "",
-						worktree: worktree ?? "",
-						outputSchema: normalizedOutputSchema,
-						outputSchemaOverridesAgent: options.outputSchemaOverridesAgent === true,
-						workPoolYieldItems: options.workPoolYieldItems ?? [],
-						ircPeers: ircRoster?.peers ?? [],
-						ircParkedCount: ircRoster?.parkedCount ?? 0,
-						ircOmittedCount: ircRoster?.omittedCount ?? 0,
-						ircSelfId: ircEnabled ? id : "",
-					});
-					return defaultPrompt.length === 0
-						? [subagentPrompt]
-						: [...defaultPrompt.slice(0, -1), subagentPrompt, defaultPrompt[defaultPrompt.length - 1]];
-				},
+				systemPromptTemplate: subagentSystemPrompt.systemPromptTemplate,
+				systemPromptTransform: subagentSystemPrompt.transform,
 				sessionManager: sessionManagerForRun,
 				hasUI: false,
 				prewalk,

@@ -79,6 +79,10 @@
 
 - Fixed inline color swatches rendering incorrectly inside highlighted lines.
 - Fixed terminal resizing in tmux panes and Windows consoles duplicating the current in-progress turn in scrollback.
+### Fixed
+
+- Fixed scrolling history appends losing final rows behind blank-first writes.
+- Fixed rapid and fullscreen-covered resizes repainting from stale multiplexer geometry.
 
 ## [18.0.8] - 2026-08-27
 
@@ -98,11 +102,13 @@
 - Removed the `inlineMathSpanEnd` and `mathStartIndex` exports; the math delimiter grammar now lives in `@oh-my-pi/pi-utils/math-delimiters`.
 
 ### Fixed
+### Changed
 
 - Math spans now end at the first unescaped delimiter, so a TeX row break no longer closes a span early: `\(a \\) b\)` renders as one equation, and an escaped `\$` no longer ends `$$…$$`.
 - Fixed image previews displaying as garbled characters in Paseo terminals.
 - Fixed terminal resizing from duplicating committed history in native scrollback.
 - Fixed autocomplete suggestions for bare-name skills such as `/batch` when no command matches the prefix more strongly.
+- Restored current upstream terminal-history and resize behavior by removing the fork-specific tmux repair stack.
 
 ## [18.0.6] - 2026-08-26
 

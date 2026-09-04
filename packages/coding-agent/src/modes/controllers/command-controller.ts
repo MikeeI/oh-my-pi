@@ -65,7 +65,7 @@ import {
 } from "../../utils/changelog";
 import { copyToClipboard } from "../../utils/clipboard";
 import { openPath } from "../../utils/open";
-import { setSessionTerminalTitle } from "../../utils/title-generator";
+import { generateSessionTitleFromRecentTranscript, setSessionTerminalTitle } from "../../utils/title-generator";
 
 function formatCreditValue(value: number): string {
 	return value.toLocaleString(undefined, { maximumFractionDigits: 4 });
@@ -1302,8 +1302,30 @@ export class CommandController {
 	}
 
 	async handleRenameCommand(title: string): Promise<void> {
+		const explicitTitle = title.trim();
 		try {
-			const stored = await this.ctx.sessionManager.setSessionName(title, "user");
+			if (!explicitTitle) {
+				this.ctx.showStatus("Generating session name from recent messages...");
+			}
+			const resolvedTitle =
+				explicitTitle ||
+				(await generateSessionTitleFromRecentTranscript(
+					this.ctx.session.messages,
+					this.ctx.session.modelRegistry,
+					this.ctx.settings,
+					this.ctx.session.sessionId,
+					this.ctx.session.model,
+					provider => this.ctx.session.agent.metadataForProvider(provider),
+				));
+			if (!resolvedTitle) {
+				this.ctx.showError("No conversation content to generate a title from.");
+				return;
+			}
+			const stored = await this.ctx.sessionManager.setSessionName(
+				resolvedTitle,
+				explicitTitle ? "user" : "auto",
+				explicitTitle ? undefined : "rename",
+			);
 			if (!stored) {
 				this.ctx.showError("Session name cannot be empty.");
 				return;

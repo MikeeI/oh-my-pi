@@ -29,7 +29,6 @@ import {
 	parseSkillInvocation,
 	type Skill,
 } from "../../extensibility/skills";
-import { loadSlashCommands } from "../../extensibility/slash-commands";
 import { type Theme, theme } from "../../modes/theme/theme";
 import type { AgentSession } from "../../session/agent-session";
 import { SKILL_PROMPT_MESSAGE_TYPE, USER_INTERRUPT_LABEL } from "../../session/messages";
@@ -1059,13 +1058,8 @@ export async function runRpcMode(
 		clearPluginRootsAndCaches(projectPath ? [projectPath] : undefined);
 		resetCapabilities();
 		await session.refreshSkills();
-		session.setSlashCommands(
-			await loadSlashCommands({
-				cwd,
-				extensionRoots: session.effectiveExtensionRoots,
-			}),
-		);
-		await emitAvailableCommandsUpdate();
+		const commands = await getAvailableCommands();
+		output({ type: "available_commands_update", commands });
 	};
 	const emitAvailableCommandsUpdate = async () => {
 		output({ type: "available_commands_update", commands: await getAvailableCommands() });
@@ -1103,38 +1097,42 @@ export async function runRpcMode(
 				if (skillResult) {
 					return success(id, "prompt", skillResult);
 				}
-				const builtinResult = await executeAcpBuiltinSlashCommand(command.message, {
-					session,
-					sessionManager: session.sessionManager,
-					settings: session.settings,
-					cwd: session.sessionManager.getCwd(),
-					output: text => output({ type: "command_output", text }),
-					refreshCommands: emitAvailableCommandsUpdate,
-					reloadPlugins: reloadPluginState,
-					runCommandInBackground: task => shutdownCoordinator.track(task()),
-					notifyTitleChanged: async () => {
-						output({ type: "session_info_update", title: session.sessionName, sessionId: session.sessionId });
-					},
-					notifyConfigChanged: async () => {
-						output({ type: "config_update", model: session.model, thinkingLevel: session.thinkingLevel });
-					},
-				});
-				if (builtinResult !== false) {
-					if ("prompt" in builtinResult) {
-						watchAndReportLocalOnlyPromptResult({
-							id,
-							startPrompt: () => session.prompt(builtinResult.prompt, { images: command.images }),
-							output,
-							onError: promptError => output(error(id, "prompt", promptError.message)),
-							extensionUserMessageTracker,
-						});
-						return success(id, "prompt");
+				try {
+					const builtinResult = await executeAcpBuiltinSlashCommand(command.message, {
+						session,
+						sessionManager: session.sessionManager,
+						settings: session.settings,
+						cwd: session.sessionManager.getCwd(),
+						output: text => output({ type: "command_output", text }),
+						refreshCommands: emitAvailableCommandsUpdate,
+						reloadPlugins: reloadPluginState,
+						runCommandInBackground: task => shutdownCoordinator.track(task()),
+						notifyTitleChanged: async () => {
+							output({ type: "session_info_update", title: session.sessionName, sessionId: session.sessionId });
+						},
+						notifyConfigChanged: async () => {
+							output({ type: "config_update", model: session.model, thinkingLevel: session.thinkingLevel });
+						},
+					});
+					if (builtinResult !== false) {
+						if ("prompt" in builtinResult) {
+							watchAndReportLocalOnlyPromptResult({
+								id,
+								startPrompt: () => session.prompt(builtinResult.prompt, { images: command.images }),
+								output,
+								onError: promptError => output(error(id, "prompt", promptError.message)),
+								extensionUserMessageTracker,
+							});
+							return success(id, "prompt");
+						}
+						// A consumed builtin is normally local-only, but some (e.g.
+						// `/retry`) schedule an agent turn whose events stream after
+						// this response. Report that so the host does not finalize the
+						// request as non-agent work while the agent is running.
+						return success(id, "prompt", { agentInvoked: builtinResult.agentInvoked === true });
 					}
-					// A consumed builtin is normally local-only, but some (e.g.
-					// `/retry`) schedule an agent turn whose events stream after
-					// this response. Report that so the host does not finalize the
-					// request as non-agent work while the agent is running.
-					return success(id, "prompt", { agentInvoked: builtinResult.agentInvoked === true });
+				} catch (err) {
+					return error(id, "prompt", err instanceof Error ? err.message : String(err));
 				}
 
 				// Don't await - events will stream

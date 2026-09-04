@@ -200,7 +200,7 @@ describe("CollabQrCodeComponent transcript height clipping", () => {
 	it("keeps the browser URL as the emergency one-row transcript representation", () => {
 		const component = new CollabQrCodeComponent("https://my.omp.sh/#clip-test");
 		component.setTranscriptAllocation(1);
-		const row = component.renderTranscriptBlockEmergencyRow(10);
+		const [row = ""] = component.renderTranscriptBlockEmergencyRows(10, 1);
 		expect(visibleWidth(row)).toBeLessThanOrEqual(10);
 		expect(row).toContain("https://my.omp.sh/#clip-test");
 		expect(row).not.toContain("URL above");

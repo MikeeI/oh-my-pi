@@ -133,6 +133,7 @@ import {
 import { splitAddressableFileLines } from "./hashline-format";
 import { readSqlite, resolveSqliteReadPath } from "./read-sqlite";
 import { isProseSummaryPath, renderSummary, routeReadThroughBridge, trySummarize } from "./read-summary";
+import type { ReadTokenDetails } from "./read-token";
 import { parseSqlitePathCandidates } from "./sqlite-reader";
 import { formatBytes, shortenPath } from "./render-utils";
 import { REPORT_ISSUE_DEVICE_NAME, reportIssueDeviceUsage } from "./report-tool-issue";
@@ -628,7 +629,7 @@ const readSchemaWithoutMemory = type({
 
 export type ReadToolInput = typeof readSchema.infer;
 
-export interface ReadToolDetails {
+export interface ReadToolDetails extends ReadTokenDetails {
 	kind?: "file" | "url";
 	truncation?: TruncationResult;
 	isDirectory?: boolean;
@@ -777,9 +778,13 @@ export class ReadTool implements AgentTool<typeof readSchema, ReadToolDetails> {
 	async #tryReadDelimitedPaths(
 		readPath: string,
 		signal?: AbortSignal,
-		routedUrlPredicate?: (entry: string) => boolean,
+		options: {
+			splitInternalUrlSemicolons?: boolean;
+		} = {},
 	): Promise<AgentToolResult<ReadToolDetails> | null> {
-		const parts = await splitDelimitedPathEntry(readPath, this.session.cwd, { routedUrlPredicate });
+		const parts = await splitDelimitedPathEntry(readPath, this.session.cwd, {
+			splitInternalUrlSemicolons: options.splitInternalUrlSemicolons,
+		});
 		if (!parts) return null;
 
 		const notice = `Note: interpreted as ${parts.length} paths: ${parts.join(", ")}`;
@@ -1290,6 +1295,15 @@ export class ReadTool implements AgentTool<typeof readSchema, ReadToolDetails> {
 			}
 			readPath = attachment.sourcePath;
 		}
+		if (readPath.startsWith("attachment://") && readPath.includes(";")) {
+			const delimitedResult = await this.#tryReadDelimitedPaths(readPath, signal);
+			if (delimitedResult) return delimitedResult;
+		}
+
+		if (readPath.startsWith("conflict://") && readPath.includes(";")) {
+			const delimitedResult = await this.#tryReadDelimitedPaths(readPath, signal);
+			if (delimitedResult) return delimitedResult;
+		}
 
 		const conflictUri = parseConflictUri(readPath);
 		if (conflictUri) {
@@ -1323,10 +1337,19 @@ export class ReadTool implements AgentTool<typeof readSchema, ReadToolDetails> {
 			return executeReadUrl(this.session, { path: parsedUrlTarget.path, raw: urlRaw }, signal);
 		}
 
-		// Handle native OMP URLs and custom-scheme resources advertised by MCP servers.
+		// MCP resource URIs are opaque and may contain literal semicolons. Route
+		// them exactly before interpreting semicolons as the Read batch delimiter.
 		const internalRouter = InternalUrlRouter.instance();
-		const delimitedInternalResult = internalRouter.canResolve(readPath)
-			? await this.#tryReadDelimitedPaths(readPath, signal, entry => internalRouter.canResolve(entry))
+		const canResolveInternal = internalRouter.canResolve(readPath);
+		const isOpaqueMcpResource =
+			readPath.toLowerCase().startsWith("mcp://") || (canResolveInternal && !internalRouter.canHandle(readPath));
+		if (isOpaqueMcpResource) {
+			return this.#handleInternalUrl(readPath, parseSel(undefined), signal);
+		}
+		const delimitedInternalResult = canResolveInternal
+			? await this.#tryReadDelimitedPaths(readPath, signal, {
+					splitInternalUrlSemicolons: true,
+				})
 			: null;
 		if (delimitedInternalResult) return delimitedInternalResult;
 

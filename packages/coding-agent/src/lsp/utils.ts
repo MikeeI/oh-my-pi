@@ -2,6 +2,7 @@ export { truncate } from "@oh-my-pi/pi-utils";
 
 import * as fs from "node:fs/promises";
 import path from "node:path";
+import { replaceTabs } from "@oh-my-pi/pi-tui";
 import { isEnoent } from "@oh-my-pi/pi-utils";
 import { type Theme, theme } from "../modes/theme/theme";
 import { formatGroupedFiles } from "../tools/grouped-file-output";
@@ -315,26 +316,48 @@ export function formatPosition(line: number, col: number): string {
 // WorkspaceEdit Formatting
 // =============================================================================
 
+const WORKSPACE_EDIT_PREVIEW_LIMIT = 8;
+const TEXT_EDIT_PREVIEW_LENGTH = 60;
+
 /**
- * Format a workspace edit as a summary of changes.
+ * Format a text edit as a preview.
+ */
+export function formatTextEdit(edit: TextEdit, maxLength = TEXT_EDIT_PREVIEW_LENGTH): string {
+	const range = `${edit.range.start.line + 1}:${edit.range.start.character + 1}`;
+	const escapedText = edit.newText.replace(/\r/g, "\\r").replace(/\n/g, "\\n");
+	const preview = escapedText.length > maxLength ? `${escapedText.slice(0, maxLength)}…` : escapedText;
+	return `line ${range} ${theme?.nav.cursor ?? "→"} "${replaceTabs(preview)}"`;
+}
+
+/**
+ * Format a workspace edit with bounded text-edit details.
  */
 export function formatWorkspaceEdit(edit: WorkspaceEdit, cwd: string): string[] {
 	const results: string[] = [];
+	let textEditCount = 0;
+	let shownTextEdits = 0;
 
-	// Handle changes map (legacy format)
+	const addTextEdits = (uri: string, textEdits: TextEdit[]): void => {
+		const file = formatPathRelativeToCwd(uriToFile(uri), cwd);
+		results.push(`${file}: ${textEdits.length} edit${textEdits.length > 1 ? "s" : ""}`);
+		textEditCount += textEdits.length;
+		for (const textEdit of textEdits) {
+			if (shownTextEdits >= WORKSPACE_EDIT_PREVIEW_LIMIT) continue;
+			results.push(`  ${formatTextEdit(textEdit)}`);
+			shownTextEdits++;
+		}
+	};
+
 	if (edit.changes) {
 		for (const [uri, textEdits] of Object.entries(edit.changes)) {
-			const file = formatPathRelativeToCwd(uriToFile(uri), cwd);
-			results.push(`${file}: ${textEdits.length} edit${textEdits.length > 1 ? "s" : ""}`);
+			addTextEdits(uri, textEdits);
 		}
 	}
 
-	// Handle documentChanges array (modern format)
 	if (edit.documentChanges) {
 		for (const change of edit.documentChanges) {
 			if ("edits" in change && change.textDocument) {
-				const file = formatPathRelativeToCwd(uriToFile(change.textDocument.uri), cwd);
-				results.push(`${file}: ${change.edits.length} edit${change.edits.length > 1 ? "s" : ""}`);
+				addTextEdits(change.textDocument.uri, change.edits);
 			} else if ("kind" in change) {
 				switch (change.kind) {
 					case "create":
@@ -353,19 +376,12 @@ export function formatWorkspaceEdit(edit: WorkspaceEdit, cwd: string): string[] 
 		}
 	}
 
+	if (shownTextEdits < textEditCount) {
+		results.push(
+			`INCOMPLETE preview: showing ${shownTextEdits}/${textEditCount} text edits; ${textEditCount - shownTextEdits} omitted`,
+		);
+	}
 	return results;
-}
-
-/**
- * Format a text edit as a preview.
- */
-export function formatTextEdit(edit: TextEdit, maxLength = 50): string {
-	const range = `${edit.range.start.line + 1}:${edit.range.start.character + 1}`;
-	const preview =
-		edit.newText.length > maxLength
-			? `${edit.newText.slice(0, maxLength).replace(/\n/g, "\\n")}…`
-			: edit.newText.replace(/\n/g, "\\n");
-	return `line ${range} ${theme.nav.cursor} "${preview}"`;
 }
 
 // =============================================================================
@@ -485,6 +501,25 @@ export function formatSymbolInformation(symbol: SymbolInformation, cwd: string):
 	const location = formatLocation(symbol.location, cwd);
 	const container = symbol.containerName ? ` (${symbol.containerName})` : "";
 	return `${icon} ${symbol.name}${container} @ ${location}`;
+}
+
+export function filterDocumentSymbols(symbols: DocumentSymbol[], query: string): DocumentSymbol[] {
+	const needle = query.trim().toLowerCase();
+	if (!needle) return symbols;
+
+	return symbols.flatMap(symbol => {
+		if ([symbol.name, symbol.detail ?? ""].some(field => field.toLowerCase().includes(needle))) return [symbol];
+		const children = symbol.children ? filterDocumentSymbols(symbol.children, needle) : [];
+		return children.length > 0 ? [{ ...symbol, children }] : [];
+	});
+}
+
+export function filterDocumentSymbolInformation(symbols: SymbolInformation[], query: string): SymbolInformation[] {
+	const needle = query.trim().toLowerCase();
+	if (!needle) return symbols;
+	return symbols.filter(symbol =>
+		[symbol.name, symbol.containerName ?? ""].some(field => field.toLowerCase().includes(needle)),
+	);
 }
 
 export function filterWorkspaceSymbols(symbols: SymbolInformation[], query: string): SymbolInformation[] {

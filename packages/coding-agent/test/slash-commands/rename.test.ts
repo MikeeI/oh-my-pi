@@ -1,6 +1,8 @@
 import { describe, expect, it, vi } from "bun:test";
 import type { InteractiveModeContext } from "@oh-my-pi/pi-coding-agent/modes/types";
+import { executeAcpBuiltinSlashCommand } from "@oh-my-pi/pi-coding-agent/slash-commands/acp-builtins";
 import { executeBuiltinSlashCommand } from "@oh-my-pi/pi-coding-agent/slash-commands/builtin-registry";
+import * as titleGenerator from "@oh-my-pi/pi-coding-agent/utils/title-generator";
 
 function createRuntime() {
 	const handleRenameCommand = vi.fn(async () => {});
@@ -33,14 +35,40 @@ describe("/rename slash command", () => {
 		expect(harness.handleRenameCommand).toHaveBeenCalledWith("my session");
 	});
 
-	it("reports usage for blank input without renaming", async () => {
+	it("routes a blank /rename invocation through the rename handler for auto-generation", async () => {
 		const harness = createRuntime();
 
 		const handled = await executeBuiltinSlashCommand("/rename   ", harness.runtime);
 
 		expect(handled).toBe(true);
-		expect(harness.showStatus).toHaveBeenCalledWith("Usage: /rename <title>");
+
 		expect(harness.setText).toHaveBeenCalledWith("");
-		expect(harness.handleRenameCommand).not.toHaveBeenCalled();
+		expect(harness.handleRenameCommand).toHaveBeenCalledWith("");
+	});
+
+	it("marks a blank direct /rename as an automatic generated title", async () => {
+		vi.spyOn(titleGenerator, "generateSessionTitleFromRecentTranscript").mockResolvedValue("Generated title");
+		const setSessionName = vi.fn(async () => true);
+		const output = vi.fn(async () => {});
+		const runtime = {
+			session: {
+				messages: [{ role: "user", content: [{ type: "text", text: "Rename this session" }] }],
+				modelRegistry: {},
+				sessionId: "rename-session",
+				model: undefined,
+				agent: { metadataForProvider: () => undefined },
+			},
+			sessionManager: { setSessionName },
+			settings: {},
+			cwd: "/tmp",
+			output,
+			refreshCommands: vi.fn(),
+			reloadPlugins: vi.fn(async () => {}),
+		} as never;
+
+		const handled = await executeAcpBuiltinSlashCommand("/rename   ", runtime);
+
+		expect(handled).toEqual({ consumed: true });
+		expect(setSessionName).toHaveBeenCalledWith("Generated title", "auto", "rename");
 	});
 });

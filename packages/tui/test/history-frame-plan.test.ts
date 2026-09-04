@@ -190,18 +190,28 @@ class TmuxPreservedClearTerminal extends VirtualTerminal {
 }
 
 describe("terminal frame plans", () => {
-	it("appends finalized history once and leaves the requested mutable viewport intact", () => {
-		const terminal = new VirtualTerminal(20, 3);
-		const provider = new Provider({
-			history: { id: 1, rows: ["history one", "history two"] },
-			viewport: ["editor", "status"],
-		});
+	it("appends finalized Q rows without blank-first loss and preserves the mutable viewport", () => {
+		const terminal = new CountingTerminal(20, 4);
+		const provider = new Provider({ viewport: ["editor", "status"] });
 		const tui = new TUI(terminal, undefined, { renderScheduler: scheduler });
 		tui.setFrameProvider(provider);
+		terminal.writes.length = 0;
 
+		provider.plan = {
+			history: { id: 1, rows: ["Q1", "Q2", "Q3", "Q4"] },
+			viewport: ["editor", "status"],
+		};
+		tui.requestRender(true);
+
+		expect(terminal.writes.filter(write => write.includes("Q1"))).toHaveLength(1);
 		expect(provider.acknowledged).toEqual([1]);
-		expect(terminal.getBufferPosition().baseY).toBe(1);
-		expect(terminal.getViewport().map(row => row.trimEnd())).toEqual(["history two", "editor", "status"]);
+		expect(plainBuffer(terminal).filter(Boolean)).toEqual(["Q1", "Q2", "Q3", "Q4", "editor", "status"]);
+		expect(
+			terminal
+				.getViewport()
+				.map(row => row.trimEnd())
+				.slice(-2),
+		).toEqual(["editor", "status"]);
 		tui.stop();
 	});
 	it("keeps live viewport rows out of tmux-style preserved-clear scrollback on a scrolling append", () => {

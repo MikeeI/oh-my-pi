@@ -8,7 +8,8 @@ Use ONLY for one binary or a short pipeline that computes a fact (`wc -l`, `sort
 - `pty: true` only for terminal interaction (`sudo`, `ssh`).
 - Order-dependent commands use `&&` in one call; independent calls may run concurrently.
 - Internal URIs (`skill://`, `agent://`, …) auto-resolve to paths.
-{{#if hasShellBuiltins}}- aux utils available: mkdir, wc, sort, comm, diff, uniq, base64, cmp, md5sum, sha{1,224,256,384,512}sum, b2sum, basename, dirname, readlink, realpath, touch, stat, date, mktemp, seq, yes, printenv, truncate, tac, nproc, uname, whoami, hostname, which, ps, pgrep, pkill, pidwait, top, cut, tee, tr, paste, sed, xargs, jq, rm, mv, ln, ts, sponge, ifne, isutf8, combine{{#unless isWindows}}, errno{{/unless}}{{/if}}
+{{#if hasShellBuiltins}}- aux utils available: mkdir, wc, sort, comm, diff, uniq, base32, base64, cmp, md5sum, sha{1,224,256,384,512}sum, b2sum, basename, dirname, readlink, realpath, touch, stat, date, mktemp, seq, yes, printenv, truncate, tac, nproc, uname, whoami, hostname, which, ps, pgrep, pkill, pidwait, top, cut, tee, tr, paste, sed, xargs, jq, rm, mv, ln, ts, sponge, ifne, isutf8, combine{{#unless isWindows}}, errno{{/unless}}{{/if}}
+- additional utils available: duckdb, mlr, yq, jc, shellcheck, shfmt, diffoscope-safe, dust, procs, glab
 {{#if asyncEnabled}}- `async: true` defers a finite command's result; it does not extend `timeout`.{{/if}}
 </instruction>
 
@@ -19,6 +20,5 @@ Use ONLY for one binary or a short pipeline that computes a fact (`wc -l`, `sort
 {{#if hasLaunch}}- Services, watchers, debuggers, and REPLs MUST use `hub` (`op:"start"`).{{/if}}
 </critical>
 
-{{#if autoBackgroundEnabled}}Long foreground calls may auto-background by the configured threshold and deliver later.
-`timeout: 0` disables the job deadline; otherwise `timeout` sets it without extending foreground waiting.{{/if}}
+{{#if autoBackgroundEnabled}}Long foreground calls may auto-background at or before the configured {{autoBackgroundThresholdSeconds}}s foreground threshold and deliver later. `timeout` sets the job deadline; raising it does not extend foreground waiting.{{/if}}
 No truncation footer means the displayed output is complete.

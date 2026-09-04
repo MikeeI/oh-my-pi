@@ -53,6 +53,10 @@
 ### Fixed
 
 - Fixed the stats dashboard being unreachable from container hosts by accepting an explicit `--host` bind address while preserving loopback-only binding and same-origin API access by default.
+### Changed
+### Removed
+
+- Moved the multi-range summary renderer into the `momp` package; the standalone `omp-stats` binary returns to upstream behavior.
 
 ## [17.3.0] - 2026-08-13
 

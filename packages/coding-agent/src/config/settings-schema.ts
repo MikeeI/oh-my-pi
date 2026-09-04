@@ -1266,6 +1266,17 @@ export const SETTINGS_SCHEMA = {
 			description: "Remove the 1-character horizontal padding from the left and right of the terminal output",
 		},
 	},
+	"tui.scrollbackRebuild": {
+		type: "boolean",
+		default: false,
+		ui: {
+			tab: "appearance",
+			group: "Display",
+			label: "Rewrite Scrollback",
+			description:
+				"On direct terminals, erase and replay scrollback when a block's final form replaces its live preview. Multiplexers never use this because ED3 clears their entire pane history. When off (default), stale preview copies may remain and final content is appended below.",
+		},
+	},
 
 	"display.shimmer": {
 		type: "enum",
@@ -5043,13 +5054,13 @@ export const SETTINGS_SCHEMA = {
 
 	"task.enableLsp": {
 		type: "boolean",
-		default: false,
+		default: true,
 		ui: {
 			tab: "tasks",
 			group: "Subagents",
 			label: "LSP in Subagents",
 			description:
-				"Allow subagents spawned via the task tool to use the lsp tool. Off by default to keep subagents cheap; enable when LSP-aware delegation is worth the extra tokens.",
+				"Allow all subagents to use the lsp tool when their agent definition includes it. The parent session's LSP capability and plan-mode restrictions still apply.",
 		},
 	},
 

@@ -72,8 +72,11 @@ describe("countTokens with modes", () => {
 	test("strict mode uses native counting regardless of encoding", () => {
 		const noEncoding = new Tokenizer();
 		expect(noEncoding.countTokens("hello world", "strict")).toBe(2);
+		expect(noEncoding.countTokensExact("hello world")).toBe(2);
 		const claudeEncoding = new Tokenizer({ tokenizer: "claude-v47" });
-		expect(claudeEncoding.countTokens("hello world", "strict")).toBeGreaterThan(0);
+		const claudeTokens = claudeEncoding.countTokens("hello world", "strict");
+		expect(claudeTokens).toBeGreaterThan(0);
+		expect(claudeEncoding.countTokensExact("hello world")).toBe(claudeTokens);
 	});
 
 	test("mode is per-call; encoding stays independently model-scoped in strict mode", () => {
@@ -91,6 +94,7 @@ describe("countTokens with modes", () => {
 		});
 		const tokenizer = new Tokenizer({ tokenizer: "deepseek-v3" });
 		expect(tokenizer.countTokens("hello world", "strict")).toBe(11);
+		expect(tokenizer.countTokensExact("hello world")).toBeUndefined();
 		expect(tokenizer.countTokens("hello world", "upperbound")).toBe(11);
 		expect(tokenizer.checkTokenBudget("x".repeat(40), 20)).toEqual({
 			fits: false,

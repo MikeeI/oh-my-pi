@@ -53,14 +53,17 @@ export class CollabQrCodeComponent implements Component, TranscriptPresentationT
 		return this.#lines;
 	}
 
-	/** Survives emergency 1-row transcript pressure when this block is otherwise hidden. */
-	renderTranscriptBlockEmergencyRow(width: number): string {
-		return this.#hiddenHint(
-			Number.isFinite(this.#allocatedRows)
-				? `viewport height ${this.#allocatedRows}; need ${this.#lines.length}`
-				: "transcript pressure",
-			width,
-		);
+	/** Survives emergency transcript pressure when this block is otherwise hidden. */
+	renderTranscriptBlockEmergencyRows(width: number, maxRows: number): readonly string[] {
+		if (maxRows <= 0) return [];
+		return [
+			this.#hiddenHint(
+				Number.isFinite(this.#allocatedRows)
+					? `viewport height ${this.#allocatedRows}; need ${this.#lines.length}`
+					: "transcript pressure",
+				width,
+			),
+		];
 	}
 
 	#hiddenHint(reason: string, width: number): string {

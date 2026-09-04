@@ -10,10 +10,11 @@ import * as os from "node:os";
 import * as path from "node:path";
 import { Transform } from "node:stream";
 import { pipeline } from "node:stream/promises";
-import { $env, $which, APP_NAME, compareVersions, isEnoent, VERSION } from "@oh-my-pi/pi-utils";
+import { $env, $which, APP_NAME, compareVersions, isEnoent } from "@oh-my-pi/pi-utils";
 import chalk from "@oh-my-pi/pi-utils/chalk";
 import { withFileLock } from "@oh-my-pi/pi-utils/file-lock";
 import { $ } from "bun";
+import { APP_DISPLAY_NAME, APP_PACKAGE_NAME, isMompPackageName, APP_VERSION as VERSION } from "../app-version";
 import { settings } from "../config/settings";
 import { theme } from "../modes/theme/theme";
 import {
@@ -28,6 +29,7 @@ const PACKAGE = "@oh-my-pi/pi-coding-agent";
 const HOMEBREW_FORMULA = "can1357/tap/omp";
 const MISE_TOOL = "github:can1357/oh-my-pi";
 const NIX_STORE_DIR = "/nix/store";
+const MOMP_INSTALL_COMMAND = "bun install -g @mikeei/momp@latest --force --minimum-release-age 0";
 /**
  * Official npm registry origin.
  *
@@ -1768,6 +1770,15 @@ export async function updateViaBinaryAt(
 	console.log(chalk.dim(`Restart ${APP_NAME} to use the new version`));
 }
 
+/** Return true when runtime package metadata identifies the personal fork. */
+export function isMompPackage(packageName: string): boolean {
+	return isMompPackageName(packageName);
+}
+
+export function buildMompUpdateInstruction(): string {
+	return MOMP_INSTALL_COMMAND;
+}
+
 /**
  * In-place forwarder bodies, by shim extension, for launchers that cannot be
  * renamed aside during a script-shim takeover; each execs the sibling
@@ -1945,6 +1956,16 @@ export async function runUpdateCommand(opts: {
 	check: boolean;
 	channel?: UpdateChannel;
 }): Promise<void> {
+	if (isMompPackage(APP_PACKAGE_NAME)) {
+		console.log(`Current version: ${VERSION}`);
+		console.log("momp updates are installed manually:");
+		console.log(`  ${buildMompUpdateInstruction()}`);
+		if (!opts.check) {
+			console.error(chalk.red("momp update is disabled for the personal fork."));
+			process.exitCode = 1;
+		}
+		return;
+	}
 	console.log(chalk.dim(`Current version: ${VERSION}`));
 	const persistedChannel = readPersistedChannel() ?? "stable";
 	const channel = opts.channel ?? persistedChannel;
@@ -2052,10 +2073,10 @@ export async function runUpdateCommand(opts: {
  * Print update command help.
  */
 export function printUpdateHelp(): void {
-	console.log(`${chalk.bold(`${APP_NAME} update`)} - Check for and install updates
+	console.log(`${chalk.bold(`${APP_DISPLAY_NAME} update`)} - Check for and install updates
 
 ${chalk.bold("Usage:")}
-  ${APP_NAME} update [options]
+  ${APP_DISPLAY_NAME} update [options]
 
 ${chalk.bold("Options:")}
   -c, --check     Check for updates without installing
@@ -2065,10 +2086,10 @@ ${chalk.bold("Options:")}
   --stable        Switch back to the stable channel
 
 ${chalk.bold("Examples:")}
-  ${APP_NAME} update              Update to latest version
-  ${APP_NAME} update --check      Check if updates are available
-  ${APP_NAME} update --force      Force reinstall
-  ${APP_NAME} update -l           Update installed plugins
-  ${APP_NAME} update --canary    Switch to the canary channel and update
+  ${APP_DISPLAY_NAME} update              Update to latest version
+  ${APP_DISPLAY_NAME} update --check      Check if updates are available
+  ${APP_DISPLAY_NAME} update --force      Force reinstall
+  ${APP_DISPLAY_NAME} update -l           Update installed plugins
+  ${APP_DISPLAY_NAME} update --canary     Switch to the canary channel and update
 `);
 }

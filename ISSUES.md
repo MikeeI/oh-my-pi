@@ -1,0 +1,40 @@
+# Issue and Pull Request Tracking
+
+Read this index at the start of every agent session before repository work.
+`FORMAT.md` owns research, lifecycle, drafting, implementation, and publication rules.
+Each linked `issues/ISSUE-NNN.md` is the complete authoritative record for one root cause.
+This file owns `Next-Finding-ID` and projects current issue-file state.
+`Next-Action` is the 2–6 word `Next-Action/Summary` projection from the issue record.
+When a row disagrees with its issue file, correct the row from the issue file in the same task.
+
+Next finding ID: ISSUE-021
+
+## Open-Findings
+
+| ID | Finding | State | Authorized-Work | Publication-Target | Contribution-Priority | Next-Action | External-Reference |
+| --- | --- | --- | --- | --- | --- | --- | --- |
+| [ISSUE-002](issues/ISSUE-002.md) | Eval registry: disabling the last live backend re-advertises every language | Investigating | Not-Selected | Not-Selected | High | Verify Eval commit boundary | Not published. |
+| [ISSUE-007](issues/ISSUE-007.md) | Hub capability: disabled process supervision remains fully advertised | Implementing | Pull-Request-Implementation | New-pull-request | High | Approve reviewed Hub PR | Not published. |
+| [ISSUE-010](issues/ISSUE-010.md) | LSP prompt: raw requests omit multi-server routing guidance | Implementing | Pull-Request-Implementation | New-pull-request | Medium | Review local LSP prompt PR | Not published. |
+| [ISSUE-011](issues/ISSUE-011.md) | Read: compact directory metadata spacing | Submitted | Pull-Request-Implementation | New-pull-request | Medium | Await Read current-head review | https://github.com/can1357/oh-my-pi/pull/9062 |
+| [ISSUE-012](issues/ISSUE-012.md) | Prompt: metadata-free workspace tree | Submitted | Pull-Request-Implementation | New-pull-request | Medium | Await tree current-head review | https://github.com/can1357/oh-my-pi/pull/9152 |
+| [ISSUE-013](issues/ISSUE-013.md) | LSP symbols: file query is ignored | Submitted | Pull-Request-Implementation | New-pull-request | Medium | Rebase LSP symbol PR | https://github.com/can1357/oh-my-pi/pull/8400 |
+| [ISSUE-014](issues/ISSUE-014.md) | LSP rename: previews omit edit details | Submitted | Pull-Request-Implementation | New-pull-request | Medium | Rebase LSP preview PR | https://github.com/can1357/oh-my-pi/pull/8401 |
+| [ISSUE-015](issues/ISSUE-015.md) | Cache marker: implicit-provider cache collapse is never reported | Investigating | Not-Selected | Not-Selected | Medium | Measure implicit cache collapse | Not published. |
+| [ISSUE-016](issues/ISSUE-016.md) | RPC wait: every event wake rescans the complete turn history | Investigating | Not-Selected | Not-Selected | Medium | Benchmark RPC completion wait | Not published. |
+| [ISSUE-017](issues/ISSUE-017.md) | Session stats: aggregate messages through four full passes | Investigating | Not-Selected | Not-Selected | Low | Benchmark session stats scans | Not published. |
+| [ISSUE-019](issues/ISSUE-019.md) | GitHub errors omit structured and request context | Submitted | Pull-Request-Implementation | New-pull-request | Medium | Await GitHub diagnostics review | https://github.com/can1357/oh-my-pi/pull/10581 |
+| [ISSUE-020](issues/ISSUE-020.md) | Read: internal-first mixed batches do not split | Submitted | Pull-Request-Implementation | New-pull-request | High | Await Read maintainer decision | https://github.com/can1357/oh-my-pi/pull/10578 |
+
+## Archived-Findings
+
+| ID | Finding | Authorized-Work | Publication-Target | Contribution-Priority | Archive-Reason | External-Reference |
+| --- | --- | --- | --- | --- | --- | --- |
+| [ISSUE-001](issues/archive/ISSUE-001.md) | Eval prompt: agent() children do not share the promised kernel state | Pull-Request-Implementation | New-pull-request | Medium | Merged | https://github.com/can1357/oh-my-pi/pull/9154 |
+| [ISSUE-003](issues/archive/ISSUE-003.md) | Todo schema: items is described as append-only despite flattened init | Pull-Request-Implementation | New-pull-request | Low | Merged | https://github.com/can1357/oh-my-pi/pull/9159 |
+| [ISSUE-004](issues/archive/ISSUE-004.md) | Bash prompt: timeout does not extend the auto-background cutoff | Pull-Request-Implementation | New-pull-request | Medium | Merged | https://github.com/can1357/oh-my-pi/pull/9155 |
+| [ISSUE-005](issues/archive/ISSUE-005.md) | Task prompt: restricted specialist defaults are called general-purpose workers | Pull-Request-Implementation | New-pull-request | Medium | Merged | https://github.com/can1357/oh-my-pi/pull/9046 |
+| [ISSUE-006](issues/archive/ISSUE-006.md) | Task prompt: same-file edits are not guaranteed to auto-resolve | Pull-Request-Implementation | New-pull-request | High | Merged | https://github.com/can1357/oh-my-pi/pull/9047 |
+| [ISSUE-008](issues/archive/ISSUE-008.md) | Read prompt: raw is not a universal converter or byte bypass | Not-Selected | Not-Selected | Medium | Fixed-Elsewhere | Not published. |
+| [ISSUE-009](issues/archive/ISSUE-009.md) | Read SSH guidance: retired search and ssh tool names remain model-visible | Pull-Request-Implementation | New-pull-request | Medium | Merged | https://github.com/can1357/oh-my-pi/pull/9045 |
+| [ISSUE-018](issues/archive/ISSUE-018.md) | Read guidance: known targets consume repeated model turns | Pull-Request-Implementation | New-pull-request | High | Withdrawn | https://github.com/can1357/oh-my-pi/pull/10465 |
