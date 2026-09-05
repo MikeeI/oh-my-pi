@@ -229,13 +229,16 @@ Each entry names its disposition, observable behavior, implementation owner, and
 - Contract: complete targets and selectors remain unchanged.
 - Contract: failed targets retry without repeating successful siblings.
 - Contract: truncated results follow their exact recovery reference.
+- Contract: middle-elided results expose the exact omitted artifact-relative range without repeating preserved output.
 - Contract: otherwise only changed content is read again.
 - Contract: MCP resource URIs retain their exact server-provided spelling.
 - Contract: semicolons belonging to SQL, archive members, URIs, or filenames remain target data.
 - Owner: `src/prompts/tools/read.md` owns model-visible scheduling and recovery guidance.
+- Owner: `src/tools/output-meta.ts` owns exact runtime recovery references for spilled result text.
 - Owner: upstream `packages/agent/src/agent-loop.ts#executeToolCalls` owns sibling-tool concurrency.
 - Required action: retain only explicit sibling scheduling and exact recovery guidance at current upstream seams.
 - Proof: scheduling and recovery description cases in `test/tools/read-guidance.test.ts`.
+- Proof: artifact spill recovery in `test/tools.test.ts`.
 - Proof: sibling concurrency in `packages/agent/test/agent-loop.test.ts`.
 
 #### `MOMP-READ-USER-AGENTS` — URL fetch identity fallback

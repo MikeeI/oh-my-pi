@@ -1013,21 +1013,37 @@ describe("Coding Agent Tools", () => {
 				const truncation = result.details?.meta?.truncation;
 				const output = getTextOutput(result);
 
-				expect(truncation?.artifactId).toBeDefined();
+				const artifactId = truncation?.artifactId;
+				const headRange = truncation?.headRange;
+				const tailRange = truncation?.tailRange;
+				expect(artifactId).toBeDefined();
 				expect(Buffer.byteLength(output, "utf-8")).toBeLessThan(20 * 1024);
 				expect(output).toContain("artifact://");
 				expect(truncation?.nextOffset).toBe(defaultLimit + 1);
 				expect(output).toContain(`Use :${defaultLimit + 1} to continue`);
+				if (!artifactId || !headRange || !tailRange) {
+					throw new Error("expected recoverable middle-elision metadata");
+				}
 
+				const omittedStart = headRange.end + 1;
+				const omittedEnd = tailRange.start - 1;
+				const recoveryPath = `artifact://${artifactId}:${omittedStart}-${omittedEnd}`;
+				expect(output).toContain(`Read ${recoveryPath} to recover omitted artifact lines`);
+				expect(output).not.toContain(`Read artifact://${artifactId} for full output`);
+
+				const artifactPath = path.join(spillManager.getArtifactsDir()!, `${artifactId}.read.log`);
+				const artifactLines = (await Bun.file(artifactPath).text()).split("\n");
 				const saveArtifact = vi.spyOn(spillManager, "saveArtifact");
 				const artifactResult = await spillReadTool.execute(
 					"test-call-read-spilled-artifact",
-					{ path: `artifact://${truncation?.artifactId}` },
+					{ path: recoveryPath },
 					undefined,
 					undefined,
 					context,
 				);
-				expect(getTextOutput(artifactResult)).toContain(line);
+				const recoveredOutput = getTextOutput(artifactResult);
+				expect(recoveredOutput).toContain(artifactLines[omittedStart - 1]!);
+				expect(recoveredOutput).toContain(artifactLines[omittedEnd - 1]!);
 				expect(saveArtifact).not.toHaveBeenCalled();
 			} finally {
 				await spillManager.close();

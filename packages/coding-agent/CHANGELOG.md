@@ -13,6 +13,7 @@
 
 ### Fixed
 
+- Middle-elided tool results now point directly to omitted artifact lines instead of rereading preserved output.
 - Fixed finalized Assistant tails disappearing after terminal acceptance or behind active transcript predecessors.
 - Restored PageUp access to native tmux history from a focused empty editor without intercepting drafts or overlays.
 - GitHub failures now retain structured API diagnostics, identify failed file reads, and clarify Boolean search syntax.
