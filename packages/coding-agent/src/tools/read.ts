@@ -778,13 +778,9 @@ export class ReadTool implements AgentTool<typeof readSchema, ReadToolDetails> {
 	async #tryReadDelimitedPaths(
 		readPath: string,
 		signal?: AbortSignal,
-		options: {
-			splitInternalUrlSemicolons?: boolean;
-		} = {},
+		routedUrlPredicate?: (entry: string) => boolean,
 	): Promise<AgentToolResult<ReadToolDetails> | null> {
-		const parts = await splitDelimitedPathEntry(readPath, this.session.cwd, {
-			splitInternalUrlSemicolons: options.splitInternalUrlSemicolons,
-		});
+		const parts = await splitDelimitedPathEntry(readPath, this.session.cwd, { routedUrlPredicate });
 		if (!parts) return null;
 
 		const notice = `Note: interpreted as ${parts.length} paths: ${parts.join(", ")}`;
@@ -1295,15 +1291,6 @@ export class ReadTool implements AgentTool<typeof readSchema, ReadToolDetails> {
 			}
 			readPath = attachment.sourcePath;
 		}
-		if (readPath.startsWith("attachment://") && readPath.includes(";")) {
-			const delimitedResult = await this.#tryReadDelimitedPaths(readPath, signal);
-			if (delimitedResult) return delimitedResult;
-		}
-
-		if (readPath.startsWith("conflict://") && readPath.includes(";")) {
-			const delimitedResult = await this.#tryReadDelimitedPaths(readPath, signal);
-			if (delimitedResult) return delimitedResult;
-		}
 
 		const conflictUri = parseConflictUri(readPath);
 		if (conflictUri) {
@@ -1337,19 +1324,10 @@ export class ReadTool implements AgentTool<typeof readSchema, ReadToolDetails> {
 			return executeReadUrl(this.session, { path: parsedUrlTarget.path, raw: urlRaw }, signal);
 		}
 
-		// MCP resource URIs are opaque and may contain literal semicolons. Route
-		// them exactly before interpreting semicolons as the Read batch delimiter.
+		// Handle native OMP URLs and custom-scheme resources advertised by MCP servers.
 		const internalRouter = InternalUrlRouter.instance();
-		const canResolveInternal = internalRouter.canResolve(readPath);
-		const isOpaqueMcpResource =
-			readPath.toLowerCase().startsWith("mcp://") || (canResolveInternal && !internalRouter.canHandle(readPath));
-		if (isOpaqueMcpResource) {
-			return this.#handleInternalUrl(readPath, parseSel(undefined), signal);
-		}
-		const delimitedInternalResult = canResolveInternal
-			? await this.#tryReadDelimitedPaths(readPath, signal, {
-					splitInternalUrlSemicolons: true,
-				})
+		const delimitedInternalResult = internalRouter.canResolve(readPath)
+			? await this.#tryReadDelimitedPaths(readPath, signal, entry => internalRouter.canResolve(entry))
 			: null;
 		if (delimitedInternalResult) return delimitedInternalResult;
 

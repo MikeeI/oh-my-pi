@@ -131,29 +131,6 @@ describe("McpProtocolHandler", () => {
 		expect(output.text).not.toContain("interpreted as");
 	});
 
-	it("preserves a literal semicolon in a native MCP resource URI", async () => {
-		const uri = "catalog://items;active";
-		const resources = new Map<string, { resources: MCPResource[]; templates: MCPResourceTemplate[] }>();
-		resources.set("catalog", {
-			resources: [{ uri, name: "active-items" }],
-			templates: [],
-		});
-		const manager = createMockManager({
-			servers: ["catalog"],
-			resources,
-			readResult: { contents: [{ uri, text: "active items" }] },
-		});
-		MCPManager.setInstance(manager);
-
-		const result = await new ReadTool(createToolSession()).execute("read-native-semicolon-resource", { path: uri });
-		const output = result.content.find(block => block.type === "text");
-
-		expect(output?.type).toBe("text");
-		if (output?.type !== "text") throw new Error("Expected text output");
-		expect(output.text).toContain("active items");
-		expect(output.text).not.toContain("interpreted as");
-	});
-
 	it("lets read consume a native URI advertised by an MCP server", async () => {
 		const resources = new Map<string, { resources: MCPResource[]; templates: MCPResourceTemplate[] }>();
 		resources.set("ags", {

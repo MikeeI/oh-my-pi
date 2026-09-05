@@ -56,18 +56,6 @@ describe("read attachment URLs", () => {
 		});
 	});
 
-	it("reads several attachment URLs from one semicolon-delimited path", async () => {
-		const result = await new ReadTool(createSession(testDir, imagePath, 2)).execute("read-attachment-batch", {
-			path: "attachment://1;attachment://2",
-		});
-		const text = result.content.flatMap(block => (block.type === "text" ? [block.text] : [])).join("\n");
-		const images = result.content.filter(block => block.type === "image");
-
-		expect(text).toContain("Note: interpreted as 2 paths: attachment://1, attachment://2");
-		expect(images).toHaveLength(2);
-		expect(result.details?.displayReadTargets).toEqual(["attachment://1", "attachment://2"]);
-	});
-
 	it("reports unknown attachment URLs with the available URIs", async () => {
 		const tool = new ReadTool(createSession(testDir, imagePath));
 

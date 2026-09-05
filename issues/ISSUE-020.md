@@ -8,7 +8,7 @@ Contribution-Priority: High
 Root-Cause-Confidence: High
 Finding-Category: Performance
 Created: 2026-09-02
-Updated: 2026-09-02
+Updated: 2026-09-05
 Source: `upstream/main@39cf639c7bb6b5014a1cc8ea8175558cccb23905`
 
 ## Root-Cause
@@ -151,8 +151,18 @@ PR #7000 proposes a substantially larger native-array API and consumer closure.
 - [x] CHANGELOG updated
 ```
 
+## Reassessment
+
+- [O] MOMP 18.1.10 combined three skill Reads and elided 213 middle lines above the configured result limit.
+- [O] Three separate same-turn Reads returned all 111, 246, and 225 lines without recovery reads.
+- [S] `packages/agent/src/agent-loop.ts#executeToolCalls` already runs independent sibling tool calls concurrently.
+- [S] Existing performance evidence compares semicolon batching with serial Main turns.
+- [S] Existing performance evidence does not compare batching with native same-turn sibling calls.
+- [S] `upstream/main@e3106be68f778635da3a17106835ce2e0e6992af` already recommends parallel independent Reads.
+- [S] The submitted implementation is no longer the recommended MOMP scheduling strategy.
+
 ## Next-Action
 
-Summary: Await Read maintainer decision
-Action: Monitor PR #10578 for the maintainer's global batching-policy decision.
-Done-When: Upstream merges, declines, supersedes, or otherwise resolves the contribution.
+Summary: Reassess Read PR direction
+Action: Decide whether PR #10578 should remain open, be revised, or be withdrawn.
+Done-When: The selected disposition and its evidence are recorded.

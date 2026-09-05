@@ -24,7 +24,7 @@ Next finding ID: ISSUE-021
 | [ISSUE-016](issues/ISSUE-016.md) | RPC wait: every event wake rescans the complete turn history | Investigating | Not-Selected | Not-Selected | Medium | Benchmark RPC completion wait | Not published. |
 | [ISSUE-017](issues/ISSUE-017.md) | Session stats: aggregate messages through four full passes | Investigating | Not-Selected | Not-Selected | Low | Benchmark session stats scans | Not published. |
 | [ISSUE-019](issues/ISSUE-019.md) | GitHub errors omit structured and request context | Submitted | Pull-Request-Implementation | New-pull-request | Medium | Await GitHub diagnostics review | https://github.com/can1357/oh-my-pi/pull/10581 |
-| [ISSUE-020](issues/ISSUE-020.md) | Read: internal-first mixed batches do not split | Submitted | Pull-Request-Implementation | New-pull-request | High | Await Read maintainer decision | https://github.com/can1357/oh-my-pi/pull/10578 |
+| [ISSUE-020](issues/ISSUE-020.md) | Read: internal-first mixed batches do not split | Submitted | Pull-Request-Implementation | New-pull-request | High | Reassess Read PR direction | https://github.com/can1357/oh-my-pi/pull/10578 |
 
 ## Archived-Findings
 

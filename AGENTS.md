@@ -218,26 +218,25 @@ Each entry names its disposition, observable behavior, implementation owner, and
 - Required action: retain only the skill-URI collapse decision at the current upstream Read-group renderer.
 - Proof: `test/read-tool-group.test.ts`.
 
-#### `MOMP-READ-BATCH-GUIDANCE` — Provider-roundtrip-efficient reads
+#### `MOMP-READ-SCHEDULING` — Provider-roundtrip-efficient reads
 
 - Disposition: `UPSTREAM-INTEGRIERT`.
 - Contract: before each Read, the model collects every bounded target required for the current step.
-- Contract: every independent target uses one native Read call.
-- Contract: known disjoint ranges from one target share one comma-separated selector.
+- Contract: known disjoint ranges for one source share one comma-separated selector.
+- Contract: each scheduling wave assigns every resulting target to exactly one native Read call.
 - Contract: independent Read calls are emitted together in the same Assistant turn.
 - Contract: dependent Reads remain sequential when one result determines the next target or selector.
 - Contract: complete targets and selectors remain unchanged.
-- Contract: only failed, truncated, or changed targets are read again.
+- Contract: failed targets retry without repeating successful siblings.
+- Contract: truncated results follow their exact recovery reference.
+- Contract: otherwise only changed content is read again.
 - Contract: MCP resource URIs retain their exact server-provided spelling.
 - Contract: semicolons belonging to SQL, archive members, URIs, or filenames remain target data.
-- Contract: existing scalar semicolon calls retain mixed internal/local and registered-resource compatibility.
-- Owner: `src/prompts/tools/read.md` owns model-visible scheduling guidance.
+- Owner: `src/prompts/tools/read.md` owns model-visible scheduling and recovery guidance.
 - Owner: upstream `packages/agent/src/agent-loop.ts#executeToolCalls` owns sibling-tool concurrency.
-- Owner: `src/tools/read.ts` and `src/tools/path-utils.ts` own scalar delimiter compatibility.
-- Required action: retain explicit sibling scheduling and existing scalar compatibility at current upstream seams.
-- Proof: scheduling-description cases in `test/tools/read-guidance.test.ts`.
+- Required action: retain only explicit sibling scheduling and exact recovery guidance at current upstream seams.
+- Proof: scheduling and recovery description cases in `test/tools/read-guidance.test.ts`.
 - Proof: sibling concurrency in `packages/agent/test/agent-loop.test.ts`.
-- Proof: scalar compatibility cases in the focused Read suites.
 
 #### `MOMP-READ-USER-AGENTS` — URL fetch identity fallback
 

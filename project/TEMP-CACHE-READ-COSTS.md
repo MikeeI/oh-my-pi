@@ -186,14 +186,15 @@ This means the internal file operations are serial even though the model-facing 
 For ordinary local files, the 7 ms median makes internal I/O parallelism a secondary optimization.
 Changing the loop to bounded concurrency would reduce tool time from the sum toward the slowest target.
 Such a change must preserve input ordering, partial-error messages, image and text block ordering, and cancellation.
-It would not eliminate any additional Main roundtrip because semicolon batching already owns that benefit.
+Both semicolon batches and native same-turn sibling calls avoid intermediate Main roundtrips.
+This measurement does not compare those two execution forms.
 
 ## Operational Guidance
 
 - Collect every independent local target needed for the current reasoning step before calling `read`.
-- Put known local paths and internal resources into one semicolon-delimited Read call.
+- Emit one native Read call per independent target in the same Assistant turn.
 - Keep dependent reads sequential when one file determines the next target or selector.
-- Select bounded ranges before batching to avoid transferring irrelevant context.
+- Select bounded ranges before reading to avoid transferring irrelevant context.
 - Treat exact Read tokens as content cost and Assistant usage as roundtrip cost.
 - Do not infer actual billing from the runtime price proxy.
 
@@ -237,5 +238,5 @@ Use `quantile_cont(value, 0.5)` for medians and `quantile_cont(value, 0.9)` for 
 The measured five-file batch cost $0.1139344 in API price proxy and completed Read work in 22 ms.
 The primary cost was replaying 207,616 cached Main-context tokens, not reading the five files.
 Five serial Reads would conservatively exceed $0.4461 under the same cached-prefix assumption.
-Semicolon batching is therefore already the correct optimization for independent local Read targets.
-Internal Read parallelism may improve tool latency, but roundtrip elimination owns the material saving.
+The evidence supports eliminating intermediate Main turns, not requiring semicolon batching.
+Native sibling Read calls provide that boundary while preserving one output limit per target.

@@ -2,13 +2,15 @@ Read files, directories, archives, SQLite, images, documents, internal resources
 
 <instruction>
 - MUST collect every bounded target required for the current step before calling `read`.
-- MUST assign each target to exactly one `read` call.
-- MUST combine known disjoint ranges of one target in one comma-separated selector.
+- MUST combine known disjoint ranges for one source in one comma-separated selector.
+- MUST assign each resulting target to exactly one `read` call in the current scheduling wave.
 - MUST issue one separate `read` call per target; NEVER join targets in one `path`.
 - MUST emit all independent `read` calls together in the same assistant turn.
 - MUST read sequentially only when one result determines the next target or selector.
 - Keep each complete `path[:selector]` target otherwise unchanged.
-- MUST re-read a target only after failure, truncation, or a change since its last complete read.
+- MUST retry a failed target without repeating successful sibling calls.
+- MUST follow the exact recovery reference after truncation.
+- Otherwise, MUST re-read only content changed since its last complete read.
 - Preserve MCP resource URIs exactly; NEVER split or percent-encode server-provided semicolons.
 - SQLite semicolons in SQL, table names, or row keys remain target data.
 - Literal semicolons inside authored non-MCP internal URIs MUST use `%3B`.
@@ -56,5 +58,5 @@ Read files, directories, archives, SQLite, images, documents, internal resources
 <critical>
 Recovery footer names ranges? Re-read ONLY those ranges.
 Recovery footer names an artifact? Read that exact artifact reference.
-NEVER reconstruct elided `..`/`…` content heuristically.
+NEVER repeat delivered ranges or reconstruct elided `..`/`…` content heuristically.
 </critical>

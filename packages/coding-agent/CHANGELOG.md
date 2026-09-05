@@ -9,7 +9,7 @@
 ### Changed
 
 - URL reads now try current Chrome, Googlebot, then curl identities when bot blocks require a fallback.
-- Independent Read targets now use separate same-turn calls to avoid aggregate batch truncation.
+- Read guidance now uses separate same-turn calls for independent targets to avoid aggregate batch truncation.
 
 ### Fixed
 
