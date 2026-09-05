@@ -2,25 +2,21 @@ Read files, directories, archives, SQLite, images, documents, internal resources
 
 <instruction>
 - MUST collect every bounded target required for the current step before calling `read`.
-- MUST partition every target into exactly one call group before scheduling calls.
-- MCP resources include `mcp://` and MCP-advertised custom URIs.
-- Every HTTP(S) URL and MCP resource is a sibling-only target.
-- NEVER place a sibling-only target in a semicolon-delimited `path`.
-- Batch-compatible targets are local paths, `file://` URLs, and internal URIs not owned or advertised by MCP.
-- MUST join all batch-compatible targets in one semicolon-delimited `path`.
-- MUST issue one `read` call per sibling-only target.
-- MUST emit all resulting calls together in the same assistant turn.
+- MUST assign each target to exactly one `read` call.
+- MUST combine known disjoint ranges of one target in one comma-separated selector.
+- MUST issue one separate `read` call per target; NEVER join targets in one `path`.
+- MUST emit all independent `read` calls together in the same assistant turn.
+- MUST read sequentially only when one result determines the next target or selector.
 - Keep each complete `path[:selector]` target otherwise unchanged.
-- Read again only for a target discovered by a result or for a failed or truncated target.
+- MUST re-read a target only after failure, truncation, or a change since its last complete read.
 - Preserve MCP resource URIs exactly; NEVER split or percent-encode server-provided semicolons.
 - SQLite semicolons in SQL, table names, or row keys remain target data.
-- Ambiguous literal semicolons → use separate sibling calls instead of corrupting a target.
-- Literal semicolons inside batch-compatible internal URIs MUST use `%3B`.
-- WRONG: `{"path":"https://a.example/x;https://b.example/y"}`.
-- RIGHT: issue these three `read` calls together in one assistant turn:
-  - `{"path":"package.json;skill://skill-momp"}`
-  - `{"path":"https://a.example/x"}`
-  - `{"path":"https://b.example/y"}`
+- Literal semicolons inside authored non-MCP internal URIs MUST use `%3B`.
+- WRONG: `{"path":"package.json:1-80;src/main.ts:120-180;skill://skill-momp:1-33"}`.
+- RIGHT: issue these sibling calls together in the same assistant turn:
+  - `{"path":"package.json:1-80"}`
+  - `{"path":"src/main.ts:120-180,420-455"}`
+  - `{"path":"skill://skill-momp:1-33"}`
 - SHOULD use `read` (not browser) for web content; browser only when `read` can't deliver.
 </instruction>
 
@@ -58,5 +54,7 @@ Read files, directories, archives, SQLite, images, documents, internal resources
   Literal `:`, `?`, `#` → percent-encode (`%3A`/`%3F`/`%23`). Requires a verified POSIX shell on the remote host. For Windows or other unsupported hosts, use `bash` with a remote SSH command or mount with `sshfs`.
 
 <critical>
-Summary footer names elided ranges? Re-issue ONLY those ranges. NEVER guess `..`/`…` content.
+Recovery footer names ranges? Re-read ONLY those ranges.
+Recovery footer names an artifact? Read that exact artifact reference.
+NEVER reconstruct elided `..`/`…` content heuristically.
 </critical>

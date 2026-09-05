@@ -14,25 +14,32 @@ function createSession(): ToolSession {
 }
 
 describe("Read guidance", () => {
-	it("partitions targets into batch-compatible and sibling-only calls", () => {
+	it("schedules independent targets as same-turn sibling calls", () => {
 		const description = new ReadTool(createSession()).description;
 
 		expect(description).toContain("MUST collect every bounded target required for the current step");
-		expect(description).toContain("MUST partition every target into exactly one call group");
-		expect(description).toContain("Every HTTP(S) URL and MCP resource is a sibling-only target");
-		expect(description).toContain("NEVER place a sibling-only target in a semicolon-delimited `path`");
+		expect(description).toContain("MUST assign each target to exactly one `read` call");
+		expect(description).toContain("MUST combine known disjoint ranges of one target");
+		expect(description).toContain("MUST issue one separate `read` call per target");
+		expect(description).toContain("NEVER join targets in one `path`");
+		expect(description).toContain("MUST emit all independent `read` calls together in the same assistant turn");
 		expect(description).toContain(
-			"Batch-compatible targets are local paths, `file://` URLs, and internal URIs not owned or advertised by MCP",
+			"MUST read sequentially only when one result determines the next target or selector",
 		);
-		expect(description).toContain("MUST issue one `read` call per sibling-only target");
-		expect(description).toContain("MUST emit all resulting calls together in the same assistant turn");
+		expect(description).toContain("Keep each complete `path[:selector]` target otherwise unchanged");
+		expect(description).toContain("MUST re-read a target only after failure, truncation, or a change");
 		expect(description).toContain("Preserve MCP resource URIs exactly");
 		expect(description).toContain("NEVER split or percent-encode server-provided semicolons");
 		expect(description).toContain("SQLite semicolons in SQL, table names, or row keys remain target data");
-		expect(description).toContain("Literal semicolons inside batch-compatible internal URIs MUST use `%3B`");
-		expect(description).toContain('WRONG: `{"path":"https://a.example/x;https://b.example/y"}`');
-		expect(description).toContain("RIGHT: issue these three `read` calls together");
-		expect(description).toContain('`{"path":"package.json;skill://skill-momp"}`');
+		expect(description).toContain("Literal semicolons inside authored non-MCP internal URIs MUST use `%3B`");
+		expect(description).toContain(
+			'WRONG: `{"path":"package.json:1-80;src/main.ts:120-180;skill://skill-momp:1-33"}`',
+		);
+		expect(description).toContain("RIGHT: issue these sibling calls together in the same assistant turn");
+		expect(description).toContain('`{"path":"package.json:1-80"}`');
+		expect(description).toContain('`{"path":"src/main.ts:120-180,420-455"}`');
+		expect(description).toContain('`{"path":"skill://skill-momp:1-33"}`');
+		expect(description).not.toContain("MUST join all batch-compatible targets");
 	});
 
 	it("describes raw output as source-specific instead of universal byte access", () => {

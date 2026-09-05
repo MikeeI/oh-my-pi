@@ -222,24 +222,22 @@ Each entry names its disposition, observable behavior, implementation owner, and
 
 - Disposition: `UPSTREAM-INTEGRIERT`.
 - Contract: before each Read, the model collects every bounded target required for the current step.
-- Contract: every collected target belongs to exactly one call group before scheduling.
-- Contract: HTTP(S) URLs and MCP resources are sibling-only targets and never use semicolon batching.
-- Contract: local paths, `file://` URLs, and non-MCP internal URIs share one semicolon-delimited batch group.
-- Contract: all resulting batch and sibling calls are emitted together in the same assistant turn.
-- Contract: mixed internal URI and local path orders route every target through the existing Read dispatcher.
-- Contract: registered `conflict://` and `attachment://` resources participate in semicolon-delimited Read calls.
-- Contract: every MCP resource uses its own Read call and preserves server-provided URI text exactly.
-- Contract: semicolons belonging to URLs, SQL, archive members, or filenames remain target data.
-- Contract: literal semicolons inside batch-compatible internal URIs use percent encoding.
-- Contract: ambiguous literal semicolons use separate calls instead of corrupting a target.
-- Owner: `src/prompts/tools/read.md` owns model-visible batching guidance.
-- Owner: `src/tools/read.ts` and `src/tools/path-utils.ts` own delimiter and opaque-resource routing.
-- Required action: retain mixed-target, conflict, attachment, opaque MCP, and guidance deltas at current upstream seams.
-- Proof: `test/tools/read-guidance.test.ts`.
-- Proof: conflict batching in `test/tools/conflict-integration.test.ts`.
-- Proof: attachment batching in `test/read-tool.test.ts`.
-- Proof: mixed-target cases in `test/skill-protocol-customdirs.test.ts`.
-- Proof: exact MCP resource cases in `test/internal-urls/mcp-protocol.test.ts`.
+- Contract: every independent target uses one native Read call.
+- Contract: known disjoint ranges from one target share one comma-separated selector.
+- Contract: independent Read calls are emitted together in the same Assistant turn.
+- Contract: dependent Reads remain sequential when one result determines the next target or selector.
+- Contract: complete targets and selectors remain unchanged.
+- Contract: only failed, truncated, or changed targets are read again.
+- Contract: MCP resource URIs retain their exact server-provided spelling.
+- Contract: semicolons belonging to SQL, archive members, URIs, or filenames remain target data.
+- Contract: existing scalar semicolon calls retain mixed internal/local and registered-resource compatibility.
+- Owner: `src/prompts/tools/read.md` owns model-visible scheduling guidance.
+- Owner: upstream `packages/agent/src/agent-loop.ts#executeToolCalls` owns sibling-tool concurrency.
+- Owner: `src/tools/read.ts` and `src/tools/path-utils.ts` own scalar delimiter compatibility.
+- Required action: retain explicit sibling scheduling and existing scalar compatibility at current upstream seams.
+- Proof: scheduling-description cases in `test/tools/read-guidance.test.ts`.
+- Proof: sibling concurrency in `packages/agent/test/agent-loop.test.ts`.
+- Proof: scalar compatibility cases in the focused Read suites.
 
 #### `MOMP-READ-USER-AGENTS` — URL fetch identity fallback
 

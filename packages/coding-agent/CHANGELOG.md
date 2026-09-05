@@ -9,7 +9,7 @@
 ### Changed
 
 - URL reads now try current Chrome, Googlebot, then curl identities when bot blocks require a fallback.
-- Read batches known local, file-URL, and non-MCP internal targets while keeping HTTP and opaque MCP resources separate.
+- Independent Read targets now use separate same-turn calls to avoid aggregate batch truncation.
 
 ### Fixed
 
