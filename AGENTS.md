@@ -171,18 +171,19 @@ Each entry names its disposition, observable behavior, implementation owner, and
 - Contract: GPT-5.6 eager mode allows proactive delegation.
 - Contract: other models retain current upstream eager/default delegation behavior.
 - Contract: fan-out, concurrency, IRC, and Hub instructions render from current upstream template inputs.
+- Contract: task one-pass guidance preserves active mutation authority instead of treating tool access as permission.
 - Contract: task `effort` maps `lo`, `med`, and `hi` to the target model's lowest, middle, and highest levels.
 - Contract: omitting task `effort` preserves normal configured thinking selection; `task.maxEffort` remains the ceiling.
 - Contract: model switches select the target model's policy even when model identity is hidden.
 - Owner: upstream `src/task/prompt-policy.ts#sessionDelegationBias` owns model classification.
 - Owner: upstream `src/prompts/system/system-prompt.md#Delegation` owns bundled policy.
 - Owner: the active project-settings `SYSTEM.template.md` owns the live policy text.
-- Owner: upstream `src/prompts/tools/task.md` owns model-visible task-effort semantics.
+- Owner: upstream `src/prompts/tools/task.md` owns model-visible task design and effort semantics.
 - Owner: `src/system-prompt.ts` owns the render inputs and template selection.
-- Required action: retain only model-policy and effort-semantics deltas at the named current upstream owners.
+- Required action: retain only model-policy, task-design, and effort-semantics deltas at the named current upstream owners.
 - Proof: candidate prompt rendering through `momp system-prompt inspect`.
 - Proof: `test/system-prompt-templates.test.ts`.
-- Proof: effort-description cases in `test/task/task-schema.test.ts`.
+- Proof: task-description and effort-description cases in `test/task/task-schema.test.ts`.
 
 #### `MOMP-EVAL-OUTPUT` — Large owner-result preservation
 

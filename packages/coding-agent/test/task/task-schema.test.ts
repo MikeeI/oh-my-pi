@@ -103,7 +103,7 @@ describe("task spawn validation", () => {
 	});
 });
 
-describe("task effort description", () => {
+describe("task description", () => {
 	afterEach(() => {
 		vi.restoreAllMocks();
 	});
@@ -134,6 +134,15 @@ describe("task effort description", () => {
 		);
 		expect(description).toContain("Selection remains subject to `task.maxEffort`.");
 		expect(description.match(/Optional model-relative reasoning override/g)).toHaveLength(1);
+	});
+
+	it("preserves assignment-owned mutation authority", async () => {
+		const description = await renderDescription(true, false);
+
+		expect(description).toContain(
+			"Tool access never grants permission to change state; the active contract and assignment define allowed effects.",
+		);
+		expect(description).not.toContain("investigate AND edit");
 	});
 
 	it("omits effort guidance when effort is disabled", async () => {
