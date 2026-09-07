@@ -46,6 +46,9 @@
 - GitHub Copilot plan/model-policy 403s no longer count as credential failures for credential-lifetime decisions: the token is valid, so stored credentials are preserved instead of wiped ([#11280](https://github.com/can1357/oh-my-pi/pull/11280) by [@H4vC](https://github.com/H4vC)).
 - Fixed custom `google-generative-ai` providers failing mid-turn model fallback when Gemini 3 tool calls are replayed without their original thought signature ([#11270](https://github.com/can1357/oh-my-pi/issues/11270)).
 - Fixed Linux `zcode://` (Z.AI coding-plan) OAuth sign-in hanging at the paste prompt after a successful browser authorization: native scheme registration now runs `update-desktop-database`, so `xdg-desktop-portal-gtk` resolves the handler on the first attempt instead of reporting "No Apps available" and no longer routes the callback to a stale transaction directory ([#11279](https://github.com/can1357/oh-my-pi/issues/11279)).
+### Added
+
+- Added opt-in explicit prompt-cache breakpoint fields to compatible Codex Responses requests.
 
 ## [18.1.14] - 2026-09-07
 
@@ -326,9 +329,6 @@
 ### Fixed
 
 - Fixed completed Anthropic turns remaining busy when the provider sent `message_stop` but kept the SSE connection open, which stranded tool execution and queued steering until timeout.
-### Added
-
-- Added opt-in explicit prompt-cache breakpoint fields to compatible Codex Responses requests.
 
 ## [17.4.2] - 2026-08-21
 

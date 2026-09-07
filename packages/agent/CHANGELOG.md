@@ -24,6 +24,9 @@
 - Fixed repeated local compaction omitting messages retained before the previous compaction record, while preserving original entry IDs and `/clear` boundaries.
 - Raised remote compaction request timeout from 3 minutes to 5 minutes so long Codex/gpt-6-astra compact streams can finish before the watchdog aborts them.
 - Fixed proxy responses dropping the cost the server reported; recorded costs are kept instead of being recomputed.
+### Added
+
+- Added an exact native token-count API that reports unavailable counters instead of returning estimates.
 
 ## [18.1.10] - 2026-09-04
 
@@ -47,9 +50,6 @@
 ### Fixed
 
 - Fixed preservation of Claude thinking/reasoning context when conversations are compacted or tool results are pruned.
-### Added
-
-- Added an exact native token-count API that reports unavailable counters instead of returning estimates.
 
 ## [18.0.11] - 2026-08-29
 

@@ -436,7 +436,7 @@ Each entry names its disposition, observable behavior, implementation owner, and
 - Contract: emergency pressure renders the finalized emergency block's newest rows, not one representative row.
 - Contract: emergency rows commit click hit-test spans while the summary row stays unmapped.
 - Contract: stable pane geometry records final transcript rows exactly once and preserves pre-existing pane history.
-- Contract: multiplexer rendering never emits ED3 or invokes `clear-history`.
+- Contract: ordinary multiplexer append and preserve-mode resize rendering never emits ED3 or invokes `clear-history`.
 - Contract: changed geometry starts a new resize transaction during post-settle suppression.
 - Contract: fullscreen resizes preserve geometry epochs and burst state for normal-buffer recovery.
 - Contract: fullscreen exits recover the restored normal-buffer anchor before provider repaint.
@@ -453,6 +453,7 @@ Each entry names its disposition, observable behavior, implementation owner, and
 - Proof: `packages/tui/test/history-frame-plan.test.ts`.
 - Proof: `packages/tui/test/resize-multiplexer-anchor.test.ts`.
 - Proof: `test/tmux-scrollback-exactness.test.ts`.
+- Proof: explicit reset and rebuild ED3 ordering in `packages/tui/test/destructive-reset-clear-order.test.ts`.
 
 #### `MOMP-TMUX-PAGEUP` — Native tmux history access
 
