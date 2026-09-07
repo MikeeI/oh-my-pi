@@ -10,6 +10,7 @@ import { formatFullOutputReference, formatStyledTruncationWarning, stripOutputNo
 import { isReadableUrlPath, splitInternalUrlSel, splitPathAndSel } from "./path-utils";
 import type { ReadToolDetails } from "./read";
 import { isRawSelector, parseSel } from "./read-selector";
+import { formatReadTokenSuffix } from "./read-token";
 import { formatBytes, sanitizeDisplayLines, shortenPath, wrapBrackets } from "./render-utils";
 
 // =============================================================================
@@ -137,6 +138,7 @@ export const readToolRenderer = {
 				const endLine = args.limit !== undefined ? startLine + args.limit - 1 : "";
 				title += `:${startLine}${endLine ? `-${endLine}` : ""}`;
 			}
+			title += formatReadTokenSuffix(result.details?.readTextTokens, uiTheme);
 			const header = renderStatusLine({ icon: "error", title }, uiTheme);
 			const errorLines = sanitizeDisplayLines(errorText).map(line => uiTheme.fg("error", line));
 			const outputBlock = new CachedOutputBlock();
@@ -188,7 +190,11 @@ export const readToolRenderer = {
 			});
 			const correction = suffix ? ` ${uiTheme.fg("dim", `(corrected from ${shortenPath(suffix.from)})`)}` : "";
 			const header = renderStatusLine(
-				{ icon: suffix ? "warning" : "success", title: "Read", description: `${displayPath}${correction}` },
+				{
+					icon: suffix ? "warning" : "success",
+					title: "Read",
+					description: `${displayPath}${correction}${formatReadTokenSuffix(details?.readTextTokens, uiTheme)}`,
+				},
 				uiTheme,
 			);
 			const detailLines = contentText
@@ -241,6 +247,7 @@ export const readToolRenderer = {
 			const n = details.conflictCount;
 			title += ` ${uiTheme.fg("warning", `(⚠ ${n} conflict${n === 1 ? "" : "s"})`)}`;
 		}
+		title += formatReadTokenSuffix(details?.readTextTokens, uiTheme);
 		const rawRequested = args?.raw === true || isRawSelector(parseSel(renderPath.sel));
 		const isMarkdown = details?.contentType === "text/markdown" && !rawRequested;
 		let cachedWidth: number | undefined;

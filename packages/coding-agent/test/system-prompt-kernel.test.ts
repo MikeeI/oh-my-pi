@@ -1,4 +1,4 @@
-import { afterEach, beforeEach, describe, expect, it, spyOn } from "bun:test";
+import { afterEach, beforeEach, describe, expect, it, vi } from "bun:test";
 import * as fs from "node:fs";
 import * as os from "node:os";
 import * as path from "node:path";
@@ -13,29 +13,40 @@ const EMPTY_TREE = {
 	agentsMdFiles: [],
 };
 
-// Regression: Bun on macOS 15+ (Darwin 24/25) makes `os.version()` return the
-// literal "unknown", which used to leak into the <workstation> block as
-// `Kernel: unknown` and caused the model to display the wrong OS glyph
-// (issue #4141). The Kernel field must always carry a real identity.
-describe("system prompt Kernel field", () => {
+// Regression: Bun on macOS 15+ may report `os.version() === "unknown"`.
+// The compact OS field deliberately uses uname-style type/release values so the
+// workstation identity remains valid while avoiding the old verbose Kernel line.
+describe("system prompt workstation identity", () => {
 	let tempDir = "";
 	let tempHomeDir = "";
+	let osReleasePath = "";
 	let originalHome: string | undefined;
+	let originalPlatform = process.platform;
+	const cleanup = cleanupTempHome(() => ({ tempDir, tempHomeDir, originalHome }));
 
 	beforeEach(() => {
-		tempDir = fs.mkdtempSync(path.join(os.tmpdir(), "pi-prompt-kernel-"));
-		tempHomeDir = fs.mkdtempSync(path.join(os.tmpdir(), "pi-prompt-kernel-home-"));
+		tempDir = fs.mkdtempSync(path.join(os.tmpdir(), "pi-prompt-workstation-"));
+		tempHomeDir = fs.mkdtempSync(path.join(os.tmpdir(), "pi-prompt-workstation-home-"));
+		osReleasePath = path.join(tempDir, "os-release");
+		fs.writeFileSync(osReleasePath, 'PRETTY_NAME="Synthetic Linux 24.04"\n');
 		originalHome = process.env.HOME;
+		originalPlatform = process.platform;
 		process.env.HOME = tempHomeDir;
+
+		const realFile = Bun.file.bind(Bun);
+		vi.spyOn(Bun, "file").mockImplementation((source, options) => {
+			if (source === "/etc/os-release") return realFile(osReleasePath, options);
+			return realFile(source as string, options);
+		});
 	});
 
-	afterEach(cleanupTempHome(() => ({ tempDir, tempHomeDir, originalHome })));
+	afterEach(() => {
+		Object.defineProperty(process, "platform", { value: originalPlatform });
+		vi.restoreAllMocks();
+		cleanup();
+	});
 
-	it(`falls back to "<type> <release>" when os.version() returns "unknown" (Bun on macOS 15+)`, async () => {
-		spyOn(os, "version").mockReturnValue("unknown");
-		spyOn(os, "type").mockReturnValue("Darwin");
-		spyOn(os, "release").mockReturnValue("25.5.0");
-
+	async function renderWorkstation(): Promise<string> {
 		const { systemPrompt } = await buildSystemPrompt({
 			cwd: tempDir,
 			contextFiles: [],
@@ -44,43 +55,47 @@ describe("system prompt Kernel field", () => {
 			toolNames: [],
 			workspaceTree: { ...EMPTY_TREE, rootPath: tempDir },
 		});
-
 		const rendered = systemPrompt.join("\n\n");
-		expect(rendered).not.toContain("Kernel: unknown");
-		expect(rendered).toContain("Kernel: Darwin 25.5.0");
+		return /<workstation>\n(?<content>[\s\S]*?)\n<\/workstation>/u.exec(rendered)?.groups?.content ?? "";
+	}
+
+	it("renders user@host, compact Linux identity, and timezone", async () => {
+		vi.spyOn(os, "hostname").mockReturnValue("AX101-1");
+		vi.spyOn(os, "type").mockReturnValue("Linux");
+		vi.spyOn(os, "release").mockReturnValue("6.8.0-test");
+		vi.spyOn(os, "arch").mockReturnValue("x64");
+
+		const workstation = await renderWorkstation();
+
+		expect(workstation).toContain(`- Identity: ${os.userInfo().username}@AX101-1`);
+		expect(workstation).toContain("- OS: Synthetic Linux 24.04 · Linux 6.8.0-test · x64");
+		expect(workstation).toContain(`- Timezone: ${Intl.DateTimeFormat().resolvedOptions().timeZone}`);
+		expect(workstation).not.toContain("- Distro:");
+		expect(workstation).not.toContain("- Kernel:");
+		expect(workstation).not.toContain("- Arch:");
 	});
 
-	it("also falls back when os.version() is empty or whitespace", async () => {
-		spyOn(os, "version").mockReturnValue("   ");
-		spyOn(os, "type").mockReturnValue("Darwin");
-		spyOn(os, "release").mockReturnValue("25.5.0");
+	it("keeps macOS identity valid when os.version returns unknown", async () => {
+		Object.defineProperty(process, "platform", { value: "darwin" });
+		vi.spyOn(os, "version").mockReturnValue("unknown");
+		vi.spyOn(os, "type").mockReturnValue("Darwin");
+		vi.spyOn(os, "release").mockReturnValue("25.5.0");
+		vi.spyOn(os, "arch").mockReturnValue("arm64");
 
-		const { systemPrompt } = await buildSystemPrompt({
-			cwd: tempDir,
-			contextFiles: [],
-			skills: [],
-			rules: [],
-			toolNames: [],
-			workspaceTree: { ...EMPTY_TREE, rootPath: tempDir },
-		});
+		const workstation = await renderWorkstation();
 
-		expect(systemPrompt.join("\n\n")).toContain("Kernel: Darwin 25.5.0");
+		expect(workstation).toContain("- OS: Darwin 25.5.0 · arm64");
+		expect(workstation).not.toContain("unknown");
 	});
 
-	it("keeps the real uname build string when os.version() is populated", async () => {
-		spyOn(os, "version").mockReturnValue(
-			"Darwin Kernel Version 25.5.0: Tue Nov  7 21:48:04 PST 2026; root:xnu-11215.1.12~1/RELEASE_ARM64_T6031",
-		);
+	it("falls back to the OS type when os-release is unavailable", async () => {
+		osReleasePath = path.join(tempDir, "missing-os-release");
+		vi.spyOn(os, "type").mockReturnValue("Linux");
+		vi.spyOn(os, "release").mockReturnValue("6.8.0-test");
+		vi.spyOn(os, "arch").mockReturnValue("x64");
 
-		const { systemPrompt } = await buildSystemPrompt({
-			cwd: tempDir,
-			contextFiles: [],
-			skills: [],
-			rules: [],
-			toolNames: [],
-			workspaceTree: { ...EMPTY_TREE, rootPath: tempDir },
-		});
+		const workstation = await renderWorkstation();
 
-		expect(systemPrompt.join("\n\n")).toContain("Kernel: Darwin Kernel Version 25.5.0:");
+		expect(workstation).toContain("- OS: Linux 6.8.0-test · x64");
 	});
 });

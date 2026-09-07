@@ -32,6 +32,7 @@ import { AgentSession, type AgentSessionEvent } from "@oh-my-pi/pi-coding-agent/
 import { AuthStorage } from "@oh-my-pi/pi-coding-agent/session/auth-storage";
 import { convertToLlm, wrapSteeringForModel } from "@oh-my-pi/pi-coding-agent/session/messages";
 import { SessionManager } from "@oh-my-pi/pi-coding-agent/session/session-manager";
+import { TtsrCoordinator } from "@oh-my-pi/pi-coding-agent/session/ttsr-coordinator";
 import { TempDir } from "@oh-my-pi/pi-utils";
 import { createAssistantMessage } from "./helpers/agent-session-setup";
 
@@ -128,6 +129,37 @@ describe("AgentSession message pipeline", () => {
 		expect(transformContext).toHaveBeenCalledWith(inputMessages, abortController.signal);
 		expect(convertToLlm).toHaveBeenCalledWith(transformedMessages);
 		expect(result).toEqual(convertedMessages);
+	});
+
+	it("counts finalized sanitized Read text after TTSR injection", async () => {
+		vi.spyOn(TtsrCoordinator.prototype, "afterToolCall").mockImplementation(ctx => ({
+			content: [{ type: "text", text: "\u001b[31mReminder\u001b[0m" }, ...ctx.result.content],
+		}));
+		const session = new AgentSession({
+			agent: createAgent(),
+			sessionManager: SessionManager.inMemory(),
+			settings: Settings.isolated({ "compaction.enabled": false }),
+			modelRegistry: {} as never,
+		});
+		sessions.push(session);
+		const afterToolCall = session.agent.afterToolCall;
+		if (!afterToolCall) throw new Error("Expected AgentSession to install the afterToolCall hook");
+
+		const result = await afterToolCall({
+			assistantMessage: createAssistantMessage(""),
+			toolCall: { type: "toolCall", id: "read-tokens", name: "read", arguments: {} },
+			args: {},
+			result: {
+				content: [{ type: "text", text: "pay\u0000load" }],
+				details: { kind: "file" },
+			},
+			isError: false,
+			context: { systemPrompt: [], messages: [], tools: [] },
+		});
+		const expectedTokens = session.agent.tokenizer.countTokensExact(["Reminder", "payload"]);
+		if (expectedTokens === undefined) throw new Error("Expected the default native tokenizer to be available");
+
+		expect(result?.details).toEqual({ kind: "file", readTextTokens: expectedTokens });
 	});
 
 	it("marks queued user steers without changing the public queue text", async () => {
@@ -1186,6 +1218,7 @@ describe("AgentSession message pipeline", () => {
 			});
 		};
 		const authStorage = await AuthStorage.create(tempDir.join("auth.db"));
+		authStorage.setRuntimeApiKey(model.provider, "test-key");
 		const modelRegistry = new ModelRegistry(authStorage, tempDir.join("models.yml"));
 		const { session } = await createAgentSession({
 			cwd: tempDir.path(),
@@ -1282,6 +1315,7 @@ describe("AgentSession message pipeline", () => {
 			});
 		};
 		const authStorage = await AuthStorage.create(tempDir.join("auth.db"));
+		authStorage.setRuntimeApiKey(model.provider, "test-key");
 		const modelRegistry = new ModelRegistry(authStorage, tempDir.join("models.yml"));
 		const { session } = await createAgentSession({
 			cwd: tempDir.path(),

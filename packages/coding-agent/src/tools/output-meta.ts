@@ -432,6 +432,20 @@ export function formatFullOutputReference(artifactId: string): string {
 	return `Read artifact://${artifactId} for full output`;
 }
 
+function formatMiddleRecoveryReference(
+	artifactId: string,
+	head: TruncationMeta["headRange"],
+	tail: TruncationMeta["tailRange"],
+): string {
+	if (!head || !tail) return formatFullOutputReference(artifactId);
+
+	const omittedStart = head.end + 1;
+	const omittedEnd = tail.start - 1;
+	if (omittedStart > omittedEnd) return formatFullOutputReference(artifactId);
+
+	return `Read artifact://${artifactId}:${omittedStart}-${omittedEnd} to recover omitted artifact lines`;
+}
+
 const RAW_OUTPUT_ARTIFACT_PREFIX = "[raw output: artifact://";
 const RAW_OUTPUT_ARTIFACT_SUFFIX = "]";
 
@@ -504,7 +518,7 @@ export function formatTruncationMetaNotice(truncation: TruncationMeta): string {
 			notice += `. Use :${truncation.nextOffset} to continue`;
 		}
 		if (truncation.artifactId != null) {
-			notice += `. ${formatFullOutputReference(truncation.artifactId)}`;
+			notice += `. ${formatMiddleRecoveryReference(truncation.artifactId, head, tail)}`;
 		}
 		return notice;
 	}

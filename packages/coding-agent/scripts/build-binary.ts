@@ -7,6 +7,14 @@ import { compileCodingAgent } from "./compile-binary";
 const packageDir = path.join(import.meta.dir, "..");
 const repoRoot = path.join(packageDir, "..", "..");
 
+function parseMetafilePath(args: readonly string[]): string | undefined {
+	if (args.length === 0) return undefined;
+	if (args.length !== 2 || args[0] !== "--metafile" || !args[1]) {
+		throw new Error("Usage: bun scripts/build-binary.ts [--metafile <path>]");
+	}
+	return path.resolve(args[1]);
+}
+
 /** Binary cross-compilation settings selected by `CROSS_TARGET`. */
 export interface CrossBuild {
 	readonly id: string;
@@ -74,6 +82,7 @@ async function runCommand(
 }
 
 async function main(): Promise<void> {
+	const metafilePath = parseMetafilePath(Bun.argv.slice(2));
 	const crossBuild = resolveCrossBuild(Bun.env.CROSS_TARGET);
 	const shouldAdhocSign = process.platform === "darwin" && !crossBuild && Bun.env.BUN_NO_CODESIGN_MACHO_BINARY !== "1";
 	const outName = crossBuild ? `omp-${crossBuild.id}` : "omp";
@@ -92,7 +101,7 @@ async function main(): Promise<void> {
 			crossBuild ? { ...Bun.env, TARGET_PLATFORM: crossBuild.platform, TARGET_ARCH: crossBuild.arch } : Bun.env,
 		);
 		try {
-			await compileCodingAgent({
+			const metafile = await compileCodingAgent({
 				repoRoot,
 				entrypoint: path.join(packageDir, "src", "cli.ts"),
 				outfile: outputPath,
@@ -100,7 +109,12 @@ async function main(): Promise<void> {
 				target: crossBuild?.target,
 				executablePath: Bun.env.BUN_COMPILE_EXECUTABLE_PATH || undefined,
 				skipBuiltinCodesign: shouldAdhocSign,
+				metafile: metafilePath !== undefined,
 			});
+			if (metafilePath) {
+				if (!metafile) throw new Error("Coding-agent build did not return the requested metafile");
+				await Bun.write(metafilePath, `${JSON.stringify(metafile, null, 2)}\n`);
+			}
 
 			if (shouldAdhocSign) {
 				await runCommand(["codesign", "--force", "--sign", "-", outputPath]);

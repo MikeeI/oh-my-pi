@@ -2,12 +2,22 @@ Run one step of code in a persistent kernel. State persists across calls and `ta
 {{#if spawns}}Eval `agent()` children use independent kernels.{{/if}}
 
 Work incrementally: imports → define → test → use, each its own cell. Re-run setup ONLY after `reset`, kernel crash.
-{{#if spawns}}{{#if eagerDelegation}}Two or more independent items → named `workpool()` + `.push(…)`; poll outside eval with `hub wait` on the pool name. Handles + `wait()` are for dependency-coupled results.{{/if}}{{/if}}
+Use Eval only when code must compute, transform, drive a protocol, or preserve state across steps.
+Use native Read for inspection; use Eval `read()` only when the cell must consume file contents.
+Need concurrent in-cell work? Use `parallel(thunks)`.
+{{#if spawns}}{{#if eagerDelegation}}Two or more independent agent items → named `workpool()` + `.push(…)`.
+Poll outside Eval with `hub wait` on the pool name.
+Handles + `wait()` are for dependency-coupled results.{{/if}}{{/if}}
+NEVER call injected helpers or `tool.*` from user-created threads, executors, workers, or subprocesses.
+Keep large raw tool results separate or pass their handles instead of re-emitting them through Eval.
 
 {{#if py}}Top-level `await` works; `asyncio.run(…)` raises error.{{/if}}
 {{#if js}}JS runs under **Bun**: globals (`Bun.file`, `Bun.write`, `Bun.$`, `fetch`, `Buffer`) available; top-level `await`/`return` work.{{/if}}
+{{#if js}}JavaScript MUST await `parallel(…)` and `pipeline(…)`.{{/if}}
 
 On error, fix and re-run only the failing step.
+One failed thunk re-raises after all settle.
+Need partial results? Catch errors inside each thunk.
 
 <prelude>
 {{#ifAll py js}}Python: sync, kwargs. JS: async, ONE trailing object literal, never positional.{{else}}{{#if py}}Sync; kwargs.{{/if}}{{#if js}}Async; ONE trailing object literal, never positional.{{/if}}{{/ifAll}}
@@ -19,6 +29,8 @@ env(key?=None, value?=None) → str | None | dict
 output(*ids, format?="raw", query?=None, offset?=None, limit?=None) → str | dict | list[dict]
 {{#if js}}await {{/if}}tool.<name>(args) → unknown
     Invoke any session tool; `args` = its parameter object.{{#if py}} Async: `await tool.read({...})`.{{/if}}
+    Treat results as unknown; inspect shape before indexing, slicing, matching, spreading, or parsing.
+    Parse JSON only when the owner guarantees JSON text.
 completion(prompt, model?="default"|"smol"|"slow", system?=None, schema?=None) → CompletionHandle
     Oneshot, stateless (no history/tools); returns immediately. `.wait()` → str (parsed object with `schema`). `model`: "smol" fast | "default" session | "slow" most capable.
 {{#if spawns}}agent(prompt, agent?="{{spawnDefaultAgent}}", label?=None, schema?=None, schema{{#if js}}Mode{{else}}_mode{{/if}}?="permissive", isolated?=None, apply?=None, merge?=None{{#if evalTools}}, tools?=None{{/if}}) → AgentHandle
@@ -52,7 +64,9 @@ Acyclic waves of handles:
 {{/if}}
 
 <critical>
-Prior top-level names survive into the next cell — reuse; NEVER re-import/re-declare. Re-read only if file changed since last read.
+Use only names established by successful cells in the current live kernel.
+Existing binding? Reuse it. After `reset` or kernel crash, rerun setup once.
+Re-read only if the file changed.
 </critical>
 
 {{#if autoBackgroundEnabled}}Long-running cells may auto-background by the configured threshold and deliver later; the kernel stays busy until the cell finishes.

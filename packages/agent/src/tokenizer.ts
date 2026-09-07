@@ -157,6 +157,16 @@ export class Tokenizer {
 	}
 
 	/**
+	 * Exact native count under this tokenizer's model encoding, using o200k for
+	 * the catalog default. Returns undefined when the loaded native addon does
+	 * not support the selected encoding.
+	 */
+	countTokensExact(text: string | string[]): number | undefined {
+		const result = countTokensNat(text, this.#encoding, "strict");
+		return result.exact ? result.tokens : undefined;
+	}
+
+	/**
 	 * Cheap-first budget probe — the way to ask "does this fit in `budget`
 	 * tokens?" without tokenizing the world.
 	 *

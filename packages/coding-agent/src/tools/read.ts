@@ -134,6 +134,7 @@ import {
 import { splitAddressableFileLines } from "./hashline-format";
 import { readSqlite, resolveSqliteReadPath } from "./read-sqlite";
 import { isProseSummaryPath, renderSummary, routeReadThroughBridge, trySummarize } from "./read-summary";
+import type { ReadTokenDetails } from "./read-token";
 import { parseSqlitePathCandidates } from "./sqlite-reader";
 import { formatBytes, shortenPath } from "./render-utils";
 import { REPORT_ISSUE_DEVICE_NAME, reportIssueDeviceUsage } from "./report-tool-issue";
@@ -629,7 +630,7 @@ const readSchemaWithoutMemory = type({
 
 export type ReadToolInput = typeof readSchema.infer;
 
-export interface ReadToolDetails {
+export interface ReadToolDetails extends ReadTokenDetails {
 	kind?: "file" | "url";
 	truncation?: TruncationResult;
 	isDirectory?: boolean;

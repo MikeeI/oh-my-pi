@@ -30,7 +30,10 @@ Agents marked BLOCKING run inline — results return in this call; non-blocking 
   - `task`: Complete, self-contained instructions. One-liners or missing acceptance criteria are PROHIBITED.
 {{#if evalToolsEnabled}}  - `tools`: Names of eval-defined tools (`@tool` in Python, `tool(fn, {…})` in JS) to expose to this subagent; each runs inside your kernel when the subagent calls it.
 {{/if}}
-{{#if effortEnabled}}  - `effort`: Scale w/ complexity of this task: `"lo"`|`"med"`|`"hi"`
+{{#if effortEnabled}}  - `effort`: Optional model-relative reasoning override.
+    Omit it to keep the selected agent's configured thinking level.
+    `"lo"`, `"med"`, and `"hi"` select the target model's lowest, middle, or highest supported thinking level.
+    Selection remains subject to `task.maxEffort`.
 {{/if}}
   - `outputSchema`: Invocation-specific JSON Schema. Overrides the selected agent and parent-session schemas.
   - `schemaMode`: `"permissive"` (default) accepts a retry-exhausted invalid result with a warning; `"strict"` fails it.
@@ -49,7 +52,10 @@ Agents marked BLOCKING run inline — results return in this call; non-blocking 
 - `task`: Complete, self-contained instructions. One-liners or missing acceptance criteria are PROHIBITED.
 {{#if evalToolsEnabled}}- `tools`: Names of eval-defined tools (`@tool` in Python, `tool(fn, {…})` in JS) to expose to this subagent; each runs inside your kernel when the subagent calls it.
 {{/if}}
-{{#if effortEnabled}}- `effort`: Scale w/ complexity of this task: `"lo"`|`"med"`|`"hi"`
+{{#if effortEnabled}}- `effort`: Optional model-relative reasoning override.
+  Omit it to keep the selected agent's configured thinking level.
+  `"lo"`, `"med"`, and `"hi"` select the target model's lowest, middle, or highest supported thinking level.
+  Selection remains subject to `task.maxEffort`.
 {{/if}}
 - `outputSchema`: Invocation-specific JSON Schema. Overrides the selected agent and parent-session schemas.
 - `schemaMode`: `"permissive"` (default) accepts a retry-exhausted invalid result with a warning; `"strict"` fails it.

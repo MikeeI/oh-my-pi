@@ -3,12 +3,20 @@ import type { EffectiveExtensionRoots } from "../capability/types";
 import type { SkillsSettings } from "../config/settings";
 import type { LoadedCustomCommand } from "../extensibility/custom-commands";
 import type { ExtensionRunner } from "../extensibility/extensions";
+import { loadRoutines, type Routine, validateRoutineCommandNames } from "../extensibility/routines";
 import { getSkillSlashCommandName, type Skill } from "../extensibility/skills";
 import { type FileSlashCommand, loadSlashCommands } from "../extensibility/slash-commands";
 import { ACP_BUILTIN_RESERVED_NAMES, isAcpBuiltinShadowedName } from "./acp-builtins";
 import { BUILTIN_SLASH_COMMANDS_INTERNAL } from "./builtin-registry";
 
-export type AvailableSlashCommandSource = "builtin" | "skill" | "extension" | "custom" | "mcp_prompt" | "file";
+export type AvailableSlashCommandSource =
+	| "builtin"
+	| "skill"
+	| "extension"
+	| "custom"
+	| "mcp_prompt"
+	| "file"
+	| "routine";
 
 export interface InternalAvailableSlashCommand {
 	name: string;
@@ -27,6 +35,7 @@ export interface AvailableCommandsSession {
 	readonly skillsSettings?: SkillsSettings;
 	readonly effectiveExtensionRoots?: EffectiveExtensionRoots;
 	setSlashCommands(slashCommands: FileSlashCommand[]): void;
+	setRoutines(routines: Routine[]): void;
 	sessionManager: { getCwd(): string };
 }
 
@@ -34,6 +43,7 @@ export async function buildAvailableSlashCommands(
 	session: AvailableCommandsSession,
 	loadFileCommands: (cwd: string) => Promise<FileSlashCommand[]> = cwd =>
 		loadSlashCommands({ cwd, extensionRoots: session.effectiveExtensionRoots }),
+	loadRoutineCommands: (cwd: string) => Promise<Routine[]> = cwd => loadRoutines({ cwd }),
 ): Promise<InternalAvailableSlashCommand[]> {
 	const commands: InternalAvailableSlashCommand[] = [];
 	const seenNames = new Set<string>();
@@ -91,9 +101,24 @@ export async function buildAvailableSlashCommands(
 	}
 
 	const fileCommands = await loadFileCommands(session.sessionManager.getCwd());
-	session.setSlashCommands(fileCommands);
 	for (const command of fileCommands) {
 		appendCommand({ name: command.name, description: command.description, source: "file" });
+	}
+	const routines = await loadRoutineCommands(session.sessionManager.getCwd());
+	const reservedNames = new Set<string>();
+	for (const command of commands) {
+		reservedNames.add(command.name);
+		for (const alias of command.aliases ?? []) reservedNames.add(alias);
+	}
+	validateRoutineCommandNames(routines, reservedNames);
+	session.setSlashCommands(fileCommands);
+	session.setRoutines(routines);
+	for (const routine of routines) {
+		appendCommand({
+			name: routine.name,
+			description: routine.description,
+			source: "routine",
+		});
 	}
 
 	return commands;

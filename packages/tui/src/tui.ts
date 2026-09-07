@@ -1244,7 +1244,11 @@ export class TUI extends Container {
 					this.#beginResizeAnchorProbe();
 					return;
 				}
-				if (this.#renderScheduler.now() < this.#suppressResizeUntil) {
+				if (
+					this.#renderScheduler.now() < this.#suppressResizeUntil &&
+					this.terminal.columns === this.#previousWidth &&
+					this.terminal.rows === this.#previousHeight
+				) {
 					this.requestRender(true);
 					return;
 				}
@@ -1406,11 +1410,11 @@ export class TUI extends Container {
 	 * to keep the good stash.
 	 */
 	#beginResizeAltPaint(restartingProbe = false): void {
+		this.#trackResizeBurst();
 		if (this.#altActive) {
 			this.requestRender(true);
 			return;
 		}
-		this.#trackResizeBurst();
 		if (!this.#resizeAltActive) {
 			this.#resizeAltActive = true;
 			setAltScreenActive(true);
@@ -2732,6 +2736,20 @@ export class TUI extends Container {
 			if (pushed > this.#providerViewportTop && this.#providerWindow.length > 0) {
 				buffer += this.#eraseBelowRow(this.#providerViewportTop, height);
 			}
+			if (preparedHistory.length > 0 && pushed > 0) {
+				const replacementRows = [...preparedHistory, ...prepared];
+				const seedCount = Math.min(pushed, replacementRows.length, height - startTop);
+				for (let index = 0; index < seedCount; index++) {
+					buffer += `\x1b[${startTop + index + 1};1H${this.#lineRewriteSequence(
+						replacementRows[index] ?? "",
+						width,
+						startTop + index,
+						-1,
+						-1,
+						this.#osc66SpacerGlyphWidth(replacementRows, index),
+					)}`;
+				}
+			}
 			buffer += `\x1b[${startTop + 1};1H`;
 			let screenRow = startTop;
 			for (let index = 0; index < preparedHistory.length; index++) {
@@ -2898,6 +2916,8 @@ export class TUI extends Container {
 			// provider repaint can overwrite history at the stale row.
 			if (width !== this.#altEnterWidth || height !== this.#altEnterHeight) {
 				if (this.#frameProvider !== undefined) {
+					this.#resizeProbeWindow = this.#providerWindow;
+					this.#resizeProbeOffset = this.#parkedViewportOffset;
 					this.#beginResizeAnchorProbe();
 					return;
 				}

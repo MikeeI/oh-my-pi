@@ -112,6 +112,11 @@ export interface AgentHubOpenOptions {
 	initialSection?: "agents" | "activity";
 }
 
+export interface NewVersionNotificationOptions {
+	sourceLabel?: string;
+	actionText?: string;
+}
+
 export interface InteractiveModeContext {
 	// UI access
 	ui: TUI;
@@ -254,6 +259,7 @@ export interface InteractiveModeContext {
 	lastStatusSpacer: Spacer | undefined;
 	lastStatusText: Text | undefined;
 	fileSlashCommands: Set<string>;
+	routineSlashCommands: Set<string>;
 	skillCommands: Map<string, Skill>;
 	oauthManualInput: OAuthManualInputManager;
 	todoPhases: TodoPhase[];
@@ -276,6 +282,7 @@ export interface InteractiveModeContext {
 	): void;
 
 	// UI helpers
+
 	/**
 	 * Mount transcript content and repaint once. The single sink for "show this in
 	 * chat": producers build and return a `Component` (or a `ChatBlock` carrying
@@ -306,7 +313,7 @@ export interface InteractiveModeContext {
 	showPinnedError(message: string): void;
 	clearPinnedError(): void;
 	showWarning(message: string, options?: { hideWithToolActivity?: boolean }): void;
-	showNewVersionNotification(newVersion: string): void;
+	showNewVersionNotification(newVersion: string, options?: NewVersionNotificationOptions): void;
 	clearEditor(): void;
 	updatePendingMessagesDisplay(): void;
 	queueCompactionMessage(text: string, mode: "steer" | "followUp", images?: ImageContent[]): void;

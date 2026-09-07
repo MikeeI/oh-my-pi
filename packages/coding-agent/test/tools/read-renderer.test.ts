@@ -45,6 +45,7 @@ describe("readToolRenderer hyperlinks", () => {
 					resolvedPath: handoffPath,
 					displayContent: { text: "second line", startLine: 2 },
 					contentType: "text/plain",
+					readTextTokens: 14_823,
 				},
 			},
 			{ expanded: false, isPartial: false },
@@ -55,6 +56,7 @@ describe("readToolRenderer hyperlinks", () => {
 		const rendered = component.render(200).join("\n");
 		expect(rendered).toContain("local://handoff.md");
 		expect(rendered).toContain(":2");
+		expect(Bun.stripANSI(rendered)).toContain("Read local://handoff.md:2 · 14,823 Read Tokens");
 		const handoffUri = new URL(url.pathToFileURL(path.resolve(handoffPath)).href);
 		handoffUri.searchParams.set("line", "2");
 		expect(extractLinkUris(rendered)).toContain(handoffUri.href);
@@ -99,6 +101,7 @@ describe("readToolRenderer hyperlinks", () => {
 					method: "fetch",
 					truncated: false,
 					notes: [],
+					readTextTokens: 321,
 				},
 			} as never,
 			{ expanded: false, isPartial: false },
@@ -108,7 +111,50 @@ describe("readToolRenderer hyperlinks", () => {
 
 		const rendered = component.render(200).join("\n");
 		expect(rendered).toContain("example.com /final");
+		expect(Bun.stripANSI(rendered)).toContain("· 321 Read Tokens");
 		expect(extractLinkUris(rendered)).toContain("http://example.com/final");
+	});
+});
+
+describe("readToolRenderer Read Tokens", () => {
+	it("shows exact Read Tokens on error frames", async () => {
+		const theme = await getThemeByName("dark");
+		expect(theme).toBeDefined();
+		const examplePath = path.resolve("/tmp/omp-read/missing.ts");
+		const component = readToolRenderer.renderResult(
+			{
+				content: [{ type: "text", text: "Error: no such file" }],
+				details: { readTextTokens: 17 },
+				isError: true,
+			},
+			{ expanded: false, isPartial: false },
+			theme!,
+			{ path: examplePath },
+		);
+
+		const rendered = Bun.stripANSI(component.render(200).join("\n"));
+		expect(rendered).toContain(`Read ${examplePath} · 17 Read Tokens`);
+	});
+
+	it("shows exact text tokens on image-result frames", async () => {
+		const theme = await getThemeByName("dark");
+		expect(theme).toBeDefined();
+		const examplePath = path.resolve("/tmp/omp-read/image.png");
+		const component = readToolRenderer.renderResult(
+			{
+				content: [
+					{ type: "text", text: "image metadata" },
+					{ type: "image", data: "aW1hZ2U=", mimeType: "image/png" },
+				],
+				details: { readTextTokens: 1_284 },
+			} as never,
+			{ expanded: false, isPartial: false },
+			theme!,
+			{ path: examplePath },
+		);
+
+		const rendered = Bun.stripANSI(component.render(200).join("\n"));
+		expect(rendered).toContain(`Read: ${examplePath} · 1,284 Read Tokens`);
 	});
 });
 

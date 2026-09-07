@@ -55,6 +55,32 @@ describe("eval tool description", () => {
 		expect(text).toContain("agent(prompt");
 	});
 
+	it("keeps large raw tool results outside Eval output", () => {
+		const text = getEvalToolDescription({ py: true, js: true, spawns: true });
+		expect(text).toContain(
+			"Keep large raw tool results separate or pass their handles instead of re-emitting them through Eval.",
+		);
+	});
+
+	it("routes in-cell tool concurrency through context-safe Eval helpers", () => {
+		const text = getEvalToolDescription({ py: true, js: true, spawns: true });
+		expect(text).toContain("Need concurrent in-cell work? Use `parallel(thunks)`.");
+		expect(text).toContain(
+			"NEVER call injected helpers or `tool.*` from user-created threads, executors, workers, or subprocesses.",
+		);
+		expect(text).toContain("Use native Read for inspection");
+		expect(text).toContain("Treat results as unknown");
+		expect(text).toContain("JavaScript MUST await `parallel(…)` and `pipeline(…)`.");
+		expect(text).toContain("One failed thunk re-raises after all settle.");
+		expect(text).toContain("Use only names established by successful cells in the current live kernel.");
+	});
+
+	it("distinguishes shared task state from isolated agent() kernels", () => {
+		const text = getEvalToolDescription({ py: true, js: true, spawns: true });
+		expect(text).toContain("State persists across calls and `task` subagents");
+		expect(text).toContain("Eval `agent()` children use independent kernels");
+	});
+
 	it("omits agent() when the session forbids spawning", () => {
 		// Subagents with spawns: undefined (resolved to "") cannot launch tasks.
 		// The prelude doc must not promise a helper that always throws.

@@ -288,10 +288,20 @@ async function executeFileRead(
 	if (branch) {
 		args.push("-f", `ref=${branch}`);
 	}
-	const response = await github.json<GitHubContentsResponse>(session.cwd, args, signal, {
-		repoProvided: true,
-		trimOutput: false,
-	});
+	let response: GitHubContentsResponse;
+	try {
+		response = await github.json<GitHubContentsResponse>(session.cwd, args, signal, {
+			repoProvided: true,
+			trimOutput: false,
+		});
+	} catch (error) {
+		// Contents API 404s conflate repository, revision, path, and access failures; identify the request without guessing.
+		if (error instanceof ToolError) {
+			const revision = branch ?? "HEAD";
+			error.message = `GitHub file read failed for '${repo}@${revision}:${filePath}': ${error.message}`;
+		}
+		throw error;
+	}
 	if (!isGitHubContentsFile(response)) {
 		throw new ToolError(`GitHub path '${filePath}' is not a file.`);
 	}

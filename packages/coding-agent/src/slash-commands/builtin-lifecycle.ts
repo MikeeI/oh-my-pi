@@ -9,7 +9,7 @@ import { loadSlashCommands } from "../extensibility/slash-commands";
 import { memoryStatsUnavailableMessage, resolveMemoryBackend } from "../memory-backend";
 import type { AgentSession, FreshSessionResult, HandoffResult } from "../session/agent-session";
 import { COMPACT_MODES, parseCompactArgs } from "../session/compact-modes";
-import { buildReplanTitleContext, USER_INTERRUPT_LABEL } from "../session/messages";
+import { USER_INTERRUPT_LABEL } from "../session/messages";
 import { resolveResumableSession } from "../session/session-listing";
 import { toggleSessionPin } from "../session/session-pins";
 import {
@@ -21,8 +21,8 @@ import {
 } from "../session/session-worktree";
 import { formatShakeSummary, type ShakeMode } from "../session/shake-types";
 import { discoverTitleSystemPromptFile, resolvePromptInput } from "../system-prompt";
-import { isLowSignalTitleInput } from "../tiny/text";
 import { resolveToCwd } from "../tools/path-utils";
+import { generateSessionTitleFromRecentTranscript } from "../utils/title-generator";
 import { commandConsumed, errorMessage, usage } from "./helpers/parse";
 import { handleSshAcp } from "./helpers/ssh";
 import type {
@@ -38,26 +38,6 @@ function formatFreshSessionResult(result: FreshSessionResult): string {
 	return `Fresh provider session started (${result.closedProviderSessions} ${stateLabel} pruned).`;
 }
 
-/** Null reports no usable title; undefined silently discards an invalidated request. */
-async function generateRenameTitle(session: AgentSession, signal?: AbortSignal): Promise<string | null | undefined> {
-	const { sessionManager } = session;
-	const context = buildReplanTitleContext(session.messages);
-	if (!context || isLowSignalTitleInput(context)) return null;
-	const revision = sessionManager.reserveTitleRevision();
-	const sessionId = sessionManager.getSessionId();
-	const titleSignal = session.titleGenerationSignal;
-	const cleanupProgress = session.notifyTitleGenerationStart();
-	try {
-		const title = await session.generateTitle(context, undefined, signal);
-		return !titleSignal.aborted &&
-			sessionManager.getSessionId() === sessionId &&
-			sessionManager.titleRevision === revision
-			? title
-			: undefined;
-	} finally {
-		cleanupProgress?.();
-	}
-}
 
 export const shutdownHandlerTui = (
 	_command: ParsedSlashCommand,
@@ -653,9 +633,11 @@ export const BUILTIN_LIFECYCLE_SLASH_COMMANDS: ReadonlyArray<SlashCommandSpec> =
 		description: "Rename the current session (omit title to generate)",
 		inlineHint: "[title]",
 		allowArgs: true,
+		argumentCompletionMode: "exclusive",
 		handle: async (command, runtime) => {
 			const session = runtime.session;
 			const sessionManager = runtime.sessionManager;
+			const explicitTitle = command.args.trim();
 			const runRename = async (): Promise<void> => {
 				const sessionId = sessionManager.getSessionId();
 				const titleSignal = session.titleGenerationSignal;
@@ -668,15 +650,27 @@ export const BUILTIN_LIFECYCLE_SLASH_COMMANDS: ReadonlyArray<SlashCommandSpec> =
 					sessionManager.getSessionId() === sessionId &&
 					sessionManager.titleRevision === titleRevision;
 				try {
-					const generation = command.args || generateRenameTitle(session, runtime.signal);
-					titleRevision = sessionManager.titleRevision;
-					const title = typeof generation === "string" ? generation : await generation;
-					if (!isCurrent() || title === undefined) return;
+					if (!explicitTitle) titleRevision = sessionManager.reserveTitleRevision();
+					const title =
+						explicitTitle ||
+						(await generateSessionTitleFromRecentTranscript(
+							session.messages,
+							session.modelRegistry,
+							runtime.settings,
+							session.sessionId,
+							session.model,
+							provider => session.agent.metadataForProvider(provider),
+						));
+					if (!isCurrent()) return;
 					if (!title) {
 						await runtime.output("Could not generate a session title. Use /rename <title> to set one.");
 						return;
 					}
-					const persistence = sessionManager.setSessionName(title, "user");
+					const persistence = sessionManager.setSessionName(
+						title,
+						explicitTitle ? "user" : "auto",
+						explicitTitle ? undefined : "rename",
+					);
 					titleRevision = sessionManager.titleRevision;
 					const ok = await persistence;
 					if (!isCurrent()) return;
@@ -689,11 +683,11 @@ export const BUILTIN_LIFECYCLE_SLASH_COMMANDS: ReadonlyArray<SlashCommandSpec> =
 					await runtime.output(`Session renamed to ${title}.`);
 				} catch (err) {
 					if (!isCurrent()) return;
-					if (command.args || !runtime.runCommandInBackground) throw err;
+					if (explicitTitle || !runtime.runCommandInBackground) throw err;
 					await runtime.output(`Rename failed: ${errorMessage(err)}`);
 				}
 			};
-			if (!command.args && runtime.runCommandInBackground) {
+			if (!explicitTitle && runtime.runCommandInBackground) {
 				runtime.runCommandInBackground(runRename);
 				return commandConsumed();
 			}
@@ -702,27 +696,7 @@ export const BUILTIN_LIFECYCLE_SLASH_COMMANDS: ReadonlyArray<SlashCommandSpec> =
 		},
 		handleTui: async (command, runtime) => {
 			runtime.ctx.editor.setText("");
-			const session = runtime.ctx.session;
-			const sessionManager = runtime.ctx.sessionManager;
-			const sessionId = sessionManager.getSessionId();
-			const titleSignal = session.titleGenerationSignal;
-			const generation = command.args.trim() || generateRenameTitle(session);
-			const titleRevision = sessionManager.titleRevision;
-			const title = typeof generation === "string" ? generation : await generation;
-			if (
-				runtime.ctx.session !== session ||
-				runtime.ctx.sessionManager !== sessionManager ||
-				titleSignal.aborted ||
-				sessionManager.getSessionId() !== sessionId ||
-				sessionManager.titleRevision !== titleRevision ||
-				title === undefined
-			)
-				return;
-			if (!title) {
-				runtime.ctx.showStatus("Could not generate a session title. Use /rename <title> to set one.");
-				return;
-			}
-			await runtime.ctx.handleRenameCommand(title);
+			await runtime.ctx.handleRenameCommand(command.args.trim());
 		},
 	},
 	{
