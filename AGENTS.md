@@ -515,6 +515,7 @@ Each entry names its disposition, observable behavior, implementation owner, and
 
 - Disposition: `UPSTREAM-INTEGRIERT`.
 - Contract: Hub guidance preserves peer messaging, job delivery, and supervised-process semantics without repetition.
+- Contract: every Hub call uses `op`; the descriptive `i` intent never replaces it.
 - Contract: Hub examples and schema hints disambiguate peer waiting, process defaults, and compound service readiness.
 - Contract: a frozen real-model benchmark scores exact Hub calls for all four retained routing examples.
 - Owner: `src/prompts/tools/hub.md` owns concise model-visible behavior guidance.
