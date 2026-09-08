@@ -4,9 +4,10 @@ import * as path from "node:path";
 import { Settings } from "@oh-my-pi/pi-coding-agent/config/settings";
 import type { ToolSession } from "@oh-my-pi/pi-coding-agent/tools";
 import { ReadTool } from "@oh-my-pi/pi-coding-agent/tools/read";
+import { BashTool } from "@oh-my-pi/pi-coding-agent/tools/bash";
 import { TempDir } from "@oh-my-pi/pi-utils";
 
-const MISSING_AGENT_DIR = path.join(os.tmpdir(), `omp-read-guidance-missing-${process.pid}`);
+const MISSING_AGENT_DIR = path.join(os.tmpdir(), `omp-tool-prompt-missing-${process.pid}`);
 
 function createSession(agentDir: string = MISSING_AGENT_DIR): ToolSession {
 	const settings = Settings.isolated();
@@ -20,7 +21,7 @@ function createSession(agentDir: string = MISSING_AGENT_DIR): ToolSession {
 	};
 }
 
-describe("Read guidance", () => {
+describe("profile-scoped tool prompts", () => {
 	it("renders a profile-scoped read.md instead of the bundled prompt", async () => {
 		using tempDir = TempDir.createSync("@omp-read-prompt-");
 		await Bun.write(tempDir.join("read.md"), "CUSTOM_READ limit={{DEFAULT_LIMIT}}");
@@ -42,5 +43,20 @@ describe("Read guidance", () => {
 		const description = new ReadTool(createSession()).description;
 
 		expect(description).toContain("SHOULD parallelize independent reads");
+	});
+
+	it("renders a profile-scoped bash.md instead of the bundled prompt", async () => {
+		using tempDir = TempDir.createSync("@omp-bash-prompt-");
+		await Bun.write(tempDir.join("bash.md"), "CUSTOM_BASH threshold={{autoBackgroundThresholdSeconds}}");
+
+		const description = new BashTool(createSession(tempDir.path())).description;
+
+		expect(description).toBe("CUSTOM_BASH threshold=60");
+	});
+
+	it("uses the bundled Bash prompt when profile bash.md is absent", () => {
+		const description = new BashTool(createSession()).description;
+
+		expect(description).toContain("`timeout: 0` disables the job deadline");
 	});
 });

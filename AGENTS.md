@@ -137,19 +137,19 @@ Each entry names its disposition, observable behavior, implementation owner, and
 - Proof: `test/cli-agents-file.test.ts`.
 - Proof: `test/system-prompt-templates.test.ts`.
 
-#### `MOMP-READ-PROMPT-OVERRIDE` — Profile-scoped Read guidance
+#### `MOMP-TOOL-PROMPT-OVERRIDES` — Profile-scoped tool guidance
 
 - Disposition: `MOMP-EIGEN`.
-- Contract: `read.md` in the active user agent directory replaces the bundled Read prompt source.
-- Contract: an absent `read.md` uses the bundled Read prompt as the sole default.
-- Contract: a selected empty, unreadable, or non-regular `read.md` fails instead of silently falling back.
-- Contract: the selected source renders through the same display-mode and limit variables as the bundled prompt.
-- Contract: prompt overrides never replace the Read tool name, schema, or runtime behavior.
+- Contract: `read.md` and `bash.md` in the active user agent directory replace their bundled tool prompt sources.
+- Contract: an absent override uses the corresponding bundled tool prompt as the sole default.
+- Contract: a selected empty, unreadable, or non-regular override fails instead of silently falling back.
+- Contract: each selected source renders through the same tool-owned variables as its bundled prompt.
+- Contract: prompt overrides never replace tool names, schemas, or runtime behavior.
 - Owner: `src/prompts/tool-prompt-source.ts` owns profile-scoped discovery, fallback, and file validation.
-- Owner: `src/tools/read.ts#ReadTool` owns rendering the selected source into the Read description.
+- Owner: `src/tools/read.ts#ReadTool` and `src/tools/bash.ts#BashTool` own rendering their selected sources.
 - Reason: current upstream has no profile-scoped override for a built-in tool prompt.
-- Required action: retain one strict `read.md` override at the current Read description owner.
-- Proof: override and fallback cases in `test/tools/read-guidance.test.ts`.
+- Required action: retain strict `read.md` and `bash.md` overrides at the current description owners.
+- Proof: override and fallback cases in `test/tools/tool-prompt-overrides.test.ts`.
 
 
 #### `MOMP-PROMPT-INSPECT` — Provider prompt inspection
@@ -239,7 +239,7 @@ Each entry names its disposition, observable behavior, implementation owner, and
 
 - Disposition: `UPSTREAM-INTEGRIERT`.
 - Contract: the bundled Read prompt follows upstream's concise guidance to parallelize independent reads.
-- Contract: the active profile may replace that guidance through `MOMP-READ-PROMPT-OVERRIDE`.
+- Contract: the active profile may replace that guidance through `MOMP-TOOL-PROMPT-OVERRIDES`.
 - Contract: middle-elided results expose the exact omitted artifact-relative range without repeating preserved output.
 - Owner: upstream `src/prompts/tools/read.md` owns the bundled model-visible scheduling guidance.
 - Owner: `src/tools/output-meta.ts` owns exact runtime recovery references for spilled result text.
@@ -539,13 +539,12 @@ Each entry names its disposition, observable behavior, implementation owner, and
 - Contract: every MOMP-only advertised executable MUST resolve on the supported workstation before publication.
 - Contract: `timeout` controls the job deadline, while `bash.autoBackground.thresholdMs` caps foreground waiting.
 - Contract: raising `timeout` never promises foreground execution beyond the configured auto-background threshold.
-- Owner: current upstream `src/prompts/tools/bash.md` owns model-visible Bash capability guidance.
+- Owner: current upstream `src/prompts/tools/bash.md` owns bundled model-visible Bash capability guidance.
+- Owner: the project-settings `bash.md` override owns MOMP-specific utility and timeout guidance.
 - Owner: current upstream `src/tools/bash.ts` owns the independent deadline and foreground-threshold runtime policy.
-- Required action: retain the minimal utility-list delta at that owner.
-- Required action: retain the minimal timeout-guidance delta until upstream integrates the contribution.
+- Required action: keep the bundled Bash prompt byte-identical to upstream and retain custom guidance in settings.
 - Proof: resolve every MOMP-only advertised executable through the workstation command lookup.
-- Proof: render the Bash tool prompt and verify the additional capability guidance.
-- Proof: guidance cases in `test/tool-guidance-efficiency.test.ts`.
+- Proof: render and inspect the deployed Bash tool prompt.
 - Proof: threshold-saturation cases in `test/tools.test.ts`.
 
 #### `MOMP-LSP` — LSP extensions at upstream owners
