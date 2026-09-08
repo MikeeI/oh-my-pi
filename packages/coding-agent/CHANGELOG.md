@@ -4,6 +4,7 @@
 
 ### Added
 
+- Added profile-scoped `read.md` overrides for experimenting with Read guidance without rebuilding MOMP.
 - Added offline Codex Main wire-request hashes and a separate synthetic GPT-5.6 breakpoint endpoint probe.
 - Added exact Read token totals to completed grouped headers, inline previews, and full result frames.
 - Added `bun --cwd packages/coding-agent run profile:runtime` for repeatable CPU, heap, timing, and bundle evidence.

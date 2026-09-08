@@ -137,6 +137,21 @@ Each entry names its disposition, observable behavior, implementation owner, and
 - Proof: `test/cli-agents-file.test.ts`.
 - Proof: `test/system-prompt-templates.test.ts`.
 
+#### `MOMP-READ-PROMPT-OVERRIDE` — Profile-scoped Read guidance
+
+- Disposition: `MOMP-EIGEN`.
+- Contract: `read.md` in the active user agent directory replaces the bundled Read prompt source.
+- Contract: an absent `read.md` uses the bundled Read prompt as the sole default.
+- Contract: a selected empty, unreadable, or non-regular `read.md` fails instead of silently falling back.
+- Contract: the selected source renders through the same display-mode and limit variables as the bundled prompt.
+- Contract: prompt overrides never replace the Read tool name, schema, or runtime behavior.
+- Owner: `src/prompts/tool-prompt-source.ts` owns profile-scoped discovery, fallback, and file validation.
+- Owner: `src/tools/read.ts#ReadTool` owns rendering the selected source into the Read description.
+- Reason: current upstream has no profile-scoped override for a built-in tool prompt.
+- Required action: retain one strict `read.md` override at the current Read description owner.
+- Proof: override and fallback cases in `test/tools/read-guidance.test.ts`.
+
+
 #### `MOMP-PROMPT-INSPECT` — Provider prompt inspection
 
 - Disposition: `MOMP-EIGEN`.
@@ -223,23 +238,14 @@ Each entry names its disposition, observable behavior, implementation owner, and
 #### `MOMP-READ-SCHEDULING` — Provider-roundtrip-efficient reads
 
 - Disposition: `UPSTREAM-INTEGRIERT`.
-- Contract: before each Read, the model collects every bounded target required for the current step.
-- Contract: known disjoint ranges for one source share one comma-separated selector.
-- Contract: each scheduling wave assigns every resulting target to exactly one native Read call.
-- Contract: independent Read calls are emitted together in the same Assistant turn.
-- Contract: dependent Reads remain sequential when one result determines the next target or selector.
-- Contract: complete targets and selectors remain unchanged.
-- Contract: failed targets retry without repeating successful siblings.
-- Contract: truncated results follow their exact recovery reference.
+- Contract: the bundled Read prompt follows upstream's concise guidance to parallelize independent reads.
+- Contract: the active profile may replace that guidance through `MOMP-READ-PROMPT-OVERRIDE`.
 - Contract: middle-elided results expose the exact omitted artifact-relative range without repeating preserved output.
-- Contract: otherwise only changed content is read again.
-- Contract: MCP resource URIs retain their exact server-provided spelling.
-- Contract: semicolons belonging to SQL, archive members, URIs, or filenames remain target data.
-- Owner: `src/prompts/tools/read.md` owns model-visible scheduling and recovery guidance.
+- Owner: upstream `src/prompts/tools/read.md` owns the bundled model-visible scheduling guidance.
 - Owner: `src/tools/output-meta.ts` owns exact runtime recovery references for spilled result text.
 - Owner: upstream `packages/agent/src/agent-loop.ts#executeToolCalls` owns sibling-tool concurrency.
-- Required action: retain only explicit sibling scheduling and exact recovery guidance at current upstream seams.
-- Proof: scheduling and recovery description cases in `test/tools/read-guidance.test.ts`.
+- Required action: keep the bundled Read prompt byte-identical to upstream and retain only runtime recovery deltas.
+- Proof: bundled prompt equality against current `upstream/main`.
 - Proof: artifact spill recovery in `test/tools.test.ts`.
 - Proof: sibling concurrency in `packages/agent/test/agent-loop.test.ts`.
 
@@ -577,9 +583,10 @@ Each entry names its disposition, observable behavior, implementation owner, and
 - Contract: Documents may still use PDF/Markit conversion under `:raw`.
 - Contract: Notebooks return storage JSON, images retain decoded image-oriented output, and archives return decoded member text.
 - Contract: URLs return the response body without JSON, feed, or HTML text shaping after binary handling.
-- Owner: upstream `packages/coding-agent/src/prompts/tools/read.md` and source-kind Read handlers.
-- Required action: retain only source-specific raw guidance and behavior deltas at current upstream Read owners.
-- Proof: `test/tools/read-guidance.test.ts` and source-kind raw behavior tests.
+- Owner: upstream source-kind Read handlers own runtime behavior.
+- Owner: the project-settings `read.md` override owns model-visible source-specific raw guidance.
+- Required action: keep the bundled prompt byte-identical to upstream and retain accurate raw guidance in settings.
+- Proof: source-kind raw behavior tests and rendered inspection of the deployed override.
 
 #### Experiments and non-contract artifacts
 

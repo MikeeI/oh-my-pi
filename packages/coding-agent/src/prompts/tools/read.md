@@ -1,34 +1,14 @@
 Read files, directories, archives, SQLite, images, documents, internal resources, and web URLs via `path`.
 
 <instruction>
-- MUST collect every bounded target required for the current step before calling `read`.
-- MUST combine known disjoint ranges for one source in one comma-separated selector.
-- MUST assign each resulting target to exactly one `read` call in the current scheduling wave.
-- MUST issue one separate `read` call per target; NEVER join targets in one `path`.
-- MUST emit all independent `read` calls together in the same assistant turn.
-- MUST read sequentially only when one result determines the next target or selector.
-- Keep each complete `path[:selector]` target otherwise unchanged.
-- MUST retry a failed target without repeating successful sibling calls.
-- MUST follow the exact recovery reference after truncation.
-- Otherwise, MUST re-read only content changed since its last complete read.
-- Preserve MCP resource URIs exactly; NEVER split or percent-encode server-provided semicolons.
-- SQLite semicolons in SQL, table names, or row keys remain target data.
-- Literal semicolons inside authored non-MCP internal URIs MUST use `%3B`.
-- WRONG: `{"path":"package.json:1-80;src/main.ts:120-180;skill://skill-momp:1-33"}`.
-- RIGHT: issue these sibling calls together in the same assistant turn:
-  - `{"path":"package.json:1-80"}`
-  - `{"path":"src/main.ts:120-180,420-455"}`
-  - `{"path":"skill://skill-momp:1-33"}`
+- SHOULD parallelize independent reads.
 - SHOULD use `read` (not browser) for web content; browser only when `read` can't deliver.
 </instruction>
 
 ## Selectors — append `:<sel>` to `path` (e.g. `src/foo.ts:50-200`, `src/foo.ts:raw`, `db.sqlite:users:42`)
 
 - `:50` / `:50-` — from line 50 | `:50-200` — inclusive | `:50+150` — 150 lines from 50 | `:-60` — last 60 lines | `:5-16,960-973` — multiple ranges
-- `:raw` returns a handler-specific raw representation.
-- `:raw` suppresses Read anchors and prefixes where supported.
-- It does not guarantee byte-exact data or bypass source-specific converters.
-- `:2-4:raw` / `:raw:2-4` — range + raw representation.
+- `:raw` — verbatim, no anchors/prefixes | `:2-4:raw` / `:raw:2-4` — range + verbatim
 - `:conflicts` — one line per unresolved git merge conflict block
 - `:img` — rasterize a local `.svg`/`.svgz` as a PNG image; use when visual layout matters
 - Bare image path → sent directly to the active model when it supports image input.
@@ -49,7 +29,5 @@ Read files, directories, archives, SQLite, images, documents, internal resources
   Literal `:`, `?`, `#` → percent-encode (`%3A`/`%3F`/`%23`). Requires a verified POSIX shell on the remote host. For Windows or other unsupported hosts, use `bash` with a remote SSH command or mount with `sshfs`.
 
 <critical>
-Recovery footer names ranges? Re-read ONLY those ranges.
-Recovery footer names an artifact? Read that exact artifact reference.
-NEVER repeat delivered ranges or reconstruct elided `..`/`…` content heuristically.
+Summary footer names elided ranges? Re-issue ONLY those ranges. NEVER guess `..`/`…` content.
 </critical>
