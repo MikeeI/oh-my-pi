@@ -7,7 +7,7 @@ import { applyProviderGlobalsFromSettings } from "../config/provider-globals";
 import { clearClaudePluginRootsCache } from "../discovery/helpers";
 import { loadSlashCommands } from "../extensibility/slash-commands";
 import { memoryStatsUnavailableMessage, resolveMemoryBackend } from "../memory-backend";
-import type { FreshSessionResult, HandoffResult } from "../session/agent-session";
+import type { AgentSession, FreshSessionResult, HandoffResult } from "../session/agent-session";
 import { COMPACT_MODES, parseCompactArgs } from "../session/compact-modes";
 import { USER_INTERRUPT_LABEL } from "../session/messages";
 import { resolveResumableSession } from "../session/session-listing";
@@ -21,8 +21,9 @@ import {
 } from "../session/session-worktree";
 import { formatShakeSummary, type ShakeMode } from "../session/shake-types";
 import { discoverTitleSystemPromptFile, resolvePromptInput } from "../system-prompt";
+import { isLowSignalTitleInput } from "../tiny/text";
 import { resolveToCwd } from "../tools/path-utils";
-import { generateSessionTitleFromRecentTranscript } from "../utils/title-generator";
+import { formatRecentTitleTranscript } from "../utils/title-generator";
 import { commandConsumed, errorMessage, usage } from "./helpers/parse";
 import { handleSshAcp } from "./helpers/ssh";
 import type {
@@ -36,6 +37,26 @@ import type {
 function formatFreshSessionResult(result: FreshSessionResult): string {
 	const stateLabel = result.closedProviderSessions === 1 ? "provider state" : "provider states";
 	return `Fresh provider session started (${result.closedProviderSessions} ${stateLabel} pruned).`;
+}
+/** Null reports no usable title; undefined silently discards an invalidated request. */
+async function generateRenameTitle(session: AgentSession, signal?: AbortSignal): Promise<string | null | undefined> {
+	const { sessionManager } = session;
+	const context = formatRecentTitleTranscript(session.messages);
+	if (!context || isLowSignalTitleInput(context)) return null;
+	const revision = sessionManager.reserveTitleRevision();
+	const sessionId = sessionManager.getSessionId();
+	const titleSignal = session.titleGenerationSignal;
+	const cleanupProgress = session.notifyTitleGenerationStart();
+	try {
+		const title = await session.generateTitle(context, undefined, signal);
+		return !titleSignal.aborted &&
+			sessionManager.getSessionId() === sessionId &&
+			sessionManager.titleRevision === revision
+			? title
+			: undefined;
+	} finally {
+		cleanupProgress?.();
+	}
 }
 
 export const shutdownHandlerTui = (
@@ -649,20 +670,12 @@ export const BUILTIN_LIFECYCLE_SLASH_COMMANDS: ReadonlyArray<SlashCommandSpec> =
 					sessionManager.getSessionId() === sessionId &&
 					sessionManager.titleRevision === titleRevision;
 				try {
-					if (!explicitTitle) titleRevision = sessionManager.reserveTitleRevision();
-					const title =
-						explicitTitle ||
-						(await generateSessionTitleFromRecentTranscript(
-							session.messages,
-							session.modelRegistry,
-							runtime.settings,
-							session.sessionId,
-							session.model,
-							provider => session.agent.metadataForProvider(provider),
-						));
-					if (!isCurrent()) return;
+					const generation = explicitTitle || generateRenameTitle(session, runtime.signal);
+					titleRevision = sessionManager.titleRevision;
+					const title = typeof generation === "string" ? generation : await generation;
+					if (!isCurrent() || title === undefined) return;
 					if (!title) {
-						await runtime.output("Could not generate a session title. Use /rename <title> to set one.");
+						await runtime.output("No conversation content to generate a title from.");
 						return;
 					}
 					const persistence = sessionManager.setSessionName(
@@ -695,7 +708,28 @@ export const BUILTIN_LIFECYCLE_SLASH_COMMANDS: ReadonlyArray<SlashCommandSpec> =
 		},
 		handleTui: async (command, runtime) => {
 			runtime.ctx.editor.setText("");
-			await runtime.ctx.handleRenameCommand(command.args.trim());
+			const session = runtime.ctx.session;
+			const sessionManager = runtime.ctx.sessionManager;
+			const sessionId = sessionManager.getSessionId();
+			const titleSignal = session.titleGenerationSignal;
+			const explicitTitle = command.args.trim();
+			const generation = explicitTitle || generateRenameTitle(session);
+			const titleRevision = sessionManager.titleRevision;
+			const title = typeof generation === "string" ? generation : await generation;
+			if (
+				runtime.ctx.session !== session ||
+				runtime.ctx.sessionManager !== sessionManager ||
+				titleSignal.aborted ||
+				sessionManager.getSessionId() !== sessionId ||
+				sessionManager.titleRevision !== titleRevision ||
+				title === undefined
+			)
+				return;
+			if (!title) {
+				runtime.ctx.showStatus("No conversation content to generate a title from.");
+				return;
+			}
+			await runtime.ctx.handleRenameCommand(title, !explicitTitle);
 		},
 	},
 	{

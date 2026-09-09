@@ -14,7 +14,6 @@ import type { AgentSession } from "@oh-my-pi/pi-coding-agent/session/agent-sessi
 import type { SessionEntry } from "@oh-my-pi/pi-coding-agent/session/session-entries";
 import type { SessionManager } from "@oh-my-pi/pi-coding-agent/session/session-manager";
 import { executeAcpBuiltinSlashCommand } from "@oh-my-pi/pi-coding-agent/slash-commands/acp-builtins";
-import * as titleGenerator from "@oh-my-pi/pi-coding-agent/utils/title-generator";
 import { getProjectDir, removeWithRetries, setProjectDir } from "@oh-my-pi/pi-utils";
 
 interface FakeAcpBuiltinSession {
@@ -656,39 +655,6 @@ describe("session lifecycle commands", () => {
 		expect(fakeSessionManager._sessionNameSource).toBe("user");
 		expect(output[0]).toBe("Session renamed to Project Apex.");
 		expect(notified).toBe(true);
-	});
-
-	it("/rename: generates and stores a blank title as replaceable auto-owned", async () => {
-		const generatorSpy = spyOn(titleGenerator, "generateSessionTitleFromRecentTranscript").mockResolvedValue(
-			"Generated title",
-		);
-		try {
-			const { output, fakeSessionManager, runtime } = createRuntime();
-
-			const result = await executeAcpBuiltinSlashCommand("/rename", runtime);
-
-			expect(result).toEqual({ consumed: true });
-			expect(fakeSessionManager._sessionName).toBe("Generated title");
-			expect(fakeSessionManager._sessionNameSource).toBe("auto");
-			expect(output[0]).toBe("Session renamed to Generated title.");
-		} finally {
-			generatorSpy.mockRestore();
-		}
-	});
-
-	it("/rename: reports missing conversation content when generation returns null", async () => {
-		const generatorSpy = spyOn(titleGenerator, "generateSessionTitleFromRecentTranscript").mockResolvedValue(null);
-		try {
-			const { output, fakeSessionManager, runtime } = createRuntime();
-
-			const result = await executeAcpBuiltinSlashCommand("/rename", runtime);
-
-			expect(result).toEqual({ consumed: true });
-			expect(fakeSessionManager._sessionName).toBeUndefined();
-			expect(output[0]).toBe("No conversation content to generate a title from.");
-		} finally {
-			generatorSpy.mockRestore();
-		}
 	});
 
 	it("/rename: outputs precedence message when setSessionName returns false", async () => {

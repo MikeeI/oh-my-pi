@@ -6070,8 +6070,8 @@ export class InteractiveMode implements InteractiveModeContext {
 		await this.#commandController.handleWorktreeCommand(branch);
 	}
 
-	handleRenameCommand(title: string): Promise<void> {
-		return this.#commandController.handleRenameCommand(title);
+	handleRenameCommand(title: string, generated?: boolean): Promise<void> {
+		return this.#commandController.handleRenameCommand(title, generated);
 	}
 
 	handleMemoryCommand(text: string): Promise<void> {

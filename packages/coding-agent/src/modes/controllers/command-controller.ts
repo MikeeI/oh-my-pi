@@ -65,7 +65,7 @@ import {
 } from "../../utils/changelog";
 import { copyToClipboard } from "../../utils/clipboard";
 import { openPath } from "../../utils/open";
-import { generateSessionTitleFromRecentTranscript, setSessionTerminalTitle } from "../../utils/title-generator";
+import { setSessionTerminalTitle } from "../../utils/title-generator";
 
 function formatCreditValue(value: number): string {
 	return value.toLocaleString(undefined, { maximumFractionDigits: 4 });
@@ -1301,13 +1301,12 @@ export class CommandController {
 		return true;
 	}
 
-	async handleRenameCommand(title: string): Promise<void> {
+	async handleRenameCommand(title: string, generated = false): Promise<void> {
 		const session = this.ctx.session;
 		const sessionManager = this.ctx.sessionManager;
 		const sessionId = sessionManager.getSessionId();
 		const signal = session.titleGenerationSignal;
 		let titleRevision = sessionManager.titleRevision;
-		const explicitTitle = title.trim();
 		const isCurrent = () =>
 			this.ctx.session === session &&
 			this.ctx.sessionManager === sessionManager &&
@@ -1315,29 +1314,10 @@ export class CommandController {
 			sessionManager.getSessionId() === sessionId &&
 			sessionManager.titleRevision === titleRevision;
 		try {
-			if (!explicitTitle) titleRevision = sessionManager.reserveTitleRevision();
-			if (!explicitTitle) {
-				this.ctx.showStatus("Generating session name from recent messages...");
-			}
-			const resolvedTitle =
-				explicitTitle ||
-				(await generateSessionTitleFromRecentTranscript(
-					session.messages,
-					session.modelRegistry,
-					this.ctx.settings,
-					session.sessionId,
-					session.model,
-					provider => session.agent.metadataForProvider(provider),
-				));
-			if (!isCurrent()) return;
-			if (!resolvedTitle) {
-				this.ctx.showError("No conversation content to generate a title from.");
-				return;
-			}
 			const persistence = sessionManager.setSessionName(
-				resolvedTitle,
-				explicitTitle ? "user" : "auto",
-				explicitTitle ? undefined : "rename",
+				title,
+				generated ? "auto" : "user",
+				generated ? "rename" : undefined,
 			);
 			titleRevision = sessionManager.titleRevision;
 			const stored = await persistence;

@@ -2229,11 +2229,12 @@ export class SessionManager {
 	/**
 	 * Set the session display name.
 	 * @param source "user" for explicit renames; "auto" for generated titles.
-	 *   Auto titles are ignored once the user has set a name.
+	 *   Automatic background titles cannot replace a user title. A generated
+	 *   blank `/rename` remains a user-requested replacement but stays auto-owned.
 	 */
 	async setSessionName(name: string, source: SessionTitleSource = "auto", trigger?: string): Promise<boolean> {
 		if (this.#released) return false;
-		if (this.#titleSource === "user" && source === "auto") return false;
+		if (this.#titleSource === "user" && source === "auto" && trigger !== "rename") return false;
 
 		const cleanedTitle = SessionManager.#cleanTitle(name);
 		if (!cleanedTitle) return false;

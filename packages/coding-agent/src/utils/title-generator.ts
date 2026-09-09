@@ -208,9 +208,9 @@ export function formatRecentTitleTranscript(messages: readonly AgentMessage[]): 
 	const rendered = selectRecentTitleMessages(messages).map(item => `<${item.role}>\n${item.text}\n</${item.role}>`);
 	if (rendered.length === 0) return null;
 
-	const transcript = rendered.join("\n\n");
+	const transcript = `<chat>\n${rendered.join("\n\n")}\n</chat>`;
 	return transcript.length > TITLE_TRANSCRIPT_MAX_TOTAL_CHARS
-		? `…${transcript.slice(-TITLE_TRANSCRIPT_MAX_TOTAL_CHARS)}`
+		? `<chat>\n…${transcript.slice(-TITLE_TRANSCRIPT_MAX_TOTAL_CHARS + 8)}`
 		: transcript;
 }
 

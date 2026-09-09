@@ -1,10 +1,10 @@
 import { afterEach, describe, expect, it, vi } from "bun:test";
 import { CommandController } from "@oh-my-pi/pi-coding-agent/modes/controllers/command-controller";
 import type { InteractiveModeContext } from "@oh-my-pi/pi-coding-agent/modes/types";
-import * as titleGenerator from "@oh-my-pi/pi-coding-agent/utils/title-generator";
 
 function createContext() {
 	let sessionName: string | undefined;
+	let titleRevision = 0;
 	const setSessionName = vi.fn(async (name: string, _source: "user" | "auto", _trigger?: string) => {
 		sessionName = name;
 		return true;
@@ -13,14 +13,17 @@ function createContext() {
 	const showError = vi.fn();
 	const ctx = {
 		session: {
-			messages: [{ role: "user", content: [{ type: "text", text: "Fix rename transport" }] }],
-			modelRegistry: {},
-			sessionId: "rename-session",
-			model: undefined,
-			agent: { metadataForProvider: () => undefined },
+			titleGenerationSignal: new AbortController().signal,
 		},
 		sessionManager: {
-			setSessionName,
+			get titleRevision() {
+				return titleRevision;
+			},
+			getSessionId: () => "rename-session",
+			setSessionName: (name: string, source: "user" | "auto", trigger?: string) => {
+				titleRevision++;
+				return setSessionName(name, source, trigger);
+			},
 			getSessionName: () => sessionName,
 		},
 		settings: {},
@@ -35,24 +38,13 @@ afterEach(() => {
 });
 
 describe("CommandController rename", () => {
-	it("keeps a generated blank rename replaceable as an automatic title", async () => {
-		vi.spyOn(titleGenerator, "generateSessionTitleFromRecentTranscript").mockResolvedValue("Generated title");
+	it("keeps a generated rename replaceable as an automatic title", async () => {
 		const { ctx, setSessionName, showStatus, showError } = createContext();
 
-		await new CommandController(ctx).handleRenameCommand("");
+		await new CommandController(ctx).handleRenameCommand("Generated title", true);
 
 		expect(setSessionName).toHaveBeenCalledWith("Generated title", "auto", "rename");
 		expect(showStatus).toHaveBeenCalledWith('Session renamed to "Generated title".');
 		expect(showError).not.toHaveBeenCalled();
-	});
-
-	it("reports missing conversation content for a blank rename", async () => {
-		vi.spyOn(titleGenerator, "generateSessionTitleFromRecentTranscript").mockResolvedValue(null);
-		const { ctx, setSessionName, showError } = createContext();
-
-		await new CommandController(ctx).handleRenameCommand("");
-
-		expect(setSessionName).not.toHaveBeenCalled();
-		expect(showError).toHaveBeenCalledWith("No conversation content to generate a title from.");
 	});
 });
