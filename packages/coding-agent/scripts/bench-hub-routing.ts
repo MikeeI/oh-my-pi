@@ -13,7 +13,7 @@ const DEFAULT_MODELS = [
 	"openai-codex/gpt-5.6-terra",
 	"openai-codex/gpt-5.6-luna",
 	"openai-codex/gpt-5.5",
-	"openai-codex/gpt-5.4-mini",
+	"openai-codex/gpt-6-astra",
 ] as const;
 const DEFAULT_TIMEOUT_SECONDS = 60;
 const MAX_TIMEOUT_SECONDS = 600;

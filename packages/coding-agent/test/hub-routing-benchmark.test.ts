@@ -33,7 +33,7 @@ describe("Hub routing benchmark", () => {
 				"openai-codex/gpt-5.6-terra",
 				"openai-codex/gpt-5.6-luna",
 				"openai-codex/gpt-5.5",
-				"openai-codex/gpt-5.4-mini",
+				"openai-codex/gpt-6-astra",
 			],
 			scenarioIds: ["peer-message", "readiness-start", "cursor-logs", "process-input"],
 			timeoutSeconds: 60,
