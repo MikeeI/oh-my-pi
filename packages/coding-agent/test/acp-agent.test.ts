@@ -2610,12 +2610,12 @@ describe("ACP agent", () => {
 
 			inferences[1].title.resolve("Rename cancellation isolation");
 			expect((await secondPrompt).stopReason).toBe("end_turn");
-			expect(session.sessionManager.getSessionName()).toBe("Rename cancellation isolation");
+			expect(session.sessionManager.getSessionName()).toBe("AUTO: Rename cancellation isolation");
 			expect(harness.updates.slice(beforeLateResult)).toContainEqual({
 				sessionId: created.sessionId,
 				update: {
 					sessionUpdate: "session_info_update",
-					title: "Rename cancellation isolation",
+					title: "AUTO: Rename cancellation isolation",
 					updatedAt: expect.any(String),
 				},
 			});
