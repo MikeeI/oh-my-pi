@@ -164,6 +164,23 @@ describe("stats summary", () => {
 		expect(output).toContain("No recorded folder usage.");
 	});
 
+	it("distinguishes unpriced usage from a zero-cost estimate", () => {
+		const unpriced = makeDashboard(
+			makeAggregated({
+				totalRequests: 2,
+				successfulRequests: 2,
+				unpricedRequests: 2,
+			}),
+			{},
+		);
+		const output = renderStatsSummary(repeatDashboard(unpriced), SUMMARY_OPTIONS);
+		const rangeSection = output.slice(0, output.indexOf("\nDETAILS"));
+
+		expect(rangeSection.match(/Cost\s+N\/A/g)).toHaveLength(3);
+		expect(rangeSection.match(/Unpriced requests\s+2/g)).toHaveLength(3);
+		expect(rangeSection).not.toContain("$0.0000");
+	});
+
 	it("renders explicit agent, model, and full sanitized folder metrics ordered by conversation tokens", () => {
 		const overall = makeAggregated({
 			totalRequests: 100,

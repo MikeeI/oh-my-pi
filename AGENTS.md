@@ -416,6 +416,7 @@ Each entry names its disposition, observable behavior, implementation owner, and
 - Disposition: `MOMP-EIGEN`.
 - Contract: `momp stats --summary` renders mobile-safe rolling 24h, 7d, and 30d usage blocks.
 - Contract: each range shows requests, conversation tokens, cost, absolute errors, and error rate.
+- Contract: aggregates with unpriced metadata show `N/A` for entirely unpriced usage and report the excluded count.
 - Contract: 24h details show aligned token and performance metrics plus agent usage.
 - Contract: overlong metric values continue on dedicated lines without truncation.
 - Contract: model and folder summaries show the top five conversation-token consumers with exact omitted counts.

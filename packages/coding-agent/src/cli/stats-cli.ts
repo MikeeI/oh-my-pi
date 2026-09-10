@@ -5,7 +5,7 @@
  */
 
 import { truncateToWidth } from "@oh-my-pi/pi-tui";
-import { APP_NAME } from "@oh-my-pi/pi-utils";
+import { APP_DISPLAY_NAME } from "../app-version";
 import chalk from "@oh-my-pi/pi-utils/chalk";
 import { openPath } from "../utils/open";
 import { loadStatsSummary, renderStatsSummary, type StatsSummaryLoader } from "./stats-summary";
@@ -150,5 +150,5 @@ export async function runStatsCommand(cmd: StatsCommandArgs): Promise<void> {
 
 async function printStatsSummary(load: StatsSummaryLoader): Promise<void> {
 	const statsByRange = await loadStatsSummary(load);
-	console.log(renderStatsSummary(statsByRange, { dashboardCommand: `${APP_NAME} stats` }));
+	console.log(renderStatsSummary(statsByRange, { dashboardCommand: `${APP_DISPLAY_NAME} stats` }));
 }

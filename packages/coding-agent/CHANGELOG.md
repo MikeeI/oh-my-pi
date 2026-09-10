@@ -33,6 +33,7 @@
 - Fixed Bash guidance implying that job timeouts extend foreground waiting past the auto-background threshold.
 - Corrected Read `:raw` guidance to describe source-specific representations instead of universal byte access.
 - Kept stats sync diagnostics on stderr so `momp stats --json` emits only JSON on stdout.
+- Stats summaries now distinguish unpriced usage from free usage and use the installed binary name in dashboard hints.
 
 ## [18.1.18] - 2026-09-11
 

@@ -40,6 +40,16 @@ function formatCost(n: number): string {
 	})}`;
 }
 
+function costMetrics(stats: { totalCost: number; unpricedRequests?: number }): SummaryMetric[] {
+	const unpricedRequests = stats.unpricedRequests ?? 0;
+	const cost = stats.totalCost === 0 && unpricedRequests > 0 ? "N/A" : formatCost(stats.totalCost);
+	const metrics: SummaryMetric[] = [["Cost", cost]];
+	if (unpricedRequests > 0) {
+		metrics.push(["Unpriced requests", formatNumber(unpricedRequests)]);
+	}
+	return metrics;
+}
+
 function normalizePremiumRequests(n: number): number {
 	return Math.round((n + Number.EPSILON) * 100) / 100;
 }
@@ -84,7 +94,7 @@ function renderRangeBlock(range: StatsSummaryRange, stats: DashboardStats): stri
 		...renderMetrics([
 			["Requests", formatNumber(overall.totalRequests)],
 			["Conversation tokens", formatNumber(conversationTokens(overall))],
-			["Cost", formatCost(overall.totalCost)],
+			...costMetrics(overall),
 			["Errors", formatErrors(overall)],
 		]),
 	);
@@ -126,7 +136,7 @@ function renderAgents(stats: DashboardStats): string[] {
 				["Requests", formatNumber(agent.totalRequests)],
 				["Conversation tokens", formatNumber(tokens)],
 				["Conversation share", formatPercent(overallTokens > 0 ? tokens / overallTokens : 0)],
-				["Cost", formatCost(agent.totalCost)],
+				...costMetrics(agent),
 			]),
 		);
 	}
@@ -150,7 +160,7 @@ function renderModels(stats: DashboardStats, dashboardCommand: string): string[]
 				[
 					["Requests", formatNumber(model.totalRequests)],
 					["Conversation tokens", formatNumber(conversationTokens(model))],
-					["Cost", formatCost(model.totalCost)],
+					...costMetrics(model),
 					["Errors", formatErrors(model)],
 					["Cache rate", formatPercent(model.cacheRate)],
 				],
@@ -185,7 +195,7 @@ function renderFolders(stats: DashboardStats, dashboardCommand: string): string[
 				[
 					["Requests", formatNumber(folder.totalRequests)],
 					["Conversation tokens", formatNumber(conversationTokens(folder))],
-					["Cost", formatCost(folder.totalCost)],
+					...costMetrics(folder),
 				],
 				SUMMARY_ITEM_INDENT,
 			),
