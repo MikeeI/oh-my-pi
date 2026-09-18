@@ -145,13 +145,16 @@ export class PromptActionAutocompleteProvider implements AutocompleteProvider {
 			leadingSlashStart !== null && !hasPromptTextBeforeCursorLine
 				? textBeforeCursor.slice(leadingSlashStart)
 				: null;
+		let baseProviderChecked = false;
 		const spaceIndex = commandText?.indexOf(" ") ?? -1;
 		if (commandText !== null && spaceIndex !== -1) {
 			const commandName = commandText.slice(1, spaceIndex);
 			const command = this.#commands.find(cmd => cmd.name === commandName || cmd.aliases?.includes(commandName));
 			if (command && (!("allowArgs" in command) || command.allowArgs !== false)) {
+				baseProviderChecked = true;
 				const argumentSuggestions = await this.#baseProvider.getSuggestions(lines, cursorLine, cursorCol, signal);
 				if (argumentSuggestions) return argumentSuggestions;
+				if (command.argumentCompletionMode === "exclusive") return null;
 				const modelMentionSuggestions = getModelMentionSuggestions(textBeforeCursor, this.#modelMentions);
 				if (modelMentionSuggestions) return modelMentionSuggestions;
 				// No slash-argument completion for this input: preserve numeric
@@ -159,7 +162,13 @@ export class PromptActionAutocompleteProvider implements AutocompleteProvider {
 				// tokens such as `#copy` literal.
 				const githubRefSuggestions = getGithubRefSuggestions(textBeforeCursor);
 				if (githubRefSuggestions) return githubRefSuggestions;
-				return getInternalUrlSuggestions(textBeforeCursor, undefined, signal, this.#internalUrlCaller);
+				const internalUrlSuggestions = await getInternalUrlSuggestions(
+					textBeforeCursor,
+					undefined,
+					signal,
+					this.#internalUrlCaller,
+				);
+				if (internalUrlSuggestions) return internalUrlSuggestions;
 			}
 		}
 
@@ -205,7 +214,7 @@ export class PromptActionAutocompleteProvider implements AutocompleteProvider {
 			if (emojiSuggestions) return emojiSuggestions;
 		}
 
-		return this.#baseProvider.getSuggestions(lines, cursorLine, cursorCol, signal);
+		return baseProviderChecked ? null : this.#baseProvider.getSuggestions(lines, cursorLine, cursorCol, signal);
 	}
 
 	applyCompletion(

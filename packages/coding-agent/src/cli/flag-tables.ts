@@ -166,8 +166,14 @@ export const STRING_SETTERS: Record<string, StringSetter> = {
 	"--system-prompt": (result, value) => {
 		result.systemPrompt = value;
 	},
+	"--system-template": (result, value) => {
+		result.systemTemplate = value;
+	},
 	"--append-system-prompt": (result, value) => {
 		result.appendSystemPrompt = value;
+	},
+	"--agents-file": (result, value) => {
+		result.agentsFile = value;
 	},
 	"--provider-session-id": (result, value) => {
 		result.providerSessionId = value;

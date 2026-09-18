@@ -3,13 +3,8 @@ import * as fs from "node:fs/promises";
 import * as os from "node:os";
 import * as path from "node:path";
 import type { Skill } from "@oh-my-pi/pi-coding-agent/extensibility/skills";
-import {
-	applyResolvedSystemPromptInputs,
-	readPipedInput,
-	submitInteractiveInput,
-} from "@oh-my-pi/pi-coding-agent/main";
+import { readPipedInput, submitInteractiveInput } from "@oh-my-pi/pi-coding-agent/main";
 import type { SubmittedUserInput } from "@oh-my-pi/pi-coding-agent/modes/types";
-import type { CreateAgentSessionOptions } from "@oh-my-pi/pi-coding-agent/sdk";
 import { SKILL_PROMPT_MESSAGE_TYPE } from "@oh-my-pi/pi-coding-agent/session/messages";
 import { discoverTitleSystemPromptFile } from "@oh-my-pi/pi-coding-agent/system-prompt";
 import { removeWithRetries } from "@oh-my-pi/pi-utils";
@@ -59,18 +54,6 @@ describe("readPipedInput", () => {
 	});
 });
 
-describe("applyResolvedSystemPromptInputs", () => {
-	it("routes SYSTEM.md content through template-aware session options", () => {
-		const options: CreateAgentSessionOptions = {};
-
-		applyResolvedSystemPromptInputs(options, "project system prompt", "append prompt");
-
-		expect(options.customSystemPrompt).toBe("project system prompt");
-		expect(options.appendSystemPrompt).toBe("append prompt");
-		expect(options.systemPrompt).toBeUndefined();
-	});
-});
-
 function createMode(options?: { pendingStart?: boolean; skillCommands?: Map<string, Skill> }) {
 	return {
 		markPendingSubmissionStarted: vi.fn(() => options?.pendingStart ?? true),
@@ -83,7 +66,6 @@ function createMode(options?: { pendingStart?: boolean; skillCommands?: Map<stri
 		clearOptimisticSkillMessage: vi.fn(),
 	};
 }
-
 describe("submitInteractiveInput", () => {
 	it("routes already-started synthetic continue submissions to a hidden developer prompt", async () => {
 		const mode = createMode({ pendingStart: false });

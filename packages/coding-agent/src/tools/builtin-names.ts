@@ -10,6 +10,7 @@ export const BUILTIN_TOOL_NAMES = [
 	"github",
 	"glob",
 	"grep",
+	"conversation_search",
 	"lsp",
 	"checkpoint",
 	"rewind",

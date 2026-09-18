@@ -13,6 +13,7 @@ import { Settings } from "@oh-my-pi/pi-coding-agent/config/settings";
 import { PluginManager } from "@oh-my-pi/pi-coding-agent/extensibility/plugins";
 import { MarketplaceManager } from "@oh-my-pi/pi-coding-agent/extensibility/plugins/marketplace";
 import type { AgentSession } from "@oh-my-pi/pi-coding-agent/session/agent-session";
+import type { SessionEntry } from "@oh-my-pi/pi-coding-agent/session/session-entries";
 import type { SessionManager } from "@oh-my-pi/pi-coding-agent/session/session-manager";
 import { executeAcpBuiltinSlashCommand } from "@oh-my-pi/pi-coding-agent/slash-commands/acp-builtins";
 import { getProjectDir, removeWithRetries, setProjectDir } from "@oh-my-pi/pi-utils";
@@ -28,6 +29,7 @@ interface FakeAcpBuiltinSession {
 	_todoPhases: Array<{ name: string; tasks: Array<{ content: string; status: string }> }>;
 	_switchedTo: string | undefined;
 	_movedFromEmptySessionFile: string | undefined;
+	agentKind(): "main" | "sub";
 	toggleFastMode(): boolean;
 	setFastMode(enabled: boolean): boolean;
 	isFastModeEnabled(): boolean;
@@ -91,6 +93,7 @@ function createRuntime() {
 		setTitleSystemPrompt: (_prompt: string | undefined) => {},
 		setSlashCommands: (_commands: unknown[]) => {},
 		refreshSkills: async () => {},
+		agentKind: () => "main",
 		toggleFastMode() {
 			this.fastMode = !this.fastMode;
 			return this.fastMode;
@@ -171,22 +174,23 @@ function createRuntime() {
 	const fakeSessionManager = {
 		_sessionFile: undefined as string | undefined,
 		_cwd: "/tmp/project",
-		_entries: [] as { type: string }[],
+		_entries: [] as SessionEntry[],
 		_customEntries: [] as Array<{ customType: string; data: unknown }>,
 		_movedTo: undefined as string | undefined,
 		_flushed: false,
 		_droppedSessions: [] as string[],
 		_sessionName: undefined as string | undefined,
+		_sessionNameSource: undefined as string | undefined,
 		getSessionId(): string {
 			return "fake-session-id";
 		},
 		getSessionFile(): string | undefined {
 			return this._sessionFile;
 		},
-		getEntries(): { type: string }[] {
+		getEntries(): SessionEntry[] {
 			return this._entries;
 		},
-		getBranch(): { type: string }[] {
+		getBranch(): SessionEntry[] {
 			return this._entries;
 		},
 		appendCustomEntry(customType: string, data?: unknown): string {
@@ -227,8 +231,12 @@ function createRuntime() {
 		getCwd(): string {
 			return this._cwd;
 		},
-		async setSessionName(name: string, _source: string): Promise<boolean> {
+		getSessionName(): string | undefined {
+			return this._sessionName;
+		},
+		async setSessionName(name: string, source: string): Promise<boolean> {
 			this._sessionName = name;
+			this._sessionNameSource = source;
 			return true;
 		},
 	};
@@ -651,6 +659,7 @@ describe("session lifecycle commands", () => {
 		const result = await executeAcpBuiltinSlashCommand("/rename Project Apex", runtime);
 		expect(result).toEqual({ consumed: true });
 		expect(fakeSessionManager._sessionName).toBe("Project Apex");
+		expect(fakeSessionManager._sessionNameSource).toBe("user");
 		expect(output[0]).toBe("Session renamed to Project Apex.");
 		expect(notified).toBe(true);
 	});

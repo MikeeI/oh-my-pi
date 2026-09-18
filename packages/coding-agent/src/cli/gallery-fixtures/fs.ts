@@ -87,7 +87,10 @@ function renderReadGroupFixtureState(state: GalleryFixtureState, width: number, 
 	if (state === "progress") return component.render(width);
 
 	component.updateResult(
-		textResult("Read three focused test ranges.", { displayReadTargets: groupedReadTargets }),
+		textResult("Read three focused test ranges.", {
+			displayReadTargets: groupedReadTargets,
+			readTextTokens: 9_841,
+		}),
 		false,
 		"read-delimited",
 	);
@@ -101,7 +104,7 @@ function renderReadGroupFixtureState(state: GalleryFixtureState, width: number, 
 
 	if (state === "error") {
 		component.updateResult(
-			textResult("Error: selector 1270-1274 is outside the file", undefined, true),
+			textResult("Error: selector 1270-1274 is outside the file", { readTextTokens: 36 }, true),
 			false,
 			"read-ranges",
 		);
@@ -115,7 +118,7 @@ function renderReadGroupFixtureState(state: GalleryFixtureState, width: number, 
 		return component.render(width);
 	}
 
-	component.updateResult(textResult("Read four render.ts ranges."), false, "read-ranges");
+	component.updateResult(textResult("Read four render.ts ranges.", { readTextTokens: 4_982 }), false, "read-ranges");
 	component.attachUsage(["read-ranges"], GROUPED_READ_USAGE, 4700, 1900, new Date(2026, 6, 28, 21, 5, 52).getTime());
 	return component.render(width);
 }
@@ -154,6 +157,7 @@ export const fsFixtures: Record<string, GalleryFixture> = {
 				kind: "file",
 				contentType: "text/typescript",
 				displayContent: { text: readSnippet, startLine: 437 },
+				readTextTokens: 1_284,
 			},
 		},
 		errorResult: {

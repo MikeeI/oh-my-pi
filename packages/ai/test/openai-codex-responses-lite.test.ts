@@ -1,4 +1,5 @@
 import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it, vi } from "bun:test";
+import { streamSimple } from "@oh-my-pi/pi-ai";
 import {
 	type InputItem,
 	type RequestBody,
@@ -16,6 +17,7 @@ import type {
 	CodexCompactionRequestContext,
 	Context,
 	FetchImpl,
+	Model,
 	ModelSpec,
 	ProviderSessionState,
 } from "@oh-my-pi/pi-ai/types";
@@ -194,6 +196,85 @@ describe("openai-codex optional response controls", () => {
 			forceReasoningOff: true,
 		});
 		expect(body.reasoning).toEqual({ effort: "none" });
+	});
+
+	it("places an explicit cache breakpoint on stable Codex history", async () => {
+		const baseModel = createCodexModel("gpt-5.6-luna");
+		const model = {
+			...baseModel,
+			compat: {
+				...baseModel.compat,
+				supportsPromptCacheBreakpoints: true,
+				promptCacheBreakpointTtl: "30m",
+			},
+		} as Model<"openai-codex-responses">;
+		const body = await buildTransformedCodexRequestBody(
+			model,
+			{
+				systemPrompt: ["You are a helpful assistant."],
+				messages: [
+					{ role: "user", content: "Stable history", timestamp: 1 },
+					{ role: "user", content: "Current prompt", timestamp: 2 },
+				],
+			},
+			{
+				promptCacheKey: "cache-key",
+				promptCache: { mode: "explicit", ttl: "30m", breakpoint: "latest-stable-message" },
+			},
+		);
+
+		expect(body.prompt_cache_options).toEqual({ mode: "explicit", ttl: "30m" });
+		expect(body.input?.[0]).toMatchObject({
+			role: "user",
+			content: [
+				{
+					type: "input_text",
+					text: "Stable history",
+					prompt_cache_breakpoint: { mode: "explicit" },
+				},
+			],
+		});
+		expect(body.input?.[1]).toMatchObject({
+			role: "user",
+			content: [{ type: "input_text", text: "Current prompt" }],
+		});
+	});
+
+	it("forwards explicit cache controls through streamSimple onto the Codex wire body", async () => {
+		const baseModel = createCodexModel("gpt-5.6-luna");
+		const model = {
+			...baseModel,
+			compat: {
+				...baseModel.compat,
+				supportsPromptCacheBreakpoints: true,
+				promptCacheBreakpointTtl: "30m",
+			},
+			preferWebsockets: false,
+		} as Model<"openai-codex-responses">;
+		let captured: CapturedCodexRequest | undefined;
+		const stream = streamSimple(
+			model,
+			{
+				systemPrompt: ["You are a helpful assistant."],
+				messages: [
+					{ role: "user", content: "Stable history", timestamp: 1 },
+					{ role: "user", content: "Current prompt", timestamp: 2 },
+				],
+			},
+			{
+				apiKey: createCodexTestToken(),
+				fetch: createCodexFetchMock(createCodexSse(COMPLETED_CODEX_EVENTS), request => {
+					captured = request;
+				}),
+				preferWebsockets: false,
+				promptCacheKey: "cache-key",
+				promptCache: { mode: "explicit", ttl: "30m", breakpoint: "latest-stable-message" },
+			},
+		);
+		await stream.result();
+
+		expect(captured?.body.prompt_cache_options).toEqual({ mode: "explicit", ttl: "30m" });
+		expect(JSON.stringify(captured?.body.input)).toContain('"prompt_cache_breakpoint":{"mode":"explicit"}');
 	});
 
 	it("forces reasoning.context to all_turns for Responses Lite", async () => {

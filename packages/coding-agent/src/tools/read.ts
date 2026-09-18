@@ -37,6 +37,7 @@ import { parseInternalUrl } from "../internal-urls/parse";
 import type { InternalUrl } from "../internal-urls/types";
 import { getExperimentalContextSession } from "./context-notes";
 import readDescription from "../prompts/tools/read.md" with { type: "text" };
+import { resolveUserToolPromptSource } from "../prompts/tool-prompt-source";
 import type { ToolSession } from "../sdk";
 import {
 	DEFAULT_MAX_BYTES,
@@ -984,7 +985,12 @@ export class ReadTool implements AgentTool<typeof readSchema, ReadToolDetails> {
 	 */
 	#renderDescription(): string {
 		const displayMode = resolveFileDisplayMode(this.session);
-		return prompt.render(readDescription, {
+		const descriptionSource = resolveUserToolPromptSource({
+			agentDir: this.session.settings.getAgentDir(),
+			toolName: this.name,
+			bundledSource: readDescription,
+		});
+		return prompt.render(descriptionSource, {
 			DEFAULT_LIMIT: String(this.#defaultLimit),
 			DEFAULT_MAX_LINES: String(DEFAULT_MAX_LINES),
 			IS_HL_MODE: displayMode.hashLines,

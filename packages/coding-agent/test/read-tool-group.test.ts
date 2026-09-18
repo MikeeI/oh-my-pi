@@ -53,6 +53,17 @@ describe("ReadToolGroupComponent", () => {
 		expect(rendered.toLowerCase()).not.toContain("ctrl+o");
 	});
 
+	it("omits Read Tokens when no exact measurement is available", () => {
+		const component = new ReadToolGroupComponent();
+		const examplePath = path.resolve("/tmp/example.ts");
+		component.updateArgs({ path: examplePath }, "read-unmeasured");
+		component.updateResult({ content: [{ type: "text", text: "line 1" }] }, false, "read-unmeasured");
+
+		const rendered = Bun.stripANSI(component.render(120).join("\n"));
+		expect(rendered).toContain(`Read ${examplePath}`);
+		expect(rendered).not.toContain("Read Tokens");
+	});
+
 	it("uses the enabled dot for completed reads", () => {
 		const component = new ReadToolGroupComponent();
 		const examplePath = path.resolve("/tmp/example.ts");
@@ -90,6 +101,50 @@ describe("ReadToolGroupComponent", () => {
 		expect(plain).toContain(`${themeModule.theme.tree.last} ${twoPath}`);
 		expect(plain).not.toContain(`${themeModule.theme.tree.branch} ${themeModule.theme.status.enabled}`);
 		expect(plain).not.toContain(`${themeModule.theme.tree.last} ${themeModule.theme.status.enabled}`);
+	});
+
+	it("shows the exact aggregate only after every grouped read settles", () => {
+		const component = new ReadToolGroupComponent();
+		const onePath = path.resolve("/tmp/one.ts");
+		const twoPath = path.resolve("/tmp/two.ts");
+		component.updateArgs({ path: onePath }, "read-one");
+		component.updateArgs({ path: twoPath }, "read-two");
+		component.updateResult(
+			{ content: [{ type: "text", text: "one" }], details: { readTextTokens: 10_000 } },
+			false,
+			"read-one",
+		);
+
+		expect(Bun.stripANSI(component.render(120).join("\n"))).not.toContain("Read Tokens");
+
+		component.updateResult(
+			{ content: [{ type: "text", text: "two" }], details: { readTextTokens: 4_823 } },
+			false,
+			"read-two",
+		);
+		const plain = Bun.stripANSI(component.render(120).join("\n"));
+		expect(plain).toContain("Read (2) · 14,823 Read Tokens");
+		expect(plain.match(/Read Tokens/g)).toHaveLength(1);
+	});
+
+	it("counts one delimited Read result once across its rendered target rows", () => {
+		const component = new ReadToolGroupComponent();
+		const onePath = path.resolve("/tmp/one.ts");
+		const twoPath = path.resolve("/tmp/two.ts");
+		const threePath = path.resolve("/tmp/three.ts");
+		component.updateArgs({ path: `${onePath}:1-2,${twoPath}:3-4;${threePath}:5-6` }, "read-many");
+		component.updateResult(
+			{
+				content: [{ type: "text", text: "combined" }],
+				details: { readTextTokens: 14_823 },
+			},
+			false,
+			"read-many",
+		);
+
+		const plain = Bun.stripANSI(component.render(120).join("\n"));
+		expect(plain).toContain("Read (3) · 14,823 Read Tokens");
+		expect(plain.match(/Read Tokens/g)).toHaveLength(1);
 	});
 
 	it("nests one usage row beneath the last path from each read-only turn", () => {
@@ -294,6 +349,7 @@ describe("ReadToolGroupComponent", () => {
 		component.updateResult(
 			{
 				content: [{ type: "text", text: "line 1\nline 2\nline 3\nline 4" }],
+				details: { readTextTokens: 1_284 },
 			},
 			false,
 			"read-3",
@@ -301,6 +357,7 @@ describe("ReadToolGroupComponent", () => {
 
 		const rendered = Bun.stripANSI(component.render(120).join("\n"));
 		const matches = rendered.split(`Read ${examplePath}:L10-L20`).length - 1;
+		expect(rendered).toContain(`Read ${examplePath}:L10-L20 · 1,284 Read Tokens`);
 
 		expect(matches).toBe(1);
 	});
@@ -383,8 +440,6 @@ describe("ReadToolGroupComponent", () => {
 
 describe("readArgsCollapseIntoGroup", () => {
 	it.each([
-		["skill://my-skill"],
-		["skill://my-skill/file.md"],
 		["omp://docs/tools/read.md"],
 		["issue://123"],
 		["pr://can1357/oh-my-pi/456"],
@@ -405,6 +460,8 @@ describe("readArgsCollapseIntoGroup", () => {
 		["https://example.com/file"],
 		["xd://"],
 		["xd://generate_image"],
+		["skill://my-skill"],
+		["skill://my-skill/file.md"],
 	])("collapses %s into the read group", target => {
 		expect(readArgsCollapseIntoGroup({ path: target })).toBe(true);
 		expect(readArgsCollapseIntoGroup({ file_path: target })).toBe(true);

@@ -101,6 +101,10 @@
 ### Fixed
 
 - Stopped long flicker when moving or resizing an omp pane in Warp. Resize repaints in place there after the drag settles (override with `PI_TUI_RESIZE_IN_PLACE=0`), with no alternate-screen borrow, no scrollback replay, blanked live rows so shrink drags cannot archive unfinished rows, and overlay toggle echoes repainting the modal instead of probing ([#11247](https://github.com/can1357/oh-my-pi/pull/11247) by [@H4vC](https://github.com/H4vC)).
+### Fixed
+
+- Fixed scrolling history appends losing final rows behind blank-first writes.
+- Fixed rapid and fullscreen-covered resizes repainting from stale multiplexer geometry.
 
 ## [18.1.14] - 2026-09-07
 

@@ -12,6 +12,7 @@ import { markFramedBlockComponent } from "../render/output-block";
 import { framedToolCard } from "../render/tool-card";
 import { type ReadUrlToolDetails, renderReadUrlCall, renderReadUrlResult } from "./fetch";
 import { formatFullOutputReference, formatStyledTruncationWarning, stripOutputNotice } from "./output-meta";
+import { formatReadTokenSuffix } from "./read-token";
 import { formatBytes, sanitizeDisplayLines, shortenPath, wrapBrackets } from "../render/render-utils";
 
 import type { OutputMeta } from "./output-meta";
@@ -22,6 +23,8 @@ export type ReadTruncationStats = Omit<TruncationResult, "content">;
 
 /** Display metadata for file and URL reads. */
 export interface ReadToolDetails {
+	/** Exact native-token count of final sanitized text blocks after session-owned postprocessing. */
+	readTextTokens?: number;
 	kind?: "file" | "url";
 	/** Filesystem hyperlink target resolved by the executing tool. */
 	displayTarget?: string;
@@ -324,6 +327,7 @@ export const readToolRenderer = {
 				const endLine = args.limit !== undefined ? startLine + args.limit - 1 : "";
 				title += `:${startLine}${endLine ? `-${endLine}` : ""}`;
 			}
+			title += formatReadTokenSuffix(result.details?.readTextTokens, uiTheme);
 			const header = renderStatusLine({ icon: "error", title }, uiTheme);
 			const errorLines = sanitizeDisplayLines(errorText).map(line => uiTheme.fg("error", line));
 			return framedToolCard(uiTheme, () => ({
@@ -374,7 +378,11 @@ export const readToolRenderer = {
 			});
 			const correction = suffix ? ` ${uiTheme.fg("dim", `(corrected from ${shortenPath(suffix.from)})`)}` : "";
 			const header = renderStatusLine(
-				{ icon: suffix ? "warning" : "success", title: "Read", description: `${displayPath}${correction}` },
+				{
+					icon: suffix ? "warning" : "success",
+					title: "Read",
+					description: `${displayPath}${correction}${formatReadTokenSuffix(details?.readTextTokens, uiTheme)}`,
+				},
 				uiTheme,
 			);
 			const detailLines = contentText
@@ -418,6 +426,7 @@ export const readToolRenderer = {
 			const n = details.conflictCount;
 			title += ` ${uiTheme.fg("warning", `(⚠ ${n} conflict${n === 1 ? "" : "s"})`)}`;
 		}
+		title += formatReadTokenSuffix(details?.readTextTokens, uiTheme);
 		const rawRequested =
 			args?.raw === true || renderPath.sel?.split(":").some(chunk => chunk.toLowerCase() === "raw") === true;
 		const isMarkdown = details?.contentType === "text/markdown" && !rawRequested;

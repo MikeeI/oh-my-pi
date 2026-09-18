@@ -1,6 +1,9 @@
 Web search: current information beyond knowledge cutoff.
 
 <instruction>
+- Before searching, collect all independent queries already required for the current step.
+- Prefer parallel sibling `web_search` calls in one assistant turn; avoid one query per turn.
+- Search sequentially only when a result determines the next query.
 - SHOULD prefer primary sources (papers, official docs); corroborate key claims with multiple sources.
 - MUST link cited sources in final response.
 - NEVER use for programmatically accessible content or known URLs (GitHub repos/issues, known arXiv papers, Wikipedia pages, official docs) — `read` URL directly.

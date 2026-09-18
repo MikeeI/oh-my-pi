@@ -4,11 +4,11 @@
  * Handles `omp stats` subcommand for viewing AI usage statistics.
  */
 
-import { truncateToWidth } from "@oh-my-pi/pi-tui/utils";
-import { formatDuration, formatNumber, formatPercent } from "@oh-my-pi/pi-utils";
+import { truncateToWidth } from "@oh-my-pi/pi-tui";
+import { APP_DISPLAY_NAME } from "../app-version";
 import chalk from "@oh-my-pi/pi-utils/chalk";
-import { formatCost } from "@oh-my-pi/pi-tui/overlays/agent-hub-renderer";
 import { openPath } from "../utils/open";
+import { loadStatsSummary, renderStatsSummary, type StatsSummaryLoader } from "./stats-summary";
 
 /**
  * Single-line TTY progress bar. On a non-TTY stream we just stay quiet -
@@ -63,8 +63,40 @@ export interface StatsCommandArgs {
 	summary: boolean;
 }
 
-function normalizePremiumRequests(n: number): number {
-	return Math.round((n + Number.EPSILON) * 100) / 100;
+// =============================================================================
+// Argument Parser
+// =============================================================================
+
+/**
+ * Parse stats subcommand arguments.
+ * Returns undefined if not a stats command.
+ */
+export function parseStatsArgs(args: string[]): StatsCommandArgs | undefined {
+	if (args.length === 0 || args[0] !== "stats") {
+		return undefined;
+	}
+
+	const result: StatsCommandArgs = {
+		port: 3847,
+		host: "127.0.0.1",
+		json: false,
+		summary: false,
+	};
+
+	for (let i = 1; i < args.length; i++) {
+		const arg = args[i];
+		if (arg === "--json" || arg === "-j") {
+			result.json = true;
+		} else if (arg === "--summary" || arg === "-s") {
+			result.summary = true;
+		} else if ((arg === "--port" || arg === "-p") && i + 1 < args.length) {
+			result.port = parseInt(args[++i], 10);
+		} else if (arg.startsWith("--port=")) {
+			result.port = parseInt(arg.split("=")[1], 10);
+		}
+	}
+
+	return result;
 }
 
 // =============================================================================
@@ -82,7 +114,7 @@ export async function runStatsCommand(cmd: StatsCommandArgs): Promise<void> {
 	const { processed, files } = await syncAllSessions({ onProgress: progress.onProgress });
 	progress.finish();
 	const total = await getTotalMessageCount();
-	console.log(`Synced ${processed} new entries from ${files} files (${total} total)\n`);
+	process.stderr.write(`Synced ${processed} new entries from ${files} files (${total} total)\n\n`);
 
 	if (cmd.json) {
 		const stats = await getDashboardStats();
@@ -91,7 +123,7 @@ export async function runStatsCommand(cmd: StatsCommandArgs): Promise<void> {
 	}
 
 	if (cmd.summary) {
-		await printStatsSummary();
+		await printStatsSummary(getDashboardStats);
 		return;
 	}
 
@@ -116,44 +148,7 @@ export async function runStatsCommand(cmd: StatsCommandArgs): Promise<void> {
 	await new Promise(() => {});
 }
 
-async function printStatsSummary(): Promise<void> {
-	const { getDashboardStats } = await import("@oh-my-pi/omp-stats");
-	const stats = await getDashboardStats();
-	const { overall, byModel, byFolder } = stats;
-
-	console.log(chalk.bold("\n=== AI Usage Statistics ===\n"));
-
-	console.log(chalk.bold("Overall:"));
-	console.log(`  Requests: ${formatNumber(overall.totalRequests)} (${formatNumber(overall.failedRequests)} errors)`);
-	console.log(`  Error Rate: ${formatPercent(overall.errorRate)}`);
-	console.log(`  Total Tokens: ${formatNumber(overall.totalInputTokens + overall.totalOutputTokens)}`);
-	console.log(`  Input Tokens: ${formatNumber(overall.totalInputTokens)}`);
-	console.log(`  Output Tokens: ${formatNumber(overall.totalOutputTokens)}`);
-	console.log(`  Cache Rate: ${formatPercent(overall.cacheRate)}`);
-	console.log(`  Cache Savings: ${formatPercent(overall.cacheSavings)}`);
-	console.log(`  Total Cost: ${formatCost(overall.totalCost)}`);
-	console.log(`  Premium Requests: ${formatNumber(normalizePremiumRequests(overall.totalPremiumRequests ?? 0))}`);
-	console.log(`  Avg Duration: ${overall.avgDuration !== null ? formatDuration(overall.avgDuration) : "-"}`);
-	console.log(`  Avg TTFT: ${overall.avgTtft !== null ? formatDuration(overall.avgTtft) : "-"}`);
-	if (overall.avgTokensPerSecond !== null) {
-		console.log(`  Avg Tokens/s: ${overall.avgTokensPerSecond.toFixed(1)}`);
-	}
-
-	if (byModel.length > 0) {
-		console.log(chalk.bold("\nBy Model:"));
-		for (const m of byModel.slice(0, 10)) {
-			console.log(
-				`  ${m.model}: ${formatNumber(m.totalRequests)} reqs, ${formatCost(m.totalCost)}, ${formatPercent(m.cacheRate)} cache rate, ${formatPercent(m.cacheSavings)} cache savings`,
-			);
-		}
-	}
-
-	if (byFolder.length > 0) {
-		console.log(chalk.bold("\nBy Folder:"));
-		for (const f of byFolder.slice(0, 10)) {
-			console.log(`  ${f.folder}: ${formatNumber(f.totalRequests)} reqs, ${formatCost(f.totalCost)}`);
-		}
-	}
-
-	console.log("");
+async function printStatsSummary(load: StatsSummaryLoader): Promise<void> {
+	const statsByRange = await loadStatsSummary(load);
+	console.log(renderStatsSummary(statsByRange, { dashboardCommand: `${APP_DISPLAY_NAME} stats` }));
 }
