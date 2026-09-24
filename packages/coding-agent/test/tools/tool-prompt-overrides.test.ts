@@ -5,8 +5,10 @@ import { Settings } from "@oh-my-pi/pi-coding-agent/config/settings";
 import type { ToolSession } from "@oh-my-pi/pi-coding-agent/tools";
 import { ReadTool } from "@oh-my-pi/pi-coding-agent/tools/read";
 import { BashTool } from "@oh-my-pi/pi-coding-agent/tools/bash";
+import { EvalTool } from "@oh-my-pi/pi-coding-agent/tools/eval";
 import { TaskTool } from "@oh-my-pi/pi-coding-agent/task";
 import { LspTool } from "@oh-my-pi/pi-coding-agent/lsp/tool";
+import { WebSearchTool } from "@oh-my-pi/pi-coding-agent/web/search";
 import { TempDir } from "@oh-my-pi/pi-utils";
 
 const MISSING_AGENT_DIR = path.join(os.tmpdir(), `omp-tool-prompt-missing-${process.pid}`);
@@ -92,5 +94,20 @@ describe("profile-scoped tool prompts", () => {
 
 		expect(new LspTool(createSession(tempDir.path())).description).toBe("CUSTOM_LSP");
 		expect(new LspTool(createSession()).description).toContain("Symbol-aware code intelligence");
+	});
+	it("renders a profile-scoped eval.md using live Eval variables and falls back when absent", async () => {
+		using tempDir = TempDir.createSync("@omp-eval-prompt-");
+		await Bun.write(tempDir.join("prompts", "tools", "eval.md"), "CUSTOM_EVAL {{#if js}}js{{/if}}");
+
+		expect(new EvalTool(createSession(tempDir.path())).description).toBe("CUSTOM_EVAL js");
+		expect(new EvalTool(createSession()).description).toContain("One cell per call");
+	});
+
+	it("uses a profile-scoped web-search.md instead of the bundled guidance", async () => {
+		using tempDir = TempDir.createSync("@omp-web-search-prompt-");
+		await Bun.write(tempDir.join("prompts", "tools", "web-search.md"), "CUSTOM_WEB_SEARCH");
+
+		expect(new WebSearchTool(createSession(tempDir.path())).description).toBe("CUSTOM_WEB_SEARCH");
+		expect(new WebSearchTool(createSession()).description).toContain("Known URLs/programmatic data");
 	});
 });

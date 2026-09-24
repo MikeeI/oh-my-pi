@@ -65,12 +65,9 @@ describe("eval tool description", () => {
 		expect(getEvalDocTopics({ py: true, js: true, spawns: true }).agents).toContain("agent(prompt");
 	});
 
-	it("keeps direct inspection and result ownership in the model-visible Eval contract", () => {
+	it("uses the bundled Eval contract without a profile override", () => {
 		const text = getEvalToolDescription({ py: true, js: true, spawns: true });
-		expect(text).toContain("use native Read for inspection");
-		expect(text).toContain("Keep large raw tool results separate or pass handles");
-		expect(text).toContain("inspect unknown result shapes");
-		expect(text).toContain("`parallel(thunks)`");
+		expect(text).toContain("One cell per call; top-level state persists");
 		expect(text).toContain("`agent()` children have separate kernels");
 	});
 
@@ -178,7 +175,9 @@ describe("eval tool description", () => {
 			["helpers", "budget.total"],
 			["helpers", "%load <path>"],
 		]) {
-			const result = await readTool.execute("read-eval-topic", { path: `xd://eval/${topic}` });
+			const result = await readTool.execute("read-eval-topic", {
+				path: `xd://eval/${topic}`,
+			});
 			expect(result.content.some(part => part.type === "text" && part.text.includes(signature))).toBe(true);
 		}
 	});

@@ -23,6 +23,7 @@ import { EvalShadowCellSession } from "../eval/speculation/cell-session";
 import { runWithEvalShadowCell } from "../eval/speculation/runtime-context";
 import type { EvalCellResult, EvalLanguage, EvalStatusEvent, EvalToolDetails } from "@oh-my-pi/pi-tui/tools/eval";
 import evalDescription from "../prompts/tools/eval.md" with { type: "text" };
+import { resolveUserToolPromptSource } from "../prompts/tool-prompt-source";
 import evalAgentsTopic from "../prompts/tools/eval-agents.md" with { type: "text" };
 import evalJudgeTopic from "../prompts/tools/eval-judge.md" with { type: "text" };
 import evalHelpersTopic from "../prompts/tools/eval-helpers.md" with { type: "text" };
@@ -198,6 +199,8 @@ function formatDisplayJson(value: unknown, canSpill: boolean): FormattedDisplayJ
 }
 
 export interface EvalToolDescriptionOptions {
+	/** Active profile directory; omit to render the bundled prompt for standalone callers. */
+	agentDir?: string;
 	py?: boolean;
 	js?: boolean;
 	/**
@@ -266,11 +269,20 @@ export function getEvalToolDescription(options: EvalToolDescriptionOptions = {})
 		const doc = prelude.documentation.trim();
 		if (doc) preludes.push({ name: prelude.name, summary: doc.split("\n", 1)[0]! });
 	}
-	return prompt.render(evalDescription, {
-		...evalTemplateContext(options),
-		preludes,
-		inlineTopics: options.inlineTopics ? Object.values(getEvalDocTopics(options)).join("\n\n") : undefined,
-	});
+	return prompt.render(
+		options.agentDir
+			? resolveUserToolPromptSource({
+					agentDir: options.agentDir,
+					toolName: "eval",
+					bundledSource: evalDescription,
+				})
+			: evalDescription,
+		{
+			...evalTemplateContext(options),
+			preludes,
+			inlineTopics: options.inlineTopics ? Object.values(getEvalDocTopics(options)).join("\n\n") : undefined,
+		},
+	);
 }
 
 export interface EvalToolOptions {
@@ -381,6 +393,7 @@ export class EvalTool implements AgentTool<typeof evalSchema> {
 			session.taskDepth ?? 0,
 		);
 		return {
+			agentDir: session.settings.getAgentDir(),
 			py: backends.python,
 			js: backends.js,
 			spawns: depthAllowsSpawning ? (session.getSessionSpawns?.() ?? "*") : false,
@@ -416,7 +429,11 @@ export class EvalTool implements AgentTool<typeof evalSchema> {
 			.map(definition => definition.codeModeDeclarations?.trim())
 			.filter((declaration): declaration is string => Boolean(declaration))
 			.join("\n\n");
-		return prompt.render(evalCodeModeDescription, { baseDescription, declarations, preludeDeclarations });
+		return prompt.render(evalCodeModeDescription, {
+			baseDescription,
+			declarations,
+			preludeDeclarations,
+		});
 	}
 	/** Only syntax not obvious from the field schema; filtered by enabled language. */
 	static readonly #examples: readonly ToolExample<typeof evalSchema.infer>[] = [
@@ -617,7 +634,9 @@ export class EvalTool implements AgentTool<typeof evalSchema> {
 					const result = await run(runSignal, (text, details) => {
 						latestText = text;
 						latestDetails = details;
-						void reportProgress(text, { async: { state: "running", jobId, type: "eval" } });
+						void reportProgress(text, {
+							async: { state: "running", jobId, type: "eval" },
+						});
 						if (forwardUpdates) emitToolUpdate?.(text, details);
 					});
 					const finalText =
@@ -956,7 +975,10 @@ export class EvalTool implements AgentTool<typeof evalSchema> {
 						jsonOutputs.push(formatted.detailsValue);
 						cellDisplayTexts.push(`${label}${formatted.previewText}`);
 						if (formatted.spillFullValue) {
-							spilledDisplays.push({ index: jsonOutputs.length - 1, fullValue: output.data });
+							spilledDisplays.push({
+								index: jsonOutputs.length - 1,
+								fullValue: output.data,
+							});
 							outputSink.push(`${label}${formatted.fullText}\n`, {
 								inline: `${label}${formatted.previewText}\n`,
 								emitInline: false,
