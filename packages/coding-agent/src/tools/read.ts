@@ -46,6 +46,7 @@ import {
 } from "../internal-urls";
 import { isMarkdownPath } from "@oh-my-pi/pi-tui/lang-from-path";
 import readDescription from "../prompts/tools/read.md" with { type: "text" };
+import { resolveUserToolPromptSource } from "../prompts/tool-prompt-source";
 import type { ToolSession } from "../sdk";
 import {
 	DEFAULT_MAX_BYTES,

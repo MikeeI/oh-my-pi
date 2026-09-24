@@ -287,6 +287,83 @@ describe("generated model policies", () => {
 		expect(models[2]?.cost.longContext).toBeUndefined();
 	});
 
+	it("assigns GPT-6 Sol and Luna base and long-context tariffs by provider", () => {
+		const cases = [
+			{
+				id: "gpt-6-sol",
+				api: {
+					input: 2,
+					output: 10,
+					cacheRead: 0.2,
+					cacheWrite: 2.5,
+					longContext: {
+						inputThreshold: 272_000,
+						input: 4,
+						output: 15,
+						cacheRead: 0.4,
+						cacheWrite: 5,
+					},
+				},
+				codex: {
+					input: 2,
+					output: 10,
+					cacheRead: 0.2,
+					cacheWrite: 0,
+					longContext: {
+						inputThreshold: 272_000,
+						input: 4,
+						output: 15,
+						cacheRead: 0.4,
+						cacheWrite: 0,
+					},
+				},
+			},
+			{
+				id: "gpt-6-luna",
+				api: {
+					input: 0.1,
+					output: 0.5,
+					cacheRead: 0.01,
+					cacheWrite: 0.125,
+					longContext: {
+						inputThreshold: 272_000,
+						input: 0.2,
+						output: 0.75,
+						cacheRead: 0.02,
+						cacheWrite: 0.25,
+					},
+				},
+				codex: {
+					input: 0.1,
+					output: 0.5,
+					cacheRead: 0.01,
+					cacheWrite: 0,
+					longContext: {
+						inputThreshold: 272_000,
+						input: 0.2,
+						output: 0.75,
+						cacheRead: 0.02,
+						cacheWrite: 0,
+					},
+				},
+			},
+		] as const;
+
+		for (const modelCase of cases) {
+			const api = buildGenerated(createSpec({ id: modelCase.id, api: "openai-responses", provider: "openai" }));
+			const codex = buildGenerated(
+				createSpec({
+					id: modelCase.id,
+					api: "openai-codex-responses",
+					provider: "openai-codex",
+				}),
+			);
+			expect(api.cost).toMatchObject(modelCase.api);
+			expect(codex.cost).toMatchObject(modelCase.codex);
+			expect(codex.serviceTierCost).toEqual({ flex: 0.5, priority: 2.5 });
+		}
+	});
+
 	it("pins Claude Mythos 5 first-party Anthropic catalog metadata", () => {
 		const model = buildGenerated(
 			createSpec({

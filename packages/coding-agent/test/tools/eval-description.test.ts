@@ -65,6 +65,15 @@ describe("eval tool description", () => {
 		expect(getEvalDocTopics({ py: true, js: true, spawns: true }).agents).toContain("agent(prompt");
 	});
 
+	it("keeps direct inspection and result ownership in the model-visible Eval contract", () => {
+		const text = getEvalToolDescription({ py: true, js: true, spawns: true });
+		expect(text).toContain("use native Read for inspection");
+		expect(text).toContain("Keep large raw tool results separate or pass handles");
+		expect(text).toContain("inspect unknown result shapes");
+		expect(text).toContain("`parallel(thunks)`");
+		expect(text).toContain("`agent()` children have separate kernels");
+	});
+
 	it("routes model calls, setup, budget, and defined tools to discoverable topics", () => {
 		const linked = getEvalToolDescription({ py: true, js: true, evalTools: true });
 		const topics = getEvalDocTopics({ py: true, js: true, evalTools: true });

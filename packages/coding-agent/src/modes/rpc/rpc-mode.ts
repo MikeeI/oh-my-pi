@@ -16,6 +16,7 @@ import { ThinkingLevel } from "@oh-my-pi/pi-agent-core";
 import { getOAuthProviders } from "@oh-my-pi/pi-ai/oauth";
 import { toolWireSchema } from "@oh-my-pi/pi-ai/utils/schema";
 import { $env, isRecord, logger, Snowflake } from "@oh-my-pi/pi-utils";
+import { reset as resetCapabilities } from "../../capability";
 import { clearPluginRootsAndCaches, resolveActiveProjectRegistryPath } from "../../discovery/helpers";
 import {
 	type ExtensionUIContext,
@@ -1102,8 +1103,10 @@ export async function runRpcMode(session: AgentSession, options: RpcModeOptions 
 		const cwd = session.sessionManager.getCwd();
 		const projectPath = await resolveActiveProjectRegistryPath(cwd);
 		clearPluginRootsAndCaches(projectPath ? [projectPath] : undefined);
-		await session.refreshSkillsAndCommands();
-		await emitAvailableCommandsUpdate();
+		resetCapabilities();
+		await session.refreshSkills();
+		const commands = await getAvailableCommands();
+		output({ type: "available_commands_update", commands });
 	};
 	const emitAvailableCommandsUpdate = async () => {
 		output({ type: "available_commands_update", commands: await getAvailableCommands() });
@@ -1192,6 +1195,7 @@ export async function runRpcMode(session: AgentSession, options: RpcModeOptions 
 						}
 						return success(id, "prompt", { agentInvoked: builtinResult.agentInvoked === true });
 					}
+
 
 					// Don't await - events will stream
 					// Extension commands are executed immediately, file prompt templates are expanded

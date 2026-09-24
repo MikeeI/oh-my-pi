@@ -100,6 +100,7 @@ import {
 	postmortem,
 	prompt,
 	Snowflake,
+	sanitizeText,
 	stringProperty,
 	withTimeout,
 } from "@oh-my-pi/pi-utils";
@@ -158,6 +159,13 @@ import { ManagedTimers } from "../extensibility/extensions/managed-timers";
 import { createExtensionModelQuery } from "../extensibility/extensions/model-api";
 import type { CompactOptions, ContextUsage } from "../extensibility/extensions/types";
 import type { CustomCommandContext } from "../extensibility/custom-commands/types";
+import {
+	buildRoutineExecutionPlan,
+	parseRoutineInvocation,
+	type Routine,
+	type RoutineExecutionPlan,
+	type RoutineProgress,
+} from "../extensibility/routines";
 import { SkillDescriptionCatalog } from "../extensibility/skill-descriptions";
 import type { Skill, SkillWarning } from "../extensibility/skills";
 import { expandSlashCommand, type FileSlashCommand, loadSlashCommands } from "../extensibility/slash-commands";
@@ -206,7 +214,7 @@ import type { SecretObfuscator } from "../secrets/obfuscator";
 import { cfgSecretsEnabled } from "../secrets/settings";
 import { releaseSharpshooterSession } from "../sharpshooter/backend";
 import { flushSharpshooterExtraction } from "../sharpshooter/extract";
-import { toolReadsSkillUris } from "../system-prompt";
+import { type BuildSystemPromptResult, toolReadsSkillUris } from "../system-prompt";
 import {
 	AUTO_THINKING,
 	type ConfiguredThinkingLevel,
@@ -230,6 +238,7 @@ import {
 import type { CheckpointState, CompletedRewindState } from "../tools/checkpoint";
 import { releaseComputerSessionsForOwner } from "../tools/computer/supervisor";
 import { isAutoQaEnabled } from "../tools/report-tool-issue";
+import type { ReadToolDetails } from "@oh-my-pi/pi-tui/tools/read";
 import {
 	buildResolveReminderMessage,
 	isPreviewResolutionToolCall,
@@ -701,6 +710,9 @@ export class AgentSession implements SettingsScope {
 	#slashCommands: FileSlashCommand[];
 	/** Tail of the serialized {@link refreshSkillsAndCommands} chain. */
 	#skillsAndCommandsRefresh: Promise<void> = Promise.resolve();
+	#routines: Routine[];
+	#activeRoutineToken: symbol | undefined;
+	#activeRoutineAbortController: AbortController | undefined;
 
 	// Event subscription state
 	#unsubscribeAgent?: () => void;
@@ -1531,6 +1543,7 @@ export class AgentSession implements SettingsScope {
 		});
 
 		this.#promptTemplates = config.promptTemplates ?? [];
+		this.#routines = config.routines ?? [];
 		this.#slashCommands = config.slashCommands ?? [];
 		this.#extensionRunner = config.extensionRunner;
 		this.#getEvalPreludes = config.getEvalPreludes;
@@ -1802,6 +1815,7 @@ export class AgentSession implements SettingsScope {
 			ensureGoalRegistered: config.ensureGoalRegistered,
 			reconcileSettingsGatedTools: config.reconcileSettingsGatedTools,
 			rebuildSystemPrompt: config.rebuildSystemPrompt,
+			initialSystemPromptResult: config.initialSystemPromptResult,
 			getMcpServerInstructions: config.getMcpServerInstructions,
 			xdev: config.xdev,
 			setActiveToolNames: config.setActiveToolNames,
@@ -2331,6 +2345,10 @@ export class AgentSession implements SettingsScope {
 
 	getAgentId(): string | undefined {
 		return this.#agentId;
+	}
+
+	agentKind(): "main" | "sub" {
+		return this.#agentKind;
 	}
 
 	/** Dequeue the next HARD forced tool choice for the upcoming LLM call, dropping
@@ -4424,7 +4442,24 @@ export class AgentSession implements SettingsScope {
 			this.#synchronouslyTerminatedYieldToolCallIds.add(ctx.toolCall.id);
 			this.agent.abort(TERMINAL_TOOL_RESULT_ABORT_REASON);
 		}
-		return this.#ttsr.afterToolCall(ctx);
+		const ttsrResult = this.#ttsr.afterToolCall(ctx);
+		if (ctx.toolCall.name !== "read") return ttsrResult;
+
+		const content = ttsrResult?.content ?? ctx.result.content;
+		const textFragments: string[] = [];
+		for (const block of content) {
+			if (block.type === "text") textFragments.push(sanitizeText(block.text));
+		}
+		if (textFragments.length === 0) return ttsrResult;
+		const readTextTokens = this.agent.tokenizer.countTokensExact(textFragments);
+		if (readTextTokens === undefined) return ttsrResult;
+
+		const details = ttsrResult?.details ?? ctx.result.details;
+		const readDetails: ReadToolDetails = {
+			...(isRecord(details) ? details : {}),
+			readTextTokens,
+		};
+		return { ...ttsrResult, details: readDetails };
 	}
 	/**
 	 * Emits the extension `tool_call` event for a loop-dispatched call at
@@ -5661,6 +5696,11 @@ export class AgentSession implements SettingsScope {
 		this.#textOutputCommitted = committed;
 	}
 
+	/** Latest accepted structured system prompt build. */
+	getSystemPromptResult(): BuildSystemPromptResult {
+		return this.#tools.systemPromptResult;
+	}
+
 	/** Current retry attempt (0 if not retrying) */
 	get retryAttempt(): number {
 		return this.#recovery.attempt;
@@ -6366,6 +6406,14 @@ export class AgentSession implements SettingsScope {
 		return this.#slashCommands;
 	}
 
+	get routines(): ReadonlyArray<Routine> {
+		return this.#routines;
+	}
+
+	setRoutines(routines: Routine[]): void {
+		this.#routines = [...routines];
+	}
+
 	/** Custom commands (TypeScript slash commands and MCP prompts) */
 	get customCommands(): ReadonlyArray<LoadedCustomCommand> {
 		if (this.#mcpPromptCommands.length === 0) return this.#customCommands;
@@ -6626,10 +6674,17 @@ export class AgentSession implements SettingsScope {
 	 * the ACP agent) use this to know whether to expect an `agent_end` event.
 	 */
 	async prompt(text: string, options?: PromptOptions): Promise<boolean> {
-		return this.#admitSubmission(() => this.#prompt(text, options));
+		return this.#admitSubmission(() => this.#promptInternal(text, options, undefined));
 	}
 
-	async #prompt(text: string, options?: PromptOptions): Promise<boolean> {
+	async #promptInternal(
+		text: string,
+		options: PromptOptions | undefined,
+		routineToken: symbol | undefined,
+	): Promise<boolean> {
+		if (this.#activeRoutineToken && routineToken !== this.#activeRoutineToken) {
+			throw new AgentBusyError("A routine is running");
+		}
 		// Stamp the operator's submission instant before ANY async preprocessing —
 		// command execution, image normalization, vision-model description — so the
 		// prompt→yield delta includes the whole wait, whatever path the prompt takes.
@@ -6681,6 +6736,12 @@ export class AgentSession implements SettingsScope {
 				text = customResult;
 			}
 
+			if (text.startsWith("/")) {
+				const handledRoutine = await this.runRoutineInvocation(text);
+				if (handledRoutine) {
+					return false;
+				}
+			}
 			// Try file-based slash commands (markdown files from commands/ directories)
 			// Only if text still starts with "/" (wasn't transformed by custom command)
 			if (text.startsWith("/")) {
@@ -6860,6 +6921,86 @@ export class AgentSession implements SettingsScope {
 			this.#promptDropped?.({ text: typedText, images: options?.images });
 		}
 		return true;
+	}
+
+	#throwIfRoutineRunning(): void {
+		if (this.#activeRoutineToken) {
+			throw new AgentBusyError("A routine is running");
+		}
+	}
+
+	async runRoutineInvocation(
+		text: string,
+		options: {
+			onProgress?: (progress: RoutineProgress) => void | Promise<void>;
+		} = {},
+	): Promise<boolean> {
+		const invocation = parseRoutineInvocation(text, this.#routines);
+		if (!invocation) return false;
+		if (this.#activeRoutineToken) {
+			throw new AgentBusyError("A routine is already running");
+		}
+
+		const token = Symbol(invocation.routine.name);
+		const abortController = new AbortController();
+		this.#activeRoutineToken = token;
+		this.#activeRoutineAbortController = abortController;
+		let currentIndex = 0;
+		let total = invocation.routine.steps.length;
+		try {
+			if (this.isStreaming || this.queuedMessageCount > 0) {
+				await options.onProgress?.({
+					routine: invocation.routine.name,
+					status: "queued",
+					index: 0,
+					total,
+				});
+				await this.waitForIdle();
+			}
+
+			const plan: RoutineExecutionPlan = buildRoutineExecutionPlan(
+				invocation,
+				this.#slashCommands,
+				new Set(this.#routines.map(routine => routine.name)),
+			);
+			total = plan.steps.length;
+			for (let i = 0; i < plan.steps.length; i++) {
+				if (abortController.signal.aborted) {
+					throw new Error("Routine cancelled");
+				}
+				const step = plan.steps[i];
+				currentIndex = i + 1;
+				await options.onProgress?.({
+					routine: plan.routine.name,
+					status: "running",
+					index: currentIndex,
+					total,
+					step: step.label,
+				});
+				await this.#promptInternal(step.text, { expandPromptTemplates: false }, token);
+				await this.waitForIdle();
+			}
+			await options.onProgress?.({
+				routine: invocation.routine.name,
+				status: "complete",
+				index: total,
+				total,
+			});
+			return true;
+		} catch (error) {
+			const message = error instanceof Error ? error.message : String(error);
+			await options.onProgress?.({
+				routine: invocation.routine.name,
+				status: abortController.signal.aborted ? "cancelled" : "failed",
+				index: currentIndex,
+				total,
+				message,
+			});
+			throw error;
+		} finally {
+			this.#activeRoutineToken = undefined;
+			this.#activeRoutineAbortController = undefined;
+		}
 	}
 
 	/**
@@ -7504,6 +7645,7 @@ export class AgentSession implements SettingsScope {
 	 * Queue a steering message to interrupt the agent mid-run.
 	 */
 	async steer(text: string, images?: ImageContent[], options?: SteerOptions): Promise<void> {
+		this.#throwIfRoutineRunning();
 		if (text.startsWith("/")) {
 			this.#throwIfExtensionCommand(text);
 		}
@@ -7526,6 +7668,7 @@ export class AgentSession implements SettingsScope {
 	 * flipping advisor auto-resume.
 	 */
 	async followUp(text: string, images?: ImageContent[], options?: FollowUpOptions): Promise<void> {
+		this.#throwIfRoutineRunning();
 		if (text.startsWith("/")) {
 			this.#throwIfExtensionCommand(text);
 		}
@@ -8614,6 +8757,7 @@ export class AgentSession implements SettingsScope {
 	}): Promise<void> {
 		const userInterrupt = options?.reason === USER_INTERRUPT_LABEL;
 		this.#pendingAbortErrorId = userInterrupt ? AIError.create(AIError.Flag.UserInterrupt) : undefined;
+		this.#activeRoutineAbortController?.abort();
 		if (userInterrupt) this.#advisors.autoResumeSuppressed = true;
 		// Pull advisor concerns out of the steer/follow-up queues before any await so
 		// the post-abort stranded-message drain can't auto-resume the run on them.

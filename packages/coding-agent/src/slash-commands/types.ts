@@ -21,6 +21,8 @@ export interface BuiltinSlashCommand {
 	icon?: SlashCommandIconName;
 	/** Whether the command consumes text after the command name. */
 	allowArgs?: boolean;
+	/** Whether generic prompt completions may serve command arguments when command-specific completion has no match. */
+	argumentCompletionMode?: "exclusive" | "prompt";
 	/** Subcommands for dropdown completion (e.g. /mcp add, /mcp list). */
 	subcommands?: SubcommandDef[];
 	/** Static inline hint when command takes a simple argument (no subcommands). */

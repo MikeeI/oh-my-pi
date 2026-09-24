@@ -1348,7 +1348,7 @@ export class CommandController {
 		return true;
 	}
 
-	async handleRenameCommand(title: string): Promise<void> {
+	async handleRenameCommand(title: string, generated = false): Promise<void> {
 		const session = this.ctx.session;
 		const sessionManager = this.ctx.sessionManager;
 		const sessionId = sessionManager.getSessionId();
@@ -1361,7 +1361,11 @@ export class CommandController {
 			sessionManager.getSessionId() === sessionId &&
 			sessionManager.titleRevision === titleRevision;
 		try {
-			const persistence = sessionManager.setSessionName(title, "user");
+			const persistence = sessionManager.setSessionName(
+				title,
+				generated ? "auto" : "user",
+				generated ? "rename" : undefined,
+			);
 			titleRevision = sessionManager.titleRevision;
 			const stored = await persistence;
 			if (!isCurrent()) return;

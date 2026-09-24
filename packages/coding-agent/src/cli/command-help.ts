@@ -133,6 +133,9 @@ export const skillHelp = {
 export const sshHelp = { description: "Manage SSH host configurations" } satisfies CommandMetadata;
 
 export const statsHelp = { description: "View usage statistics" } satisfies CommandMetadata;
+export const systemPromptHelp = {
+	description: "Inspect provider-facing system prompts",
+} satisfies CommandMetadata;
 
 export const streamHelp = {
 	description: "Broadcast local omp session screens and chat to your public live channel",

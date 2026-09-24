@@ -43,6 +43,7 @@ import { type AgentProgress, oneLineLabel, type SingleResult } from "@oh-my-pi/p
 import type { ToolSession } from "../tools";
 import { formatDuration } from "@oh-my-pi/pi-tui/render/render-utils";
 import { ToolError } from "@oh-my-pi/pi-tui/tools/tool-errors";
+import { isAgentsContextFile } from "../utils/context-files";
 import { calculateTokensPerSecond } from "../utils/token-rate";
 
 import {
@@ -1297,7 +1298,7 @@ export class VibeSessionRegistry {
 			modelRegistry: session.modelRegistry,
 			settings: session.settings,
 			mcpManager: session.mcpManager ?? MCPManager.instance(),
-			contextFiles: session.contextFiles?.filter(file => path.basename(file.path).toLowerCase() !== "agents.md"),
+			contextFiles: session.contextFiles?.filter(file => !isAgentsContextFile(file)),
 			skills: [...(session.skills ?? [])],
 			workspaceTree: session.workspaceTree,
 			promptTemplates: session.promptTemplates,

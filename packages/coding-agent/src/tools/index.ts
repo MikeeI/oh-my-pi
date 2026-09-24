@@ -50,6 +50,7 @@ import { BashTool } from "./bash";
 import { type BuiltinToolName, type HiddenToolName, normalizeToolNames } from "./builtin-names";
 import { type CheckpointState, CheckpointTool, type CompletedRewindState, RewindTool } from "./checkpoint";
 import { ContextNotesTool, NewContextTool } from "./context-notes";
+import { ConversationSearchTool } from "./conversation-search";
 import { DebugTool } from "./debug";
 import { cfgIdaAvailable } from "../ida/install";
 import { EvalTool } from "./eval";
@@ -125,6 +126,8 @@ export * from "./checkpoint";
 export * from "./computer";
 export * from "./computer/supervisor";
 export * from "./context-notes";
+export * from "./conversation-search";
+export * from "./conversation-search-format";
 export * from "./debug";
 export * from "./ida";
 export * from "./essential-tools";
@@ -170,6 +173,7 @@ export type ContextFileEntry = {
 	path: string;
 	content: string;
 	depth?: number;
+	kind?: "agents-md";
 };
 
 /** Image attachment handle exposed to tools for user-facing labels such as `Image #1`. */
@@ -560,6 +564,7 @@ export const BUILTIN_TOOLS: Record<BuiltinToolName, ToolFactory> = {
 	glob: s => new GlobTool(s, { rootPathAlias: true }),
 	grep: s => new GrepTool(s),
 	find: s => new FindTool(s),
+	conversation_search: ConversationSearchTool.createIf,
 	lsp: LspTool.createIf,
 	checkpoint: CheckpointTool.createIf,
 	rewind: RewindTool.createIf,
@@ -743,6 +748,7 @@ export async function resolveBuiltinToolPlan(session: ToolSession, toolNames?: s
 		if (name === "glob") return cfgGlobEnabled.get(session.settings);
 		if (name === "grep") return cfgGrepEnabled.get(session.settings);
 		if (name === "find") return isFindEnabled(session);
+		if (name === "conversation_search") return (session.taskDepth ?? 0) === 0;
 		if (name === "github") return cfgGithubEnabled.get(session.settings);
 		if (name === "ast_grep") return cfgAstGrepEnabled.get(session.settings);
 		if (name === "ast_edit") return cfgAstEditEnabled.get(session.settings);

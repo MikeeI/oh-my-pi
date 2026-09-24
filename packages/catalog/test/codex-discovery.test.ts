@@ -293,11 +293,25 @@ describe("Codex model discovery", () => {
 			// Discovery has no rates; the generated KDL policy supplies them
 			// when the discovered spec becomes a usable model.
 			expect(model.cost).toEqual({ input: 0, output: 0, cacheRead: 0, cacheWrite: 0 });
-			expect(buildModel(model).cost).toEqual(
+			const builtModel = buildModel(model);
+			expect(builtModel.cost).toEqual(
 				model.id.startsWith("gpt-6-sol")
-					? { input: 2, output: 10, cacheRead: 0.2, cacheWrite: 0 }
-					: { input: 0.1, output: 0.5, cacheRead: 0.01, cacheWrite: 0 },
+					? {
+							input: 2,
+							output: 10,
+							cacheRead: 0.2,
+							cacheWrite: 0,
+							longContext: { inputThreshold: 272_000, input: 4, output: 15, cacheRead: 0.4, cacheWrite: 0 },
+						}
+					: {
+							input: 0.1,
+							output: 0.5,
+							cacheRead: 0.01,
+							cacheWrite: 0,
+							longContext: { inputThreshold: 272_000, input: 0.2, output: 0.75, cacheRead: 0.02, cacheWrite: 0 },
+						},
 			);
+			expect(builtModel.serviceTierCost).toEqual({ flex: 0.5, priority: 2.5 });
 		}
 	});
 

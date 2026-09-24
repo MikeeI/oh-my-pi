@@ -80,11 +80,28 @@ provider "openai-codex" {
 		}
 		max-context-window 922000
 	}
+	// Sol and Luna use the documented Work/Codex token-equivalent rates, free
+	// cache writes, and the 2.5x fast tier. Unlike Astra, prompt input above
+	// 272K applies the whole-request 2x input/cache and 1.5x output tariff.
+	// https://help.openai.com/en/articles/20001415
+	models "gpt-6-sol" "gpt-6-sol-wm" "gpt-6-luna" "gpt-6-luna-wm" {
+		service-tier-cost {
+			flex 0.5
+			priority 2.5
+		}
+	}
 	models "gpt-6-sol" "gpt-6-sol-wm" {
 		cost-patch {
 			input 2.0
 			output 10.0
 			cache-read 0.2
+			cache-write 0
+		}
+		long-context-cost {
+			input-threshold 272000
+			input 4.0
+			output 15.0
+			cache-read 0.4
 			cache-write 0
 		}
 	}
@@ -93,6 +110,13 @@ provider "openai-codex" {
 			input 0.1
 			output 0.5
 			cache-read 0.01
+			cache-write 0
+		}
+		long-context-cost {
+			input-threshold 272000
+			input 0.2
+			output 0.75
+			cache-read 0.02
 			cache-write 0
 		}
 	}

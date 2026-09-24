@@ -78,6 +78,7 @@ export async function buildDirectoryTree(cwd: string, options: BuildDirectoryTre
 		// Tool output (read tool directory listing), not a cached prefix —
 		// the human-friendly relative "ago" is appropriate here.
 		ageMode: "relative",
+		includeMetadata: true,
 	});
 }
 
@@ -102,11 +103,12 @@ export async function buildWorkspaceTree(cwd: string, options: BuildWorkspaceTre
 			rootLimit: WORKSPACE_DEFAULTS.perDirLimit,
 			lineCap: WORKSPACE_DEFAULTS.lineCap,
 			nativeTruncated: result.truncated,
-			// This tree is embedded in the cached system prompt. Render absolute
-			// mtimes so the block is byte-identical across sessions and does not
-			// bust the prompt cache (a relative "Nm ago" drifts every build).
+			// Keep the existing ordering and tree shape while omitting volatile
+			// size and mtime columns from the cached prompt block.
 			ageMode: "absolute",
+			includeMetadata: false,
 		});
+
 		return { ...tree, agentsMdFiles: result.agentsMdFiles };
 	} catch {
 		return { ...emptyTree(rootPath), agentsMdFiles: [] };
@@ -146,6 +148,8 @@ interface AssembleOptions {
 	 *   the system-prompt workspace tree). See {@link makeAgeFormatter}.
 	 */
 	ageMode: "relative" | "absolute";
+	/** Whether rendered entries include size and modification-time columns. */
+	includeMetadata: boolean;
 }
 
 function assembleTree(rootPath: string, entries: readonly GlobMatch[], opts: AssembleOptions): DirectoryTree {
@@ -206,7 +210,7 @@ function assembleTree(rootPath: string, entries: readonly GlobMatch[], opts: Ass
 
 	return {
 		rootPath,
-		rendered: formatLines(lines),
+		rendered: formatLines(lines, opts.includeMetadata),
 		truncated: truncated || elidedCount > 0,
 		totalLines: lines.length,
 	};
@@ -305,13 +309,14 @@ function applyLineCap(
 	return { lines: kept, elidedCount: removable.length };
 }
 
-function formatLines(lines: readonly RenderedLine[]): string {
-	const maxLabelLength = lines.reduce((max, line) => Math.max(max, line.label.length), 0);
+function formatLines(lines: readonly RenderedLine[], includeMetadata: boolean): string {
+	if (!includeMetadata) return lines.map(line => line.label).join("\n");
+
 	return lines
 		.map(line => {
 			if (!line.age) return line.label;
-			const sizeColumn = (line.size ?? "").padEnd(8);
-			return `${line.label.padEnd(maxLabelLength + 2)}${sizeColumn}  ${line.age.padEnd(4)}`.trimEnd();
+			const sizeColumn = line.size ? ` ${line.size}` : "";
+			return `${line.label}${sizeColumn} ${line.age}`;
 		})
 		.join("\n");
 }

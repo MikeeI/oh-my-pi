@@ -24,6 +24,7 @@ import type { ToolSession } from "..";
 import type { EffectiveExtensionRoots } from "../capability/types";
 import type { Theme } from "@oh-my-pi/pi-tui/theme";
 import subagentUserPromptTemplate from "../prompts/system/subagent-user-prompt.md" with { type: "text" };
+import { resolveUserToolPromptSource } from "../prompts/tool-prompt-source";
 import taskDescriptionTemplate from "../prompts/tools/task.md" with { type: "text" };
 import taskAsyncContractTemplate from "../prompts/tools/task-async-contract.md" with { type: "text" };
 import taskCoordinationAdvisoryTemplate from "../prompts/tools/task-coordination-advisory.md" with { type: "text" };
@@ -146,7 +147,7 @@ interface TaskDescriptionOptions {
 }
 
 /** Render the tool description from a cached agent list and current settings. */
-function renderDescription(options: TaskDescriptionOptions): string {
+function renderDescription(options: TaskDescriptionOptions, descriptionSource: string): string {
 	const spawnPolicy = resolveSpawnPolicy(options.parentSpawns);
 	const spawningDisabled = !spawnPolicy.enabled;
 	const agents = [...options.agents, ...options.sessionAgents];
@@ -165,7 +166,7 @@ function renderDescription(options: TaskDescriptionOptions): string {
 		blocking: agent.blocking === true,
 	}));
 	const scoutAvailable = isScoutSpawnable(options.disabledAgents, options.parentSpawns);
-	return prompt.render(taskDescriptionTemplate, {
+	return prompt.render(descriptionSource, {
 		agents: renderedAgents,
 		scoutAvailable,
 		spawningDisabled,
@@ -609,21 +610,29 @@ export class TaskTool implements AgentTool<TaskToolSchemaInstance, TaskToolDetai
 		const disabledAgents = cfgTaskDisabledAgents.get(this.session.settings);
 		const planMode = this.session.getPlanModeState?.()?.enabled === true;
 		const isolationEnabled = cfgTaskIsolationEnabled.get(this.session.settings);
-		return renderDescription({
-			agents:
-				discoverySnapshots.get(discoveryCacheKey(this.session.cwd, this.session.effectiveExtensionRoots?.())) ??
-				this.#discoveredAgents,
-			sessionAgents: this.session.getSessionAgents?.() ?? [],
-			isolationEnabled: !planMode && isolationEnabled,
-			applyIsolatedChanges: cfgTaskIsolationApply.get(this.session.settings),
-			disabledAgents,
-			batchEnabled: this.#isBatchEnabled(),
-			effortEnabled: cfgTaskEnableEffort.get(this.session.settings),
-			evalToolsEnabled: evalToolsEnabled(this.session),
-			asyncEnabled: cfgAsyncEnabled.get(this.session.settings),
-			ircEnabled: isIrcEnabled(this.session.settings, this.session.taskDepth ?? 0),
-			parentSpawns: this.session.getSessionSpawns() ?? "*",
+		const descriptionSource = resolveUserToolPromptSource({
+			agentDir: this.session.settings.getAgentDir(),
+			toolName: this.name,
+			bundledSource: taskDescriptionTemplate,
 		});
+		return renderDescription(
+			{
+				agents:
+					discoverySnapshots.get(discoveryCacheKey(this.session.cwd, this.session.effectiveExtensionRoots?.())) ??
+					this.#discoveredAgents,
+				sessionAgents: this.session.getSessionAgents?.() ?? [],
+				isolationEnabled: !planMode && isolationEnabled,
+				applyIsolatedChanges: cfgTaskIsolationApply.get(this.session.settings),
+				disabledAgents,
+				batchEnabled: this.#isBatchEnabled(),
+				effortEnabled: cfgTaskEnableEffort.get(this.session.settings),
+				evalToolsEnabled: evalToolsEnabled(this.session),
+				asyncEnabled: cfgAsyncEnabled.get(this.session.settings),
+				ircEnabled: isIrcEnabled(this.session.settings, this.session.taskDepth ?? 0),
+				parentSpawns: this.session.getSessionSpawns() ?? "*",
+			},
+			descriptionSource,
+		);
 	}
 	private constructor(
 		private readonly session: ToolSession,

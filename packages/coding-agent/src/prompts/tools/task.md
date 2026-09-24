@@ -12,7 +12,7 @@ Shared edits need one integration owner{{#if ircEnabled}}; siblings coordinate v
 # Inputs
 `name`: CamelCase ≤32, auto-generated if omitted; address agent by name. `outputSchema` overrides agent/session schemas.
 {{#if evalToolsEnabled}}`tools`: eval-defined, run in your kernel.
-{{/if}}{{#if effortEnabled}}`effort`: `"lo"`|`"med"`|`"hi"` by complexity.
+{{/if}}{{#if effortEnabled}}`effort`: optional `"lo"`|`"med"`|`"hi"` selects the target model's lowest/middle/highest level; omission retains configured thinking, bounded by `task.maxEffort`.
 {{/if}}`schemaMode`: default permissive warns after retries; strict fails.
 {{#if isolationEnabled}}{{#if applyIsolatedChanges}}`isolated`: worktree; successful changes apply to parent.
 {{else}}`isolated`: worktree; changes retained, not applied.

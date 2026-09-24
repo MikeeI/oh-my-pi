@@ -4,6 +4,7 @@
 import { dlopen, FFIType, ptr } from "bun:ffi";
 import * as path from "node:path";
 
+import type { AgentMessage } from "@oh-my-pi/pi-agent-core";
 import {
 	type Api,
 	type AssistantMessage,
@@ -19,12 +20,13 @@ import { $env, isTerminalHeadless, isWsl, logger, prompt } from "@oh-my-pi/pi-ut
 import type { ModelRegistry } from "../config/model-registry";
 
 import { roleCandidatePool } from "../config/model-roles";
-import { formatModelStringWithRouting } from "../config/model-resolver";
+import { formatModelStringWithRouting, resolveRoleSelection } from "../config/model-resolver";
 import { collectOnlineTinyCandidates, expandOnlineTinyModelFallbacks } from "../tiny/online-candidates";
 import type { Settings } from "../config/settings";
 import titleMarkerInstruction from "../prompts/system/title-marker-instruction.md" with { type: "text" };
 import titleSystemPrompt from "../prompts/system/title-system.md" with { type: "text" };
-import { formatTitleUserMessage } from "../tiny/message-preproc";
+import titleTranscriptSystemPrompt from "../prompts/system/title-transcript-system.md" with { type: "text" };
+import { formatTitleUserMessage, stripCodeBlocks } from "../tiny/message-preproc";
 import { isLowSignalTitleInput, normalizeGeneratedTitle } from "../tiny/text";
 import { tinyTitleClient } from "../tiny/title-client";
 
@@ -32,6 +34,7 @@ import { cfgRetryModelFallback } from "../session/settings";
 
 const TITLE_SYSTEM_PROMPT = prompt.render(titleSystemPrompt);
 const TITLE_MARKER_INSTRUCTION = prompt.render(titleMarkerInstruction);
+const TITLE_TRANSCRIPT_SYSTEM_PROMPT = prompt.render(titleTranscriptSystemPrompt);
 
 // Plain π, not the nerd-font `icon.omp` glyph: window/tab titles render in the
 // OS UI font, which has no nerd-font PUA coverage.
@@ -110,6 +113,16 @@ function disposeWindowsConsoleTitleApi(): void {
 // ceiling costs nothing when thinking is genuinely suppressed and keeps the
 // `<title>` marker output reachable when it isn't (issue #4355).
 const TITLE_MAX_TOKENS = 1024;
+const TITLE_TRANSCRIPT_MAX_USER_MESSAGES = 5;
+const TITLE_TRANSCRIPT_MAX_ASSISTANT_MESSAGES = 5;
+const TITLE_TRANSCRIPT_MAX_MESSAGE_CHARS = 10_000;
+const TITLE_TRANSCRIPT_MAX_TOTAL_CHARS = 40_000;
+
+interface TitleModelSelectionOptions {
+	roleOrder?: readonly string[];
+	fallbackToCurrentModel?: boolean;
+	userMessageFormatter?: (message: string) => string;
+}
 
 /** Matches the title the model wraps in `<title>...</title>`. */
 const TITLE_MARKER_GLOBAL_RE = /<title>([\s\S]*?)<\/title>|<title\s*\/>|<title>\s*$/gi;
@@ -121,14 +134,19 @@ const LEADING_THINKING_FENCE_RE = /^\s*```(?:thinking|reasoning)\b[\s\S]*?```\s*
 const LEADING_PROSE_THINKING_PREAMBLE_RE =
 	/^[ \t]*(?:(?:here(?:['’]s| is)[ \t]+(?:a|the|my)[ \t]+)|my[ \t]+)?(?:thinking|thought|reasoning)[ \t]+process[ \t]*:?[ \t]*(?:\r?\n|$)/i;
 
-function getTitleModels(registry: ModelRegistry, settings: Settings, currentModel?: Model<Api>): Model<Api>[] {
-	const availableModels = roleCandidatePool("tiny", settings, registry);
+function getTitleModels(
+	registry: ModelRegistry,
+	settings: Settings,
+	currentModel?: Model<Api>,
+	options?: TitleModelSelectionOptions,
+): Model<Api>[] {
+	const availableModels = options?.roleOrder ? registry.getAvailable() : roleCandidatePool("tiny", settings, registry);
 	if (availableModels.length === 0) return [];
 
-	const models = collectOnlineTinyCandidates(["tiny", "commit", "smol"], settings, availableModels).map(
-		candidate => candidate.model,
-	);
+	const roleOrder = options?.roleOrder ?? ["tiny", "commit", "smol"];
+	const models = collectOnlineTinyCandidates(roleOrder, settings, availableModels).map(candidate => candidate.model);
 	if (
+		options?.fallbackToCurrentModel !== false &&
 		currentModel &&
 		(models.length === 0 || cfgRetryModelFallback.get(settings) !== false) &&
 		!models.some(model => formatModelStringWithRouting(model) === formatModelStringWithRouting(currentModel))
@@ -144,6 +162,118 @@ function getTitleModels(registry: ModelRegistry, settings: Settings, currentMode
 		}
 	}
 	return models;
+}
+
+interface TextBlock {
+	type: "text";
+	text: string;
+}
+
+interface RecentTitleMessage {
+	role: "user" | "assistant";
+	text: string;
+	index: number;
+}
+
+function isTextBlock(value: unknown): value is TextBlock {
+	if (typeof value !== "object" || value === null) return false;
+	const block = value as { type?: unknown; text?: unknown };
+	return block.type === "text" && typeof block.text === "string";
+}
+
+function extractTextOnly(message: AgentMessage): string {
+	const content = "content" in message ? message.content : undefined;
+	if (typeof content === "string") return content;
+	if (!Array.isArray(content)) return "";
+	return content
+		.filter(isTextBlock)
+		.map(block => block.text)
+		.join("\n");
+}
+
+function capTranscriptMessage(text: string): string {
+	const cleaned = stripCodeBlocks(text).trim();
+	return cleaned.length > TITLE_TRANSCRIPT_MAX_MESSAGE_CHARS
+		? `${cleaned.slice(0, TITLE_TRANSCRIPT_MAX_MESSAGE_CHARS)}…`
+		: cleaned;
+}
+
+function selectRecentTitleMessages(messages: readonly AgentMessage[]): RecentTitleMessage[] {
+	const selected: RecentTitleMessage[] = [];
+	let userCount = 0;
+	let assistantCount = 0;
+
+	for (let index = messages.length - 1; index >= 0; index--) {
+		const message = messages[index];
+		if (!message || (message.role !== "user" && message.role !== "assistant")) continue;
+		if (message.role === "user" && userCount >= TITLE_TRANSCRIPT_MAX_USER_MESSAGES) continue;
+		if (message.role === "assistant" && assistantCount >= TITLE_TRANSCRIPT_MAX_ASSISTANT_MESSAGES) continue;
+
+		const text = capTranscriptMessage(extractTextOnly(message));
+		if (!text) continue;
+
+		selected.push({ role: message.role, text, index });
+		if (message.role === "user") userCount++;
+		else assistantCount++;
+
+		if (
+			userCount >= TITLE_TRANSCRIPT_MAX_USER_MESSAGES &&
+			assistantCount >= TITLE_TRANSCRIPT_MAX_ASSISTANT_MESSAGES
+		) {
+			break;
+		}
+	}
+
+	return selected.sort((a, b) => a.index - b.index);
+}
+
+export function formatRecentTitleTranscript(messages: readonly AgentMessage[]): string | null {
+	const rendered = selectRecentTitleMessages(messages).map(item => `<${item.role}>\n${item.text}\n</${item.role}>`);
+	if (rendered.length === 0) return null;
+
+	const transcript = `<chat>\n${rendered.join("\n\n")}\n</chat>`;
+	return transcript.length > TITLE_TRANSCRIPT_MAX_TOTAL_CHARS
+		? `<chat>\n…${transcript.slice(-TITLE_TRANSCRIPT_MAX_TOTAL_CHARS + 8)}`
+		: transcript;
+}
+
+function formatTitleTranscriptUserMessage(message: string): string {
+	return `<user-message>\n${message}\n</user-message>`;
+}
+
+export async function generateSessionTitleFromRecentTranscript(
+	messages: readonly AgentMessage[],
+	registry: ModelRegistry,
+	settings: Settings,
+	sessionId?: string,
+	currentModel?: Model<Api>,
+	metadataResolver?: (provider: string) => Record<string, unknown> | undefined,
+): Promise<string | null> {
+	const transcript = formatRecentTitleTranscript(messages);
+	if (!transcript) {
+		logger.debug("title-generator: skipped empty transcript", { sessionId, reason: "empty-transcript" });
+		return null;
+	}
+
+	const smolModel = resolveRoleSelection(["smol"], settings, registry.getAvailable())?.model;
+	if (!smolModel) {
+		throw new Error(
+			"Cannot auto-generate session name: no smol model configured. Set `modelRoles.smol` or `PI_SMOL_MODEL`.",
+		);
+	}
+
+	return generateTitleOnline(
+		transcript,
+		registry,
+		settings,
+		sessionId,
+		currentModel,
+		metadataResolver,
+		undefined,
+		TITLE_TRANSCRIPT_SYSTEM_PROMPT,
+		undefined,
+		{ roleOrder: ["smol"], fallbackToCurrentModel: false, userMessageFormatter: formatTitleTranscriptUserMessage },
+	);
 }
 
 /**
@@ -201,6 +331,7 @@ export async function generateSessionTitle(
 			signal,
 			titleSystemPrompt,
 			credentialSourceSessionId,
+			formatTitleUserMessage,
 		);
 	}
 
@@ -251,8 +382,9 @@ export async function generateTitleOnline(
 	signal?: AbortSignal,
 	customSystemPrompt?: string,
 	credentialSourceSessionId?: string,
+	modelSelection?: TitleModelSelectionOptions,
 ): Promise<string | null> {
-	const models = getTitleModels(registry, settings, currentModel);
+	const models = getTitleModels(registry, settings, currentModel, modelSelection);
 	if (models.length === 0) {
 		logger.warn("title-generator: no title model found", { sessionId, reason: "no-title-model" });
 		return null;
@@ -266,6 +398,7 @@ export async function generateTitleOnline(
 		signal,
 		customSystemPrompt,
 		credentialSourceSessionId,
+		modelSelection?.userMessageFormatter ?? formatTitleUserMessage,
 	);
 }
 
@@ -278,6 +411,7 @@ async function generateTitleOnlineWithModels(
 	signal?: AbortSignal,
 	customSystemPrompt?: string,
 	credentialSourceSessionId?: string,
+	userMessageFormatter: (message: string) => string = formatTitleUserMessage,
 ): Promise<string | null> {
 	const titleSystemPrompt = customSystemPrompt?.trim() || undefined;
 	// The model is always asked to wrap the title in `<title>...</title>` and
@@ -286,7 +420,7 @@ async function generateTitleOnlineWithModels(
 	// the prompt's `{"title": ...}` JSON example verbatim as the session title;
 	// markers work uniformly everywhere.
 	const systemPrompt = titleSystemPrompt ? [titleSystemPrompt, TITLE_MARKER_INSTRUCTION] : [TITLE_SYSTEM_PROMPT];
-	const userMessage = formatTitleUserMessage(firstMessage);
+	const userMessage = userMessageFormatter(firstMessage);
 
 	for (const model of models) {
 		const modelName = `${model.provider}/${model.id}`;

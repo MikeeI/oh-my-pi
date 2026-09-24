@@ -12,9 +12,9 @@
  * as an error from `drain()`.
  *
  * Each batch registers as an async job under its id so completion auto-delivers
- * a summary to the agent and `hub wait ids:[id]` / `hub cancel` address it. The
- * batch survives kernel resets (`attach(id)`) until `close()` or its owner
- * session releases it.
+ * a summary to the agent. The `wait` tool observes completion when blocked,
+ * while the batch handle owns cancellation. The batch survives kernel resets
+ * (`attach(id)`) until `close()` or its owner session releases it.
  */
 import type { JudgmentState, Question } from "@oh-my-pi/pi-ai";
 import { isRecord, logger, Snowflake } from "@oh-my-pi/pi-utils";

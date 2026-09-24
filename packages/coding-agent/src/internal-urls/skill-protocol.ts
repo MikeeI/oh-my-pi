@@ -96,6 +96,8 @@ export class SkillProtocolHandler implements ProtocolHandler {
 	readonly spec: SchemeSpec = {
 		backing: "file",
 		selectors: "lines",
+		// Group the read card without trimming the resolved skill instructions.
+		compactTranscript: true,
 		immutable: true,
 		unbounded: true,
 		linkable: true,

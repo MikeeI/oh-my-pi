@@ -8,7 +8,9 @@ import { Settings } from "@oh-my-pi/pi-coding-agent/config/settings";
 import { tinyTitleClient } from "@oh-my-pi/pi-coding-agent/tiny/title-client";
 import {
 	disposeTerminalTitleState,
+	formatRecentTitleTranscript,
 	generateSessionTitle,
+	generateSessionTitleFromRecentTranscript,
 	initTerminalTitleState,
 	setExtensionTerminalTitle,
 	setSessionTerminalTitle,
@@ -147,6 +149,34 @@ describe("title generator", () => {
 		expect(messages?.map(message => message.role)).toEqual(["user", "assistant"]);
 		const prefill = messages?.at(-1);
 		expect(prefill?.role === "assistant" && prefill.content).toEqual([{ type: "text", text: "<title>" }]);
+	});
+
+	it("generates recent transcript titles through marker text without tools", async () => {
+		const model = getModelOrThrow("claude-sonnet-4-5");
+		const completeSimpleMock = vi.spyOn(ai, "completeSimple").mockResolvedValue({
+			stopReason: "stop",
+			content: [{ type: "text", text: "<title>Generated transcript title</title>" }],
+		} as never);
+
+		const title = await generateSessionTitleFromRecentTranscript(
+			[
+				{ role: "user", content: [{ type: "text", text: "Fix transcript rename transport" }] },
+				{ role: "assistant", content: [{ type: "text", text: "I found the unavailable tool call." }] },
+			] as never,
+			createRegistry(model),
+			Settings.isolated({ modelRoles: { smol: `${model.provider}/${model.id}` } }),
+		);
+
+		expect(title).toBe("Generated transcript title");
+		const request = completeSimpleMock.mock.calls[0]?.[1] as
+			| { systemPrompt?: string[]; tools?: unknown; messages?: Array<{ content?: string }> }
+			| undefined;
+		const options = completeSimpleMock.mock.calls[0]?.[2] as { toolChoice?: unknown } | undefined;
+		expect(request?.systemPrompt).toHaveLength(2);
+		expect(request?.systemPrompt?.join("\n")).not.toContain("set_title");
+		expect(request?.messages?.[0]?.content).toContain("<user-message>");
+		expect(request?.tools).toBeUndefined();
+		expect(options?.toolChoice).toBeUndefined();
 	});
 
 	it.each([
@@ -826,6 +856,43 @@ describe("title generator", () => {
 		expect(completeSimpleMock).toHaveBeenCalledTimes(2);
 		expect(completeSimpleMock.mock.calls[0]?.[0]).toBe(smolModel);
 		expect(completeSimpleMock.mock.calls[1]?.[0]).toBe(fallbackModel);
+	});
+
+	it("formats a recent text-only transcript for auto rename", () => {
+		const transcript = formatRecentTitleTranscript([
+			{ role: "user", content: [{ type: "text", text: "user 1 should be dropped" }] },
+			{ role: "assistant", content: [{ type: "text", text: "assistant 1 should be dropped" }] },
+			{ role: "toolResult", content: [{ type: "text", text: "tool output should be ignored" }] },
+			{
+				role: "user",
+				content: [{ type: "text", text: "user 2 implement rename\n```ts\nconst leaked = true;\n```" }],
+			},
+			{ role: "assistant", content: [{ type: "text", text: "assistant 2 discussed rename" }] },
+			{ role: "user", content: [{ type: "text", text: "user 3 wants smol" }] },
+			{ role: "assistant", content: [{ type: "text", text: "assistant 3 explains smol path" }] },
+			{ role: "user", content: [{ type: "text", text: "user 4 wants larger context" }] },
+			{ role: "assistant", content: [{ type: "text", text: "assistant 4 proposes 40000 chars" }] },
+			{ role: "user", content: [{ type: "text", text: "user 5 approves simple prompt" }] },
+			{ role: "assistant", content: [{ type: "text", text: "assistant 5 drops regex parsing" }] },
+			{ role: "user", content: [{ type: "text", text: "user 6 says continue" }] },
+			{
+				role: "assistant",
+				content: [
+					{ type: "thinking", thinking: "thinking leak" },
+					{ type: "text", text: "assistant 6 final rename plan" },
+					{ type: "toolCall", name: "search", arguments: { pattern: "leak" } },
+				],
+			},
+		] as never);
+
+		expect(transcript).toContain("<user>\nuser 2 implement rename\n</user>");
+		expect(transcript).toContain("<assistant>\nassistant 6 final rename plan\n</assistant>");
+		expect(transcript).not.toContain("user 1 should be dropped");
+		expect(transcript).not.toContain("assistant 1 should be dropped");
+		expect(transcript).not.toContain("tool output should be ignored");
+		expect(transcript).not.toContain("const leaked");
+		expect(transcript).not.toContain("thinking leak");
+		expect(transcript).not.toContain("search");
 	});
 });
 

@@ -6,6 +6,7 @@ import { Text } from "../components/text";
 import { getLanguageFromPath, theme } from "../theme";
 import { parseLineRanges, selectorLineRanges } from "../tools/line-ranges";
 import { type ReadRenderArgs, type ReadToolDetails, readSourceFsPath, splitPathAndSel } from "../tools/read";
+import { formatReadTokenSuffix } from "../tools/read-token";
 import { PREVIEW_LIMITS, shortenPath } from "../render/render-utils";
 import { fileHyperlink, renderCodeCell } from "../render";
 import { canonicalizeMessage } from "./thinking-display";
@@ -34,9 +35,9 @@ export function readArgsHaveTarget(args: unknown): boolean {
 /**
  * Whether a read collapses into the compact {@link ReadToolGroupComponent}
  * rather than a full tool execution. Filesystem/external targets always
- * collapse; registered internal-URL schemes render full so their resolved
- * content is visible, unless their spec declares `compactTranscript`
- * (device listings/docs read better in the compact grouped view).
+ * collapse; registered internal-URL schemes render full unless their spec
+ * requests `compactTranscript`. Skill instructions and `xd://` device docs
+ * remain expandable in the compact grouped view.
  */
 export function readArgsCollapseIntoGroup(args: unknown): boolean {
 	const target = readArgsTarget(args);
@@ -103,6 +104,7 @@ type ReadEntry = {
 	conflictCount?: number;
 	codeStartLine?: number;
 	codeLineNumbers?: Array<number | null>;
+	readTextTokens?: number;
 };
 
 type ReadUsageRow = {
@@ -325,9 +327,8 @@ export class ReadToolGroupComponent extends Container implements ToolExecutionHa
 	// completion) so no late result is coming. Set via `seal()`.
 	#sealed = false;
 	// Post-finalize mutation counter (FinalizableBlock.getTranscriptBlockVersion):
-	// a finalized group can still change — a late read result landing after the
-	// run broke, seal(), or an expansion toggle — and the transcript's
-	// width-epoch resolution and committed-render bypass must observe it.
+	// a finalized group can still change after a late result, seal(), or expansion
+	// toggle, so accepted-tape drift detection preserves bytes already in history.
 	#blockVersion = 0;
 
 	constructor(options: ReadToolGroupOptions = {}) {
@@ -357,6 +358,20 @@ export class ReadToolGroupComponent extends Container implements ToolExecutionHa
 			if (entry.status === "pending") return true;
 		}
 		return false;
+	}
+
+	#formatReadTokenSuffix(entries: Iterable<ReadEntry>): string {
+		if (this.#hasPendingEntries()) return "";
+		const uniqueEntries = new Map<string, ReadEntry>();
+		for (const entry of entries) uniqueEntries.set(entry.toolCallId, entry);
+		if (uniqueEntries.size === 0) return "";
+
+		let total = 0;
+		for (const entry of uniqueEntries.values()) {
+			if (entry.readTextTokens === undefined) return "";
+			total += entry.readTextTokens;
+		}
+		return formatReadTokenSuffix(total, theme);
 	}
 
 	finalize(): void {
@@ -444,6 +459,11 @@ export class ReadToolGroupComponent extends Container implements ToolExecutionHa
 		const conflictCount =
 			typeof details?.conflictCount === "number" && details.conflictCount > 0 ? details.conflictCount : undefined;
 		entry.conflictCount = conflictCount;
+		const readTextTokens = details?.readTextTokens;
+		entry.readTextTokens =
+			typeof readTextTokens === "number" && Number.isSafeInteger(readTextTokens) && readTextTokens >= 0
+				? readTextTokens
+				: undefined;
 		entry.status = result.isError ? "error" : suffixResolution ? "warning" : "success";
 		// Store clean display content for preview/expanded display when the read
 		// tool provides it; fall back to model-facing text for legacy results.
@@ -535,7 +555,10 @@ export class ReadToolGroupComponent extends Container implements ToolExecutionHa
 			if (!this.#shouldRenderPreviewRow(row)) {
 				const statusSymbol = this.#formatStatus(this.#statusForTargets(row.targets));
 				const pathDisplay = this.#formatRowPath(row);
-				const lines = [` ${statusSymbol} ${theme.fg("toolTitle", theme.bold("Read"))} ${pathDisplay}`.trimEnd()];
+				const tokenSuffix = this.#formatReadTokenSuffix(row.targets.map(target => target.entry));
+				const lines = [
+					` ${statusSymbol} ${theme.fg("toolTitle", theme.bold("Read"))} ${pathDisplay}${tokenSuffix}`.trimEnd(),
+				];
 				const usageRows = this.#usageRowsBySummaryRow(displayRows).get(0) ?? [];
 				this.#appendUsageRows(lines, usageRows, "   ");
 				this.#text.setText(lines.join("\n"));
@@ -548,7 +571,7 @@ export class ReadToolGroupComponent extends Container implements ToolExecutionHa
 			return;
 		}
 
-		const header = `${theme.fg("toolTitle", theme.bold("Read"))}${theme.fg("dim", ` (${displayRows.length})`)}`;
+		const header = `${theme.fg("toolTitle", theme.bold("Read"))}${theme.fg("dim", ` (${displayRows.length})`)}${this.#formatReadTokenSuffix(entries)}`;
 		const lines = [` ${theme.format.bullet} ${header}`];
 		const entriesWithoutPreview = entries.filter(entry => !this.#shouldRenderPreview(entry));
 		const summaryTargets = this.#displayTargetsForEntries(entriesWithoutPreview);
@@ -800,7 +823,9 @@ export class ReadToolGroupComponent extends Container implements ToolExecutionHa
 					linkPath: readTargetLinkPath(split.path, entry.linkPath),
 				})
 			: "";
-		const title = pathDisplay ? `Read ${pathDisplay}` : "Read";
+		const title = pathDisplay
+			? `Read ${pathDisplay}${this.#formatReadTokenSuffix([entry])}`
+			: `Read${this.#formatReadTokenSuffix([entry])}`;
 		let cachedWidth: number | undefined;
 		let cachedLines: string[] | undefined;
 		const expanded = this.#expanded;
