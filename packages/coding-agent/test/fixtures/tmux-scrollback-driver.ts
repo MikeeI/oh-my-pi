@@ -83,6 +83,13 @@ async function main(): Promise<void> {
 		const terminal = new DriverTerminal();
 		tui = new TUI(terminal);
 		const transcript = new TranscriptContainer();
+		const transientScreen = process.argv.includes("--transient-screen");
+		if (transientScreen) {
+			const prior = new AssistantMessageComponent();
+			prior.updateContent(makeMsg("PRIOR-ANSWER"));
+			prior.markTranscriptBlockFinalized();
+			transcript.addChild(prior);
+		}
 		const assistant = new AssistantMessageComponent();
 		transcript.addChild(assistant);
 		tui.addChild(transcript);
@@ -119,6 +126,8 @@ async function main(): Promise<void> {
 		tui.setFrameProvider(frameProvider);
 		tui.start();
 		await renderFrame(tui);
+		if (transientScreen) tui.setTransientScreen(true);
+
 		terminal.enableResizes();
 
 		const markers = Array.from(
@@ -137,6 +146,10 @@ async function main(): Promise<void> {
 		assistant.updateContent(makeMsg(resolved), { transient: false });
 		assistant.markTranscriptBlockFinalized();
 		await renderFrame(tui);
+		if (transientScreen) {
+			tui.setTransientScreen(false);
+			await renderFrame(tui);
+		}
 	} finally {
 		tui?.stop();
 		setTerminalHeadless(previousHeadless);

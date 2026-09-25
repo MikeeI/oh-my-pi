@@ -203,6 +203,7 @@ export function createInteractiveModeContext(overrides: ContextOverrides = {}): 
 		requestRender: vi.fn(),
 		requestComponentRender: vi.fn(),
 		setFocus: vi.fn(),
+		setTransientScreen: vi.fn(),
 		terminal: { setProgress: vi.fn() },
 		imageBudget: undefined,
 	};

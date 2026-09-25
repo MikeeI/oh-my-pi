@@ -535,7 +535,7 @@ export class Composer implements TerminalFrameProvider {
 		}
 	}
 
-	/** Render the semantic transcript tail while the terminal borrows its resize buffer. */
+	/** Render the semantic transcript tail on a transient alternate buffer, for resize or an active tmux turn. */
 	renderResizeFrame(viewport: ViewportSize): readonly string[] {
 		if (!this.#started || this.#stopped) return [];
 		const width = Math.max(1, viewport.columns);
@@ -694,9 +694,9 @@ export class Composer implements TerminalFrameProvider {
 		return rows;
 	}
 	/**
-	 * Mounted-runtime rows for the transient resize buffer. Only the trailing
-	 * viewport can survive the caller's bottom slice, so the transcript renders
-	 * a bounded tail instead of the full committed ledger, and the chrome above
+	 * Mounted-runtime rows for the transient alternate buffer. Only the
+	 * trailing viewport can survive the caller's bottom slice, so the transcript
+	 * renders a bounded tail instead of the full committed ledger; chrome above
 	 * it renders only when that tail underfills the screen.
 	 */
 	#renderResizeTail(width: number, rows: number): string[] {

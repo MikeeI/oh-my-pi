@@ -806,6 +806,7 @@ export class EventController {
 		this.#streamingReveal.stop();
 		this.#toolArgsReveal.stop();
 		this.#seedHeldCompletionsFromPendingResults();
+		this.ctx.ui.setTransientScreen(this.ctx.viewSession.isStreaming);
 	}
 
 	/** Restore display state without replaying completion notifications or persistence. */
@@ -949,6 +950,7 @@ export class EventController {
 		this.#cancelIdleCompaction();
 		this.#cancelIdleRecap();
 		this.ctx.statusLine.markActivityStart();
+		this.ctx.ui.setTransientScreen(true);
 		this.#setTerminalProgress(true);
 		this.ctx.ensureLoadingAnimation();
 		setTerminalTitleState("working");
@@ -2104,6 +2106,7 @@ export class EventController {
 		// When the interrupted/failed turn died on a tool call, this replaces the
 		// torn-down "Working…" row with the "F5 to Retry" affordance.
 		this.ctx.syncRetryHintRow();
+		this.ctx.ui.setTransientScreen(false);
 		this.ctx.ui.requestRender();
 		this.#scheduleIdleCompaction();
 		this.#idleRecapPending = true;

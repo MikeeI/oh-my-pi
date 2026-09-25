@@ -462,6 +462,13 @@ Each entry names its disposition, observable behavior, implementation owner, and
 - Contract: emergency pressure renders the finalized emergency block's newest rows, not one representative row.
 - Contract: emergency rows commit click hit-test spans while the summary row stays unmapped.
 - Contract: stable pane geometry records final transcript rows exactly once and preserves pre-existing pane history.
+- Contract: turn-scoped alternate-buffer painting activates only under tmux; other terminals retain normal rendering.
+- Contract: `agent_start` opens the borrow; non-terminal and superseded `agent_end` events do not release it.
+- Contract: terminal `agent_end` releases the borrow; a visible fullscreen overlay may retain alternate-buffer ownership.
+- Contract: session-focus rebuilds reconcile the borrow with the viewed session's streaming state.
+- Contract: unfinished rows stay out of native history through grow-shrink resizes, without deleting older pane history.
+- Contract: after release, finalized transcript rows appear once in the normal pane without an implicit ED3.
+- Contract: during the borrow, native history is not updated and inline mouse capture is off; the editor cursor remains usable.
 - Contract: ordinary multiplexer append and preserve-mode resize rendering never emits ED3 or invokes `clear-history`.
 - Contract: changed geometry starts a new resize transaction during post-settle suppression.
 - Contract: fullscreen resizes preserve geometry epochs and burst state for normal-buffer recovery.
@@ -472,11 +479,13 @@ Each entry names its disposition, observable behavior, implementation owner, and
 - Owner: upstream `packages/tui/src/chat/finalizable-block.ts#getTranscriptBlockVersion` owns presentation versions.
 - Owner: `packages/tui/src/render/terminal-row-reflow.ts#reflowHardRows` owns accepted-row hard reflow.
 - Owner: upstream `packages/tui/src/tui.ts` owns resize epochs, anchor recovery, and fullscreen-exit probing.
-- Required action: retain only accepted-transcript and resize deltas at the named current upstream owners.
+- Owner: `packages/tui/src/tui.ts#TUI` owns transient alternate-buffer paint and normal-buffer restoration.
+- Owner: `src/modes/controllers/event-controller.ts` owns the active-turn borrow and release lifecycle.
+- Required action: retain accepted-transcript, resize, and tmux turn-borrow deltas at their named current owners.
 - Proof: `packages/tui/test/transcript-container.test.ts`.
 - Proof: `packages/tui/test/history-frame-plan.test.ts`.
 - Proof: `packages/tui/test/resize-multiplexer-anchor.test.ts`.
-- Proof: `test/tmux-scrollback-exactness.test.ts`.
+- Proof: active-turn grow-shrink and pre-existing history in `test/tmux-scrollback-exactness.test.ts`.
 - Proof: explicit reset and rebuild ED3 ordering in `packages/tui/test/destructive-reset-clear-order.test.ts`.
 
 #### `MOMP-TMUX-PAGEUP` — Native tmux history access
