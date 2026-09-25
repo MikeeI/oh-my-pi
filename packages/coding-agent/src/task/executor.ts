@@ -114,7 +114,6 @@ import {
 	cfgTaskSoftRequestBudget,
 	cfgTaskAgentIdleTtlMs,
 	cfgTaskMaxRuntimeMs,
-	cfgTaskMaxRecursionDepth,
 	cfgTaskAgentAdvisor,
 } from "./settings";
 import {
@@ -3458,7 +3457,11 @@ export async function runSubprocess(options: ExecutorOptions): Promise<SingleRes
 		options.parentServiceTier,
 	);
 	const maxRuntimeMs = Math.max(0, Math.trunc(Number(options.maxRuntimeMs ?? cfgTaskMaxRuntimeMs.get(settings)) || 0));
-	const { childDepth, toolNames, spawns: spawnsEnv } = resolveSubagentCapabilities(agent, subagentSettings, {
+	const {
+		childDepth,
+		toolNames,
+		spawns: spawnsEnv,
+	} = resolveSubagentCapabilities(agent, subagentSettings, {
 		parentDepth: options.taskDepth,
 	});
 	// Inbound steering works without messaging; outbound peer coordination requires write.

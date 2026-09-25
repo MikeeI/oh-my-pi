@@ -295,7 +295,7 @@ describe("system Handlebars prompt templates", () => {
 		expect(subagentUser).not.toContain("Shared task background");
 	});
 
-	test("buildSystemPrompt gates memory root URL advertisement", async () => {
+	test("buildSystemPrompt advertises memory root only for the local backend", async () => {
 		const nativeTemplate = await Bun.file(path.join(systemPromptsDir, "system-prompt.md")).text();
 		const baseOptions = {
 			cwd: os.tmpdir(),
@@ -309,11 +309,11 @@ describe("system Handlebars prompt templates", () => {
 
 		const enabled = await buildSystemPrompt({
 			...baseOptions,
-			memoryRootEnabled: true,
+			memoryBackend: "local",
 		});
 		const disabled = await buildSystemPrompt({
 			...baseOptions,
-			memoryRootEnabled: false,
+			memoryBackend: "hindsight",
 		});
 		const omitted = await buildSystemPrompt(baseOptions);
 

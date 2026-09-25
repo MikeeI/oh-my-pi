@@ -2211,8 +2211,8 @@ export class InteractiveMode implements InteractiveModeContext {
 		this.fileSlashCommands = new Set(fileCommands.map(cmd => cmd.name));
 		this.routineSlashCommands = routineNames;
 		if (candidate) {
-			this.session.setSlashCommands(fileCommands);
-			this.session.setRoutines(routines);
+			this.session.setSlashCommands(candidate.fileCommands);
+			this.session.setRoutines(candidate.routines);
 		}
 		const routineSlashCommands: SlashCommand[] = routines.map(routine => ({
 			name: routine.name,

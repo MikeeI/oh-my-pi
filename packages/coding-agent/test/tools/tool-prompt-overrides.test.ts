@@ -28,12 +28,14 @@ function createSession(agentDir: string = MISSING_AGENT_DIR): ToolSession {
 describe("profile-scoped tool prompts", () => {
 	it("renders a profile-scoped read.md instead of the bundled prompt", async () => {
 		using tempDir = TempDir.createSync("@omp-read-prompt-");
-		await Bun.write(tempDir.join("prompts", "tools", "read.md"), "CUSTOM_READ limit={{DEFAULT_LIMIT}}");
+		await Bun.write(
+			tempDir.join("prompts", "tools", "read.md"),
+			"CUSTOM_READ {{#if IS_HL_MODE}}hash{{else}}plain{{/if}}",
+		);
 
 		const description = new ReadTool(createSession(tempDir.path())).description;
 
-		expect(description).toMatch(/^CUSTOM_READ limit=\d+$/);
-		expect(description).not.toContain("MUST collect every bounded target");
+		expect(description).toBe("CUSTOM_READ hash");
 	});
 
 	it("rejects an empty selected read.md instead of silently using the bundled prompt", async () => {

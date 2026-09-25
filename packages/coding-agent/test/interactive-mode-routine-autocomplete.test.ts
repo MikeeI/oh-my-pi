@@ -8,6 +8,7 @@ import { ModelRegistry } from "@oh-my-pi/pi-coding-agent/config/model-registry";
 import type { PromptTemplate } from "@oh-my-pi/pi-coding-agent/config/prompt-templates";
 import { resetSettingsForTest, Settings } from "@oh-my-pi/pi-coding-agent/config/settings";
 import { InteractiveMode } from "@oh-my-pi/pi-coding-agent/modes/interactive-mode";
+import { cfgStartupQuiet } from "@oh-my-pi/pi-coding-agent/modes/settings";
 import { initTheme } from "@oh-my-pi/pi-tui/theme";
 import { AgentSession } from "@oh-my-pi/pi-coding-agent/session/agent-session";
 import { AuthStorage } from "@oh-my-pi/pi-coding-agent/session/auth-storage";
@@ -45,7 +46,7 @@ describe("InteractiveMode routine autocomplete", () => {
 		setAgentDir(path.join(tempDir.path(), "agent"));
 		resetCapabilities();
 		await Settings.init({ inMemory: true, cwd: tempDir.path() });
-		Settings.instance.set("startup.quiet", true);
+		cfgStartupQuiet.set(Settings.instance, true);
 		authStorage = await AuthStorage.create(path.join(tempDir.path(), "testauth.db"));
 		authStorage.keys.setRuntime("anthropic", "test-key");
 		registry = new ModelRegistry(authStorage, path.join(tempDir.path(), "models.yml"));

@@ -1196,7 +1196,6 @@ export async function runRpcMode(session: AgentSession, options: RpcModeOptions 
 						return success(id, "prompt", { agentInvoked: builtinResult.agentInvoked === true });
 					}
 
-
 					// Don't await - events will stream
 					// Extension commands are executed immediately, file prompt templates are expanded
 					// If streaming and streamingBehavior specified, queues via steer/followUp

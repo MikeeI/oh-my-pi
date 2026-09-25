@@ -31,6 +31,8 @@ async function main(): Promise<void> {
 			getKeys: () => [],
 			matches: () => false,
 		},
+		// PageUp uses the real controller; leave the unrelated STT hold gesture disabled.
+		dictationSpaceHold: () => ({ enabled: () => false, onStart: () => undefined, onEnd: () => undefined }),
 		handlesBtwBranchKey: () => false,
 		canCopyBtw: () => false,
 	} as unknown as InteractiveModeContext;

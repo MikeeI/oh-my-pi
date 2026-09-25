@@ -15,15 +15,17 @@ import { ModelRegistry } from "../config/model-registry";
 import { resolveAgentModelPatterns } from "../config/model-resolver";
 import { Settings } from "../config/settings";
 import { buildDiscoveredSystemPromptOptions } from "../main";
-import { type CreateAgentSessionResult, createAgentSession, discoverAuthStorage } from "../sdk";
+import { type CreateAgentSessionResult, createAgentSession, discoverAuthStorage, discoverContextFiles } from "../sdk";
 import { SessionManager } from "../session/session-manager";
 import type { BuildSystemPromptResult, DynamicPromptPart } from "../system-prompt";
 import { discoverAgents, getAgent } from "../task/discovery";
 import { createSubagentSettings } from "../task/executor";
 import { resolveSubagentCapabilities } from "../task/subagent-runtime-config";
 import { resolveSubagentSystemPrompt } from "../task/subagent-system-prompt";
+import { cfgTaskAgentModelOverrides, cfgTaskDisabledAgents, cfgTaskEnableLsp } from "../task/settings";
 import type { AgentSource } from "@oh-my-pi/pi-tui/tools/task";
 import { shortenPath } from "@oh-my-pi/pi-tui/render/render-utils";
+import { isAgentsContextFile } from "../utils/context-files";
 
 const ACTIONS = ["inspect"] as const;
 type SystemPromptAction = (typeof ACTIONS)[number];
@@ -663,7 +665,7 @@ export async function inspectSubagentSystemPrompt(cwd: string, rawName: string):
 		const available = discovery.agents.map(candidate => candidate.name).join(", ") || "none";
 		throw new Error(`Unknown agent "${name}". Available: ${available}`);
 	}
-	const disabledAgents = settings.get("task.disabledAgents");
+	const disabledAgents = cfgTaskDisabledAgents.get(settings);
 	if (disabledAgents.includes(name)) {
 		const enabled = discovery.agents
 			.filter(candidate => !disabledAgents.includes(candidate.name))
@@ -679,7 +681,7 @@ export async function inspectSubagentSystemPrompt(cwd: string, rawName: string):
 	);
 	const defaultModelPattern = settings.getModelRole("default");
 	const modelPatterns = resolveAgentModelPatterns({
-		settingsOverride: settings.get("task.agentModelOverrides")[name],
+		settingsOverride: cfgTaskAgentModelOverrides.get(settings)[name],
 		agentModel: agent.model,
 		settings,
 		activeModelPattern: defaultModelPattern,
@@ -690,6 +692,8 @@ export async function inspectSubagentSystemPrompt(cwd: string, rawName: string):
 		agent: agent.systemPrompt,
 		outputSchema: agent.output,
 	});
+	// A preview has no parent snapshot; exclude AGENTS context just as fresh Task and Vibe spawns do.
+	const contextFiles = (await discoverContextFiles(cwd)).filter(file => !isAgentsContextFile(file));
 	const authStorage = await discoverAuthStorage();
 	let result: CreateAgentSessionResult | undefined;
 	try {
@@ -705,11 +709,12 @@ export async function inspectSubagentSystemPrompt(cwd: string, rawName: string):
 			toolNames: capabilities.toolNames,
 			outputSchema: agent.output,
 			requireYieldTool: true,
+			contextFiles,
 			hasUI: false,
 			sessionManager: SessionManager.inMemory(cwd),
 			spawns: capabilities.spawns,
 			taskDepth: capabilities.childDepth,
-			enableLsp: settings.get("task.enableLsp"),
+			enableLsp: cfgTaskEnableLsp.get(settings),
 			enableIrc: false,
 			enableMCP: false,
 			systemPromptTemplate: subagentPrompt.systemPromptTemplate,
