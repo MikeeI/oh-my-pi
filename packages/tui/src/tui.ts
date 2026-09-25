@@ -7,8 +7,6 @@
  * acknowledgement) plus the complete mutable viewport. The writer anchors the
  * viewport directly below whatever history remains visible, diffs
  * viewport-only frames, and never infers finality from a row's position.
- * During tmux turns, unfinished frames borrow the alternate buffer, then the
- * finalized transcript enters normal history without erasing older shell rows.
  * Destructive clears (ED3) happen through explicit user gestures or configured
  * settled-width rebuilds. Hosts without a
  * provider paint their composed children as a bounded viewport and never
@@ -175,7 +173,7 @@ export interface TerminalFramePlan {
 export interface TerminalFrameProvider {
 	renderFrame(viewport: ViewportSize): TerminalFramePlan;
 	acknowledgeHistory(id: number): void;
-	/** Full semantic viewport used on the transient resize or active-turn alternate buffer. */
+	/** Full semantic viewport used only on the transient resize buffer. */
 	renderResizeFrame?(viewport: ViewportSize): readonly string[];
 	/** Re-offer finalized history after a display reset or resize replay. */
 	beginHistoryReplay?(): void;
@@ -914,9 +912,6 @@ export class TUI extends Container {
 	// Holds an alternate-screen exit until its replacement full paint can emit it
 	// atomically. It must survive a deferred Ghostty image frame.
 	#pendingAltExit = "";
-	// A streaming turn borrows the alternate buffer so tmux cannot move
-	// unfinished normal-screen rows into immutable pane history during resize.
-	#transientScreen = false;
 
 	// Overlay stack for modal components rendered on top of base content
 	overlayStack: {
@@ -990,13 +985,6 @@ export class TUI extends Container {
 	/** Set how settled resizes refresh native scrollback. */
 	setResizeScrollback(mode: ResizeScrollbackMode): void {
 		this.#resizeScrollbackMode = mode;
-	}
-
-	/** Keep unfinished provider frames off the normal buffer while a turn streams in tmux. */
-	setTransientScreen(active: boolean): void {
-		if (this.#transientScreen === active || !Bun.env.TMUX || !this.#frameProvider?.renderResizeFrame) return;
-		this.#transientScreen = active;
-		this.requestRender(true);
 	}
 
 	/** Delete every tracked Kitty image from the terminal graphics store. */
@@ -2026,7 +2014,6 @@ export class TUI extends Container {
 			this.terminal.write(MOUSE_TRACKING_OFF);
 			this.#mouseTracking = "off";
 		}
-		this.#transientScreen = false;
 		// A latched destructive reset (settled rebuild-mode resize, /clear) pairs
 		// ED3 with a complete-ledger replay. Running that pair during stop would
 		// erase native history and re-stream the whole transcript at quit; drop
@@ -3048,23 +3035,19 @@ export class TUI extends Container {
 			return;
 		}
 
-		// Fullscreen overlays and active tmux turns borrow the alternate buffer;
-		// neither may let unfinished rows enter native pane history. The normal
-		// screen and its history accounting stay frozen until the borrow ends.
+		// Fullscreen alt-screen short-circuit. While the topmost visible overlay
+		// requests it, borrow the terminal's alternate buffer and paint only the
+		// modal there; the normal screen and all accounting stay untouched.
 		const topOverlay = this.#getTopmostVisibleOverlay();
-		const wantAlt = topOverlay?.options?.fullscreen === true || this.#transientScreen;
-		// The normal-buffer click map does not describe the semantic alt tail.
-		// Disable inline mouse capture until normal rendering restores its map.
+		const wantAlt = topOverlay?.options?.fullscreen === true;
 		const wantMouse: MouseTrackingState =
-			this.#transientScreen && topOverlay?.options?.fullscreen !== true
-				? "off"
-				: topOverlay === undefined
-					? this.#inlineMouseProvider?.() === true
-						? "inline"
-						: "off"
-					: wantAlt && topOverlay.options?.mouseTracking !== false
-						? "full"
-						: "off";
+			topOverlay === undefined
+				? this.#inlineMouseProvider?.() === true
+					? "inline"
+					: "off"
+				: wantAlt && topOverlay.options?.mouseTracking !== false
+					? "full"
+					: "off";
 		if (wantAlt && !this.#altActive) {
 			// Enhanced keyboard modes can be buffer-local: re-push the active
 			// modified-key reporting sequence on the freshly entered alternate
@@ -3127,8 +3110,7 @@ export class TUI extends Container {
 			this.#setMouseTracking(wantMouse);
 		}
 		if (this.#altActive) {
-			if (topOverlay?.options?.fullscreen === true) this.#renderAltFrame(width, height);
-			else this.#renderTransientAltFrame(width, height);
+			this.#renderAltFrame(width, height);
 			return;
 		}
 		// #prepareResizeReplay can latch this frame's reset itself (a settled
@@ -3569,31 +3551,6 @@ export class TUI extends Container {
 	}
 
 	/**
-	 * Stream the complete visible tail on the alternate buffer without offering
-	 * history. The normal screen remains frozen until the turn is complete:
-	 * tmux can resize it without ever archiving a partial assistant frame.
-	 */
-	#renderTransientAltFrame(width: number, height: number): void {
-		const provider = this.#frameProvider;
-		if (!provider?.renderResizeFrame) return;
-		let viewport: string[];
-		do {
-			this.#imageBudget.beginPass(false, true);
-			viewport = Array.from(provider.renderResizeFrame({ columns: width, rows: height }).slice(-height));
-			viewport = this.#compositeVisibleOverlays(viewport, width, height);
-		} while (this.#imageBudget.endPass());
-		const marker = this.#extractCursorMarkers(viewport)[0];
-		const cursor = marker ? this.#targetHardwareCursorState(marker, height) : null;
-		this.#emitAltFrame(
-			this.#prepareLinesArray(viewport, width, this.#altPreparedRows, height),
-			width,
-			height,
-			true,
-			cursor,
-		);
-	}
-
-	/**
 	 * Compose and paint a single fullscreen overlay frame on the alt buffer.
 	 * Cursor markers are stripped (the modal draws its own in-band caret and
 	 * keeps the hardware cursor hidden), and only the modal is composited over a
@@ -3615,16 +3572,9 @@ export class TUI extends Container {
 	/**
 	 * Full per-row viewport rewrite on the alt buffer. Emits only sync-output
 	 * brackets, a cursor home, and per-row rewrites — never ED3 or any
-	 * native-scrollback byte. Fullscreen overlays keep the cursor hidden;
-	 * transient provider frames retain the editor's hardware cursor.
+	 * native-scrollback byte. The hardware cursor stays hidden here.
 	 */
-	#emitAltFrame(
-		prepared: PreparedLines,
-		width: number,
-		height: number,
-		notifyPaint: boolean,
-		cursor: HardwareCursorState | null = null,
-	): void {
+	#emitAltFrame(prepared: PreparedLines, width: number, height: number, notifyPaint: boolean): void {
 		// The pass that composed this frame ran with `altScreen`, so the normal
 		// screen's own placements behind it are not treated as retired.
 		this.#imageBudget.limitResidentImages();
@@ -3644,20 +3594,13 @@ export class TUI extends Container {
 			for (const seq of imageTransmits) transmitBuffer += seq;
 			this.terminal.write(transmitBuffer);
 		}
-		// Skip an identical repaint unless a forced redraw or cursor-mode change
-		// is pending. An overlay can take ownership without changing the rows:
-		// its hidden cursor must still replace the stream editor's visible caret.
+		// Skip an identical repaint (the modal is mostly static between
+		// keystrokes) — unless a forced repaint (resetDisplay,
+		// requestRender(true)) is pending: the redraw gesture must repair a
+		// corrupted modal even when our cached frame is byte-identical.
 		const force = this.#forceViewportRepaintOnNextRender;
 		this.#forceViewportRepaintOnNextRender = false;
-		if (
-			!force &&
-			this.#altPreviousLines.length === height &&
-			(cursor === null
-				? this.#hardwareCursorState?.visible !== true
-				: this.#hardwareCursorState?.row === cursor.row &&
-					this.#hardwareCursorState.col === cursor.col &&
-					this.#hardwareCursorState.visible === cursor.visible)
-		) {
+		if (!force && this.#altPreviousLines.length === height) {
 			let same = true;
 			for (let r = 0; r < height; r++) {
 				const previous = this.#altPreparedRows[r];
@@ -3691,19 +3634,11 @@ export class TUI extends Container {
 				this.#osc66SpacerGlyphWidth(prepared.lines, r),
 			);
 		}
-		if (cursor) buffer += `\x1b[${cursor.row + 1};${cursor.col + 1}H${cursor.visible ? "\x1b[?25h" : "\x1b[?25l"}`;
 		buffer += this.#paintEndSequence;
 		this.terminal.write(buffer);
-		if (cursor) this.#recordHardwareCursorState(cursor);
-		else this.#recordHardwareCursorHidden();
 		this.#altPreviousLines = prepared.lines;
 		this.#altPreparedRows = prepared.rows;
-		this.#debugPaint = {
-			lines: prepared.lines,
-			windowTop: 0,
-			altScreen: true,
-			...(cursor === null ? {} : { cursor: { x: cursor.col, y: cursor.row, visible: cursor.visible } }),
-		};
+		this.#debugPaint = { lines: prepared.lines, windowTop: 0, altScreen: true };
 		if (notifyPaint) {
 			this.#notifyPaint({
 				history: [],

@@ -96,11 +96,11 @@ async function killTmuxServer(): Promise<void> {
 	}
 }
 
-async function startTranscriptPane(sessionName: string, transientScreen = false): Promise<string> {
+async function startTranscriptPane(sessionName: string): Promise<string> {
 	const paneTarget = `${sessionName}:0.0`;
 	await runTmux(["new-session", "-d", "-x", String(PANE_COLUMNS), "-y", String(PANE_ROWS), "-s", sessionName]);
 	await runTmux(["set-option", "-w", "-t", `${sessionName}:0`, "remain-on-exit", "on"]);
-	const paneCommand = `${shellQuote(process.execPath)} ${shellQuote(driverPath)}${transientScreen ? " --transient-screen" : ""} && echo ${shellQuote(DRIVER_EXIT_MARKER)}`;
+	const paneCommand = `${shellQuote(process.execPath)} ${shellQuote(driverPath)} && echo ${shellQuote(DRIVER_EXIT_MARKER)}`;
 	await runTmux(["respawn-pane", "-k", "-t", paneTarget, paneCommand]);
 	return paneTarget;
 }
@@ -161,41 +161,6 @@ describe.skipIf(process.platform === "win32" || !tmuxPath)("tmux scrollback exac
 			capture = await waitForPaneTranscript(paneTarget);
 			expect(paneState, `pane did not exit; captured pane:\n${capture}`).toBe("1");
 			expectFinalTranscript(capture, false);
-		} finally {
-			await killTmuxServer();
-		}
-	}, 15_000);
-
-	it("keeps pre-existing history and records a single finalized answer after grow-shrink streaming", async () => {
-		let capture = "";
-		try {
-			const sessionName = "transient-resize";
-			const paneTarget = await startTranscriptPane(sessionName, true);
-			const liveFrame = await waitForPaneOutput(paneTarget, "TRANSIENT-LIVE", false);
-			expect(liveFrame, "transient answer was not visible while streaming").toContain("TRANSIENT-LIVE");
-			await runTmux([
-				"resize-window",
-				"-x",
-				String(PANE_COLUMNS),
-				"-y",
-				String(PANE_ROWS + 27),
-				"-t",
-				`${sessionName}:0`,
-			]);
-			await runTmux([
-				"resize-window",
-				"-x",
-				String(PANE_COLUMNS),
-				"-y",
-				String(PANE_ROWS),
-				"-t",
-				`${sessionName}:0`,
-			]);
-			const paneState = await waitForPaneDeath(paneTarget);
-			capture = await waitForPaneTranscript(paneTarget);
-			expect(paneState, `pane did not exit; captured pane:\n${capture}`).toBe("1");
-			expectFinalTranscript(capture, true);
-			expect(countOccurrences(capture, "PRIOR-ANSWER"), capture).toBe(1);
 		} finally {
 			await killTmuxServer();
 		}
