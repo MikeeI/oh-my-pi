@@ -19,7 +19,7 @@ import { taskSubprocessRenderer } from "@oh-my-pi/pi-tui/tools/subprocess";
 import path from "node:path";
 import type { AgentTool, AgentToolResult, AgentToolUpdateCallback } from "@oh-my-pi/pi-agent-core";
 import type { Usage } from "@oh-my-pi/pi-ai";
-import { $env, logger, prompt } from "@oh-my-pi/pi-utils";
+import { $env, getAgentDir, logger, prompt } from "@oh-my-pi/pi-utils";
 import type { ToolSession } from "..";
 import type { EffectiveExtensionRoots } from "../capability/types";
 import type { Theme } from "@oh-my-pi/pi-tui/theme";
@@ -445,12 +445,12 @@ class TaskJobError extends AsyncJobError {}
 
 /**
  * Process-level create-time discovery memo and published reload snapshots,
- * keyed by resolved cwd plus the exact effective `extensions` array.
+ * keyed by resolved cwd, agent directory, and the exact effective extension roots.
  *
  * `TaskTool.create` runs for every (sub)agent session in this process. Sessions
- * may share a cwd while carrying different overlay/runtime extension settings,
- * so cwd alone is not an isolation boundary. Explicit plugin reloads replace
- * only the matching cwd+extensions snapshot. Execution-time discovery
+ * may share a cwd while carrying different profiles or overlay/runtime extension
+ * settings, so cwd alone is not an isolation boundary. Explicit plugin reloads
+ * replace only the matching cwd+profile+extensions snapshot. Execution-time discovery
  * (`#runSpawn`) intentionally stays fresh. The memo also tracks the live
  * `discoverAgents` binding: test spies swap that binding, which invalidates
  * both caches automatically.
@@ -459,22 +459,26 @@ const discoveryMemo = new Map<string, Promise<DiscoveryResult>>();
 const discoverySnapshots = new Map<string, AgentDefinition[]>();
 let discoveryMemoFn: typeof discoverAgents | undefined;
 
-/** Stable cache identity for the filesystem root and the full effective extension-root struct. */
-function discoveryCacheKey(cwd: string, extensionRoots?: EffectiveExtensionRoots): string {
-	return `${path.resolve(cwd)}\0${JSON.stringify(extensionRoots ?? null)}`;
+/** Stable cache identity for the workspace, profile, and full effective extension-root struct. */
+function discoveryCacheKey(cwd: string, agentDir: string, extensionRoots?: EffectiveExtensionRoots): string {
+	return `${path.resolve(cwd)}\0${path.resolve(agentDir)}\0${JSON.stringify(extensionRoots ?? null)}`;
 }
 
-function discoverAgentsForCreate(cwd: string, extensionRoots?: EffectiveExtensionRoots): Promise<DiscoveryResult> {
+function discoverAgentsForCreate(
+	cwd: string,
+	agentDir: string,
+	extensionRoots?: EffectiveExtensionRoots,
+): Promise<DiscoveryResult> {
 	const fn = discoverAgents;
 	if (discoveryMemoFn !== fn) {
 		discoveryMemoFn = fn;
 		discoveryMemo.clear();
 		discoverySnapshots.clear();
 	}
-	const key = discoveryCacheKey(cwd, extensionRoots);
+	const key = discoveryCacheKey(cwd, agentDir, extensionRoots);
 	let pending = discoveryMemo.get(key);
 	if (!pending) {
-		pending = fn(cwd, undefined, extensionRoots);
+		pending = fn(cwd, undefined, extensionRoots, agentDir);
 		discoveryMemo.set(key, pending);
 		pending.catch(() => {
 			if (discoveryMemo.get(key) === pending) discoveryMemo.delete(key);
@@ -484,10 +488,15 @@ function discoverAgentsForCreate(cwd: string, extensionRoots?: EffectiveExtensio
 }
 
 /** Rescan one cwd and publish its definitions to existing and future task tools. */
-export async function refreshAgentDiscovery(cwd: string, extensionRoots?: EffectiveExtensionRoots): Promise<void> {
-	const key = discoveryCacheKey(cwd, extensionRoots);
+export async function refreshAgentDiscovery(
+	cwd: string,
+	extensionRoots?: EffectiveExtensionRoots,
+	agentDir?: string,
+): Promise<void> {
+	const resolvedAgentDir = agentDir ?? getAgentDir();
+	const key = discoveryCacheKey(cwd, resolvedAgentDir, extensionRoots);
 	discoveryMemo.delete(key);
-	const pending = discoverAgentsForCreate(cwd, extensionRoots);
+	const pending = discoverAgentsForCreate(cwd, resolvedAgentDir, extensionRoots);
 	const { agents } = await pending;
 	if (discoveryMemo.get(key) === pending) {
 		discoverySnapshots.set(key, agents);
@@ -618,8 +627,13 @@ export class TaskTool implements AgentTool<TaskToolSchemaInstance, TaskToolDetai
 		return renderDescription(
 			{
 				agents:
-					discoverySnapshots.get(discoveryCacheKey(this.session.cwd, this.session.effectiveExtensionRoots?.())) ??
-					this.#discoveredAgents,
+					discoverySnapshots.get(
+						discoveryCacheKey(
+							this.session.cwd,
+							this.session.settings.getAgentDir(),
+							this.session.effectiveExtensionRoots?.(),
+						),
+					) ?? this.#discoveredAgents,
 				sessionAgents: this.session.getSessionAgents?.() ?? [],
 				isolationEnabled: !planMode && isolationEnabled,
 				applyIsolatedChanges: cfgTaskIsolationApply.get(this.session.settings),
@@ -688,7 +702,11 @@ export class TaskTool implements AgentTool<TaskToolSchemaInstance, TaskToolDetai
 	 * Create a TaskTool instance with async agent discovery.
 	 */
 	static async create(session: ToolSession): Promise<TaskTool> {
-		const { agents } = await discoverAgentsForCreate(session.cwd, session.effectiveExtensionRoots?.());
+		const { agents } = await discoverAgentsForCreate(
+			session.cwd,
+			session.settings.getAgentDir(),
+			session.effectiveExtensionRoots?.(),
+		);
 		return new TaskTool(session, agents);
 	}
 

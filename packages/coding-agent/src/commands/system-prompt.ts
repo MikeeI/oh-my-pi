@@ -659,7 +659,7 @@ export async function inspectSubagentSystemPrompt(cwd: string, rawName: string):
 
 	setProjectDir(cwd);
 	const settings = await Settings.loadReadOnly({ cwd });
-	const discovery = await discoverAgents(cwd);
+	const discovery = await discoverAgents(cwd, undefined, undefined, settings.getAgentDir());
 	const agent = getAgent(discovery.agents, name);
 	if (!agent) {
 		const available = discovery.agents.map(candidate => candidate.name).join(", ") || "none";

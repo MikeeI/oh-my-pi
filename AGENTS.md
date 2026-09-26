@@ -163,6 +163,31 @@ Each entry names its disposition, observable behavior, implementation owner, and
 - Required action: retain strict overrides for Read, Bash, Task, LSP, Eval, and Web Search at the current description owners.
 - Proof: override and fallback cases in `test/tools/tool-prompt-overrides.test.ts`.
 
+#### `MOMP-AGENT-PROMPT-OVERRIDES` — Profile-scoped agent templates
+
+- Disposition: `MOMP-EIGEN`.
+- Contract: `prompts/agents/` under the active user agent directory overrides the matching bundled templates.
+- Contract: supported sources are `scout.md`, `reviewer.md`, `security-reviewer.md`, `task.md`, `frontmatter.md`, `init.md`, and `model-mention.md`.
+- Contract: absent sources use bundled defaults; selected empty, unreadable, non-regular, or invalid sources fail.
+- Contract: regular-file symlinks are supported; dangling symlinks fail instead of selecting bundled defaults.
+- Contract: agent templates retain their built-in names and non-empty bodies after rendering and parsing.
+- Contract: Task and Sonic share `task.md` and render distinct metadata through `frontmatter.md`.
+- Contract: project, user, and plugin agent definitions retain precedence over the built-in agent tier.
+- Contract: profile overrides are re-read for fresh discovery; immutable embedded defaults remain separately cached.
+- Contract: Task discovery snapshots are profile-isolated; restarting MOMP refreshes all advertised and command templates.
+- Contract: existing live or persisted Child prompt bytes are not rewritten by template edits.
+- Contract: changing the security-reviewer source invalidates a security plan's workflow fingerprint.
+- Owner: `src/prompts/user-prompt-source.ts` owns the shared strict Tool and Agent override file boundary.
+- Owner: `src/task/agents.ts` owns agent rendering and parsing; `src/task/discovery.ts` retains discovery precedence.
+- Owner: `src/task/index.ts` and `src/task/structured-subagent.ts` use the session profile for Task and Eval discovery.
+- Owner: `src/task/command-templates.ts` and `src/session/model-mentions.ts` render init and tagged-model templates.
+- Owner: `src/security/coordinator.ts` fingerprints the selected security-reviewer source.
+- Owner: project-settings `data/sync/agent/prompts/agents/` owns editable deployed copies.
+- Reason: upstream embeds these templates and cannot load them from profile `prompts/agents/`.
+- Required action: keep bundled templates upstream-identical and apply strict overrides at their existing consumers.
+- Proof: `test/task/agent-prompt-overrides.test.ts` and `test/tools/tool-prompt-overrides.test.ts`.
+- Proof: `system-prompt inspect --subagent scout --json` against the source CLI and deployed Settings templates.
+
 #### `MOMP-PROMPT-INSPECT` — Provider prompt inspection
 
 - Disposition: `MOMP-EIGEN`.

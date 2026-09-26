@@ -1,8 +1,9 @@
 import type { Model } from "@oh-my-pi/pi-ai";
-import { isRecord, prompt } from "@oh-my-pi/pi-utils";
+import { getAgentDir, isRecord, prompt } from "@oh-my-pi/pi-utils";
 import type { ModelRegistry } from "../config/model-registry";
 import { formatModelString } from "../config/model-resolver";
 import modelMentionDescription from "../prompts/agents/model-mention.md" with { type: "text" };
+import { resolveUserPromptSource } from "../prompts/user-prompt-source";
 import { getBundledAgent } from "../task/agents";
 import type { AgentDefinition } from "../task/types";
 import {
@@ -105,10 +106,16 @@ export class ModelMentionRegistry {
 	sessionAgents(): AgentDefinition[] {
 		const task = getBundledAgent("task");
 		if (!task) throw new Error("Bundled task agent is unavailable");
+		const description = resolveUserPromptSource({
+			agentDir: getAgentDir(),
+			kind: "agent",
+			name: "model-mention",
+			bundledSource: modelMentionDescription,
+		}).source;
 		return this.#mentions.map(mention => ({
 			...task,
 			name: mention.agent,
-			description: prompt.render(modelMentionDescription, { name: mention.name, selector: mention.selector }),
+			description: prompt.render(description, { name: mention.name, selector: mention.selector }),
 			model: [mention.selector],
 			filePath: undefined,
 		}));
