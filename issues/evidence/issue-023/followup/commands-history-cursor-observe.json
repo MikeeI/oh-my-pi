@@ -1,0 +1,1423 @@
+{
+  "socket": "issue-023-followup-604906",
+  "commands": [
+    {
+      "args": [
+        "new-session",
+        "-d",
+        "-x",
+        "79",
+        "-y",
+        "39",
+        "-s",
+        "history-cursor-observe-control",
+        "AUDIT_LOG='/root/projects/project-oh-my-pi-fork/issues/evidence/issue-023/followup/history-cursor-observe-control.jsonl' AUDIT_SCENARIO='history-cursor-observe' '/root/.bun/bin/bun' '/root/projects/project-oh-my-pi-fork/issues/evidence/issue-023/followup-driver.ts'"
+      ],
+      "at": 1790720173559
+    },
+    {
+      "args": [
+        "set-option",
+        "-w",
+        "-t",
+        "history-cursor-observe-control",
+        "remain-on-exit",
+        "on"
+      ],
+      "at": 1790720173603
+    },
+    {
+      "args": [
+        "display-message",
+        "-p",
+        "-t",
+        "history-cursor-observe-control",
+        "#{pane_dead}|#{pane_title}"
+      ],
+      "at": 1790720173615
+    },
+    {
+      "args": [
+        "display-message",
+        "-p",
+        "-t",
+        "history-cursor-observe-control",
+        "#{pane_dead}|#{pane_title}"
+      ],
+      "at": 1790720173646
+    },
+    {
+      "args": [
+        "display-message",
+        "-p",
+        "-t",
+        "history-cursor-observe-control",
+        "#{pane_dead}|#{pane_title}"
+      ],
+      "at": 1790720173679
+    },
+    {
+      "args": [
+        "display-message",
+        "-p",
+        "-t",
+        "history-cursor-observe-control",
+        "#{pane_dead}|#{pane_title}"
+      ],
+      "at": 1790720173712
+    },
+    {
+      "args": [
+        "display-message",
+        "-p",
+        "-t",
+        "history-cursor-observe-control",
+        "#{pane_dead}|#{pane_title}"
+      ],
+      "at": 1790720173738
+    },
+    {
+      "args": [
+        "display-message",
+        "-p",
+        "-t",
+        "history-cursor-observe-control",
+        "#{pane_dead}|#{pane_title}"
+      ],
+      "at": 1790720173770
+    },
+    {
+      "args": [
+        "display-message",
+        "-p",
+        "-t",
+        "history-cursor-observe-control",
+        "#{pane_dead}|#{pane_title}"
+      ],
+      "at": 1790720173801
+    },
+    {
+      "args": [
+        "display-message",
+        "-p",
+        "-t",
+        "history-cursor-observe-control",
+        "#{pane_dead}|#{pane_title}"
+      ],
+      "at": 1790720173832
+    },
+    {
+      "args": [
+        "display-message",
+        "-p",
+        "-t",
+        "history-cursor-observe-control",
+        "#{pane_dead}|#{pane_title}"
+      ],
+      "at": 1790720173863
+    },
+    {
+      "args": [
+        "display-message",
+        "-p",
+        "-t",
+        "history-cursor-observe-control",
+        "#{pane_dead}|#{pane_title}"
+      ],
+      "at": 1790720173893
+    },
+    {
+      "args": [
+        "display-message",
+        "-p",
+        "-t",
+        "history-cursor-observe-control",
+        "#{pane_dead}|#{pane_title}"
+      ],
+      "at": 1790720173926
+    },
+    {
+      "args": [
+        "display-message",
+        "-p",
+        "-t",
+        "history-cursor-observe-control",
+        "#{pane_dead}|#{pane_title}"
+      ],
+      "at": 1790720173956
+    },
+    {
+      "args": [
+        "display-message",
+        "-p",
+        "-t",
+        "history-cursor-observe-control",
+        "#{pane_dead}|#{pane_title}"
+      ],
+      "at": 1790720173991
+    },
+    {
+      "args": [
+        "display-message",
+        "-p",
+        "-t",
+        "history-cursor-observe-control",
+        "#{pane_dead}|#{pane_title}"
+      ],
+      "at": 1790720174023
+    },
+    {
+      "args": [
+        "display-message",
+        "-p",
+        "-t",
+        "history-cursor-observe-control",
+        "#{pane_dead}|#{pane_title}"
+      ],
+      "at": 1790720174056
+    },
+    {
+      "args": [
+        "display-message",
+        "-p",
+        "-t",
+        "history-cursor-observe-control",
+        "#{pane_dead}|#{pane_title}"
+      ],
+      "at": 1790720174084
+    },
+    {
+      "args": [
+        "display-message",
+        "-p",
+        "-t",
+        "history-cursor-observe-control",
+        "#{pane_dead}|#{pane_title}"
+      ],
+      "at": 1790720174112
+    },
+    {
+      "args": [
+        "display-message",
+        "-p",
+        "-t",
+        "history-cursor-observe-control",
+        "#{pane_dead}|#{pane_title}"
+      ],
+      "at": 1790720174146
+    },
+    {
+      "args": [
+        "display-message",
+        "-p",
+        "-t",
+        "history-cursor-observe-control",
+        "#{pane_dead}|#{pane_title}"
+      ],
+      "at": 1790720174178
+    },
+    {
+      "args": [
+        "display-message",
+        "-p",
+        "-t",
+        "history-cursor-observe-control",
+        "#{pane_dead}|#{pane_title}"
+      ],
+      "at": 1790720174210
+    },
+    {
+      "args": [
+        "display-message",
+        "-p",
+        "-t",
+        "history-cursor-observe-control",
+        "#{pane_dead}|#{pane_title}"
+      ],
+      "at": 1790720174240
+    },
+    {
+      "args": [
+        "display-message",
+        "-p",
+        "-t",
+        "history-cursor-observe-control",
+        "#{pane_dead}|#{pane_title}"
+      ],
+      "at": 1790720174272
+    },
+    {
+      "args": [
+        "display-message",
+        "-p",
+        "-t",
+        "history-cursor-observe-control",
+        "#{pane_dead}|#{pane_title}"
+      ],
+      "at": 1790720174303
+    },
+    {
+      "args": [
+        "display-message",
+        "-p",
+        "-t",
+        "history-cursor-observe-control",
+        "#{pane_dead}|#{pane_title}"
+      ],
+      "at": 1790720174332
+    },
+    {
+      "args": [
+        "display-message",
+        "-p",
+        "-t",
+        "history-cursor-observe-control",
+        "#{pane_dead}|#{pane_title}"
+      ],
+      "at": 1790720174363
+    },
+    {
+      "args": [
+        "display-message",
+        "-p",
+        "-t",
+        "history-cursor-observe-control",
+        "#{pane_dead}|#{pane_title}"
+      ],
+      "at": 1790720174396
+    },
+    {
+      "args": [
+        "display-message",
+        "-p",
+        "-t",
+        "history-cursor-observe-control",
+        "#{pane_dead}|#{pane_title}"
+      ],
+      "at": 1790720174431
+    },
+    {
+      "args": [
+        "display-message",
+        "-p",
+        "-t",
+        "history-cursor-observe-control",
+        "#{pane_dead}|#{pane_title}"
+      ],
+      "at": 1790720174465
+    },
+    {
+      "args": [
+        "display-message",
+        "-p",
+        "-t",
+        "history-cursor-observe-control",
+        "#{pane_dead}|#{pane_title}"
+      ],
+      "at": 1790720174498
+    },
+    {
+      "args": [
+        "display-message",
+        "-p",
+        "-t",
+        "history-cursor-observe-control",
+        "#{pane_dead}|#{pane_title}"
+      ],
+      "at": 1790720174533
+    },
+    {
+      "args": [
+        "display-message",
+        "-p",
+        "-t",
+        "history-cursor-observe-control",
+        "#{pane_dead}|#{pane_title}"
+      ],
+      "at": 1790720174566
+    },
+    {
+      "args": [
+        "display-message",
+        "-p",
+        "-t",
+        "history-cursor-observe-control",
+        "#{pane_dead}|#{pane_title}"
+      ],
+      "at": 1790720174598
+    },
+    {
+      "args": [
+        "capture-pane",
+        "-p",
+        "-t",
+        "history-cursor-observe-control"
+      ],
+      "at": 1790720174612
+    },
+    {
+      "args": [
+        "capture-pane",
+        "-p",
+        "-S",
+        "-",
+        "-t",
+        "history-cursor-observe-control"
+      ],
+      "at": 1790720174624
+    },
+    {
+      "args": [
+        "display-message",
+        "-p",
+        "-t",
+        "history-cursor-observe-control",
+        "#{history_size}"
+      ],
+      "at": 1790720174633
+    },
+    {
+      "args": [
+        "send-keys",
+        "-t",
+        "history-cursor-observe-control",
+        "F6"
+      ],
+      "at": 1790720174647
+    },
+    {
+      "args": [
+        "display-message",
+        "-p",
+        "-t",
+        "history-cursor-observe-control",
+        "#{pane_dead}|#{pane_title}"
+      ],
+      "at": 1790720174659
+    },
+    {
+      "args": [
+        "display-message",
+        "-p",
+        "-t",
+        "history-cursor-observe-control",
+        "#{pane_dead}|#{pane_title}"
+      ],
+      "at": 1790720174690
+    },
+    {
+      "args": [
+        "capture-pane",
+        "-p",
+        "-t",
+        "history-cursor-observe-control"
+      ],
+      "at": 1790720174702
+    },
+    {
+      "args": [
+        "capture-pane",
+        "-p",
+        "-S",
+        "-",
+        "-t",
+        "history-cursor-observe-control"
+      ],
+      "at": 1790720174713
+    },
+    {
+      "args": [
+        "display-message",
+        "-p",
+        "-t",
+        "history-cursor-observe-control",
+        "#{history_size}"
+      ],
+      "at": 1790720174725
+    },
+    {
+      "args": [
+        "send-keys",
+        "-t",
+        "history-cursor-observe-control",
+        "F7"
+      ],
+      "at": 1790720174738
+    },
+    {
+      "args": [
+        "display-message",
+        "-p",
+        "-t",
+        "history-cursor-observe-control",
+        "#{pane_dead}|#{pane_title}"
+      ],
+      "at": 1790720174752
+    },
+    {
+      "args": [
+        "display-message",
+        "-p",
+        "-t",
+        "history-cursor-observe-control",
+        "#{pane_dead}|#{pane_title}"
+      ],
+      "at": 1790720174785
+    },
+    {
+      "args": [
+        "capture-pane",
+        "-p",
+        "-t",
+        "history-cursor-observe-control"
+      ],
+      "at": 1790720174896
+    },
+    {
+      "args": [
+        "capture-pane",
+        "-p",
+        "-S",
+        "-",
+        "-t",
+        "history-cursor-observe-control"
+      ],
+      "at": 1790720174909
+    },
+    {
+      "args": [
+        "display-message",
+        "-p",
+        "-t",
+        "history-cursor-observe-control",
+        "#{history_size}"
+      ],
+      "at": 1790720174921
+    },
+    {
+      "args": [
+        "send-keys",
+        "-t",
+        "history-cursor-observe-control",
+        "F8"
+      ],
+      "at": 1790720174946
+    },
+    {
+      "args": [
+        "display-message",
+        "-p",
+        "-t",
+        "history-cursor-observe-control",
+        "#{pane_dead}|#{pane_title}"
+      ],
+      "at": 1790720174959
+    },
+    {
+      "args": [
+        "capture-pane",
+        "-p",
+        "-t",
+        "history-cursor-observe-control"
+      ],
+      "at": 1790720175072
+    },
+    {
+      "args": [
+        "capture-pane",
+        "-p",
+        "-S",
+        "-",
+        "-t",
+        "history-cursor-observe-control"
+      ],
+      "at": 1790720175085
+    },
+    {
+      "args": [
+        "display-message",
+        "-p",
+        "-t",
+        "history-cursor-observe-control",
+        "#{history_size}"
+      ],
+      "at": 1790720175094
+    },
+    {
+      "args": [
+        "send-keys",
+        "-t",
+        "history-cursor-observe-control",
+        "F9"
+      ],
+      "at": 1790720175106
+    },
+    {
+      "args": [
+        "new-session",
+        "-d",
+        "-x",
+        "79",
+        "-y",
+        "39",
+        "-s",
+        "history-cursor-observe-resize",
+        "AUDIT_LOG='/root/projects/project-oh-my-pi-fork/issues/evidence/issue-023/followup/history-cursor-observe-resize.jsonl' AUDIT_SCENARIO='history-cursor-observe' '/root/.bun/bin/bun' '/root/projects/project-oh-my-pi-fork/issues/evidence/issue-023/followup-driver.ts'"
+      ],
+      "at": 1790720175116
+    },
+    {
+      "args": [
+        "set-option",
+        "-w",
+        "-t",
+        "history-cursor-observe-resize",
+        "remain-on-exit",
+        "on"
+      ],
+      "at": 1790720175136
+    },
+    {
+      "args": [
+        "display-message",
+        "-p",
+        "-t",
+        "history-cursor-observe-resize",
+        "#{pane_dead}|#{pane_title}"
+      ],
+      "at": 1790720175146
+    },
+    {
+      "args": [
+        "display-message",
+        "-p",
+        "-t",
+        "history-cursor-observe-resize",
+        "#{pane_dead}|#{pane_title}"
+      ],
+      "at": 1790720175176
+    },
+    {
+      "args": [
+        "display-message",
+        "-p",
+        "-t",
+        "history-cursor-observe-resize",
+        "#{pane_dead}|#{pane_title}"
+      ],
+      "at": 1790720175209
+    },
+    {
+      "args": [
+        "display-message",
+        "-p",
+        "-t",
+        "history-cursor-observe-resize",
+        "#{pane_dead}|#{pane_title}"
+      ],
+      "at": 1790720175242
+    },
+    {
+      "args": [
+        "display-message",
+        "-p",
+        "-t",
+        "history-cursor-observe-resize",
+        "#{pane_dead}|#{pane_title}"
+      ],
+      "at": 1790720175274
+    },
+    {
+      "args": [
+        "display-message",
+        "-p",
+        "-t",
+        "history-cursor-observe-resize",
+        "#{pane_dead}|#{pane_title}"
+      ],
+      "at": 1790720175305
+    },
+    {
+      "args": [
+        "display-message",
+        "-p",
+        "-t",
+        "history-cursor-observe-resize",
+        "#{pane_dead}|#{pane_title}"
+      ],
+      "at": 1790720175338
+    },
+    {
+      "args": [
+        "display-message",
+        "-p",
+        "-t",
+        "history-cursor-observe-resize",
+        "#{pane_dead}|#{pane_title}"
+      ],
+      "at": 1790720175369
+    },
+    {
+      "args": [
+        "display-message",
+        "-p",
+        "-t",
+        "history-cursor-observe-resize",
+        "#{pane_dead}|#{pane_title}"
+      ],
+      "at": 1790720175401
+    },
+    {
+      "args": [
+        "display-message",
+        "-p",
+        "-t",
+        "history-cursor-observe-resize",
+        "#{pane_dead}|#{pane_title}"
+      ],
+      "at": 1790720175433
+    },
+    {
+      "args": [
+        "display-message",
+        "-p",
+        "-t",
+        "history-cursor-observe-resize",
+        "#{pane_dead}|#{pane_title}"
+      ],
+      "at": 1790720175465
+    },
+    {
+      "args": [
+        "display-message",
+        "-p",
+        "-t",
+        "history-cursor-observe-resize",
+        "#{pane_dead}|#{pane_title}"
+      ],
+      "at": 1790720175498
+    },
+    {
+      "args": [
+        "display-message",
+        "-p",
+        "-t",
+        "history-cursor-observe-resize",
+        "#{pane_dead}|#{pane_title}"
+      ],
+      "at": 1790720175530
+    },
+    {
+      "args": [
+        "display-message",
+        "-p",
+        "-t",
+        "history-cursor-observe-resize",
+        "#{pane_dead}|#{pane_title}"
+      ],
+      "at": 1790720175565
+    },
+    {
+      "args": [
+        "display-message",
+        "-p",
+        "-t",
+        "history-cursor-observe-resize",
+        "#{pane_dead}|#{pane_title}"
+      ],
+      "at": 1790720175597
+    },
+    {
+      "args": [
+        "display-message",
+        "-p",
+        "-t",
+        "history-cursor-observe-resize",
+        "#{pane_dead}|#{pane_title}"
+      ],
+      "at": 1790720175627
+    },
+    {
+      "args": [
+        "display-message",
+        "-p",
+        "-t",
+        "history-cursor-observe-resize",
+        "#{pane_dead}|#{pane_title}"
+      ],
+      "at": 1790720175658
+    },
+    {
+      "args": [
+        "display-message",
+        "-p",
+        "-t",
+        "history-cursor-observe-resize",
+        "#{pane_dead}|#{pane_title}"
+      ],
+      "at": 1790720175687
+    },
+    {
+      "args": [
+        "display-message",
+        "-p",
+        "-t",
+        "history-cursor-observe-resize",
+        "#{pane_dead}|#{pane_title}"
+      ],
+      "at": 1790720175719
+    },
+    {
+      "args": [
+        "display-message",
+        "-p",
+        "-t",
+        "history-cursor-observe-resize",
+        "#{pane_dead}|#{pane_title}"
+      ],
+      "at": 1790720175749
+    },
+    {
+      "args": [
+        "display-message",
+        "-p",
+        "-t",
+        "history-cursor-observe-resize",
+        "#{pane_dead}|#{pane_title}"
+      ],
+      "at": 1790720175780
+    },
+    {
+      "args": [
+        "display-message",
+        "-p",
+        "-t",
+        "history-cursor-observe-resize",
+        "#{pane_dead}|#{pane_title}"
+      ],
+      "at": 1790720175811
+    },
+    {
+      "args": [
+        "display-message",
+        "-p",
+        "-t",
+        "history-cursor-observe-resize",
+        "#{pane_dead}|#{pane_title}"
+      ],
+      "at": 1790720175843
+    },
+    {
+      "args": [
+        "display-message",
+        "-p",
+        "-t",
+        "history-cursor-observe-resize",
+        "#{pane_dead}|#{pane_title}"
+      ],
+      "at": 1790720175877
+    },
+    {
+      "args": [
+        "display-message",
+        "-p",
+        "-t",
+        "history-cursor-observe-resize",
+        "#{pane_dead}|#{pane_title}"
+      ],
+      "at": 1790720175908
+    },
+    {
+      "args": [
+        "display-message",
+        "-p",
+        "-t",
+        "history-cursor-observe-resize",
+        "#{pane_dead}|#{pane_title}"
+      ],
+      "at": 1790720175941
+    },
+    {
+      "args": [
+        "display-message",
+        "-p",
+        "-t",
+        "history-cursor-observe-resize",
+        "#{pane_dead}|#{pane_title}"
+      ],
+      "at": 1790720175974
+    },
+    {
+      "args": [
+        "display-message",
+        "-p",
+        "-t",
+        "history-cursor-observe-resize",
+        "#{pane_dead}|#{pane_title}"
+      ],
+      "at": 1790720176008
+    },
+    {
+      "args": [
+        "display-message",
+        "-p",
+        "-t",
+        "history-cursor-observe-resize",
+        "#{pane_dead}|#{pane_title}"
+      ],
+      "at": 1790720176041
+    },
+    {
+      "args": [
+        "capture-pane",
+        "-p",
+        "-t",
+        "history-cursor-observe-resize"
+      ],
+      "at": 1790720176052
+    },
+    {
+      "args": [
+        "capture-pane",
+        "-p",
+        "-S",
+        "-",
+        "-t",
+        "history-cursor-observe-resize"
+      ],
+      "at": 1790720176061
+    },
+    {
+      "args": [
+        "display-message",
+        "-p",
+        "-t",
+        "history-cursor-observe-resize",
+        "#{history_size}"
+      ],
+      "at": 1790720176067
+    },
+    {
+      "args": [
+        "resize-window",
+        "-t",
+        "history-cursor-observe-resize",
+        "-x",
+        "79",
+        "-y",
+        "33"
+      ],
+      "at": 1790720176074
+    },
+    {
+      "args": [
+        "display-message",
+        "-p",
+        "-t",
+        "history-cursor-observe-resize",
+        "#{pane_dead}|#{pane_title}"
+      ],
+      "at": 1790720176082
+    },
+    {
+      "args": [
+        "display-message",
+        "-p",
+        "-t",
+        "history-cursor-observe-resize",
+        "#{pane_dead}|#{pane_title}"
+      ],
+      "at": 1790720176113
+    },
+    {
+      "args": [
+        "display-message",
+        "-p",
+        "-t",
+        "history-cursor-observe-resize",
+        "#{pane_dead}|#{pane_title}"
+      ],
+      "at": 1790720176143
+    },
+    {
+      "args": [
+        "display-message",
+        "-p",
+        "-t",
+        "history-cursor-observe-resize",
+        "#{pane_dead}|#{pane_title}"
+      ],
+      "at": 1790720176174
+    },
+    {
+      "args": [
+        "display-message",
+        "-p",
+        "-t",
+        "history-cursor-observe-resize",
+        "#{pane_dead}|#{pane_title}"
+      ],
+      "at": 1790720176200
+    },
+    {
+      "args": [
+        "display-message",
+        "-p",
+        "-t",
+        "history-cursor-observe-resize",
+        "#{pane_dead}|#{pane_title}"
+      ],
+      "at": 1790720176233
+    },
+    {
+      "args": [
+        "capture-pane",
+        "-p",
+        "-t",
+        "history-cursor-observe-resize"
+      ],
+      "at": 1790720176245
+    },
+    {
+      "args": [
+        "capture-pane",
+        "-p",
+        "-S",
+        "-",
+        "-t",
+        "history-cursor-observe-resize"
+      ],
+      "at": 1790720176257
+    },
+    {
+      "args": [
+        "display-message",
+        "-p",
+        "-t",
+        "history-cursor-observe-resize",
+        "#{history_size}"
+      ],
+      "at": 1790720176270
+    },
+    {
+      "args": [
+        "resize-window",
+        "-t",
+        "history-cursor-observe-resize",
+        "-x",
+        "79",
+        "-y",
+        "39"
+      ],
+      "at": 1790720176284
+    },
+    {
+      "args": [
+        "display-message",
+        "-p",
+        "-t",
+        "history-cursor-observe-resize",
+        "#{pane_dead}|#{pane_title}"
+      ],
+      "at": 1790720176291
+    },
+    {
+      "args": [
+        "display-message",
+        "-p",
+        "-t",
+        "history-cursor-observe-resize",
+        "#{pane_dead}|#{pane_title}"
+      ],
+      "at": 1790720176320
+    },
+    {
+      "args": [
+        "display-message",
+        "-p",
+        "-t",
+        "history-cursor-observe-resize",
+        "#{pane_dead}|#{pane_title}"
+      ],
+      "at": 1790720176354
+    },
+    {
+      "args": [
+        "display-message",
+        "-p",
+        "-t",
+        "history-cursor-observe-resize",
+        "#{pane_dead}|#{pane_title}"
+      ],
+      "at": 1790720176385
+    },
+    {
+      "args": [
+        "display-message",
+        "-p",
+        "-t",
+        "history-cursor-observe-resize",
+        "#{pane_dead}|#{pane_title}"
+      ],
+      "at": 1790720176418
+    },
+    {
+      "args": [
+        "display-message",
+        "-p",
+        "-t",
+        "history-cursor-observe-resize",
+        "#{pane_dead}|#{pane_title}"
+      ],
+      "at": 1790720176451
+    },
+    {
+      "args": [
+        "display-message",
+        "-p",
+        "-t",
+        "history-cursor-observe-resize",
+        "#{pane_dead}|#{pane_title}"
+      ],
+      "at": 1790720176481
+    },
+    {
+      "args": [
+        "capture-pane",
+        "-p",
+        "-t",
+        "history-cursor-observe-resize"
+      ],
+      "at": 1790720176492
+    },
+    {
+      "args": [
+        "capture-pane",
+        "-p",
+        "-S",
+        "-",
+        "-t",
+        "history-cursor-observe-resize"
+      ],
+      "at": 1790720176506
+    },
+    {
+      "args": [
+        "display-message",
+        "-p",
+        "-t",
+        "history-cursor-observe-resize",
+        "#{history_size}"
+      ],
+      "at": 1790720176519
+    },
+    {
+      "args": [
+        "send-keys",
+        "-t",
+        "history-cursor-observe-resize",
+        "F6"
+      ],
+      "at": 1790720176533
+    },
+    {
+      "args": [
+        "display-message",
+        "-p",
+        "-t",
+        "history-cursor-observe-resize",
+        "#{pane_dead}|#{pane_title}"
+      ],
+      "at": 1790720176543
+    },
+    {
+      "args": [
+        "display-message",
+        "-p",
+        "-t",
+        "history-cursor-observe-resize",
+        "#{pane_dead}|#{pane_title}"
+      ],
+      "at": 1790720176577
+    },
+    {
+      "args": [
+        "capture-pane",
+        "-p",
+        "-t",
+        "history-cursor-observe-resize"
+      ],
+      "at": 1790720176588
+    },
+    {
+      "args": [
+        "capture-pane",
+        "-p",
+        "-S",
+        "-",
+        "-t",
+        "history-cursor-observe-resize"
+      ],
+      "at": 1790720176597
+    },
+    {
+      "args": [
+        "display-message",
+        "-p",
+        "-t",
+        "history-cursor-observe-resize",
+        "#{history_size}"
+      ],
+      "at": 1790720176608
+    },
+    {
+      "args": [
+        "send-keys",
+        "-t",
+        "history-cursor-observe-resize",
+        "F7"
+      ],
+      "at": 1790720176625
+    },
+    {
+      "args": [
+        "display-message",
+        "-p",
+        "-t",
+        "history-cursor-observe-resize",
+        "#{pane_dead}|#{pane_title}"
+      ],
+      "at": 1790720176635
+    },
+    {
+      "args": [
+        "display-message",
+        "-p",
+        "-t",
+        "history-cursor-observe-resize",
+        "#{pane_dead}|#{pane_title}"
+      ],
+      "at": 1790720176666
+    },
+    {
+      "args": [
+        "capture-pane",
+        "-p",
+        "-t",
+        "history-cursor-observe-resize"
+      ],
+      "at": 1790720176780
+    },
+    {
+      "args": [
+        "capture-pane",
+        "-p",
+        "-S",
+        "-",
+        "-t",
+        "history-cursor-observe-resize"
+      ],
+      "at": 1790720176793
+    },
+    {
+      "args": [
+        "display-message",
+        "-p",
+        "-t",
+        "history-cursor-observe-resize",
+        "#{history_size}"
+      ],
+      "at": 1790720176802
+    },
+    {
+      "args": [
+        "send-keys",
+        "-t",
+        "history-cursor-observe-resize",
+        "F8"
+      ],
+      "at": 1790720176812
+    },
+    {
+      "args": [
+        "display-message",
+        "-p",
+        "-t",
+        "history-cursor-observe-resize",
+        "#{pane_dead}|#{pane_title}"
+      ],
+      "at": 1790720176825
+    },
+    {
+      "args": [
+        "capture-pane",
+        "-p",
+        "-t",
+        "history-cursor-observe-resize"
+      ],
+      "at": 1790720176943
+    },
+    {
+      "args": [
+        "capture-pane",
+        "-p",
+        "-S",
+        "-",
+        "-t",
+        "history-cursor-observe-resize"
+      ],
+      "at": 1790720176953
+    },
+    {
+      "args": [
+        "display-message",
+        "-p",
+        "-t",
+        "history-cursor-observe-resize",
+        "#{history_size}"
+      ],
+      "at": 1790720176966
+    },
+    {
+      "args": [
+        "send-keys",
+        "-t",
+        "history-cursor-observe-resize",
+        "F9"
+      ],
+      "at": 1790720176978
+    }
+  ],
+  "results": [
+    {
+      "name": "history-cursor-observe-control",
+      "stage": "initial",
+      "draft": "",
+      "viewportRows": 19,
+      "historySize": 44,
+      "physicalStatus": 1,
+      "plannedStatus": 1,
+      "oldPreviewLive": true,
+      "oldPreviewPlanned": true,
+      "oldPreviewHistory": false,
+      "oldLiveHistory": false
+    },
+    {
+      "name": "history-cursor-observe-control",
+      "stage": "contract",
+      "draft": "",
+      "viewportRows": 7,
+      "historySize": 44,
+      "physicalStatus": 1,
+      "plannedStatus": 1,
+      "oldPreviewLive": false,
+      "oldPreviewPlanned": false,
+      "oldPreviewHistory": false,
+      "oldLiveHistory": false
+    },
+    {
+      "name": "history-cursor-observe-control",
+      "stage": "assistant",
+      "draft": "",
+      "viewportRows": 10,
+      "historySize": 44,
+      "physicalStatus": 1,
+      "plannedStatus": 1,
+      "oldPreviewLive": false,
+      "oldPreviewPlanned": false,
+      "oldPreviewHistory": false,
+      "oldLiveHistory": false
+    },
+    {
+      "name": "history-cursor-observe-control",
+      "stage": "scroll",
+      "draft": "",
+      "viewportRows": 2,
+      "historySize": 84,
+      "physicalStatus": 1,
+      "plannedStatus": 1,
+      "oldPreviewLive": false,
+      "oldPreviewPlanned": false,
+      "oldPreviewHistory": false,
+      "oldLiveHistory": false
+    },
+    {
+      "name": "history-cursor-observe-resize",
+      "stage": "initial",
+      "draft": "",
+      "viewportRows": 19,
+      "historySize": 44,
+      "physicalStatus": 1,
+      "plannedStatus": 1,
+      "oldPreviewLive": true,
+      "oldPreviewPlanned": true,
+      "oldPreviewHistory": false,
+      "oldLiveHistory": false
+    },
+    {
+      "name": "history-cursor-observe-resize",
+      "stage": "shrunk",
+      "draft": "",
+      "viewportRows": 19,
+      "historySize": 50,
+      "physicalStatus": 1,
+      "plannedStatus": 1,
+      "oldPreviewLive": true,
+      "oldPreviewPlanned": true,
+      "oldPreviewHistory": false,
+      "oldLiveHistory": false
+    },
+    {
+      "name": "history-cursor-observe-resize",
+      "stage": "settled",
+      "draft": "",
+      "viewportRows": 19,
+      "historySize": 44,
+      "physicalStatus": 2,
+      "plannedStatus": 1,
+      "oldPreviewLive": true,
+      "oldPreviewPlanned": true,
+      "oldPreviewHistory": false,
+      "oldLiveHistory": false
+    },
+    {
+      "name": "history-cursor-observe-resize",
+      "stage": "contract",
+      "draft": "",
+      "viewportRows": 7,
+      "historySize": 44,
+      "physicalStatus": 3,
+      "plannedStatus": 1,
+      "oldPreviewLive": true,
+      "oldPreviewPlanned": false,
+      "oldPreviewHistory": false,
+      "oldLiveHistory": false
+    },
+    {
+      "name": "history-cursor-observe-resize",
+      "stage": "assistant",
+      "draft": "",
+      "viewportRows": 10,
+      "historySize": 44,
+      "physicalStatus": 3,
+      "plannedStatus": 1,
+      "oldPreviewLive": true,
+      "oldPreviewPlanned": false,
+      "oldPreviewHistory": false,
+      "oldLiveHistory": false
+    },
+    {
+      "name": "history-cursor-observe-resize",
+      "stage": "scroll",
+      "draft": "",
+      "viewportRows": 2,
+      "historySize": 78,
+      "physicalStatus": 1,
+      "plannedStatus": 1,
+      "oldPreviewLive": false,
+      "oldPreviewPlanned": false,
+      "oldPreviewHistory": false,
+      "oldLiveHistory": false
+    }
+  ]
+}

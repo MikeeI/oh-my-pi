@@ -1,0 +1,290 @@
+{
+  "baselineRevision": "77adac703fc417e0692d0f1e2946ece747d83421",
+  "runtimeSha256": "36abd10fad2dd08d458612bb7a6d9bd78c2c80e0ad408694d224b034acf494be",
+  "snapshots": [
+    {
+      "name": "tool-control",
+      "stage": "initial",
+      "statusCount": 1
+    },
+    {
+      "name": "tool-control",
+      "stage": "contract",
+      "statusCount": 1
+    },
+    {
+      "name": "tool-control",
+      "stage": "assistant",
+      "statusCount": 1
+    },
+    {
+      "name": "tool-control",
+      "stage": "scroll",
+      "statusCount": 1
+    },
+    {
+      "name": "tool-resize",
+      "stage": "initial",
+      "statusCount": 1
+    },
+    {
+      "name": "tool-resize",
+      "stage": "shrunk",
+      "statusCount": 1
+    },
+    {
+      "name": "tool-resize",
+      "stage": "settled",
+      "statusCount": 1
+    },
+    {
+      "name": "tool-resize",
+      "stage": "contract",
+      "statusCount": 1
+    },
+    {
+      "name": "tool-resize",
+      "stage": "assistant",
+      "statusCount": 1
+    },
+    {
+      "name": "tool-resize",
+      "stage": "scroll",
+      "statusCount": 1
+    },
+    {
+      "name": "typing-control",
+      "stage": "initial",
+      "statusCount": 1
+    },
+    {
+      "name": "typing-control",
+      "stage": "typed",
+      "statusCount": 1
+    },
+    {
+      "name": "typing-control",
+      "stage": "cleared",
+      "statusCount": 1
+    },
+    {
+      "name": "typing-control",
+      "stage": "contract",
+      "statusCount": 1
+    },
+    {
+      "name": "typing-control",
+      "stage": "assistant",
+      "statusCount": 1
+    },
+    {
+      "name": "typing-control",
+      "stage": "scroll",
+      "statusCount": 1
+    },
+    {
+      "name": "typing-resize",
+      "stage": "initial",
+      "statusCount": 1
+    },
+    {
+      "name": "typing-resize",
+      "stage": "shrunk",
+      "statusCount": 1
+    },
+    {
+      "name": "typing-resize",
+      "stage": "settled",
+      "statusCount": 1
+    },
+    {
+      "name": "typing-resize",
+      "stage": "typed",
+      "statusCount": 1
+    },
+    {
+      "name": "typing-resize",
+      "stage": "cleared",
+      "statusCount": 1
+    },
+    {
+      "name": "typing-resize",
+      "stage": "contract",
+      "statusCount": 1
+    },
+    {
+      "name": "typing-resize",
+      "stage": "assistant",
+      "statusCount": 1
+    },
+    {
+      "name": "typing-resize",
+      "stage": "scroll",
+      "statusCount": 1
+    },
+    {
+      "name": "history-probe-control",
+      "stage": "initial",
+      "statusCount": 1
+    },
+    {
+      "name": "history-probe-control",
+      "stage": "contract",
+      "statusCount": 1
+    },
+    {
+      "name": "history-probe-control",
+      "stage": "assistant",
+      "statusCount": 1
+    },
+    {
+      "name": "history-probe-control",
+      "stage": "scroll",
+      "statusCount": 1
+    },
+    {
+      "name": "history-probe-resize",
+      "stage": "initial",
+      "statusCount": 1
+    },
+    {
+      "name": "history-probe-resize",
+      "stage": "shrunk",
+      "statusCount": 1
+    },
+    {
+      "name": "history-probe-resize",
+      "stage": "settled",
+      "statusCount": 1
+    },
+    {
+      "name": "history-probe-resize",
+      "stage": "contract",
+      "statusCount": 1
+    },
+    {
+      "name": "history-probe-resize",
+      "stage": "assistant",
+      "statusCount": 1
+    },
+    {
+      "name": "history-probe-resize",
+      "stage": "scroll",
+      "statusCount": 1
+    },
+    {
+      "name": "finalize-short-control",
+      "stage": "initial",
+      "statusCount": 1
+    },
+    {
+      "name": "finalize-short-control",
+      "stage": "contract",
+      "statusCount": 1
+    },
+    {
+      "name": "finalize-short-control",
+      "stage": "assistant",
+      "statusCount": 1
+    },
+    {
+      "name": "finalize-short-control",
+      "stage": "scroll",
+      "statusCount": 1
+    },
+    {
+      "name": "finalize-short-resize",
+      "stage": "initial",
+      "statusCount": 1
+    },
+    {
+      "name": "finalize-short-resize",
+      "stage": "shrunk",
+      "statusCount": 1
+    },
+    {
+      "name": "finalize-short-resize",
+      "stage": "settled",
+      "statusCount": 1
+    },
+    {
+      "name": "finalize-short-resize",
+      "stage": "contract",
+      "statusCount": 1
+    },
+    {
+      "name": "finalize-short-resize",
+      "stage": "assistant",
+      "statusCount": 1
+    },
+    {
+      "name": "finalize-short-resize",
+      "stage": "scroll",
+      "statusCount": 1
+    },
+    {
+      "name": "raw-scroll-control",
+      "stage": "initial",
+      "statusCount": 0
+    },
+    {
+      "name": "raw-scroll-control",
+      "stage": "contract",
+      "statusCount": 0
+    },
+    {
+      "name": "raw-scroll-control",
+      "stage": "scroll",
+      "statusCount": 0
+    },
+    {
+      "name": "raw-scroll-control",
+      "stage": "grow",
+      "statusCount": 0
+    },
+    {
+      "name": "raw-scroll-resize",
+      "stage": "initial",
+      "statusCount": 0
+    },
+    {
+      "name": "raw-scroll-resize",
+      "stage": "shrunk",
+      "statusCount": 0
+    },
+    {
+      "name": "raw-scroll-resize",
+      "stage": "settled",
+      "statusCount": 0
+    },
+    {
+      "name": "raw-scroll-resize",
+      "stage": "contract",
+      "statusCount": 0
+    },
+    {
+      "name": "raw-scroll-resize",
+      "stage": "scroll",
+      "statusCount": 0
+    },
+    {
+      "name": "raw-scroll-resize",
+      "stage": "grow",
+      "statusCount": 0
+    }
+  ],
+  "growReply": "\u001b[39;18R",
+  "acceptedPrefaceMarkers": 32,
+  "typedDraftExact": true,
+  "clearedDraftAbsent": true,
+  "noProviderCalls": true,
+  "realTermiusClientMeasured": false,
+  "gates": {
+    "tests": 88,
+    "failures": 0,
+    "expectCalls": 1234,
+    "testFiles": 9,
+    "tuiTypes": "passed",
+    "codingAgentTypes": "passed"
+  }
+}

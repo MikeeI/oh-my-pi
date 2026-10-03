@@ -24,13 +24,14 @@ function props(described: NativeNode | null): Record<string, unknown> {
 
 describe("Markdown.describe streaming", () => {
 	it("keeps the node while unchanged and grows the same md node append-only while streaming", () => {
-		const markdown = new Markdown("# Title\n\nFirst", 0, 0, getMarkdownTheme());
+		const markdown = new Markdown("# Title\n\nFirst", 0, 0, { ...getMarkdownTheme(), textColors: false });
 		markdown.transientRenderCache = true;
 		const first = markdown.describe(CX);
 		expect(markdown.describe(CX)).toBe(first);
 
 		markdown.setText("# Title\n\nFirst and then the parser");
 		const second = markdown.describe(CX);
+		if (!first || !second) throw new Error("Disabled text colors must retain native Markdown");
 		expect(second).not.toBe(first);
 		expect(second.k).toBe("md");
 		expect(second.key).toBe(first.key);

@@ -5,6 +5,7 @@ import { col } from "../native/describe";
 import type { NativeNode } from "../native/node";
 import { isNativeSettled, settleNative } from "../native/settle";
 import { isUsageRowBlock } from "../overlays/usage-row";
+import { reflowHardRows } from "../render/terminal-row-reflow";
 import { isToolActivityComponent } from "./tool-activity";
 
 /** Shared animation time supplied by the constrained transcript root. */
@@ -56,8 +57,10 @@ export interface AppendOnlyTranscriptBlock {
 
 interface FinalizableBlock {
 	isTranscriptBlockFinalized?(): boolean;
-	/** Render the row that must remain represented under emergency viewport pressure. */
-	renderTranscriptBlockEmergencyRow?(width: number): string | undefined;
+	/** Monotonic version used to detect mutation after physical terminal acceptance. */
+	getTranscriptBlockVersion?(): number;
+	/** Render the final rows that must remain reachable under emergency viewport pressure. */
+	renderTranscriptBlockEmergencyRows?(width: number, maxRows: number): readonly string[];
 }
 
 /**
@@ -92,9 +95,26 @@ interface TranscriptEntry {
 }
 
 type RetirementPolicy = "pressure" | "flush";
+interface AcceptedTapePart {
+	component: Component & FinalizableBlock;
+	start: number;
+	end: number;
+	stableStart: number;
+	stableEnd?: number;
+	version: number | undefined;
+}
+interface AcceptedTapeChunk {
+	rows: readonly string[];
+	offerWidth: number;
+	parts: readonly AcceptedTapePart[];
+}
+interface AcceptedOffer {
+	offerWidth: number;
+	parts: readonly AcceptedTapePart[];
+}
 type Offered =
-	| { batch: HistoryBatch; kind: "append"; entry: number; emittedEnd: number }
-	| { batch: HistoryBatch; kind: "commit"; end: number }
+	| ({ batch: HistoryBatch; kind: "append"; entry: number; emittedEnd: number } & AcceptedOffer)
+	| ({ batch: HistoryBatch; kind: "commit"; end: number } & AcceptedOffer)
 	| { batch: HistoryBatch; kind: "replay" };
 
 /** Rows a progressive-append retirement offers, and the stable count they bring the head to. */
@@ -203,9 +223,11 @@ export class TranscriptContainer extends Container {
 	#syncedChildren: Component[] | undefined;
 	/** Forces the next {@link #syncEntries} to compare every entry, not just the live tail. */
 	#entriesUnverified = false;
-	/** Block list handed to the native frame provider, reused while the children are unchanged. */
+	/** TSP keeps the full transcript rather than retiring accepted physical rows. */
 	#nativeBlocks: readonly Component[] = [];
 	#nativeNode: NativeNode | undefined;
+	#acceptedTapeChunks: AcceptedTapeChunk[] = [];
+	#acceptedTapeDrifted = false;
 	override addChild(component: Component): void {
 		if (isToolActivityComponent(component)) component.setToolActivityVisible(this.#toolActivityVisible);
 		super.addChild(component);
@@ -242,6 +264,8 @@ export class TranscriptContainer extends Container {
 		this.#replayPending = false;
 		this.#replayRequested = false;
 		this.#lastViewportSpans = [];
+		this.#acceptedTapeChunks = [];
+		this.#acceptedTapeDrifted = false;
 	}
 
 	setToolActivityVisible(visible: boolean): void {
@@ -487,9 +511,12 @@ export class TranscriptContainer extends Container {
 			this.#lastViewportSpans = [];
 			return EMPTY_ROWS;
 		}
-		if (shown.length > capacity) {
-			// Blocks the walk never reached are still transcript state: the
-			// emergency layout consults them only where it must.
+		const hasEmergencyFinal = shown.some(candidate => {
+			const block = candidate.entry.component as Component & FinalizableBlock;
+			return candidate.entry.state === "settled" && block.renderTranscriptBlockEmergencyRows !== undefined;
+		});
+		if (shown.length > capacity || (total > capacity && hasEmergencyFinal)) {
+			// Unvisited blocks remain transcript state; emergency probes only what it needs.
 			return this.#renderEmergency(shown, live.slice(0, unrendered), width, capacity, frame);
 		}
 		if (total <= capacity) {
@@ -598,8 +625,13 @@ export class TranscriptContainer extends Container {
 			const before = this.#renderStablePrefix(entry, entry.emitted, width);
 			const after = this.#renderStablePrefix(entry, offered.emittedEnd, width);
 			rows = after.slice(before.length);
+			offered.offerWidth = width;
+			offered.parts = [this.#capturePart(entry, 0, rows.length, entry.emitted, offered.emittedEnd)];
 		} else if (offered.kind === "commit") {
-			rows = this.#renderRange(this.#frontier, offered.end, width, true).rows;
+			const parts: AcceptedTapePart[] = [];
+			rows = this.#renderRange(this.#frontier, offered.end, width, true, undefined, parts).rows;
+			offered.offerWidth = width;
+			offered.parts = parts;
 		} else {
 			rows = this.#renderReplay(width);
 		}
@@ -680,7 +712,14 @@ export class TranscriptContainer extends Container {
 					rows,
 					kind: "append",
 				};
-				this.#offered = { batch, kind: "append", entry: this.#frontier, emittedEnd };
+				this.#offered = {
+					batch,
+					kind: "append",
+					entry: this.#frontier,
+					emittedEnd,
+					offerWidth: width,
+					parts: [this.#capturePart(appendHead, 0, rows.length, appendHead.emitted, emittedEnd)],
+				};
 				this.#pinnedFrontier = undefined;
 				return batch;
 			}
@@ -701,6 +740,7 @@ export class TranscriptContainer extends Container {
 		}
 		this.#pinnedFrontier = undefined;
 		pushLoopPhase("ui.transcript-retire");
+		const parts: AcceptedTapePart[] = [];
 		let retirement: { rows: readonly string[]; end: number };
 		try {
 			// Shutdown must hand over the full prefix; a live frame stops at the
@@ -711,6 +751,7 @@ export class TranscriptContainer extends Container {
 				width,
 				true,
 				policy === "flush" ? undefined : RETIREMENT_BUDGET_MS,
+				parts,
 			);
 		} finally {
 			popLoopPhase();
@@ -720,7 +761,13 @@ export class TranscriptContainer extends Container {
 			rows: retirement.rows,
 			kind: "append",
 		};
-		this.#offered = { batch, end: retirement.end, kind: "commit" };
+		this.#offered = {
+			batch,
+			end: retirement.end,
+			kind: "commit",
+			offerWidth: width,
+			parts,
+		};
 		return batch;
 	}
 
@@ -734,8 +781,10 @@ export class TranscriptContainer extends Container {
 			// stale offer (already-advanced entry) or a retraction (entry reset to
 			// zero with the offer still live) must not move it backwards.
 			if (entry === undefined || offered.entry !== this.#frontier || offered.emittedEnd <= entry.emitted) return;
+			this.#acceptTape(offered);
 			entry.emitted = offered.emittedEnd;
 		} else if (offered.kind === "commit") {
+			this.#acceptTape(offered);
 			for (let index = this.#frontier; index < offered.end; index++) {
 				this.#retireEntry(this.#entries[index]!);
 			}
@@ -754,15 +803,33 @@ export class TranscriptContainer extends Container {
 		this.#syncEntries();
 		const cap = Math.max(0, Math.trunc(maxRows));
 		if (cap === 0) return EMPTY_ROWS;
-		const rows: string[] = [];
-		for (let index = this.#entries.length - 1; index >= 0; index--) {
+		this.#detectAcceptedTapeDrift();
+		if (!this.#acceptedTapeDrifted) {
+			const rows: string[] = [];
+			for (let index = this.#entries.length - 1; index >= 0; index--) {
+				const entry = this.#entries[index]!;
+				this.#setAllocation(entry.component, Number.MAX_SAFE_INTEGER, this.#lastFrame);
+				const block = trimBlankEdges(entry.component.render(width));
+				if (block.length === 0) continue;
+				if (rows.length > 0) rows.unshift("");
+				rows.unshift(...block);
+				if (rows.length >= cap) break;
+			}
+			return rows.length > cap ? rows.slice(rows.length - cap) : rows;
+		}
+
+		const rows = this.#renderAcceptedTape(width);
+		if (rows.length > 0 && isPlainBlank(rows.at(-1)!)) rows.pop();
+		for (let index = this.#frontier; index < this.#entries.length; index++) {
 			const entry = this.#entries[index]!;
 			this.#setAllocation(entry.component, Number.MAX_SAFE_INTEGER, this.#lastFrame);
-			const block = trimBlankEdges(entry.component.render(width));
+			const rendered = this.#renderEntry(entry, width);
+			const emittedRows =
+				index === this.#frontier ? this.#renderStablePrefix(entry, entry.emitted, width).length : 0;
+			const block = rendered.slice(emittedRows);
 			if (block.length === 0) continue;
-			if (rows.length > 0) rows.unshift("");
-			rows.unshift(...block);
-			if (rows.length >= cap) break;
+			if (rows.length > 0) rows.push("");
+			rows.push(...block);
 		}
 		return rows.length > cap ? rows.slice(rows.length - cap) : rows;
 	}
@@ -990,6 +1057,7 @@ export class TranscriptContainer extends Container {
 		width: number,
 		trailingBlank: boolean,
 		budgetMs?: number,
+		parts?: AcceptedTapePart[],
 	): { rows: readonly string[]; end: number } {
 		const rows: string[] = [];
 		const startedAt = budgetMs === undefined ? 0 : performance.now();
@@ -1008,7 +1076,11 @@ export class TranscriptContainer extends Container {
 			reached = index + 1;
 			if (block.length > 0) {
 				if (rows.length > 0) rows.push("");
+				const offset = rows.length;
 				rows.push(...block);
+				// Capture boundaries during composition: blank rows can also be block content,
+				// and a discarded offer must replace both its rows and these boundaries.
+				parts?.push(this.#capturePart(entry, offset, rows.length, index === start ? entry.emitted : 0));
 			}
 			if (budgetMs !== undefined && performance.now() - startedAt >= budgetMs) break;
 		}
@@ -1017,12 +1089,85 @@ export class TranscriptContainer extends Container {
 	}
 
 	#renderReplay(width: number): readonly string[] {
-		const rows = Array.from(this.#renderRange(0, this.#frontier, width, true).rows);
+		this.#detectAcceptedTapeDrift();
+		const rows = this.#acceptedTapeDrifted
+			? this.#renderAcceptedTape(width)
+			: Array.from(this.#renderRange(0, this.#frontier, width, true).rows);
 		const head = this.#entries[this.#frontier];
 		if (head?.mode === "appendOnly" && head.emitted > 0) {
 			this.#setAllocation(head.component, Number.MAX_SAFE_INTEGER, this.#lastFrame);
 			this.#renderEntry(head, width);
 			rows.push(...this.#renderStablePrefix(head, head.emitted, width));
+		}
+		return rows;
+	}
+
+	#capturePart(
+		entry: TranscriptEntry,
+		start: number,
+		end: number,
+		stableStart: number,
+		stableEnd?: number,
+	): AcceptedTapePart {
+		const component = entry.component as Component & FinalizableBlock;
+		return { component, start, end, stableStart, stableEnd, version: component.getTranscriptBlockVersion?.() };
+	}
+
+	#acceptTape(offered: Extract<Offered, AcceptedOffer>): void {
+		if (this.#partsDrifted(offered.parts)) this.#acceptedTapeDrifted = true;
+		this.#acceptedTapeChunks.push({
+			rows: offered.batch.rows.slice(),
+			offerWidth: offered.offerWidth,
+			parts: offered.parts,
+		});
+	}
+
+	#detectAcceptedTapeDrift(): void {
+		if (this.#acceptedTapeDrifted) return;
+		for (const chunk of this.#acceptedTapeChunks) {
+			if (!this.#partsDrifted(chunk.parts)) continue;
+			this.#acceptedTapeDrifted = true;
+			return;
+		}
+	}
+
+	#partsDrifted(parts: readonly AcceptedTapePart[]): boolean {
+		return parts.some(
+			({ component, version }) => version !== undefined && component.getTranscriptBlockVersion?.() !== version,
+		);
+	}
+
+	#acceptedRows(chunk: AcceptedTapeChunk, width: number, start: number, end: number): string[] {
+		const rows = chunk.rows.slice(start, end);
+		return width === chunk.offerWidth ? rows : reflowHardRows(rows, width);
+	}
+
+	#renderAcceptedPart(part: AcceptedTapePart, width: number): readonly string[] {
+		this.#setAllocation(part.component, Number.MAX_SAFE_INTEGER, this.#lastFrame);
+		const appendOnly = part.component as Component & AppendOnlyTranscriptBlock;
+		const emittedRows =
+			part.stableStart === 0 ? 0 : appendOnly.renderTranscriptStableRows(part.stableStart, width).length;
+		const rendered =
+			part.stableEnd === undefined
+				? trimBlankEdges(part.component.render(width))
+				: appendOnly.renderTranscriptStableRows(part.stableEnd, width);
+		return rendered.slice(emittedRows);
+	}
+
+	#renderAcceptedTape(width: number): string[] {
+		const rows: string[] = [];
+		for (const chunk of this.#acceptedTapeChunks) {
+			let offset = 0;
+			for (const part of chunk.parts) {
+				rows.push(...this.#acceptedRows(chunk, width, offset, part.start));
+				rows.push(
+					...(part.version !== undefined && part.component.getTranscriptBlockVersion?.() !== part.version
+						? this.#acceptedRows(chunk, width, part.start, part.end)
+						: this.#renderAcceptedPart(part, width)),
+				);
+				offset = part.end;
+			}
+			rows.push(...this.#acceptedRows(chunk, width, offset, chunk.rows.length));
 		}
 		return rows;
 	}
@@ -1054,11 +1199,8 @@ export class TranscriptContainer extends Container {
 	}
 
 	/**
-	 * One-row-per-block fallback for a live region that cannot fit the viewport.
-	 * `behind` holds the older live blocks `renderViewport` deliberately left
-	 * unrendered. Only its active blocks (few) and the newest settled block
-	 * offering an emergency row are rendered, so the summary count and the
-	 * surviving emergency row match a full walk without rendering the ledger.
+	 * When the bounded viewport overflows, probe older blocks only for a
+	 * finalized tail or active backlog; never render the whole settled ledger.
 	 */
 	#renderEmergency(
 		shown: readonly { entry: TranscriptEntry; index: number }[],
@@ -1067,94 +1209,114 @@ export class TranscriptContainer extends Container {
 		rows: number,
 		frame: AnimationFrame,
 	): readonly string[] {
-		let hiddenBelow = 0;
-		for (const candidate of behind) {
-			if (candidate.entry.state !== "active") continue;
-			if (this.#liveBlockRows(candidate.entry, candidate.index, width).length > 0) hiddenBelow++;
-		}
-		let behindEmergency: { candidate: { entry: TranscriptEntry; index: number }; row: string } | null | undefined;
-		const findBehindEmergency = () => {
-			if (behindEmergency !== undefined) return behindEmergency;
-			behindEmergency = null;
-			for (let index = behind.length - 1; index >= 0; index--) {
-				const candidate = behind[index]!;
+		const visibleActive = shown.findLast(candidate => candidate.entry.state === "active");
+		const behindActive = behind.filter(
+			candidate =>
+				candidate.entry.state === "active" &&
+				this.#liveBlockRows(candidate.entry, candidate.index, width).length > 0,
+		);
+		const activeCount = shown.filter(candidate => candidate.entry.state === "active").length + behindActive.length;
+		const tailCandidate = visibleActive ?? (behindActive.length > 0 ? shown.at(-1) : undefined);
+		const activeSlot = tailCandidate !== undefined && rows > 1 ? 1 : 0;
+		const hiddenActive = Math.max(0, activeCount - (visibleActive === undefined ? 0 : activeSlot));
+		const showSummary = hiddenActive > 0 && rows - activeSlot >= 2;
+		const finalCapacity = rows - activeSlot - (showSummary ? 1 : 0);
+		let settled: { entry: TranscriptEntry; index: number } | undefined;
+		let finalRows: readonly string[] = EMPTY_ROWS;
+		// The bounded viewport walk did not render `behind`; probe only until a
+		// settled block actually supplies a tail, rather than painting the ledger.
+		for (const candidates of [shown, behind]) {
+			for (let index = candidates.length - 1; index >= 0; index--) {
+				const candidate = candidates[index]!;
 				if (candidate.entry.state !== "settled") continue;
 				const block = candidate.entry.component as Component & FinalizableBlock;
-				if (block.renderTranscriptBlockEmergencyRow === undefined) continue;
-				if (this.#liveBlockRows(candidate.entry, candidate.index, width).length === 0) continue;
-				const row = block.renderTranscriptBlockEmergencyRow(width);
-				if (row === undefined) continue;
-				behindEmergency = { candidate, row };
+				if (block.renderTranscriptBlockEmergencyRows === undefined) continue;
+				const rendered = block.renderTranscriptBlockEmergencyRows(width, finalCapacity);
+				if (rendered.length === 0) continue;
+				settled = candidate;
+				finalRows = rendered;
 				break;
 			}
-			return behindEmergency;
-		};
-		let visibleRows = rows;
-		let visible: { entry: TranscriptEntry; index: number }[] = [];
-		let emergencyCandidate: { entry: TranscriptEntry; index: number } | undefined;
-		let emergencyRow: string | undefined;
-		let hiddenActive = 0;
-		for (let attempt = 0; attempt < 2; attempt++) {
-			visible = visibleRows > 0 ? shown.slice(-visibleRows) : [];
-			emergencyCandidate = undefined;
-			emergencyRow = undefined;
-			const visibleStart = shown.length - visibleRows;
-			for (let index = visibleStart - 1; index >= 0; index--) {
-				const candidate = shown[index]!;
-				const block = candidate.entry.component as Component & FinalizableBlock;
-				const row =
-					candidate.entry.state === "settled" ? block.renderTranscriptBlockEmergencyRow?.(width) : undefined;
-				if (row === undefined) continue;
-				emergencyCandidate = candidate;
-				emergencyRow = row;
-				visible = [candidate, ...visible.slice(1)];
-				break;
-			}
-			if (emergencyCandidate === undefined) {
-				const found = findBehindEmergency();
-				if (found !== null) {
-					emergencyCandidate = found.candidate;
-					emergencyRow = found.row;
-					visible = [found.candidate, ...visible.slice(1)];
-				}
-			}
+			if (settled !== undefined) break;
+		}
+		if (settled === undefined) return this.#renderActiveEmergency(shown, behind, width, rows, frame);
 
-			let activeTotal = hiddenBelow;
-			for (const candidate of shown) {
-				if (candidate.entry.state === "active") activeTotal++;
-			}
-			hiddenActive = activeTotal;
-			for (const candidate of visible) {
-				if (candidate.entry.state === "active") hiddenActive--;
-			}
+		const output: string[] = [];
+		const owners: (Component | undefined)[] = [];
+		if (showSummary) {
+			output.push(`${hiddenActive} more transcript blocks active`);
+			owners.push(undefined);
+		}
+		for (const row of finalRows.slice(-finalCapacity)) {
+			output.push(row);
+			owners.push(settled.entry.component);
+		}
+		if (activeSlot > 0 && tailCandidate !== undefined) {
+			output.push(this.#renderEmergencyCandidate(tailCandidate, width, frame));
+			owners.push(tailCandidate.entry.component);
+		}
+		const drop = Math.max(0, output.length - rows);
+		this.#commitViewportSpans(owners.slice(drop), output.length - drop);
+		return drop > 0 ? output.slice(drop) : output;
+	}
+
+	#renderActiveEmergency(
+		shown: readonly { entry: TranscriptEntry; index: number }[],
+		behind: readonly { entry: TranscriptEntry; index: number }[],
+		width: number,
+		rows: number,
+		frame: AnimationFrame,
+	): readonly string[] {
+		const active = shown.filter(candidate => candidate.entry.state === "active");
+		const hiddenBelow =
+			active.length === 0
+				? 0
+				: behind.filter(
+						candidate =>
+							candidate.entry.state === "active" &&
+							this.#liveBlockRows(candidate.entry, candidate.index, width).length > 0,
+					).length;
+		const candidates = active.length > 0 ? active : shown;
+		let visibleRows = rows;
+		let visible: Array<{ entry: TranscriptEntry; index: number }> = [];
+		let hidden = 0;
+		for (let attempt = 0; attempt < 2; attempt++) {
+			visible = visibleRows > 0 ? candidates.slice(-visibleRows) : [];
+			hidden = active.length > 0 ? candidates.length - visible.length + hiddenBelow : 0;
 			// The summary row itself represents the newest active block when no
-			// active row fits beside it; report only the additional backlog.
-			if (hiddenActive === activeTotal && hiddenActive > 0) hiddenActive--;
-			if (attempt === 0 && hiddenActive > 0) {
+			// block row fits beside it; report only the additional backlog.
+			if (hidden === candidates.length + hiddenBelow && hidden > 0) hidden--;
+			if (attempt === 0 && hidden > 0) {
 				visibleRows = Math.max(0, rows - 1);
 				continue;
 			}
 			break;
 		}
-
-		const output = hiddenActive > 0 ? [`${hiddenActive} more transcript blocks active`] : [];
-		const owners: (Component | undefined)[] = hiddenActive > 0 ? [undefined] : [];
+		const output: string[] = [];
+		const owners: (Component | undefined)[] = [];
+		if (hidden > 0) {
+			output.push(`${hidden} more transcript blocks active`);
+			owners.push(undefined);
+		}
 		for (const candidate of visible) {
-			if (candidate === emergencyCandidate) {
-				output.push(emergencyRow ?? "");
-				owners.push(candidate.entry.component);
-				continue;
-			}
-			this.#setAllocation(candidate.entry.component, 1, frame);
-			const rendered = this.#renderEntry(candidate.entry, width).slice(
-				this.#projectedEmittedRowCount(candidate.entry, candidate.index, width),
-			);
-			output.push(rendered[0] ?? "");
+			output.push(this.#renderEmergencyCandidate(candidate, width, frame));
 			owners.push(candidate.entry.component);
 		}
-		const visibleOutput = output.slice(0, rows);
-		this.#commitViewportSpans(owners, visibleOutput.length);
-		return visibleOutput;
+		const drop = Math.max(0, output.length - rows);
+		this.#commitViewportSpans(owners.slice(drop), output.length - drop);
+		return drop > 0 ? output.slice(drop) : output;
+	}
+
+	#renderEmergencyCandidate(
+		candidate: { entry: TranscriptEntry; index: number },
+		width: number,
+		frame: AnimationFrame,
+	): string {
+		this.#setAllocation(candidate.entry.component, 1, frame);
+		const rendered = this.#renderEntry(candidate.entry, width).slice(
+			this.#projectedEmittedRowCount(candidate.entry, candidate.index, width),
+		);
+		return rendered[0] ?? "";
 	}
 
 	#setAllocation(component: Component, rows: number, frame: AnimationFrame): void {

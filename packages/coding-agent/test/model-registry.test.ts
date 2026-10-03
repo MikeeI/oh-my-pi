@@ -22,6 +22,7 @@ import { roleCandidatePool } from "@oh-my-pi/pi-coding-agent/config/model-roles"
 import { resetSettingsForTest, Settings, settings } from "@oh-my-pi/pi-coding-agent/config/settings";
 import { AuthStorage } from "@oh-my-pi/pi-coding-agent/session/auth-storage";
 import { removeSyncWithRetries, Snowflake } from "@oh-my-pi/pi-utils";
+import { persistedModelCacheProviderId } from "../../catalog/test/model-cache-fixture";
 
 import { cfgExtendedContext } from "@oh-my-pi/pi-coding-agent/session/context-settings";
 
@@ -3050,7 +3051,9 @@ describe("ModelRegistry", () => {
 						);
 						const db = new Database(dbPath);
 						try {
-							db.run("UPDATE model_cache SET version = 5 WHERE provider_id = ?", ["openai"]);
+							db.run("UPDATE model_cache SET version = 5 WHERE provider_id = ?", [
+								persistedModelCacheProviderId(db, "openai"),
+							]);
 						} finally {
 							db.close();
 						}

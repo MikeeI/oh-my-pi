@@ -142,6 +142,17 @@ export function formatFullOutputReference(artifactId: string, artifactElidedByte
 	}
 	return `Read artifact://${artifactId} for full output`;
 }
+function formatMiddleRecoveryReference(
+	artifactId: string,
+	head: TruncationMeta["headRange"],
+	tail: TruncationMeta["tailRange"],
+): string {
+	if (!head || !tail) return formatFullOutputReference(artifactId);
+	const omittedStart = head.end + 1;
+	const omittedEnd = tail.start - 1;
+	if (omittedStart > omittedEnd) return formatFullOutputReference(artifactId);
+	return `Read artifact://${artifactId}:${omittedStart}-${omittedEnd} to recover omitted artifact lines`;
+}
 
 /** Strip the last literal notice or a matching final line; optionally preserve surrounding whitespace. */
 export function stripTrailingNotice(
@@ -209,10 +220,11 @@ export function stripGeneratedOutputNotice(text: string): string {
 /** Format truncation ranges and recovery hints. */
 export function formatTruncationMetaNotice(truncation: TruncationMeta, source?: SourceMeta): string {
 	let notice: string;
+	const artifactIsSample = (truncation.artifactElidedBytes ?? 0) > 0;
 	const artifactReference =
 		truncation.artifactId == null
 			? undefined
-			: source?.type === "report"
+			: source?.type === "report" && !artifactIsSample
 				? `Read artifact://${truncation.artifactId} for full report (${source.value})`
 				: formatFullOutputReference(truncation.artifactId, truncation.artifactElidedBytes);
 
@@ -234,8 +246,13 @@ export function formatTruncationMetaNotice(truncation: TruncationMeta, source?: 
 		if (truncation.nextOffset != null) {
 			notice += `. Use :${truncation.nextOffset} to continue`;
 		}
-		if (artifactReference) {
-			notice += `. ${artifactReference}`;
+		if (truncation.artifactId != null) {
+			// Capping changes artifact line coordinates and discards bytes that no recovery selector can retrieve.
+			const recoveryReference =
+				source?.type === "report" || artifactIsSample
+					? artifactReference
+					: formatMiddleRecoveryReference(truncation.artifactId, head, tail);
+			if (recoveryReference) notice += `. ${recoveryReference}`;
 		}
 		return notice;
 	}

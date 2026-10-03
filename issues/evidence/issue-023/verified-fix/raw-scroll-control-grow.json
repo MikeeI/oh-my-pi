@@ -1,0 +1,68 @@
+{
+  "name": "raw-scroll-control",
+  "stage": "grow",
+  "live": "ACCEPTED-1-29\nNEW-LIVE-0\nNEW-LIVE-1\nNEW-LIVE-2\nNEW-LIVE-3\nNEW-LIVE-4\nNEW-LIVE-5\nNEW-LIVE-6\nNEW-LIVE-7\nNEW-LIVE-8\nNEW-LIVE-9\nNEW-LIVE-10\nNEW-LIVE-11\nNEW-LIVE-12\nNEW-LIVE-13\nNEW-LIVE-14\nNEW-LIVE-15\nNEW-LIVE-16\nNEW-LIVE-17\n",
+  "full": "ACCEPTED-1-0\nACCEPTED-1-1\nACCEPTED-1-2\nACCEPTED-1-3\nACCEPTED-1-4\nACCEPTED-1-5\nACCEPTED-1-6\nACCEPTED-1-7\nACCEPTED-1-8\nACCEPTED-1-9\nACCEPTED-1-10\nACCEPTED-1-11\nACCEPTED-1-12\nACCEPTED-1-13\nACCEPTED-1-14\nACCEPTED-1-15\nACCEPTED-1-16\nACCEPTED-1-17\nACCEPTED-1-18\nACCEPTED-1-19\nACCEPTED-1-20\nACCEPTED-1-21\nACCEPTED-1-22\nACCEPTED-1-23\nACCEPTED-1-24\nACCEPTED-1-25\nACCEPTED-1-26\nACCEPTED-1-27\nACCEPTED-1-28\nACCEPTED-1-29\nNEW-LIVE-0\nNEW-LIVE-1\nNEW-LIVE-2\nNEW-LIVE-3\nNEW-LIVE-4\nNEW-LIVE-5\nNEW-LIVE-6\nNEW-LIVE-7\nNEW-LIVE-8\nNEW-LIVE-9\nNEW-LIVE-10\nNEW-LIVE-11\nNEW-LIVE-12\nNEW-LIVE-13\nNEW-LIVE-14\nNEW-LIVE-15\nNEW-LIVE-16\nNEW-LIVE-17\n",
+  "historySize": 29,
+  "history": "ACCEPTED-1-0\nACCEPTED-1-1\nACCEPTED-1-2\nACCEPTED-1-3\nACCEPTED-1-4\nACCEPTED-1-5\nACCEPTED-1-6\nACCEPTED-1-7\nACCEPTED-1-8\nACCEPTED-1-9\nACCEPTED-1-10\nACCEPTED-1-11\nACCEPTED-1-12\nACCEPTED-1-13\nACCEPTED-1-14\nACCEPTED-1-15\nACCEPTED-1-16\nACCEPTED-1-17\nACCEPTED-1-18\nACCEPTED-1-19\nACCEPTED-1-20\nACCEPTED-1-21\nACCEPTED-1-22\nACCEPTED-1-23\nACCEPTED-1-24\nACCEPTED-1-25\nACCEPTED-1-26\nACCEPTED-1-27\nACCEPTED-1-28",
+  "paint": {
+    "t": 1790723813189,
+    "kind": "paint",
+    "stage": "grow",
+    "paint": 5,
+    "history": [],
+    "viewport": [
+      "NEW-LIVE-0",
+      "NEW-LIVE-1",
+      "NEW-LIVE-2",
+      "NEW-LIVE-3",
+      "NEW-LIVE-4",
+      "NEW-LIVE-5",
+      "NEW-LIVE-6",
+      "NEW-LIVE-7",
+      "NEW-LIVE-8",
+      "NEW-LIVE-9",
+      "NEW-LIVE-10",
+      "NEW-LIVE-11",
+      "NEW-LIVE-12",
+      "NEW-LIVE-13",
+      "NEW-LIVE-14",
+      "NEW-LIVE-15",
+      "NEW-LIVE-16",
+      "NEW-LIVE-17"
+    ],
+    "reset": false,
+    "alt": false,
+    "columns": 79,
+    "rows": 19,
+    "debug": {
+      "lines": [
+        "NEW-LIVE-0",
+        "NEW-LIVE-1",
+        "NEW-LIVE-2",
+        "NEW-LIVE-3",
+        "NEW-LIVE-4",
+        "NEW-LIVE-5",
+        "NEW-LIVE-6",
+        "NEW-LIVE-7",
+        "NEW-LIVE-8",
+        "NEW-LIVE-9",
+        "NEW-LIVE-10",
+        "NEW-LIVE-11",
+        "NEW-LIVE-12",
+        "NEW-LIVE-13",
+        "NEW-LIVE-14",
+        "NEW-LIVE-15",
+        "NEW-LIVE-16",
+        "NEW-LIVE-17"
+      ],
+      "windowTop": 0,
+      "altScreen": false,
+      "cursor": {
+        "x": 11,
+        "y": 18,
+        "visible": true
+      }
+    }
+  }
+}

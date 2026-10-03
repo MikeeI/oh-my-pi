@@ -86,6 +86,7 @@ import type {
 	ExtensionWidgetOptions,
 } from "../extensibility/extensions";
 import type { CompactOptions } from "../extensibility/extensions/types";
+import { loadRoutines, type Routine, validateRoutineCommandNames } from "../extensibility/routines";
 import type { Skill } from "../extensibility/skills";
 import type { FileSlashCommand } from "../extensibility/slash-commands";
 import { loadSlashCommands } from "../extensibility/slash-commands";
@@ -303,6 +304,7 @@ import {
 	onTerminalAppearanceChange,
 	onThemeChange,
 	setMarkdownMermaidRendering,
+	setMarkdownTextColors,
 	setSymbolPreset,
 	startMacOSAppearanceReprobeFallback,
 	theme,
@@ -315,6 +317,7 @@ import type {
 	InteractiveModeContext,
 	InteractiveModeInitOptions,
 	InteractiveSelectorDialogOptions,
+	NewVersionNotificationOptions,
 	RenderSessionContextOptions,
 	SubmittedUserInput,
 } from "./types";
@@ -361,6 +364,7 @@ import {
 	cfgTuiMaxInlineImages,
 	cfgTuiMouse,
 	cfgTuiRenderMermaid,
+	cfgTuiTextColors,
 	cfgTuiResizeScrollback,
 	cfgTuiTextSizing,
 	cfgTuiTight,
@@ -423,6 +427,7 @@ const cfgLiveUiSettings = combine({
 	"display.showTokenUsage": cfgDisplayShowTokenUsage,
 	"display.showTurnTime": cfgDisplayShowTurnTime,
 	"tui.renderMermaid": cfgTuiRenderMermaid,
+	"tui.textColors": cfgTuiTextColors,
 	"tui.textSizing": cfgTuiTextSizing,
 	"tui.tight": cfgTuiTight,
 	"tui.hyperlinks": cfgTuiHyperlinks,
@@ -1484,6 +1489,7 @@ export class InteractiveMode implements InteractiveModeContext {
 	hookEditor: HookEditorComponent | undefined = undefined;
 	lastStatus: StatusNotice | undefined = undefined;
 	fileSlashCommands: Set<string> = new Set();
+	routineSlashCommands: Set<string> = new Set();
 	skillCommands: Map<string, Skill> = new Map();
 	oauthManualInput: OAuthManualInputManager = new OAuthManualInputManager();
 	/** Owns hosting: manual `/collab`, `collab.autoStart`, and room rotation on session switch. */
@@ -1785,6 +1791,7 @@ export class InteractiveMode implements InteractiveModeContext {
 
 		setTuiTight(cfgTuiTight.get(settings));
 		setMarkdownMermaidRendering(cfgTuiRenderMermaid.get(settings));
+		setMarkdownTextColors(cfgTuiTextColors.get(settings));
 		this.#applyTextSizingSetting();
 		// Keep generic pi-tui renderers aligned with the coding-agent setting.
 		applyHyperlinkSetting();
@@ -2571,7 +2578,7 @@ export class InteractiveMode implements InteractiveModeContext {
 					name: commandName,
 					description: skill.description,
 					icon,
-					iconName: "skill",
+					argumentCompletionMode: "prompt",
 				});
 			}
 		}
@@ -2590,25 +2597,28 @@ export class InteractiveMode implements InteractiveModeContext {
 		const basePath = cwd ?? this.sessionManager.getCwd();
 		// Session construction already ran slash-command discovery for this cwd;
 		// init passes that result through instead of re-walking the providers.
-		const fileCommands = preloaded
-			? [...preloaded]
-			: await loadSlashCommands({
-					cwd: basePath,
-					extensionRoots: this.session.effectiveExtensionRoots,
-				});
-		this.session.setSlashCommands(fileCommands);
-		this.#rebuildSlashCommandAutocomplete(basePath);
+		const [fileCommands, routines] = await Promise.all([
+			preloaded
+				? [...preloaded]
+				: loadSlashCommands({
+						cwd: basePath,
+						extensionRoots: this.session.effectiveExtensionRoots,
+					}),
+			loadRoutines({ cwd: basePath }),
+		]);
+		this.#rebuildSlashCommandAutocomplete(basePath, { fileCommands, routines });
 	}
 
 	/**
 	 * Rebuild the editor's slash-command autocomplete from the pending command list and
 	 * the session's current file-based slash commands and prompt templates.
 	 */
-	#rebuildSlashCommandAutocomplete(basePath: string): void {
-		if (theme.getSymbolPreset() !== this.#slashIconPreset)
-			this.#pendingSlashCommands = this.#buildPendingSlashCommands();
-		const fileCommands = this.session.slashCommands;
-		this.fileSlashCommands = new Set(fileCommands.map(cmd => cmd.name));
+	#rebuildSlashCommandAutocomplete(
+		basePath: string,
+		candidate?: { fileCommands: FileSlashCommand[]; routines: Routine[] },
+	): void {
+		const fileCommands = candidate?.fileCommands ?? this.session.slashCommands;
+		const routines = candidate?.routines ?? this.session.routines;
 		const promptIcon = getSlashCommandTypeIcon("prompt");
 		const fileSlashCommands: SlashCommand[] = fileCommands.map(cmd => {
 			const argumentHint = cmd.argumentHint ? replaceTabs(cmd.argumentHint).replace(/[\r\n]+/g, " ") : undefined;
@@ -2619,19 +2629,37 @@ export class InteractiveMode implements InteractiveModeContext {
 				iconName: "prompt",
 				argumentHint,
 				getInlineHint: argumentHint ? buildStaticInlineHint(argumentHint) : undefined,
+				argumentCompletionMode: "prompt",
 			};
 		});
+		const existingCommandNames = new Set<string>();
+		for (const command of this.#pendingSlashCommands) {
+			existingCommandNames.add(command.name);
+			for (const alias of command.aliases ?? []) existingCommandNames.add(alias);
+		}
+		for (const command of fileSlashCommands) {
+			existingCommandNames.add(command.name);
+			for (const alias of command.aliases ?? []) existingCommandNames.add(alias);
+		}
+		const routineNames = validateRoutineCommandNames(routines, existingCommandNames);
+		this.fileSlashCommands = new Set(fileCommands.map(cmd => cmd.name));
+		this.routineSlashCommands = routineNames;
+		if (candidate) {
+			this.session.setSlashCommands(candidate.fileCommands);
+			this.session.setRoutines(candidate.routines);
+		}
+		const routineSlashCommands: SlashCommand[] = routines.map(routine => ({
+			name: routine.name,
+			description: routine.description,
+			argumentCompletionMode: "prompt",
+		}));
 		// Surface discovered prompt templates in the picker. AgentSession.prompt() expands
 		// `expandSlashCommand` before `expandPromptTemplate`, and builtin command
 		// execution resolves aliases before template expansion. Mirror that command
 		// resolution order by skipping templates whose names already appear in any
-		// builtin/hook/custom/skill/file command token.
-		const reservedNames = new Set<string>();
-		for (const command of this.#pendingSlashCommands) {
-			reservedNames.add(command.name);
-			for (const alias of command.aliases ?? []) reservedNames.add(alias);
-		}
-		for (const command of fileSlashCommands) {
+		// builtin/hook/custom/skill/file/routine command token.
+		const reservedNames = new Set<string>(existingCommandNames);
+		for (const command of routineSlashCommands) {
 			reservedNames.add(command.name);
 			for (const alias of command.aliases ?? []) reservedNames.add(alias);
 		}
@@ -2643,12 +2671,15 @@ export class InteractiveMode implements InteractiveModeContext {
 				// source suffix (e.g. "Review code (project)"), so pass it through verbatim.
 				description: template.description,
 				icon: promptIcon,
-				iconName: "prompt",
+				argumentCompletionMode: "prompt",
 			}));
-		this.#baseAutocompleteProvider = this.#inputController.createAutocompleteProvider(
-			[...this.#pendingSlashCommands, ...fileSlashCommands, ...promptTemplateCommands],
-			basePath,
-		);
+		const autocompleteCommands = [
+			...this.#pendingSlashCommands,
+			...fileSlashCommands,
+			...routineSlashCommands,
+			...promptTemplateCommands,
+		].map(command => ({ ...command, icon: undefined, iconName: undefined }));
+		this.#baseAutocompleteProvider = this.#inputController.createAutocompleteProvider(autocompleteCommands, basePath);
 		this.#applyAutocompleteProvider();
 	}
 
@@ -3509,6 +3540,10 @@ export class InteractiveMode implements InteractiveModeContext {
 		}
 		if (any("tui.renderMermaid")) {
 			setMarkdownMermaidRendering(cfgTuiRenderMermaid.get(this.settings));
+			rebuildChat = true;
+		}
+		if (any("tui.textColors")) {
+			setMarkdownTextColors(cfgTuiTextColors.get(this.settings));
 			rebuildChat = true;
 		}
 		if (any("tui.textSizing")) {
@@ -7389,8 +7424,8 @@ export class InteractiveMode implements InteractiveModeContext {
 		this.setWorkingMessage(message);
 	}
 
-	showNewVersionNotification(newVersion: string): void {
-		this.#uiHelpers.showNewVersionNotification(newVersion);
+	showNewVersionNotification(newVersion: string, options?: NewVersionNotificationOptions): void {
+		this.#uiHelpers.showNewVersionNotification(newVersion, options);
 	}
 
 	clearEditor(): void {
@@ -7628,8 +7663,8 @@ export class InteractiveMode implements InteractiveModeContext {
 		return this.#btwController.withSessionMove(operation);
 	}
 
-	handleRenameCommand(title: string): Promise<void> {
-		return this.#commandController.handleRenameCommand(title);
+	handleRenameCommand(title: string, generated?: boolean): Promise<void> {
+		return this.#commandController.handleRenameCommand(title, generated);
 	}
 
 	handleMemoryCommand(text: string): Promise<void> {

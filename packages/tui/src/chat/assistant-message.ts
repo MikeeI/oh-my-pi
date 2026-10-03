@@ -230,7 +230,6 @@ export class AssistantMessageComponent extends Container {
 	#cacheMarker?: CacheInvalidationMarkerComponent;
 	#servedModelMarker?: ServedModelMarkerComponent;
 	#lastMessage?: AssistantMessage;
-	#emergencyText?: Markdown;
 	#toolImagesByCallId = new Map<string, ImageContent[]>();
 	/**
 	 * Payload keys ({@link imagePayloadKey}) whose Kitty PNG conversion this
@@ -540,8 +539,9 @@ export class AssistantMessageComponent extends Container {
 	}
 
 	setHideThinkingBlock(hide: boolean): void {
+		if (this.#hideThinkingBlock === hide) return;
 		this.#hideThinkingBlock = hide;
-		this.#thinkingCollapsed.clear();
+		if (this.#lastMessage) this.updateContent(this.#lastMessage, { transient: this.#lastUpdateTransient });
 	}
 
 	/**
@@ -557,7 +557,9 @@ export class AssistantMessageComponent extends Container {
 	}
 
 	setProseOnlyThinking(proseOnly: boolean): void {
+		if (this.#proseOnlyThinking === proseOnly) return;
 		this.#proseOnlyThinking = proseOnly;
+		if (this.#lastMessage) this.updateContent(this.#lastMessage, { transient: this.#lastUpdateTransient });
 	}
 
 	override dispose(): void {
@@ -1234,10 +1236,12 @@ export class AssistantMessageComponent extends Container {
 		this.#stableReplayRenderer = undefined;
 	}
 
-	/** Render completed prose rather than an earlier thinking row under emergency viewport pressure. */
-	renderTranscriptBlockEmergencyRow(width: number): string | undefined {
-		if (!this.#transcriptBlockFinalized) return undefined;
-		return this.#emergencyText?.render(width)[0];
+	/** Keep the newest finalized rows reachable under emergency viewport pressure. */
+	renderTranscriptBlockEmergencyRows(width: number, maxRows: number): readonly string[] {
+		const count = Math.max(0, Math.trunc(maxRows));
+		if (!this.#transcriptBlockFinalized || count === 0) return EMPTY_STABLE_RENDER;
+		const rows = this.render(width);
+		return rows.slice(-count);
 	}
 
 	getTranscriptBlockVersion(): number {
@@ -1572,8 +1576,6 @@ export class AssistantMessageComponent extends Container {
 
 		// Clear content container
 		this.#contentContainer.clear();
-		this.#thinkingExtensions.clear();
-		this.#emergencyText = undefined;
 		this.#thinkingDots = undefined;
 		this.#hasTruncatableError = false;
 
@@ -1603,7 +1605,6 @@ export class AssistantMessageComponent extends Container {
 				const mdOptions = this.#textColorTransform ? { color: this.#textColorTransform } : undefined;
 				const md = new Markdown(trimmed, 1, 0, this.#getProseTheme(), mdOptions, 0);
 				this.#contentContainer.addChild(md);
-				this.#emergencyText = md;
 				captureItems?.push({ md, contentIndex: i, blockType: "text", lastText: trimmed });
 				hasRenderedContent = true;
 			} else if (content.type === "thinking") {

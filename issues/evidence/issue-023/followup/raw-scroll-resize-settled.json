@@ -1,0 +1,56 @@
+{
+  "name": "raw-scroll-resize",
+  "stage": "settled",
+  "live": "OLD-LIVE-0\nOLD-LIVE-1\nOLD-LIVE-2\nOLD-LIVE-3\nOLD-LIVE-4\nOLD-LIVE-5\nOLD-LIVE-6\nOLD-LIVE-7\nOLD-LIVE-8\nOLD-LIVE-9\nOLD-LIVE-10\nOLD-LIVE-11\n\n\n\n\n\n\n\n",
+  "full": "OLD-LIVE-0\nOLD-LIVE-1\nOLD-LIVE-2\nOLD-LIVE-3\nOLD-LIVE-4\nOLD-LIVE-5\nOLD-LIVE-6\nOLD-LIVE-7\nOLD-LIVE-8\nOLD-LIVE-9\nOLD-LIVE-10\nOLD-LIVE-11\n\n\n\n\n\n\n\n",
+  "historySize": 0,
+  "history": "",
+  "paint": {
+    "t": 1790719665441,
+    "kind": "paint",
+    "stage": "initial",
+    "paint": 3,
+    "history": [],
+    "viewport": [
+      "OLD-LIVE-0",
+      "OLD-LIVE-1",
+      "OLD-LIVE-2",
+      "OLD-LIVE-3",
+      "OLD-LIVE-4",
+      "OLD-LIVE-5",
+      "OLD-LIVE-6",
+      "OLD-LIVE-7",
+      "OLD-LIVE-8",
+      "OLD-LIVE-9",
+      "OLD-LIVE-10",
+      "OLD-LIVE-11"
+    ],
+    "reset": false,
+    "alt": false,
+    "columns": 79,
+    "rows": 19,
+    "debug": {
+      "lines": [
+        "OLD-LIVE-0",
+        "OLD-LIVE-1",
+        "OLD-LIVE-2",
+        "OLD-LIVE-3",
+        "OLD-LIVE-4",
+        "OLD-LIVE-5",
+        "OLD-LIVE-6",
+        "OLD-LIVE-7",
+        "OLD-LIVE-8",
+        "OLD-LIVE-9",
+        "OLD-LIVE-10",
+        "OLD-LIVE-11"
+      ],
+      "windowTop": 0,
+      "altScreen": false,
+      "cursor": {
+        "x": 11,
+        "y": 11,
+        "visible": true
+      }
+    }
+  }
+}

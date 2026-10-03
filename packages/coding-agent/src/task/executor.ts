@@ -53,7 +53,6 @@ import type { MCPManager } from "../mcp/manager";
 import type { MnemopiSessionState } from "../mnemopi/state";
 import { initializeExtensions } from "../modes/runtime-init";
 import subagentAsyncPendingTemplate from "../prompts/system/subagent-async-pending.md" with { type: "text" };
-import subagentSystemPromptTemplate from "../prompts/system/subagent-system-prompt.md" with { type: "text" };
 import submitReminderTemplate from "../prompts/system/subagent-yield-reminder.md" with { type: "text" };
 import { AgentLifecycleManager, type AgentReviver } from "../registry/agent-lifecycle";
 import { AgentRegistry, MAIN_AGENT_ID } from "../registry/agent-registry";
@@ -78,8 +77,7 @@ import {
 	resolveTaskEffortLevel,
 	type TaskEffort,
 } from "@oh-my-pi/pi-tui/thinking";
-import type { ContextFileEntry, ToolSession } from "../tools";
-import { resolveEvalBackends } from "../tools/eval-backends";
+import type { ContextFileEntry } from "../tools";
 import { isIrcEnabled } from "../irc/messaging";
 import { LIST_STATUS_ORDER } from "@oh-my-pi/pi-tui/tools/irc";
 import { DEFAULT_PEER_ROSTER_LIMIT } from "@oh-my-pi/pi-tui/tools/irc";
@@ -97,6 +95,12 @@ import { generateTaskLabel } from "./label";
 import { resolveAgentPrewalkDefault } from "./prewalk";
 import { isReadOnlyAgent } from "./read-only-policy";
 import { formatTaskResultSummary } from "./result-summary";
+import { resolveSubagentCapabilities } from "./subagent-runtime-config";
+import {
+	createSubagentSystemPromptTransform,
+	type ResolvedSubagentSystemPrompt,
+	resolveSubagentSystemPrompt,
+} from "./subagent-system-prompt";
 import { subprocessToolRegistry } from "./subprocess-tool-registry";
 import type { WorkPoolYieldItem } from "./workpool-yield";
 import {
@@ -126,7 +130,6 @@ import {
 	cfgTaskSoftRequestBudget,
 	cfgTaskAgentIdleTtlMs,
 	cfgTaskMaxRuntimeMs,
-	cfgTaskMaxRecursionDepth,
 	cfgTaskAgentAdvisor,
 } from "./settings";
 import {
@@ -335,7 +338,6 @@ export interface IrcPeerRosterData {
 	/** Live rows dropped by the bound; the prompt reports them truthfully. */
 	omittedCount: number;
 }
-
 export function collectIrcPeerRoster(
 	registry: AgentRegistry,
 	selfId: string,
@@ -1073,7 +1075,6 @@ export function createSubagentSettings(
 	subagentSettings[kRootCompactionThresholds] = rootThresholds;
 	return subagentSettings;
 }
-
 export type AbortReason = "signal" | "shutdown" | "terminate" | "timeout" | "budget";
 
 const MAX_YIELD_TOOL_ERRORS = 6;
@@ -3521,6 +3522,7 @@ interface SubagentPromptInputs {
 	ircEnabled: boolean;
 	/** Root resolved by the latest roster ensure; peer rows render scoped to it, so a session switch hides stale parked trees. */
 	ircRoot: { sessionFile?: string };
+	sources: ResolvedSubagentSystemPrompt;
 }
 
 /**
@@ -3535,6 +3537,8 @@ interface SubagentSessionSpec {
 		| "sessionManager"
 		| "expectedAgentRef"
 		| "systemPrompt"
+		| "systemPromptTemplate"
+		| "systemPromptTransform"
 		| "resolveServiceTierByFamily"
 		| "onFirstChatDispatch"
 	>;
@@ -3563,35 +3567,26 @@ function buildSubagentSessionOptions(
 		expectedAgentRef,
 		resolveServiceTierByFamily: launch?.resolveServiceTierByFamily,
 		onFirstChatDispatch: launch?.onFirstChatDispatch,
-		systemPrompt: defaultPrompt => {
-			const ircRoster = inputs.ircEnabled
-				? collectIrcPeerRoster(AgentRegistry.global(), inputs.id, inputs.ircRoot.sessionFile)
-				: undefined;
-			const subagentPrompt = prompt.render(subagentSystemPromptTemplate, {
-				agent: inputs.agentSystemPrompt,
-				context: inputs.context,
-				planReference: inputs.planReference,
-				planReferencePath: inputs.planReferencePath,
-				worktree: inputs.worktree,
-				outputSchema: inputs.outputSchema,
-				outputSchemaOverridesAgent: inputs.outputSchemaOverridesAgent,
-				// Read the live item set through the registry instead of capturing the session, which
-				// would pin its whole graph past park. A revive builds while the registry session is
-				// null, so it renders the cleared set rather than the launch-time pooled instructions.
-				workPoolYieldItems:
-					AgentRegistry.global().get(inputs.id)?.session?.getWorkPoolYieldItems?.() ??
-					launch?.workPoolYieldItems ??
-					[],
-				ircPeers: ircRoster?.peers ?? [],
-				ircParkedCount: ircRoster?.parkedCount ?? 0,
-				ircOmittedCount: ircRoster?.omittedCount ?? 0,
-				ircSelfId: inputs.ircEnabled ? inputs.id : "",
-			});
-			// Per-spawn text (context, worktree, IRC roster) goes after the trailing
-			// `<project-context>` block so spawns of the same agent share the static
-			// prompt prefix as a cache hit.
-			return [...defaultPrompt, subagentPrompt];
-		},
+		systemPromptTemplate: inputs.sources.systemPromptTemplate,
+		systemPromptTransform: createSubagentSystemPromptTransform(inputs.sources, {
+			agent: inputs.agentSystemPrompt,
+			context: inputs.context,
+			planReference: { path: inputs.planReferencePath, content: inputs.planReference },
+			worktree: inputs.worktree,
+			outputSchema: inputs.outputSchema,
+			outputSchemaOverridesAgent: inputs.outputSchemaOverridesAgent,
+			// Read the live item set through the registry instead of capturing the session, which
+			// would pin its whole graph past park. A revive builds while the registry session is
+			// null, so it renders the cleared set rather than the launch-time pooled instructions.
+			workPoolYieldItems: () =>
+				AgentRegistry.global().get(inputs.id)?.session?.getWorkPoolYieldItems?.() ??
+				launch?.workPoolYieldItems ??
+				[],
+			ircRoster: inputs.ircEnabled
+				? () => collectIrcPeerRoster(AgentRegistry.global(), inputs.id, inputs.ircRoot.sessionFile)
+				: undefined,
+			ircSelfId: inputs.ircEnabled ? inputs.id : "",
+		}),
 	};
 }
 
@@ -3779,65 +3774,28 @@ export async function runSubprocess(options: ExecutorOptions): Promise<SingleRes
 		},
 		options.parentServiceTier,
 	);
-	const maxRecursionDepth = cfgTaskMaxRecursionDepth.get(settings);
 	const maxRuntimeMs = Math.max(0, Math.trunc(Number(options.maxRuntimeMs ?? cfgTaskMaxRuntimeMs.get(settings)) || 0));
+	const {
+		childDepth,
+		toolNames,
+		spawns: spawnsEnv,
+	} = resolveSubagentCapabilities(agent, subagentSettings, {
+		parentDepth: options.taskDepth,
+		restrictToolNames: options.restrictToolNames === true,
+	});
+	// Inbound steering works without messaging; outbound peer coordination requires write.
+	const ircEnabled =
+		options.enableIrc !== false &&
+		isIrcEnabled(subagentSettings, childDepth) &&
+		(toolNames === undefined || toolNames.includes("write"));
+	const modelPatterns = normalizeModelPatterns(modelOverride ?? agent.model);
+	const sessionFile = subtaskSessionFile ?? null;
 	// TTL before an adopted idle subagent is parked by the lifecycle manager.
 	// <= 0 disables parking (the session stays live until process teardown).
 	const agentIdleTtlMs = Math.trunc(Number(cfgTaskAgentIdleTtlMs.get(settings)) || 0);
 	const configuredDefaultBudget = Math.max(0, Math.trunc(Number(cfgTaskSoftRequestBudget.get(settings)) || 0));
 	const softRequestBudget = resolveSoftRequestBudget(agent.name, configuredDefaultBudget);
 	const softRequestBudgetNotice = cfgTaskSoftRequestBudgetNotice.get(settings);
-	const parentDepth = options.taskDepth ?? 0;
-	const childDepth = parentDepth + 1;
-	const atMaxDepth = maxRecursionDepth >= 0 && childDepth >= maxRecursionDepth;
-
-	// Add tools if specified
-	let toolNames: string[] | undefined;
-	if (agent.tools) {
-		toolNames = agent.tools;
-		// Auto-include task tool if spawns defined but task not in tools
-		if (agent.spawns !== undefined && !toolNames.includes("task") && !atMaxDepth) {
-			toolNames = [...toolNames, "task"];
-		}
-	}
-
-	if (atMaxDepth && toolNames?.includes("task")) {
-		toolNames = toolNames.filter(name => name !== "task");
-	}
-	if (toolNames?.includes("exec")) {
-		const backends = resolveEvalBackends({ settings } as ToolSession);
-		const expanded = toolNames.filter(name => name !== "exec");
-		if (backends.python || backends.js) expanded.push("eval");
-		expanded.push("bash");
-		toolNames = Array.from(new Set(expanded));
-	}
-	// Agents that can start background work (`task`, `bash`) need `wait` to block on it;
-	// without it they `sleep`. Runs after `exec` expansion and the max-depth `task` strip.
-	// `createTools` still drops it when no wake source (async/IRC/services) is enabled.
-	// Restricted sessions own their explicit list and are never widened.
-	if (
-		toolNames &&
-		!options.restrictToolNames &&
-		!toolNames.includes("wait") &&
-		(toolNames.includes("task") || toolNames.includes("bash"))
-	) {
-		toolNames = [...toolNames, "wait"];
-	}
-	// Inbound steering works without messaging; outbound peer coordination requires write.
-	const ircEnabled =
-		options.enableIrc !== false &&
-		isIrcEnabled(subagentSettings, childDepth) &&
-		(toolNames === undefined || toolNames.includes("write"));
-
-	const modelPatterns = normalizeModelPatterns(modelOverride ?? agent.model);
-	const sessionFile = subtaskSessionFile ?? null;
-	const spawnsEnv = atMaxDepth
-		? ""
-		: agent.spawns === undefined
-			? ""
-			: agent.spawns === "*"
-				? "*"
-				: agent.spawns.join(",");
 
 	const lspEnabled = enableLsp ?? true;
 	const skipPythonPreflight = Array.isArray(toolNames) && !toolNames.includes("eval");
@@ -4141,7 +4099,6 @@ export async function runSubprocess(options: ExecutorOptions): Promise<SingleRes
 				});
 			}
 
-			const { normalized: normalizedOutputSchema } = normalizeSchema(outputSchema);
 			// Rebuilding an equivalent session from the same JSONL file re-invokes
 			// createAgentSession with this spec (same agent id, tools, model, system
 			// prompt, artifacts dir) — only the SessionManager and settings differ.
@@ -4206,12 +4163,13 @@ export async function runSubprocess(options: ExecutorOptions): Promise<SingleRes
 				},
 				prompt: {
 					id,
+					sources: await resolveSubagentSystemPrompt(effectiveCwd),
 					agentSystemPrompt: agent.systemPrompt,
 					context: options.context?.trim() ?? "",
 					planReference: options.planReference?.content ?? "",
 					planReferencePath: options.planReference?.path ?? "",
 					worktree: worktree ?? "",
-					outputSchema: normalizedOutputSchema,
+					outputSchema,
 					outputSchemaOverridesAgent: options.outputSchemaOverridesAgent === true,
 					ircEnabled,
 					ircRoot: {},

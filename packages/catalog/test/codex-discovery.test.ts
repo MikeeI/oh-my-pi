@@ -13,6 +13,7 @@ import { getSupportedEfforts } from "@oh-my-pi/pi-catalog/model-thinking";
 import { openaiCodexModelManagerOptions } from "@oh-my-pi/pi-catalog/provider-models/special";
 import { modelKind, type ModelSpec } from "@oh-my-pi/pi-catalog/types";
 import { resolveProviderModelReference } from "@oh-my-pi/pi-coding-agent/config/model-resolver";
+import { persistedModelCacheProviderId } from "./model-cache-fixture";
 
 describe("Codex model discovery", () => {
 	it("normalizes optional maximum context windows separately from the default window", async () => {
@@ -323,13 +324,42 @@ describe("Codex model discovery", () => {
 			// Discovery has no rates; the generated KDL policy supplies them
 			// when the discovered spec becomes a usable model.
 			expect(model.cost).toEqual({ input: 0, output: 0, cacheRead: 0, cacheWrite: 0 });
-			expect(buildModel(model).cost).toEqual(
-				model.id.startsWith("gpt-6.1-sol")
-					? { input: 2, output: 10, cacheRead: 0.1, cacheWrite: 0 }
-					: model.id.startsWith("gpt-6-sol")
-						? { input: 2, output: 10, cacheRead: 0.2, cacheWrite: 0 }
-						: { input: 0.1, output: 0.5, cacheRead: 0.01, cacheWrite: 0 },
-			);
+			const builtModel = buildModel(model);
+			if (model.id.startsWith("gpt-6.1-sol")) {
+				expect(builtModel.cost).toEqual({
+					input: 2,
+					output: 10,
+					cacheRead: 0.1,
+					cacheWrite: 0,
+					longContext: { inputThreshold: 272_000, input: 4, output: 15, cacheRead: 0.2, cacheWrite: 0 },
+				});
+				expect(builtModel.serviceTierCost).toEqual({ flex: 0.5, priority: 2 });
+			} else {
+				expect(builtModel.cost).toEqual(
+					model.id.startsWith("gpt-6-sol")
+						? {
+								input: 2,
+								output: 10,
+								cacheRead: 0.2,
+								cacheWrite: 0,
+								longContext: { inputThreshold: 272_000, input: 4, output: 15, cacheRead: 0.4, cacheWrite: 0 },
+							}
+						: {
+								input: 0.1,
+								output: 0.5,
+								cacheRead: 0.01,
+								cacheWrite: 0,
+								longContext: {
+									inputThreshold: 272_000,
+									input: 0.2,
+									output: 0.75,
+									cacheRead: 0.02,
+									cacheWrite: 0,
+								},
+							},
+				);
+				expect(builtModel.serviceTierCost).toEqual({ flex: 0.5, priority: 2.5 });
+			}
 		}
 	});
 
@@ -743,7 +773,9 @@ describe("Codex model discovery", () => {
 			);
 			const db = new Database(dbPath);
 			try {
-				db.run("UPDATE model_cache SET version = 7 WHERE provider_id = ?", ["openai-codex"]);
+				db.run("UPDATE model_cache SET version = 7 WHERE provider_id = ?", [
+					persistedModelCacheProviderId(db, "openai-codex"),
+				]);
 			} finally {
 				db.close();
 			}
@@ -815,7 +847,7 @@ describe("Codex model discovery", () => {
 				const row = inspect
 					.query<{ version: number }, [string]>("SELECT version FROM model_cache WHERE provider_id = ?")
 					.get("openai-codex");
-				expect(row?.version).not.toBe(2);
+				expect(row).toBeNull();
 			} finally {
 				inspect.close();
 			}

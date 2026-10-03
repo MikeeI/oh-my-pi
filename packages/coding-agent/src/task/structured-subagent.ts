@@ -36,6 +36,7 @@ import type { TaskEffort } from "@oh-my-pi/pi-tui/thinking";
 import type { ToolSession } from "../tools";
 import { isIrcEnabled } from "../irc/messaging";
 import { buildOutputValidator } from "../tools/output-schema-validator";
+import { isAgentsContextFile } from "../utils/context-files";
 import { trackLateCleanup } from "../utils/late-cleanup";
 import { type DiscoveryResult, discoverAgents, getAgent } from "./discovery";
 import { type ExecutorOptions, runSubprocess } from "./executor";
@@ -347,7 +348,12 @@ export async function resolveEffectiveSubagentPolicy(
 	assertPlanControlsAllowed(request, planMode);
 	assertDepthAndSpawnAllowed(request, agentName);
 
-	const discovery = await discoverAgents(request.session.cwd, undefined, request.session.effectiveExtensionRoots?.());
+	const discovery = await discoverAgents(
+		request.session.cwd,
+		undefined,
+		request.session.effectiveExtensionRoots?.(),
+		request.session.settings.getAgentDir(),
+	);
 	const agents = [...discovery.agents, ...(request.session.getSessionAgents?.() ?? [])];
 	const agent = getAgent(agents, agentName);
 	if (!agent) {
@@ -661,7 +667,7 @@ function buildExecutorOptions(
 		enableMCP,
 		customTools: request.customTools,
 		workPoolYieldItems: request.workPoolYieldItems,
-		contextFiles: session.contextFiles?.filter(file => path.basename(file.path).toLowerCase() !== "agents.md"),
+		contextFiles: session.contextFiles?.filter(file => !isAgentsContextFile(file)),
 		skills,
 		autoloadSkills,
 		workspaceTree: session.workspaceTree,

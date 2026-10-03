@@ -20,6 +20,7 @@ import { setShimmerMode } from "@oh-my-pi/pi-tui/theme/shimmer";
 import { setAutoThemeMapping, setColorBlindMode, setSymbolPreset } from "@oh-my-pi/pi-tui/theme/theme";
 
 const EMPTY_UNKNOWN_RECORD: Record<string, unknown> = {};
+const DEFAULT_TUI_TEXT_COLORS = false;
 
 // ────────────────────────────────────────────────────────────────────────
 // General settings (no UI)
@@ -422,6 +423,18 @@ export const cfgTuiRenderMermaid = register({
 		group: "Display",
 		label: "Render Mermaid Diagrams",
 		description: "Render Mermaid fenced code blocks as ASCII diagrams",
+	},
+});
+
+export const cfgTuiTextColors = register({
+	id: "tui.textColors",
+	type: "boolean",
+	default: DEFAULT_TUI_TEXT_COLORS,
+	ui: {
+		tab: "appearance",
+		group: "Display",
+		label: "Colored Response Text",
+		description: "Render inline RGB foreground spans and enable color guidance for Main UI sessions. Off by default.",
 	},
 });
 

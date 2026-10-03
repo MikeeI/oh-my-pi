@@ -4,7 +4,7 @@
  * Agents are embedded at build time via Bun's import with { type: "text" }.
  */
 import { Effort } from "@oh-my-pi/pi-ai";
-import { parseFrontmatter, prompt } from "@oh-my-pi/pi-utils";
+import { getAgentDir, parseFrontmatter, prompt } from "@oh-my-pi/pi-utils";
 import { parseAgentFields } from "../discovery/helpers";
 // Embed agent markdown files at build time
 import agentFrontmatterTemplate from "../prompts/agents/frontmatter.md" with { type: "text" };
@@ -12,6 +12,7 @@ import reviewerMd from "../prompts/agents/reviewer.md" with { type: "text" };
 import scoutMd from "../prompts/agents/scout.md" with { type: "text" };
 import securityReviewerMd from "../prompts/agents/security-reviewer.md" with { type: "text" };
 import taskMd from "../prompts/agents/task.md" with { type: "text" };
+import { resolveUserPromptSource } from "../prompts/user-prompt-source";
 import { AUTO_THINKING } from "@oh-my-pi/pi-tui/thinking";
 
 import type { AgentSource } from "@oh-my-pi/pi-tui/tools/task";
@@ -33,12 +34,33 @@ interface EmbeddedAgentDef {
 	fileName: string;
 	frontmatter?: AgentFrontmatter;
 	template: string;
+	templateName?: string;
 }
 
-function buildAgentContent(def: EmbeddedAgentDef): string {
-	const body = prompt.render(def.template);
-	if (!def.frontmatter) return body;
-	return prompt.render(agentFrontmatterTemplate, { ...def.frontmatter, body });
+function buildAgentContent(def: EmbeddedAgentDef, agentDir?: string): { content: string; filePath: string } {
+	const selected = agentDir
+		? resolveUserPromptSource({
+				agentDir,
+				kind: "agent",
+				name: def.templateName ?? def.fileName.slice(0, -3),
+				bundledSource: def.template,
+			})
+		: { source: def.template, filePath: undefined };
+	const body = prompt.render(selected.source);
+	const filePath = selected.filePath ?? `embedded:${def.fileName}`;
+	if (!def.frontmatter) return { content: body, filePath };
+	const frontmatter = agentDir
+		? resolveUserPromptSource({
+				agentDir,
+				kind: "agent",
+				name: "frontmatter",
+				bundledSource: agentFrontmatterTemplate,
+			})
+		: { source: agentFrontmatterTemplate, filePath: undefined };
+	return {
+		content: prompt.render(frontmatter.source, { ...def.frontmatter, body }),
+		filePath: selected.filePath ?? frontmatter.filePath ?? filePath,
+	};
 }
 
 const EMBEDDED_AGENT_DEFS: EmbeddedAgentDef[] = [
@@ -62,6 +84,7 @@ const EMBEDDED_AGENT_DEFS: EmbeddedAgentDef[] = [
 	},
 	{
 		fileName: "sonic.md",
+		templateName: "task",
 		frontmatter: {
 			name: "sonic",
 			description: "Low-reasoning agent for strictly mechanical updates or data collection only",
@@ -126,24 +149,31 @@ export function parseAgent(
 let bundledAgentsCache: AgentDefinition[] | null = null;
 
 /**
- * Load all bundled agents from embedded content.
- * Results are cached after first load.
+ * Load embedded defaults, optionally replacing their sources from a profile.
+ * Only immutable embedded defaults are cached; profile edits are re-read on every discovery.
  */
-export function loadBundledAgents(): AgentDefinition[] {
-	if (bundledAgentsCache !== null) {
+export function loadBundledAgents(agentDir?: string): AgentDefinition[] {
+	if (!agentDir && bundledAgentsCache !== null) {
 		return bundledAgentsCache;
 	}
-	bundledAgentsCache = EMBEDDED_AGENT_DEFS.map(def =>
-		parseAgent(`embedded:${def.fileName}`, buildAgentContent(def), "bundled"),
-	);
-	return bundledAgentsCache;
+	const agents = EMBEDDED_AGENT_DEFS.map(def => {
+		const { content, filePath } = buildAgentContent(def, agentDir);
+		const agent = parseAgent(filePath, content, "bundled");
+		const expectedName = def.frontmatter?.name ?? def.fileName.slice(0, -3);
+		if (agent.name !== expectedName || !agent.systemPrompt.trim()) {
+			throw new AgentParsingError(new Error(`Expected non-empty agent ${expectedName}: ${filePath}`), filePath);
+		}
+		return agent;
+	});
+	if (!agentDir) bundledAgentsCache = agents;
+	return agents;
 }
 
 /**
- * Get a bundled agent by name.
+ * Get a built-in agent with the active profile's prompt overrides.
  */
 export function getBundledAgent(name: string): AgentDefinition | undefined {
-	return loadBundledAgents().find(a => a.name === name);
+	return loadBundledAgents(getAgentDir()).find(a => a.name === name);
 }
 
 /**

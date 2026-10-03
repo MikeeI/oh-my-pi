@@ -63,7 +63,7 @@ export function createAgentsHubDeps(
 	return {
 		browserSource: createModelBrowserSource(settings),
 		loadAgents: async () => {
-			const { agents } = await discoverAgents(cwd, undefined, extensionRoots());
+			const { agents } = await discoverAgents(cwd, undefined, extensionRoots(), settings.getAgentDir());
 			const disabled = new Set(cfgTaskDisabledAgents.get(settings));
 			const overrides = cfgTaskAgentModelOverrides.get(settings);
 			const prewalkOverrides = cfgTaskAgentPrewalk.get(settings);
@@ -197,7 +197,7 @@ export function createAgentsHubDeps(
 			}
 			const frontmatter = YAML.stringify({ name: spec.identifier, description: spec.whenToUse }, null, 2).trimEnd();
 			await Bun.write(filePath, `---\n${frontmatter}\n---\n\n${spec.systemPrompt.trim()}\n`);
-			await refreshAgentDiscovery(cwd, extensionRoots());
+			await refreshAgentDiscovery(cwd, extensionRoots(), settings.getAgentDir());
 			return filePath;
 		},
 	};

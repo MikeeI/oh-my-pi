@@ -23,6 +23,7 @@ import { ProviderDiscoverySchema } from "@oh-my-pi/pi-coding-agent/config/models
 import { resetSettingsForTest } from "@oh-my-pi/pi-coding-agent/config/settings";
 import { AuthStorage } from "@oh-my-pi/pi-coding-agent/session/auth-storage";
 import { removeSyncWithRetries, Snowflake } from "@oh-my-pi/pi-utils";
+import { persistedModelCacheProviderId } from "../../catalog/test/model-cache-fixture";
 
 describe("ModelRegistry runtime discovery", () => {
 	let tempDir: string;
@@ -3506,7 +3507,9 @@ describe("ModelRegistry runtime discovery", () => {
 		const cacheProviderId = resolveModelCacheProviderId("github-copilot", { apiKey: "ghp_test_token" });
 		writeModelCache(cacheProviderId, Date.now(), [cachedVariant], true, "", cacheDbPath);
 		const db = new Database(cacheDbPath);
-		db.run("UPDATE model_cache SET header_restore_version = 0 WHERE provider_id = ?", [cacheProviderId]);
+		db.run("UPDATE model_cache SET header_restore_version = 0 WHERE provider_id = ?", [
+			persistedModelCacheProviderId(db, cacheProviderId),
+		]);
 		db.close();
 
 		const registry = new ModelRegistry(authStorage, modelsJsonPath);

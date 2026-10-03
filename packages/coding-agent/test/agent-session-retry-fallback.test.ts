@@ -22,6 +22,7 @@ import { AssistantMessageEventStream } from "@oh-my-pi/pi-ai/utils/event-stream"
 import { buildModel } from "@oh-my-pi/pi-catalog/build";
 import { writeModelCache } from "@oh-my-pi/pi-catalog/model-cache";
 import { getBundledModel } from "@oh-my-pi/pi-catalog/models";
+import { resolveModelCacheProviderId } from "@oh-my-pi/pi-catalog/provider-models";
 import { ModelRegistry } from "@oh-my-pi/pi-coding-agent/config/model-registry";
 import { parseModelString } from "@oh-my-pi/pi-tui/overlays/model-selector";
 import { parseModelPattern } from "@oh-my-pi/pi-coding-agent/config/model-resolver";
@@ -5670,6 +5671,128 @@ describe("AgentSession retry fallback", () => {
 		expect(session.configWarnings).not.toContain(
 			"Fallback chain for role 'default' references unknown model: ollama-cloud/deepseek-v4-pro",
 		);
+	});
+
+	it("never flashes web fallback warnings for a partial Codex cache and reports unresolved entries after discovery", async () => {
+		const primaryModel = getBundledModel("openai", "gpt-4o-mini");
+		const cachedModel = getBundledModel("openai-codex", "gpt-6-luna");
+		if (!primaryModel || !cachedModel) throw new Error("Expected bundled fallback test models");
+		const cacheProviderId = resolveModelCacheProviderId("openai-codex");
+		const cacheDbPath = path.join(tempDir.path(), "partial-codex-models.db");
+		const discoveredModel = buildModel({
+			...cachedModel,
+			id: "discovered-web-fallback",
+			name: "Discovered Web Fallback",
+		});
+		const validSelector = `${discoveredModel.provider}/${discoveredModel.id}`;
+		const missingSelector = "openai-codex/missing-web-fallback";
+		const wrongKindModel = buildModel({
+			...cachedModel,
+			id: "image-only-fallback",
+			name: "Image-only Fallback",
+			kind: "image",
+		});
+		const wrongKindSelector = `${wrongKindModel.provider}/${wrongKindModel.id}`;
+		writeModelCache(cacheProviderId, Date.now(), [cachedModel, wrongKindModel], true, "", cacheDbPath);
+		const registry = new ModelRegistry(authStorage, path.join(tempDir.path(), "partial-codex-models.yml"), {
+			cacheDbPath,
+		});
+		const settings = Settings.isolated({
+			"compaction.enabled": false,
+			"retry.fallbackChains": { web: [validSelector, missingSelector, wrongKindSelector] },
+		});
+		const agent = new Agent({
+			initialState: { model: primaryModel, systemPrompt: ["Test"], tools: [], messages: [] },
+			streamFn: () => {
+				throw new Error("Not exercised");
+			},
+		});
+		session = new AgentSession({
+			agent,
+			sessionManager: SessionManager.inMemory(),
+			settings,
+			modelRegistry: registry,
+			deferRetryFallbackValidation: true,
+		});
+		const warningSnapshots: string[][] = [];
+		session.subscribe(event => {
+			if (event.type === "config_warnings_changed") warningSnapshots.push([...session!.configWarnings]);
+		});
+		session.validateRetryFallbackChains();
+		expect(session.configWarnings.some(warning => warning.includes(validSelector))).toBe(false);
+		expect(session.configWarnings.some(warning => warning.includes(missingSelector))).toBe(false);
+		expect(session.configWarnings.some(warning => warning.includes(wrongKindSelector))).toBe(true);
+
+		// Use the real initial-refresh barrier and offline cache reload so no
+		// provider request or global fetch mutation is needed to control ordering.
+		writeModelCache(
+			cacheProviderId,
+			Date.now(),
+			[cachedModel, wrongKindModel, discoveredModel],
+			true,
+			"",
+			cacheDbPath,
+		);
+		const { promise: warningsChanged, resolve: resolveWarningsChanged } = Promise.withResolvers<void>();
+		const unsubscribe = session.subscribe(event => {
+			if (event.type === "config_warnings_changed") resolveWarningsChanged();
+		});
+		try {
+			registry.refreshInBackground("offline");
+			await registry.awaitInitialBackgroundRefresh();
+			await warningsChanged;
+			expect(session.configWarnings.some(warning => warning.includes(missingSelector))).toBe(true);
+			expect(session.configWarnings.some(warning => warning.includes(wrongKindSelector))).toBe(true);
+			expect(warningSnapshots.some(warnings => warnings.some(warning => warning.includes(validSelector)))).toBe(
+				false,
+			);
+		} finally {
+			unsubscribe();
+		}
+	});
+
+	it("reports unresolved fallback entries when initial background discovery fails", async () => {
+		const primaryModel = getBundledModel("openai", "gpt-4o-mini");
+		const cachedModel = getBundledModel("openai-codex", "gpt-6-luna");
+		if (!primaryModel || !cachedModel) throw new Error("Expected bundled fallback test models");
+		const cacheDbPath = path.join(tempDir.path(), "failed-codex-models.db");
+		writeModelCache(resolveModelCacheProviderId("openai-codex"), Date.now(), [cachedModel], true, "", cacheDbPath);
+		const registry = new ModelRegistry(authStorage, path.join(tempDir.path(), "failed-codex-models.yml"), {
+			cacheDbPath,
+		});
+		const selector = "openai-codex/missing-after-refresh-error";
+		const settings = Settings.isolated({
+			"compaction.enabled": false,
+			"retry.fallbackChains": { web: [selector] },
+		});
+		session = new AgentSession({
+			agent: new Agent({
+				initialState: { model: primaryModel, systemPrompt: ["Test"], tools: [], messages: [] },
+				streamFn: () => {
+					throw new Error("Not exercised");
+				},
+			}),
+			sessionManager: SessionManager.inMemory(),
+			settings,
+			modelRegistry: registry,
+		});
+		expect(session.configWarnings.some(warning => warning.includes(selector))).toBe(false);
+
+		// A failed refresh must release startup suppression rather than hiding
+		// a bad selector indefinitely; the background owner catches this error.
+		vi.spyOn(registry, "refresh").mockRejectedValue(new Error("Discovery unavailable"));
+		const { promise: warningsChanged, resolve: resolveWarningsChanged } = Promise.withResolvers<void>();
+		const unsubscribe = session.subscribe(event => {
+			if (event.type === "config_warnings_changed") resolveWarningsChanged();
+		});
+		try {
+			registry.refreshInBackground();
+			await registry.awaitInitialBackgroundRefresh();
+			await warningsChanged;
+			expect(session.configWarnings.filter(warning => warning.includes(selector))).toHaveLength(1);
+		} finally {
+			unsubscribe();
+		}
 	});
 
 	it("suppresses unknown-model warnings for a config-declared discovery provider with a cold cache", async () => {

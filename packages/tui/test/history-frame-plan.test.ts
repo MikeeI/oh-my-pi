@@ -8,6 +8,7 @@ import {
 	TUI,
 	type ViewportSize,
 } from "@oh-my-pi/pi-tui";
+import { TranscriptContainer } from "@oh-my-pi/pi-tui/chrome/transcript-container";
 import { VirtualRenderScheduler } from "./virtual-render-scheduler";
 import { VirtualTerminal } from "./virtual-terminal";
 import { WidthReplayProvider } from "./width-replay-provider";
@@ -185,18 +186,28 @@ class ConptyPendingWrapTerminal extends VirtualTerminal {
 
 describe("terminal frame plans", () => {
 	withoutTerminalMultiplexer();
-	it("appends finalized history once and leaves the requested mutable viewport intact", () => {
-		const terminal = new VirtualTerminal(20, 3);
-		const provider = new Provider({
-			history: { id: 1, rows: ["history one", "history two"] },
-			viewport: ["editor", "status"],
-		});
+	it("appends finalized Q rows without blank-first loss and preserves the mutable viewport", () => {
+		const terminal = new CountingTerminal(20, 4);
+		const provider = new Provider({ viewport: ["editor", "status"] });
 		const tui = new TUI(terminal, undefined, { renderScheduler: scheduler });
 		tui.setFrameProvider(provider);
+		terminal.writes.length = 0;
 
+		provider.plan = {
+			history: { id: 1, rows: ["Q1", "Q2", "Q3", "Q4"] },
+			viewport: ["editor", "status"],
+		};
+		tui.requestRender(true);
+
+		expect(terminal.writes.filter(write => write.includes("Q1"))).toHaveLength(1);
 		expect(provider.acknowledged).toEqual([1]);
-		expect(terminal.getBufferPosition().baseY).toBe(1);
-		expect(terminal.getViewport().map(row => row.trimEnd())).toEqual(["history two", "editor", "status"]);
+		expect(plainBuffer(terminal).filter(Boolean)).toEqual(["Q1", "Q2", "Q3", "Q4", "editor", "status"]);
+		expect(
+			terminal
+				.getViewport()
+				.map(row => row.trimEnd())
+				.slice(-2),
+		).toEqual(["editor", "status"]);
 		tui.stop();
 	});
 	it("keeps an exact-width live row out of scrollback when ConPTY materializes pending wrap", () => {
@@ -225,11 +236,12 @@ describe("terminal frame plans", () => {
 
 		// Every row moved, so each is reused by content rather than position.
 		terminal.writes.length = 0;
-		provider.plan = { viewport: [`ed${CURSOR_MARKER}it`, "status", "alpha"] };
+		provider.plan = { viewport: ["status", "alpha", `ed${CURSOR_MARKER}it`] };
 		tui.requestRender(true);
 		let written = terminal.writes.join("");
 		expect(written).not.toContain(CURSOR_MARKER);
-		expect(written).toContain("\x1b[1;3H\x1b[?25h");
+		expect(terminal.getCursor()).toEqual({ row: 2, col: 2 });
+		expect(written).toContain("\x1b[?25h");
 
 		// The marker-free row now matches the stripped row painted last frame.
 		terminal.writes.length = 0;
@@ -240,6 +252,8 @@ describe("terminal frame plans", () => {
 		expect(written).toContain("\x1b[?25l");
 		expect(terminal.getViewport().map(row => row.trimEnd())).toEqual(["status", "alpha", "edit", ""]);
 		tui.stop();
+		terminal.write("SHELL");
+		expect(terminal.getViewport().map(row => row.trimEnd())).toEqual(["status", "alpha", "edit", "SHELL"]);
 	});
 	it("keeps live viewport rows out of tmux-style preserved-clear scrollback on a scrolling append", () => {
 		// Viewport at row 0 fills the screen: the protective erase is emitted
@@ -296,6 +310,34 @@ describe("terminal frame plans", () => {
 			"live",
 			"editor",
 		]);
+		tui.stop();
+	});
+	it("replays accepted history only once when a paint listener resets an outstanding offer", () => {
+		const terminal = new CountingTerminal(20, 4);
+		const transcript = new TranscriptContainer();
+		const provider: TerminalFrameProvider = {
+			renderFrame: ({ columns }) => ({
+				history: transcript.peekFinalizedBatch(columns, 0),
+				viewport: ["editor"],
+			}),
+			beginHistoryReplay: () => transcript.beginReplay(),
+			acknowledgeHistory: id => transcript.acknowledgeFinalizedBatch(id),
+		};
+		const tui = new TUI(terminal, undefined, { renderScheduler: scheduler });
+		tui.setFrameProvider(provider);
+		const finalizedBlock = { isTranscriptBlockFinalized: () => true, render: () => ["history"] };
+		transcript.addChild(finalizedBlock);
+		let reset = false;
+		tui.addPaintListener(paint => {
+			if (reset || paint.history.length === 0) return;
+			reset = true;
+			tui.resetDisplay();
+		});
+
+		tui.requestRender(true);
+
+		expect(reset).toBe(true);
+		expect(plainBuffer(terminal).filter(row => row === "history")).toHaveLength(1);
 		tui.stop();
 	});
 

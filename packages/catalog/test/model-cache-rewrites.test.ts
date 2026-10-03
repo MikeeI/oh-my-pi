@@ -10,6 +10,7 @@ import { type GeneratedProvider, getBundledModels, getBundledProviders } from "@
 import { modelsDevCatalogFallback } from "@oh-my-pi/pi-catalog/provider-models/openai-compat";
 import type { FetchImpl, Model, ModelSpec } from "@oh-my-pi/pi-catalog/types";
 import { removeWithRetries } from "../../utils/src/temp";
+import { persistedModelCacheProviderId } from "./model-cache-fixture";
 
 const TTL_MS = 24 * 60 * 60 * 1000;
 
@@ -43,7 +44,7 @@ function payloadRow(dbPath: string, providerId: string): PayloadRow | null {
 	try {
 		return db
 			.query<PayloadRow, [string]>("SELECT updated_at, authoritative, models FROM model_cache WHERE provider_id = ?")
-			.get(providerId);
+			.get(persistedModelCacheProviderId(db, providerId));
 	} finally {
 		db.close();
 	}
@@ -122,13 +123,91 @@ describe("model cache write churn", () => {
 	it("ignores a side row left behind by a payload another writer replaced", () => {
 		writeModelCache("rewrite-test", 1_000, [model("a")], true, "fp", dbPath);
 		writeModelCache("rewrite-test", 5_000, [model("a")], true, "fp", dbPath);
-		// Simulate an older binary rewriting the payload without knowing the side table.
+		// A compatible writer can replace the payload without updating its side row.
 		const db = new Database(dbPath);
-		db.run("UPDATE model_cache SET updated_at = 3000, authoritative = 0 WHERE provider_id = 'rewrite-test'");
+		db.run("UPDATE model_cache SET updated_at = 3000, authoritative = 0 WHERE provider_id = ?", [
+			persistedModelCacheProviderId(db, "rewrite-test"),
+		]);
 		db.close();
 		const entry = readModelCache("rewrite-test", TTL_MS, () => 3_000, dbPath);
 		expect(entry?.updatedAt).toBe(3_000);
 		expect(entry?.authoritative).toBe(false);
+	});
+
+	it("isolates payload and freshness from old and incompatible materialization writers", () => {
+		writeModelCache("rewrite-test", 1_000, [model("a")], true, "fp", dbPath);
+		writeModelCache("rewrite-test", 5_000, [model("a")], true, "fp", dbPath);
+		readModelCache("rewrite-test", TTL_MS, () => 6_000, dbPath);
+		const db = new Database(dbPath);
+		try {
+			const current = db
+				.query<{ provider_id: string; materialization_policy: string }, []>(
+					"SELECT provider_id, materialization_policy FROM model_cache",
+				)
+				.get();
+			if (!current) throw new Error("Missing current cache fixture");
+			const foreignPolicy = "incompatible-materialization-policy";
+			const foreignId = current.provider_id.replace(current.materialization_policy, foreignPolicy);
+			const writers: [string, string][] = [
+				[foreignId, foreignPolicy],
+				["rewrite-test", "legacy-materialization-policy"],
+			];
+			for (const [providerId, policy] of writers) {
+				// Clone a valid payload but give both foreign freshness rows the
+				// same payload timestamp, exposing incorrectly shared side-row keys.
+				db.run(
+					`INSERT OR REPLACE INTO model_cache (
+						provider_id, version, materialization_policy, updated_at, authoritative,
+						static_fingerprint, header_omitted_model_ids, unrestorable_header_model_ids,
+						header_restore_version, models
+					) SELECT ?, version, ?, updated_at, authoritative, static_fingerprint,
+						header_omitted_model_ids, unrestorable_header_model_ids, header_restore_version, models
+					FROM model_cache WHERE provider_id = ?`,
+					[providerId, policy, current.provider_id],
+				);
+				db.run(
+					`INSERT OR REPLACE INTO model_cache_refresh
+						(provider_id, payload_updated_at, updated_at, authoritative) VALUES (?, 1000, 9000, 0)`,
+					[providerId],
+				);
+			}
+			const otherRows = () => ({
+				payloads: db
+					.query<Record<string, string | number>, [string, string]>(
+						"SELECT * FROM model_cache WHERE provider_id IN (?, ?) ORDER BY provider_id",
+					)
+					.all(foreignId, "rewrite-test"),
+				refreshes: db
+					.query<Record<string, string | number>, [string, string]>(
+						"SELECT * FROM model_cache_refresh WHERE provider_id IN (?, ?) ORDER BY provider_id",
+					)
+					.all(foreignId, "rewrite-test"),
+			});
+			const foreignRows = otherRows();
+			expect(readModelCache("rewrite-test", TTL_MS, () => 6_000, dbPath)).toMatchObject({
+				models: [{ id: "a" }],
+				updatedAt: 5_000,
+				authoritative: true,
+				fresh: true,
+			});
+
+			const before = getModelCacheWriteStats();
+			writeModelCache("rewrite-test", 6_000, [model("a")], true, "fp", dbPath);
+			expect(getModelCacheWriteStats().payloadWrites).toBe(before.payloadWrites);
+			expect(getModelCacheWriteStats().refreshWrites).toBe(before.refreshWrites + 1);
+			expect(readModelCache("rewrite-test", TTL_MS, () => 6_000, dbPath)?.updatedAt).toBe(6_000);
+			expect(otherRows()).toEqual(foreignRows);
+
+			writeModelCache("rewrite-test", 7_000, [model("a"), model("c")], false, "fp", dbPath);
+			expect(readModelCache("rewrite-test", TTL_MS, () => 7_000, dbPath)).toMatchObject({
+				models: [{ id: "a" }, { id: "c" }],
+				updatedAt: 7_000,
+				authoritative: false,
+			});
+			expect(otherRows()).toEqual(foreignRows);
+		} finally {
+			db.close();
+		}
 	});
 
 	it("does not re-persist an unchanged snapshot while discovery keeps failing", async () => {

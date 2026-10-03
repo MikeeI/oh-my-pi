@@ -1,0 +1,6695 @@
+{
+  "socket": "issue-023-followup-827750",
+  "commands": [
+    {
+      "args": [
+        "new-session",
+        "-d",
+        "-x",
+        "79",
+        "-y",
+        "39",
+        "-s",
+        "tool-control",
+        "AUDIT_LOG='/root/projects/project-oh-my-pi-fork/issues/evidence/issue-023/verified-fix/tool-control.jsonl' AUDIT_SCENARIO='tool' '/root/.bun/bin/bun' '/root/projects/project-oh-my-pi-fork/issues/evidence/issue-023/followup-driver.ts'"
+      ],
+      "at": 1790723803240
+    },
+    {
+      "args": [
+        "set-option",
+        "-w",
+        "-t",
+        "tool-control",
+        "remain-on-exit",
+        "on"
+      ],
+      "at": 1790723803249
+    },
+    {
+      "args": [
+        "display-message",
+        "-p",
+        "-t",
+        "tool-control",
+        "#{pane_dead}|#{pane_title}"
+      ],
+      "at": 1790723803252
+    },
+    {
+      "args": [
+        "display-message",
+        "-p",
+        "-t",
+        "tool-control",
+        "#{pane_dead}|#{pane_title}"
+      ],
+      "at": 1790723803274
+    },
+    {
+      "args": [
+        "display-message",
+        "-p",
+        "-t",
+        "tool-control",
+        "#{pane_dead}|#{pane_title}"
+      ],
+      "at": 1790723803297
+    },
+    {
+      "args": [
+        "display-message",
+        "-p",
+        "-t",
+        "tool-control",
+        "#{pane_dead}|#{pane_title}"
+      ],
+      "at": 1790723803321
+    },
+    {
+      "args": [
+        "display-message",
+        "-p",
+        "-t",
+        "tool-control",
+        "#{pane_dead}|#{pane_title}"
+      ],
+      "at": 1790723803346
+    },
+    {
+      "args": [
+        "display-message",
+        "-p",
+        "-t",
+        "tool-control",
+        "#{pane_dead}|#{pane_title}"
+      ],
+      "at": 1790723803370
+    },
+    {
+      "args": [
+        "display-message",
+        "-p",
+        "-t",
+        "tool-control",
+        "#{pane_dead}|#{pane_title}"
+      ],
+      "at": 1790723803396
+    },
+    {
+      "args": [
+        "display-message",
+        "-p",
+        "-t",
+        "tool-control",
+        "#{pane_dead}|#{pane_title}"
+      ],
+      "at": 1790723803422
+    },
+    {
+      "args": [
+        "display-message",
+        "-p",
+        "-t",
+        "tool-control",
+        "#{pane_dead}|#{pane_title}"
+      ],
+      "at": 1790723803447
+    },
+    {
+      "args": [
+        "display-message",
+        "-p",
+        "-t",
+        "tool-control",
+        "#{pane_dead}|#{pane_title}"
+      ],
+      "at": 1790723803474
+    },
+    {
+      "args": [
+        "display-message",
+        "-p",
+        "-t",
+        "tool-control",
+        "#{pane_dead}|#{pane_title}"
+      ],
+      "at": 1790723803500
+    },
+    {
+      "args": [
+        "display-message",
+        "-p",
+        "-t",
+        "tool-control",
+        "#{pane_dead}|#{pane_title}"
+      ],
+      "at": 1790723803527
+    },
+    {
+      "args": [
+        "display-message",
+        "-p",
+        "-t",
+        "tool-control",
+        "#{pane_dead}|#{pane_title}"
+      ],
+      "at": 1790723803551
+    },
+    {
+      "args": [
+        "display-message",
+        "-p",
+        "-t",
+        "tool-control",
+        "#{pane_dead}|#{pane_title}"
+      ],
+      "at": 1790723803575
+    },
+    {
+      "args": [
+        "display-message",
+        "-p",
+        "-t",
+        "tool-control",
+        "#{pane_dead}|#{pane_title}"
+      ],
+      "at": 1790723803600
+    },
+    {
+      "args": [
+        "display-message",
+        "-p",
+        "-t",
+        "tool-control",
+        "#{pane_dead}|#{pane_title}"
+      ],
+      "at": 1790723803624
+    },
+    {
+      "args": [
+        "display-message",
+        "-p",
+        "-t",
+        "tool-control",
+        "#{pane_dead}|#{pane_title}"
+      ],
+      "at": 1790723803654
+    },
+    {
+      "args": [
+        "display-message",
+        "-p",
+        "-t",
+        "tool-control",
+        "#{pane_dead}|#{pane_title}"
+      ],
+      "at": 1790723803680
+    },
+    {
+      "args": [
+        "display-message",
+        "-p",
+        "-t",
+        "tool-control",
+        "#{pane_dead}|#{pane_title}"
+      ],
+      "at": 1790723803706
+    },
+    {
+      "args": [
+        "display-message",
+        "-p",
+        "-t",
+        "tool-control",
+        "#{pane_dead}|#{pane_title}"
+      ],
+      "at": 1790723803732
+    },
+    {
+      "args": [
+        "display-message",
+        "-p",
+        "-t",
+        "tool-control",
+        "#{pane_dead}|#{pane_title}"
+      ],
+      "at": 1790723803757
+    },
+    {
+      "args": [
+        "capture-pane",
+        "-p",
+        "-t",
+        "tool-control"
+      ],
+      "at": 1790723803764
+    },
+    {
+      "args": [
+        "capture-pane",
+        "-p",
+        "-S",
+        "-",
+        "-t",
+        "tool-control"
+      ],
+      "at": 1790723803768
+    },
+    {
+      "args": [
+        "display-message",
+        "-p",
+        "-t",
+        "tool-control",
+        "#{history_size}"
+      ],
+      "at": 1790723803771
+    },
+    {
+      "args": [
+        "send-keys",
+        "-t",
+        "tool-control",
+        "F6"
+      ],
+      "at": 1790723803775
+    },
+    {
+      "args": [
+        "display-message",
+        "-p",
+        "-t",
+        "tool-control",
+        "#{pane_dead}|#{pane_title}"
+      ],
+      "at": 1790723803778
+    },
+    {
+      "args": [
+        "display-message",
+        "-p",
+        "-t",
+        "tool-control",
+        "#{pane_dead}|#{pane_title}"
+      ],
+      "at": 1790723803801
+    },
+    {
+      "args": [
+        "display-message",
+        "-p",
+        "-t",
+        "tool-control",
+        "#{pane_dead}|#{pane_title}"
+      ],
+      "at": 1790723803825
+    },
+    {
+      "args": [
+        "capture-pane",
+        "-p",
+        "-t",
+        "tool-control"
+      ],
+      "at": 1790723803828
+    },
+    {
+      "args": [
+        "capture-pane",
+        "-p",
+        "-S",
+        "-",
+        "-t",
+        "tool-control"
+      ],
+      "at": 1790723803831
+    },
+    {
+      "args": [
+        "display-message",
+        "-p",
+        "-t",
+        "tool-control",
+        "#{history_size}"
+      ],
+      "at": 1790723803833
+    },
+    {
+      "args": [
+        "send-keys",
+        "-t",
+        "tool-control",
+        "F7"
+      ],
+      "at": 1790723803836
+    },
+    {
+      "args": [
+        "display-message",
+        "-p",
+        "-t",
+        "tool-control",
+        "#{pane_dead}|#{pane_title}"
+      ],
+      "at": 1790723803838
+    },
+    {
+      "args": [
+        "display-message",
+        "-p",
+        "-t",
+        "tool-control",
+        "#{pane_dead}|#{pane_title}"
+      ],
+      "at": 1790723803860
+    },
+    {
+      "args": [
+        "capture-pane",
+        "-p",
+        "-t",
+        "tool-control"
+      ],
+      "at": 1790723803966
+    },
+    {
+      "args": [
+        "capture-pane",
+        "-p",
+        "-S",
+        "-",
+        "-t",
+        "tool-control"
+      ],
+      "at": 1790723803969
+    },
+    {
+      "args": [
+        "display-message",
+        "-p",
+        "-t",
+        "tool-control",
+        "#{history_size}"
+      ],
+      "at": 1790723803971
+    },
+    {
+      "args": [
+        "send-keys",
+        "-t",
+        "tool-control",
+        "F8"
+      ],
+      "at": 1790723803975
+    },
+    {
+      "args": [
+        "display-message",
+        "-p",
+        "-t",
+        "tool-control",
+        "#{pane_dead}|#{pane_title}"
+      ],
+      "at": 1790723803977
+    },
+    {
+      "args": [
+        "display-message",
+        "-p",
+        "-t",
+        "tool-control",
+        "#{pane_dead}|#{pane_title}"
+      ],
+      "at": 1790723803999
+    },
+    {
+      "args": [
+        "capture-pane",
+        "-p",
+        "-t",
+        "tool-control"
+      ],
+      "at": 1790723804103
+    },
+    {
+      "args": [
+        "capture-pane",
+        "-p",
+        "-S",
+        "-",
+        "-t",
+        "tool-control"
+      ],
+      "at": 1790723804109
+    },
+    {
+      "args": [
+        "display-message",
+        "-p",
+        "-t",
+        "tool-control",
+        "#{history_size}"
+      ],
+      "at": 1790723804113
+    },
+    {
+      "args": [
+        "send-keys",
+        "-t",
+        "tool-control",
+        "F9"
+      ],
+      "at": 1790723804117
+    },
+    {
+      "args": [
+        "new-session",
+        "-d",
+        "-x",
+        "79",
+        "-y",
+        "39",
+        "-s",
+        "tool-resize",
+        "AUDIT_LOG='/root/projects/project-oh-my-pi-fork/issues/evidence/issue-023/verified-fix/tool-resize.jsonl' AUDIT_SCENARIO='tool' '/root/.bun/bin/bun' '/root/projects/project-oh-my-pi-fork/issues/evidence/issue-023/followup-driver.ts'"
+      ],
+      "at": 1790723804120
+    },
+    {
+      "args": [
+        "set-option",
+        "-w",
+        "-t",
+        "tool-resize",
+        "remain-on-exit",
+        "on"
+      ],
+      "at": 1790723804125
+    },
+    {
+      "args": [
+        "display-message",
+        "-p",
+        "-t",
+        "tool-resize",
+        "#{pane_dead}|#{pane_title}"
+      ],
+      "at": 1790723804128
+    },
+    {
+      "args": [
+        "display-message",
+        "-p",
+        "-t",
+        "tool-resize",
+        "#{pane_dead}|#{pane_title}"
+      ],
+      "at": 1790723804152
+    },
+    {
+      "args": [
+        "display-message",
+        "-p",
+        "-t",
+        "tool-resize",
+        "#{pane_dead}|#{pane_title}"
+      ],
+      "at": 1790723804181
+    },
+    {
+      "args": [
+        "display-message",
+        "-p",
+        "-t",
+        "tool-resize",
+        "#{pane_dead}|#{pane_title}"
+      ],
+      "at": 1790723804206
+    },
+    {
+      "args": [
+        "display-message",
+        "-p",
+        "-t",
+        "tool-resize",
+        "#{pane_dead}|#{pane_title}"
+      ],
+      "at": 1790723804242
+    },
+    {
+      "args": [
+        "display-message",
+        "-p",
+        "-t",
+        "tool-resize",
+        "#{pane_dead}|#{pane_title}"
+      ],
+      "at": 1790723804267
+    },
+    {
+      "args": [
+        "display-message",
+        "-p",
+        "-t",
+        "tool-resize",
+        "#{pane_dead}|#{pane_title}"
+      ],
+      "at": 1790723804290
+    },
+    {
+      "args": [
+        "display-message",
+        "-p",
+        "-t",
+        "tool-resize",
+        "#{pane_dead}|#{pane_title}"
+      ],
+      "at": 1790723804314
+    },
+    {
+      "args": [
+        "display-message",
+        "-p",
+        "-t",
+        "tool-resize",
+        "#{pane_dead}|#{pane_title}"
+      ],
+      "at": 1790723804337
+    },
+    {
+      "args": [
+        "display-message",
+        "-p",
+        "-t",
+        "tool-resize",
+        "#{pane_dead}|#{pane_title}"
+      ],
+      "at": 1790723804360
+    },
+    {
+      "args": [
+        "display-message",
+        "-p",
+        "-t",
+        "tool-resize",
+        "#{pane_dead}|#{pane_title}"
+      ],
+      "at": 1790723804384
+    },
+    {
+      "args": [
+        "display-message",
+        "-p",
+        "-t",
+        "tool-resize",
+        "#{pane_dead}|#{pane_title}"
+      ],
+      "at": 1790723804407
+    },
+    {
+      "args": [
+        "display-message",
+        "-p",
+        "-t",
+        "tool-resize",
+        "#{pane_dead}|#{pane_title}"
+      ],
+      "at": 1790723804430
+    },
+    {
+      "args": [
+        "display-message",
+        "-p",
+        "-t",
+        "tool-resize",
+        "#{pane_dead}|#{pane_title}"
+      ],
+      "at": 1790723804452
+    },
+    {
+      "args": [
+        "display-message",
+        "-p",
+        "-t",
+        "tool-resize",
+        "#{pane_dead}|#{pane_title}"
+      ],
+      "at": 1790723804475
+    },
+    {
+      "args": [
+        "display-message",
+        "-p",
+        "-t",
+        "tool-resize",
+        "#{pane_dead}|#{pane_title}"
+      ],
+      "at": 1790723804498
+    },
+    {
+      "args": [
+        "display-message",
+        "-p",
+        "-t",
+        "tool-resize",
+        "#{pane_dead}|#{pane_title}"
+      ],
+      "at": 1790723804521
+    },
+    {
+      "args": [
+        "display-message",
+        "-p",
+        "-t",
+        "tool-resize",
+        "#{pane_dead}|#{pane_title}"
+      ],
+      "at": 1790723804544
+    },
+    {
+      "args": [
+        "display-message",
+        "-p",
+        "-t",
+        "tool-resize",
+        "#{pane_dead}|#{pane_title}"
+      ],
+      "at": 1790723804567
+    },
+    {
+      "args": [
+        "capture-pane",
+        "-p",
+        "-t",
+        "tool-resize"
+      ],
+      "at": 1790723804569
+    },
+    {
+      "args": [
+        "capture-pane",
+        "-p",
+        "-S",
+        "-",
+        "-t",
+        "tool-resize"
+      ],
+      "at": 1790723804572
+    },
+    {
+      "args": [
+        "display-message",
+        "-p",
+        "-t",
+        "tool-resize",
+        "#{history_size}"
+      ],
+      "at": 1790723804574
+    },
+    {
+      "args": [
+        "resize-window",
+        "-t",
+        "tool-resize",
+        "-x",
+        "79",
+        "-y",
+        "33"
+      ],
+      "at": 1790723804577
+    },
+    {
+      "args": [
+        "display-message",
+        "-p",
+        "-t",
+        "tool-resize",
+        "#{pane_dead}|#{pane_title}"
+      ],
+      "at": 1790723804579
+    },
+    {
+      "args": [
+        "display-message",
+        "-p",
+        "-t",
+        "tool-resize",
+        "#{pane_dead}|#{pane_title}"
+      ],
+      "at": 1790723804601
+    },
+    {
+      "args": [
+        "display-message",
+        "-p",
+        "-t",
+        "tool-resize",
+        "#{pane_dead}|#{pane_title}"
+      ],
+      "at": 1790723804624
+    },
+    {
+      "args": [
+        "display-message",
+        "-p",
+        "-t",
+        "tool-resize",
+        "#{pane_dead}|#{pane_title}"
+      ],
+      "at": 1790723804647
+    },
+    {
+      "args": [
+        "display-message",
+        "-p",
+        "-t",
+        "tool-resize",
+        "#{pane_dead}|#{pane_title}"
+      ],
+      "at": 1790723804669
+    },
+    {
+      "args": [
+        "display-message",
+        "-p",
+        "-t",
+        "tool-resize",
+        "#{pane_dead}|#{pane_title}"
+      ],
+      "at": 1790723804692
+    },
+    {
+      "args": [
+        "display-message",
+        "-p",
+        "-t",
+        "tool-resize",
+        "#{pane_dead}|#{pane_title}"
+      ],
+      "at": 1790723804715
+    },
+    {
+      "args": [
+        "capture-pane",
+        "-p",
+        "-t",
+        "tool-resize"
+      ],
+      "at": 1790723804718
+    },
+    {
+      "args": [
+        "capture-pane",
+        "-p",
+        "-S",
+        "-",
+        "-t",
+        "tool-resize"
+      ],
+      "at": 1790723804720
+    },
+    {
+      "args": [
+        "display-message",
+        "-p",
+        "-t",
+        "tool-resize",
+        "#{history_size}"
+      ],
+      "at": 1790723804722
+    },
+    {
+      "args": [
+        "resize-window",
+        "-t",
+        "tool-resize",
+        "-x",
+        "79",
+        "-y",
+        "39"
+      ],
+      "at": 1790723804726
+    },
+    {
+      "args": [
+        "display-message",
+        "-p",
+        "-t",
+        "tool-resize",
+        "#{pane_dead}|#{pane_title}"
+      ],
+      "at": 1790723804729
+    },
+    {
+      "args": [
+        "display-message",
+        "-p",
+        "-t",
+        "tool-resize",
+        "#{pane_dead}|#{pane_title}"
+      ],
+      "at": 1790723804751
+    },
+    {
+      "args": [
+        "display-message",
+        "-p",
+        "-t",
+        "tool-resize",
+        "#{pane_dead}|#{pane_title}"
+      ],
+      "at": 1790723804775
+    },
+    {
+      "args": [
+        "display-message",
+        "-p",
+        "-t",
+        "tool-resize",
+        "#{pane_dead}|#{pane_title}"
+      ],
+      "at": 1790723804797
+    },
+    {
+      "args": [
+        "display-message",
+        "-p",
+        "-t",
+        "tool-resize",
+        "#{pane_dead}|#{pane_title}"
+      ],
+      "at": 1790723804821
+    },
+    {
+      "args": [
+        "display-message",
+        "-p",
+        "-t",
+        "tool-resize",
+        "#{pane_dead}|#{pane_title}"
+      ],
+      "at": 1790723804851
+    },
+    {
+      "args": [
+        "display-message",
+        "-p",
+        "-t",
+        "tool-resize",
+        "#{pane_dead}|#{pane_title}"
+      ],
+      "at": 1790723804882
+    },
+    {
+      "args": [
+        "display-message",
+        "-p",
+        "-t",
+        "tool-resize",
+        "#{pane_dead}|#{pane_title}"
+      ],
+      "at": 1790723804908
+    },
+    {
+      "args": [
+        "display-message",
+        "-p",
+        "-t",
+        "tool-resize",
+        "#{pane_dead}|#{pane_title}"
+      ],
+      "at": 1790723804931
+    },
+    {
+      "args": [
+        "display-message",
+        "-p",
+        "-t",
+        "tool-resize",
+        "#{pane_dead}|#{pane_title}"
+      ],
+      "at": 1790723804955
+    },
+    {
+      "args": [
+        "capture-pane",
+        "-p",
+        "-t",
+        "tool-resize"
+      ],
+      "at": 1790723804958
+    },
+    {
+      "args": [
+        "capture-pane",
+        "-p",
+        "-S",
+        "-",
+        "-t",
+        "tool-resize"
+      ],
+      "at": 1790723804961
+    },
+    {
+      "args": [
+        "display-message",
+        "-p",
+        "-t",
+        "tool-resize",
+        "#{history_size}"
+      ],
+      "at": 1790723804964
+    },
+    {
+      "args": [
+        "send-keys",
+        "-t",
+        "tool-resize",
+        "F6"
+      ],
+      "at": 1790723804967
+    },
+    {
+      "args": [
+        "display-message",
+        "-p",
+        "-t",
+        "tool-resize",
+        "#{pane_dead}|#{pane_title}"
+      ],
+      "at": 1790723804969
+    },
+    {
+      "args": [
+        "display-message",
+        "-p",
+        "-t",
+        "tool-resize",
+        "#{pane_dead}|#{pane_title}"
+      ],
+      "at": 1790723804992
+    },
+    {
+      "args": [
+        "capture-pane",
+        "-p",
+        "-t",
+        "tool-resize"
+      ],
+      "at": 1790723804994
+    },
+    {
+      "args": [
+        "capture-pane",
+        "-p",
+        "-S",
+        "-",
+        "-t",
+        "tool-resize"
+      ],
+      "at": 1790723804997
+    },
+    {
+      "args": [
+        "display-message",
+        "-p",
+        "-t",
+        "tool-resize",
+        "#{history_size}"
+      ],
+      "at": 1790723804999
+    },
+    {
+      "args": [
+        "send-keys",
+        "-t",
+        "tool-resize",
+        "F7"
+      ],
+      "at": 1790723805002
+    },
+    {
+      "args": [
+        "display-message",
+        "-p",
+        "-t",
+        "tool-resize",
+        "#{pane_dead}|#{pane_title}"
+      ],
+      "at": 1790723805005
+    },
+    {
+      "args": [
+        "display-message",
+        "-p",
+        "-t",
+        "tool-resize",
+        "#{pane_dead}|#{pane_title}"
+      ],
+      "at": 1790723805028
+    },
+    {
+      "args": [
+        "capture-pane",
+        "-p",
+        "-t",
+        "tool-resize"
+      ],
+      "at": 1790723805132
+    },
+    {
+      "args": [
+        "capture-pane",
+        "-p",
+        "-S",
+        "-",
+        "-t",
+        "tool-resize"
+      ],
+      "at": 1790723805136
+    },
+    {
+      "args": [
+        "display-message",
+        "-p",
+        "-t",
+        "tool-resize",
+        "#{history_size}"
+      ],
+      "at": 1790723805139
+    },
+    {
+      "args": [
+        "send-keys",
+        "-t",
+        "tool-resize",
+        "F8"
+      ],
+      "at": 1790723805143
+    },
+    {
+      "args": [
+        "display-message",
+        "-p",
+        "-t",
+        "tool-resize",
+        "#{pane_dead}|#{pane_title}"
+      ],
+      "at": 1790723805146
+    },
+    {
+      "args": [
+        "display-message",
+        "-p",
+        "-t",
+        "tool-resize",
+        "#{pane_dead}|#{pane_title}"
+      ],
+      "at": 1790723805169
+    },
+    {
+      "args": [
+        "capture-pane",
+        "-p",
+        "-t",
+        "tool-resize"
+      ],
+      "at": 1790723805273
+    },
+    {
+      "args": [
+        "capture-pane",
+        "-p",
+        "-S",
+        "-",
+        "-t",
+        "tool-resize"
+      ],
+      "at": 1790723805276
+    },
+    {
+      "args": [
+        "display-message",
+        "-p",
+        "-t",
+        "tool-resize",
+        "#{history_size}"
+      ],
+      "at": 1790723805279
+    },
+    {
+      "args": [
+        "send-keys",
+        "-t",
+        "tool-resize",
+        "F9"
+      ],
+      "at": 1790723805283
+    },
+    {
+      "args": [
+        "new-session",
+        "-d",
+        "-x",
+        "79",
+        "-y",
+        "39",
+        "-s",
+        "typing-control",
+        "AUDIT_LOG='/root/projects/project-oh-my-pi-fork/issues/evidence/issue-023/verified-fix/typing-control.jsonl' AUDIT_SCENARIO='typing' '/root/.bun/bin/bun' '/root/projects/project-oh-my-pi-fork/issues/evidence/issue-023/followup-driver.ts'"
+      ],
+      "at": 1790723805286
+    },
+    {
+      "args": [
+        "set-option",
+        "-w",
+        "-t",
+        "typing-control",
+        "remain-on-exit",
+        "on"
+      ],
+      "at": 1790723805291
+    },
+    {
+      "args": [
+        "display-message",
+        "-p",
+        "-t",
+        "typing-control",
+        "#{pane_dead}|#{pane_title}"
+      ],
+      "at": 1790723805293
+    },
+    {
+      "args": [
+        "display-message",
+        "-p",
+        "-t",
+        "typing-control",
+        "#{pane_dead}|#{pane_title}"
+      ],
+      "at": 1790723805317
+    },
+    {
+      "args": [
+        "display-message",
+        "-p",
+        "-t",
+        "typing-control",
+        "#{pane_dead}|#{pane_title}"
+      ],
+      "at": 1790723805341
+    },
+    {
+      "args": [
+        "display-message",
+        "-p",
+        "-t",
+        "typing-control",
+        "#{pane_dead}|#{pane_title}"
+      ],
+      "at": 1790723805364
+    },
+    {
+      "args": [
+        "display-message",
+        "-p",
+        "-t",
+        "typing-control",
+        "#{pane_dead}|#{pane_title}"
+      ],
+      "at": 1790723805387
+    },
+    {
+      "args": [
+        "display-message",
+        "-p",
+        "-t",
+        "typing-control",
+        "#{pane_dead}|#{pane_title}"
+      ],
+      "at": 1790723805410
+    },
+    {
+      "args": [
+        "display-message",
+        "-p",
+        "-t",
+        "typing-control",
+        "#{pane_dead}|#{pane_title}"
+      ],
+      "at": 1790723805434
+    },
+    {
+      "args": [
+        "display-message",
+        "-p",
+        "-t",
+        "typing-control",
+        "#{pane_dead}|#{pane_title}"
+      ],
+      "at": 1790723805457
+    },
+    {
+      "args": [
+        "display-message",
+        "-p",
+        "-t",
+        "typing-control",
+        "#{pane_dead}|#{pane_title}"
+      ],
+      "at": 1790723805480
+    },
+    {
+      "args": [
+        "display-message",
+        "-p",
+        "-t",
+        "typing-control",
+        "#{pane_dead}|#{pane_title}"
+      ],
+      "at": 1790723805503
+    },
+    {
+      "args": [
+        "display-message",
+        "-p",
+        "-t",
+        "typing-control",
+        "#{pane_dead}|#{pane_title}"
+      ],
+      "at": 1790723805527
+    },
+    {
+      "args": [
+        "display-message",
+        "-p",
+        "-t",
+        "typing-control",
+        "#{pane_dead}|#{pane_title}"
+      ],
+      "at": 1790723805551
+    },
+    {
+      "args": [
+        "display-message",
+        "-p",
+        "-t",
+        "typing-control",
+        "#{pane_dead}|#{pane_title}"
+      ],
+      "at": 1790723805574
+    },
+    {
+      "args": [
+        "display-message",
+        "-p",
+        "-t",
+        "typing-control",
+        "#{pane_dead}|#{pane_title}"
+      ],
+      "at": 1790723805597
+    },
+    {
+      "args": [
+        "display-message",
+        "-p",
+        "-t",
+        "typing-control",
+        "#{pane_dead}|#{pane_title}"
+      ],
+      "at": 1790723805620
+    },
+    {
+      "args": [
+        "display-message",
+        "-p",
+        "-t",
+        "typing-control",
+        "#{pane_dead}|#{pane_title}"
+      ],
+      "at": 1790723805644
+    },
+    {
+      "args": [
+        "capture-pane",
+        "-p",
+        "-t",
+        "typing-control"
+      ],
+      "at": 1790723805647
+    },
+    {
+      "args": [
+        "capture-pane",
+        "-p",
+        "-S",
+        "-",
+        "-t",
+        "typing-control"
+      ],
+      "at": 1790723805650
+    },
+    {
+      "args": [
+        "display-message",
+        "-p",
+        "-t",
+        "typing-control",
+        "#{history_size}"
+      ],
+      "at": 1790723805653
+    },
+    {
+      "args": [
+        "send-keys",
+        "-t",
+        "typing-control",
+        "F10"
+      ],
+      "at": 1790723805656
+    },
+    {
+      "args": [
+        "send-keys",
+        "-t",
+        "typing-control",
+        "-l",
+        "INPUT-ONCE-"
+      ],
+      "at": 1790723805658
+    },
+    {
+      "args": [
+        "send-keys",
+        "-t",
+        "typing-control",
+        "-l",
+        "alpha "
+      ],
+      "at": 1790723805697
+    },
+    {
+      "args": [
+        "send-keys",
+        "-t",
+        "typing-control",
+        "-l",
+        "beta "
+      ],
+      "at": 1790723805735
+    },
+    {
+      "args": [
+        "send-keys",
+        "-t",
+        "typing-control",
+        "-l",
+        "gamma "
+      ],
+      "at": 1790723805773
+    },
+    {
+      "args": [
+        "send-keys",
+        "-t",
+        "typing-control",
+        "-l",
+        "delta "
+      ],
+      "at": 1790723805811
+    },
+    {
+      "args": [
+        "send-keys",
+        "-t",
+        "typing-control",
+        "-l",
+        "epsilon "
+      ],
+      "at": 1790723805849
+    },
+    {
+      "args": [
+        "send-keys",
+        "-t",
+        "typing-control",
+        "-l",
+        "zeta "
+      ],
+      "at": 1790723805887
+    },
+    {
+      "args": [
+        "send-keys",
+        "-t",
+        "typing-control",
+        "-l",
+        "eta "
+      ],
+      "at": 1790723805925
+    },
+    {
+      "args": [
+        "send-keys",
+        "-t",
+        "typing-control",
+        "-l",
+        "theta "
+      ],
+      "at": 1790723805963
+    },
+    {
+      "args": [
+        "send-keys",
+        "-t",
+        "typing-control",
+        "-l",
+        "iota "
+      ],
+      "at": 1790723806001
+    },
+    {
+      "args": [
+        "send-keys",
+        "-t",
+        "typing-control",
+        "-l",
+        "kappa "
+      ],
+      "at": 1790723806039
+    },
+    {
+      "args": [
+        "send-keys",
+        "-t",
+        "typing-control",
+        "-l",
+        "lambda "
+      ],
+      "at": 1790723806077
+    },
+    {
+      "args": [
+        "send-keys",
+        "-t",
+        "typing-control",
+        "-l",
+        "mu "
+      ],
+      "at": 1790723806115
+    },
+    {
+      "args": [
+        "send-keys",
+        "-t",
+        "typing-control",
+        "-l",
+        "nu "
+      ],
+      "at": 1790723806153
+    },
+    {
+      "args": [
+        "send-keys",
+        "-t",
+        "typing-control",
+        "-l",
+        "xi "
+      ],
+      "at": 1790723806194
+    },
+    {
+      "args": [
+        "send-keys",
+        "-t",
+        "typing-control",
+        "-l",
+        "omicron "
+      ],
+      "at": 1790723806241
+    },
+    {
+      "args": [
+        "send-keys",
+        "-t",
+        "typing-control",
+        "-l",
+        "pi "
+      ],
+      "at": 1790723806290
+    },
+    {
+      "args": [
+        "send-keys",
+        "-t",
+        "typing-control",
+        "-l",
+        "rho "
+      ],
+      "at": 1790723806338
+    },
+    {
+      "args": [
+        "send-keys",
+        "-t",
+        "typing-control",
+        "-l",
+        "sigma "
+      ],
+      "at": 1790723806377
+    },
+    {
+      "args": [
+        "send-keys",
+        "-t",
+        "typing-control",
+        "-l",
+        "END-ONCE"
+      ],
+      "at": 1790723806415
+    },
+    {
+      "args": [
+        "display-message",
+        "-p",
+        "-t",
+        "typing-control",
+        "#{pane_dead}|#{pane_title}"
+      ],
+      "at": 1790723806453
+    },
+    {
+      "args": [
+        "display-message",
+        "-p",
+        "-t",
+        "typing-control",
+        "#{pane_dead}|#{pane_title}"
+      ],
+      "at": 1790723806476
+    },
+    {
+      "args": [
+        "capture-pane",
+        "-p",
+        "-t",
+        "typing-control"
+      ],
+      "at": 1790723806579
+    },
+    {
+      "args": [
+        "capture-pane",
+        "-p",
+        "-S",
+        "-",
+        "-t",
+        "typing-control"
+      ],
+      "at": 1790723806582
+    },
+    {
+      "args": [
+        "display-message",
+        "-p",
+        "-t",
+        "typing-control",
+        "#{history_size}"
+      ],
+      "at": 1790723806584
+    },
+    {
+      "args": [
+        "send-keys",
+        "-t",
+        "typing-control",
+        "C-u"
+      ],
+      "at": 1790723806589
+    },
+    {
+      "args": [
+        "capture-pane",
+        "-p",
+        "-t",
+        "typing-control"
+      ],
+      "at": 1790723806692
+    },
+    {
+      "args": [
+        "capture-pane",
+        "-p",
+        "-S",
+        "-",
+        "-t",
+        "typing-control"
+      ],
+      "at": 1790723806695
+    },
+    {
+      "args": [
+        "display-message",
+        "-p",
+        "-t",
+        "typing-control",
+        "#{history_size}"
+      ],
+      "at": 1790723806698
+    },
+    {
+      "args": [
+        "send-keys",
+        "-t",
+        "typing-control",
+        "F6"
+      ],
+      "at": 1790723806702
+    },
+    {
+      "args": [
+        "display-message",
+        "-p",
+        "-t",
+        "typing-control",
+        "#{pane_dead}|#{pane_title}"
+      ],
+      "at": 1790723806705
+    },
+    {
+      "args": [
+        "display-message",
+        "-p",
+        "-t",
+        "typing-control",
+        "#{pane_dead}|#{pane_title}"
+      ],
+      "at": 1790723806727
+    },
+    {
+      "args": [
+        "capture-pane",
+        "-p",
+        "-t",
+        "typing-control"
+      ],
+      "at": 1790723806731
+    },
+    {
+      "args": [
+        "capture-pane",
+        "-p",
+        "-S",
+        "-",
+        "-t",
+        "typing-control"
+      ],
+      "at": 1790723806735
+    },
+    {
+      "args": [
+        "display-message",
+        "-p",
+        "-t",
+        "typing-control",
+        "#{history_size}"
+      ],
+      "at": 1790723806737
+    },
+    {
+      "args": [
+        "send-keys",
+        "-t",
+        "typing-control",
+        "F7"
+      ],
+      "at": 1790723806742
+    },
+    {
+      "args": [
+        "display-message",
+        "-p",
+        "-t",
+        "typing-control",
+        "#{pane_dead}|#{pane_title}"
+      ],
+      "at": 1790723806744
+    },
+    {
+      "args": [
+        "display-message",
+        "-p",
+        "-t",
+        "typing-control",
+        "#{pane_dead}|#{pane_title}"
+      ],
+      "at": 1790723806767
+    },
+    {
+      "args": [
+        "display-message",
+        "-p",
+        "-t",
+        "typing-control",
+        "#{pane_dead}|#{pane_title}"
+      ],
+      "at": 1790723806790
+    },
+    {
+      "args": [
+        "capture-pane",
+        "-p",
+        "-t",
+        "typing-control"
+      ],
+      "at": 1790723806893
+    },
+    {
+      "args": [
+        "capture-pane",
+        "-p",
+        "-S",
+        "-",
+        "-t",
+        "typing-control"
+      ],
+      "at": 1790723806896
+    },
+    {
+      "args": [
+        "display-message",
+        "-p",
+        "-t",
+        "typing-control",
+        "#{history_size}"
+      ],
+      "at": 1790723806898
+    },
+    {
+      "args": [
+        "send-keys",
+        "-t",
+        "typing-control",
+        "F8"
+      ],
+      "at": 1790723806902
+    },
+    {
+      "args": [
+        "display-message",
+        "-p",
+        "-t",
+        "typing-control",
+        "#{pane_dead}|#{pane_title}"
+      ],
+      "at": 1790723806904
+    },
+    {
+      "args": [
+        "display-message",
+        "-p",
+        "-t",
+        "typing-control",
+        "#{pane_dead}|#{pane_title}"
+      ],
+      "at": 1790723806927
+    },
+    {
+      "args": [
+        "capture-pane",
+        "-p",
+        "-t",
+        "typing-control"
+      ],
+      "at": 1790723807030
+    },
+    {
+      "args": [
+        "capture-pane",
+        "-p",
+        "-S",
+        "-",
+        "-t",
+        "typing-control"
+      ],
+      "at": 1790723807046
+    },
+    {
+      "args": [
+        "display-message",
+        "-p",
+        "-t",
+        "typing-control",
+        "#{history_size}"
+      ],
+      "at": 1790723807056
+    },
+    {
+      "args": [
+        "send-keys",
+        "-t",
+        "typing-control",
+        "F9"
+      ],
+      "at": 1790723807071
+    },
+    {
+      "args": [
+        "new-session",
+        "-d",
+        "-x",
+        "79",
+        "-y",
+        "39",
+        "-s",
+        "typing-resize",
+        "AUDIT_LOG='/root/projects/project-oh-my-pi-fork/issues/evidence/issue-023/verified-fix/typing-resize.jsonl' AUDIT_SCENARIO='typing' '/root/.bun/bin/bun' '/root/projects/project-oh-my-pi-fork/issues/evidence/issue-023/followup-driver.ts'"
+      ],
+      "at": 1790723807084
+    },
+    {
+      "args": [
+        "set-option",
+        "-w",
+        "-t",
+        "typing-resize",
+        "remain-on-exit",
+        "on"
+      ],
+      "at": 1790723807102
+    },
+    {
+      "args": [
+        "display-message",
+        "-p",
+        "-t",
+        "typing-resize",
+        "#{pane_dead}|#{pane_title}"
+      ],
+      "at": 1790723807111
+    },
+    {
+      "args": [
+        "display-message",
+        "-p",
+        "-t",
+        "typing-resize",
+        "#{pane_dead}|#{pane_title}"
+      ],
+      "at": 1790723807142
+    },
+    {
+      "args": [
+        "display-message",
+        "-p",
+        "-t",
+        "typing-resize",
+        "#{pane_dead}|#{pane_title}"
+      ],
+      "at": 1790723807165
+    },
+    {
+      "args": [
+        "display-message",
+        "-p",
+        "-t",
+        "typing-resize",
+        "#{pane_dead}|#{pane_title}"
+      ],
+      "at": 1790723807188
+    },
+    {
+      "args": [
+        "display-message",
+        "-p",
+        "-t",
+        "typing-resize",
+        "#{pane_dead}|#{pane_title}"
+      ],
+      "at": 1790723807211
+    },
+    {
+      "args": [
+        "display-message",
+        "-p",
+        "-t",
+        "typing-resize",
+        "#{pane_dead}|#{pane_title}"
+      ],
+      "at": 1790723807234
+    },
+    {
+      "args": [
+        "display-message",
+        "-p",
+        "-t",
+        "typing-resize",
+        "#{pane_dead}|#{pane_title}"
+      ],
+      "at": 1790723807258
+    },
+    {
+      "args": [
+        "display-message",
+        "-p",
+        "-t",
+        "typing-resize",
+        "#{pane_dead}|#{pane_title}"
+      ],
+      "at": 1790723807281
+    },
+    {
+      "args": [
+        "display-message",
+        "-p",
+        "-t",
+        "typing-resize",
+        "#{pane_dead}|#{pane_title}"
+      ],
+      "at": 1790723807304
+    },
+    {
+      "args": [
+        "display-message",
+        "-p",
+        "-t",
+        "typing-resize",
+        "#{pane_dead}|#{pane_title}"
+      ],
+      "at": 1790723807327
+    },
+    {
+      "args": [
+        "display-message",
+        "-p",
+        "-t",
+        "typing-resize",
+        "#{pane_dead}|#{pane_title}"
+      ],
+      "at": 1790723807349
+    },
+    {
+      "args": [
+        "display-message",
+        "-p",
+        "-t",
+        "typing-resize",
+        "#{pane_dead}|#{pane_title}"
+      ],
+      "at": 1790723807372
+    },
+    {
+      "args": [
+        "display-message",
+        "-p",
+        "-t",
+        "typing-resize",
+        "#{pane_dead}|#{pane_title}"
+      ],
+      "at": 1790723807395
+    },
+    {
+      "args": [
+        "display-message",
+        "-p",
+        "-t",
+        "typing-resize",
+        "#{pane_dead}|#{pane_title}"
+      ],
+      "at": 1790723807418
+    },
+    {
+      "args": [
+        "display-message",
+        "-p",
+        "-t",
+        "typing-resize",
+        "#{pane_dead}|#{pane_title}"
+      ],
+      "at": 1790723807441
+    },
+    {
+      "args": [
+        "display-message",
+        "-p",
+        "-t",
+        "typing-resize",
+        "#{pane_dead}|#{pane_title}"
+      ],
+      "at": 1790723807465
+    },
+    {
+      "args": [
+        "display-message",
+        "-p",
+        "-t",
+        "typing-resize",
+        "#{pane_dead}|#{pane_title}"
+      ],
+      "at": 1790723807488
+    },
+    {
+      "args": [
+        "capture-pane",
+        "-p",
+        "-t",
+        "typing-resize"
+      ],
+      "at": 1790723807491
+    },
+    {
+      "args": [
+        "capture-pane",
+        "-p",
+        "-S",
+        "-",
+        "-t",
+        "typing-resize"
+      ],
+      "at": 1790723807493
+    },
+    {
+      "args": [
+        "display-message",
+        "-p",
+        "-t",
+        "typing-resize",
+        "#{history_size}"
+      ],
+      "at": 1790723807496
+    },
+    {
+      "args": [
+        "resize-window",
+        "-t",
+        "typing-resize",
+        "-x",
+        "79",
+        "-y",
+        "33"
+      ],
+      "at": 1790723807499
+    },
+    {
+      "args": [
+        "display-message",
+        "-p",
+        "-t",
+        "typing-resize",
+        "#{pane_dead}|#{pane_title}"
+      ],
+      "at": 1790723807501
+    },
+    {
+      "args": [
+        "display-message",
+        "-p",
+        "-t",
+        "typing-resize",
+        "#{pane_dead}|#{pane_title}"
+      ],
+      "at": 1790723807524
+    },
+    {
+      "args": [
+        "display-message",
+        "-p",
+        "-t",
+        "typing-resize",
+        "#{pane_dead}|#{pane_title}"
+      ],
+      "at": 1790723807546
+    },
+    {
+      "args": [
+        "display-message",
+        "-p",
+        "-t",
+        "typing-resize",
+        "#{pane_dead}|#{pane_title}"
+      ],
+      "at": 1790723807569
+    },
+    {
+      "args": [
+        "display-message",
+        "-p",
+        "-t",
+        "typing-resize",
+        "#{pane_dead}|#{pane_title}"
+      ],
+      "at": 1790723807592
+    },
+    {
+      "args": [
+        "display-message",
+        "-p",
+        "-t",
+        "typing-resize",
+        "#{pane_dead}|#{pane_title}"
+      ],
+      "at": 1790723807614
+    },
+    {
+      "args": [
+        "display-message",
+        "-p",
+        "-t",
+        "typing-resize",
+        "#{pane_dead}|#{pane_title}"
+      ],
+      "at": 1790723807637
+    },
+    {
+      "args": [
+        "capture-pane",
+        "-p",
+        "-t",
+        "typing-resize"
+      ],
+      "at": 1790723807640
+    },
+    {
+      "args": [
+        "capture-pane",
+        "-p",
+        "-S",
+        "-",
+        "-t",
+        "typing-resize"
+      ],
+      "at": 1790723807642
+    },
+    {
+      "args": [
+        "display-message",
+        "-p",
+        "-t",
+        "typing-resize",
+        "#{history_size}"
+      ],
+      "at": 1790723807644
+    },
+    {
+      "args": [
+        "resize-window",
+        "-t",
+        "typing-resize",
+        "-x",
+        "79",
+        "-y",
+        "39"
+      ],
+      "at": 1790723807647
+    },
+    {
+      "args": [
+        "display-message",
+        "-p",
+        "-t",
+        "typing-resize",
+        "#{pane_dead}|#{pane_title}"
+      ],
+      "at": 1790723807649
+    },
+    {
+      "args": [
+        "display-message",
+        "-p",
+        "-t",
+        "typing-resize",
+        "#{pane_dead}|#{pane_title}"
+      ],
+      "at": 1790723807672
+    },
+    {
+      "args": [
+        "display-message",
+        "-p",
+        "-t",
+        "typing-resize",
+        "#{pane_dead}|#{pane_title}"
+      ],
+      "at": 1790723807695
+    },
+    {
+      "args": [
+        "display-message",
+        "-p",
+        "-t",
+        "typing-resize",
+        "#{pane_dead}|#{pane_title}"
+      ],
+      "at": 1790723807718
+    },
+    {
+      "args": [
+        "display-message",
+        "-p",
+        "-t",
+        "typing-resize",
+        "#{pane_dead}|#{pane_title}"
+      ],
+      "at": 1790723807741
+    },
+    {
+      "args": [
+        "display-message",
+        "-p",
+        "-t",
+        "typing-resize",
+        "#{pane_dead}|#{pane_title}"
+      ],
+      "at": 1790723807763
+    },
+    {
+      "args": [
+        "display-message",
+        "-p",
+        "-t",
+        "typing-resize",
+        "#{pane_dead}|#{pane_title}"
+      ],
+      "at": 1790723807786
+    },
+    {
+      "args": [
+        "display-message",
+        "-p",
+        "-t",
+        "typing-resize",
+        "#{pane_dead}|#{pane_title}"
+      ],
+      "at": 1790723807809
+    },
+    {
+      "args": [
+        "display-message",
+        "-p",
+        "-t",
+        "typing-resize",
+        "#{pane_dead}|#{pane_title}"
+      ],
+      "at": 1790723807833
+    },
+    {
+      "args": [
+        "display-message",
+        "-p",
+        "-t",
+        "typing-resize",
+        "#{pane_dead}|#{pane_title}"
+      ],
+      "at": 1790723807855
+    },
+    {
+      "args": [
+        "display-message",
+        "-p",
+        "-t",
+        "typing-resize",
+        "#{pane_dead}|#{pane_title}"
+      ],
+      "at": 1790723807879
+    },
+    {
+      "args": [
+        "capture-pane",
+        "-p",
+        "-t",
+        "typing-resize"
+      ],
+      "at": 1790723807882
+    },
+    {
+      "args": [
+        "capture-pane",
+        "-p",
+        "-S",
+        "-",
+        "-t",
+        "typing-resize"
+      ],
+      "at": 1790723807884
+    },
+    {
+      "args": [
+        "display-message",
+        "-p",
+        "-t",
+        "typing-resize",
+        "#{history_size}"
+      ],
+      "at": 1790723807887
+    },
+    {
+      "args": [
+        "send-keys",
+        "-t",
+        "typing-resize",
+        "F10"
+      ],
+      "at": 1790723807890
+    },
+    {
+      "args": [
+        "send-keys",
+        "-t",
+        "typing-resize",
+        "-l",
+        "INPUT-ONCE-"
+      ],
+      "at": 1790723807893
+    },
+    {
+      "args": [
+        "send-keys",
+        "-t",
+        "typing-resize",
+        "-l",
+        "alpha "
+      ],
+      "at": 1790723807930
+    },
+    {
+      "args": [
+        "send-keys",
+        "-t",
+        "typing-resize",
+        "-l",
+        "beta "
+      ],
+      "at": 1790723807968
+    },
+    {
+      "args": [
+        "send-keys",
+        "-t",
+        "typing-resize",
+        "-l",
+        "gamma "
+      ],
+      "at": 1790723808006
+    },
+    {
+      "args": [
+        "send-keys",
+        "-t",
+        "typing-resize",
+        "-l",
+        "delta "
+      ],
+      "at": 1790723808044
+    },
+    {
+      "args": [
+        "send-keys",
+        "-t",
+        "typing-resize",
+        "-l",
+        "epsilon "
+      ],
+      "at": 1790723808082
+    },
+    {
+      "args": [
+        "send-keys",
+        "-t",
+        "typing-resize",
+        "-l",
+        "zeta "
+      ],
+      "at": 1790723808120
+    },
+    {
+      "args": [
+        "send-keys",
+        "-t",
+        "typing-resize",
+        "-l",
+        "eta "
+      ],
+      "at": 1790723808158
+    },
+    {
+      "args": [
+        "send-keys",
+        "-t",
+        "typing-resize",
+        "-l",
+        "theta "
+      ],
+      "at": 1790723808196
+    },
+    {
+      "args": [
+        "send-keys",
+        "-t",
+        "typing-resize",
+        "-l",
+        "iota "
+      ],
+      "at": 1790723808233
+    },
+    {
+      "args": [
+        "send-keys",
+        "-t",
+        "typing-resize",
+        "-l",
+        "kappa "
+      ],
+      "at": 1790723808272
+    },
+    {
+      "args": [
+        "send-keys",
+        "-t",
+        "typing-resize",
+        "-l",
+        "lambda "
+      ],
+      "at": 1790723808310
+    },
+    {
+      "args": [
+        "send-keys",
+        "-t",
+        "typing-resize",
+        "-l",
+        "mu "
+      ],
+      "at": 1790723808348
+    },
+    {
+      "args": [
+        "send-keys",
+        "-t",
+        "typing-resize",
+        "-l",
+        "nu "
+      ],
+      "at": 1790723808386
+    },
+    {
+      "args": [
+        "send-keys",
+        "-t",
+        "typing-resize",
+        "-l",
+        "xi "
+      ],
+      "at": 1790723808424
+    },
+    {
+      "args": [
+        "send-keys",
+        "-t",
+        "typing-resize",
+        "-l",
+        "omicron "
+      ],
+      "at": 1790723808462
+    },
+    {
+      "args": [
+        "send-keys",
+        "-t",
+        "typing-resize",
+        "-l",
+        "pi "
+      ],
+      "at": 1790723808507
+    },
+    {
+      "args": [
+        "send-keys",
+        "-t",
+        "typing-resize",
+        "-l",
+        "rho "
+      ],
+      "at": 1790723808554
+    },
+    {
+      "args": [
+        "send-keys",
+        "-t",
+        "typing-resize",
+        "-l",
+        "sigma "
+      ],
+      "at": 1790723808592
+    },
+    {
+      "args": [
+        "send-keys",
+        "-t",
+        "typing-resize",
+        "-l",
+        "END-ONCE"
+      ],
+      "at": 1790723808629
+    },
+    {
+      "args": [
+        "display-message",
+        "-p",
+        "-t",
+        "typing-resize",
+        "#{pane_dead}|#{pane_title}"
+      ],
+      "at": 1790723808667
+    },
+    {
+      "args": [
+        "display-message",
+        "-p",
+        "-t",
+        "typing-resize",
+        "#{pane_dead}|#{pane_title}"
+      ],
+      "at": 1790723808690
+    },
+    {
+      "args": [
+        "display-message",
+        "-p",
+        "-t",
+        "typing-resize",
+        "#{pane_dead}|#{pane_title}"
+      ],
+      "at": 1790723808713
+    },
+    {
+      "args": [
+        "capture-pane",
+        "-p",
+        "-t",
+        "typing-resize"
+      ],
+      "at": 1790723808815
+    },
+    {
+      "args": [
+        "capture-pane",
+        "-p",
+        "-S",
+        "-",
+        "-t",
+        "typing-resize"
+      ],
+      "at": 1790723808819
+    },
+    {
+      "args": [
+        "display-message",
+        "-p",
+        "-t",
+        "typing-resize",
+        "#{history_size}"
+      ],
+      "at": 1790723808821
+    },
+    {
+      "args": [
+        "send-keys",
+        "-t",
+        "typing-resize",
+        "C-u"
+      ],
+      "at": 1790723808825
+    },
+    {
+      "args": [
+        "capture-pane",
+        "-p",
+        "-t",
+        "typing-resize"
+      ],
+      "at": 1790723808928
+    },
+    {
+      "args": [
+        "capture-pane",
+        "-p",
+        "-S",
+        "-",
+        "-t",
+        "typing-resize"
+      ],
+      "at": 1790723808930
+    },
+    {
+      "args": [
+        "display-message",
+        "-p",
+        "-t",
+        "typing-resize",
+        "#{history_size}"
+      ],
+      "at": 1790723808932
+    },
+    {
+      "args": [
+        "send-keys",
+        "-t",
+        "typing-resize",
+        "F6"
+      ],
+      "at": 1790723808937
+    },
+    {
+      "args": [
+        "display-message",
+        "-p",
+        "-t",
+        "typing-resize",
+        "#{pane_dead}|#{pane_title}"
+      ],
+      "at": 1790723808939
+    },
+    {
+      "args": [
+        "capture-pane",
+        "-p",
+        "-t",
+        "typing-resize"
+      ],
+      "at": 1790723808942
+    },
+    {
+      "args": [
+        "capture-pane",
+        "-p",
+        "-S",
+        "-",
+        "-t",
+        "typing-resize"
+      ],
+      "at": 1790723808944
+    },
+    {
+      "args": [
+        "display-message",
+        "-p",
+        "-t",
+        "typing-resize",
+        "#{history_size}"
+      ],
+      "at": 1790723808946
+    },
+    {
+      "args": [
+        "send-keys",
+        "-t",
+        "typing-resize",
+        "F7"
+      ],
+      "at": 1790723808951
+    },
+    {
+      "args": [
+        "display-message",
+        "-p",
+        "-t",
+        "typing-resize",
+        "#{pane_dead}|#{pane_title}"
+      ],
+      "at": 1790723808953
+    },
+    {
+      "args": [
+        "display-message",
+        "-p",
+        "-t",
+        "typing-resize",
+        "#{pane_dead}|#{pane_title}"
+      ],
+      "at": 1790723808975
+    },
+    {
+      "args": [
+        "display-message",
+        "-p",
+        "-t",
+        "typing-resize",
+        "#{pane_dead}|#{pane_title}"
+      ],
+      "at": 1790723808998
+    },
+    {
+      "args": [
+        "capture-pane",
+        "-p",
+        "-t",
+        "typing-resize"
+      ],
+      "at": 1790723809100
+    },
+    {
+      "args": [
+        "capture-pane",
+        "-p",
+        "-S",
+        "-",
+        "-t",
+        "typing-resize"
+      ],
+      "at": 1790723809102
+    },
+    {
+      "args": [
+        "display-message",
+        "-p",
+        "-t",
+        "typing-resize",
+        "#{history_size}"
+      ],
+      "at": 1790723809105
+    },
+    {
+      "args": [
+        "send-keys",
+        "-t",
+        "typing-resize",
+        "F8"
+      ],
+      "at": 1790723809109
+    },
+    {
+      "args": [
+        "display-message",
+        "-p",
+        "-t",
+        "typing-resize",
+        "#{pane_dead}|#{pane_title}"
+      ],
+      "at": 1790723809112
+    },
+    {
+      "args": [
+        "display-message",
+        "-p",
+        "-t",
+        "typing-resize",
+        "#{pane_dead}|#{pane_title}"
+      ],
+      "at": 1790723809134
+    },
+    {
+      "args": [
+        "capture-pane",
+        "-p",
+        "-t",
+        "typing-resize"
+      ],
+      "at": 1790723809237
+    },
+    {
+      "args": [
+        "capture-pane",
+        "-p",
+        "-S",
+        "-",
+        "-t",
+        "typing-resize"
+      ],
+      "at": 1790723809239
+    },
+    {
+      "args": [
+        "display-message",
+        "-p",
+        "-t",
+        "typing-resize",
+        "#{history_size}"
+      ],
+      "at": 1790723809241
+    },
+    {
+      "args": [
+        "send-keys",
+        "-t",
+        "typing-resize",
+        "F9"
+      ],
+      "at": 1790723809246
+    },
+    {
+      "args": [
+        "new-session",
+        "-d",
+        "-x",
+        "79",
+        "-y",
+        "39",
+        "-s",
+        "history-probe-control",
+        "AUDIT_LOG='/root/projects/project-oh-my-pi-fork/issues/evidence/issue-023/verified-fix/history-probe-control.jsonl' AUDIT_SCENARIO='history-probe' '/root/.bun/bin/bun' '/root/projects/project-oh-my-pi-fork/issues/evidence/issue-023/followup-driver.ts'"
+      ],
+      "at": 1790723809248
+    },
+    {
+      "args": [
+        "set-option",
+        "-w",
+        "-t",
+        "history-probe-control",
+        "remain-on-exit",
+        "on"
+      ],
+      "at": 1790723809252
+    },
+    {
+      "args": [
+        "display-message",
+        "-p",
+        "-t",
+        "history-probe-control",
+        "#{pane_dead}|#{pane_title}"
+      ],
+      "at": 1790723809254
+    },
+    {
+      "args": [
+        "display-message",
+        "-p",
+        "-t",
+        "history-probe-control",
+        "#{pane_dead}|#{pane_title}"
+      ],
+      "at": 1790723809276
+    },
+    {
+      "args": [
+        "display-message",
+        "-p",
+        "-t",
+        "history-probe-control",
+        "#{pane_dead}|#{pane_title}"
+      ],
+      "at": 1790723809299
+    },
+    {
+      "args": [
+        "display-message",
+        "-p",
+        "-t",
+        "history-probe-control",
+        "#{pane_dead}|#{pane_title}"
+      ],
+      "at": 1790723809322
+    },
+    {
+      "args": [
+        "display-message",
+        "-p",
+        "-t",
+        "history-probe-control",
+        "#{pane_dead}|#{pane_title}"
+      ],
+      "at": 1790723809344
+    },
+    {
+      "args": [
+        "display-message",
+        "-p",
+        "-t",
+        "history-probe-control",
+        "#{pane_dead}|#{pane_title}"
+      ],
+      "at": 1790723809367
+    },
+    {
+      "args": [
+        "display-message",
+        "-p",
+        "-t",
+        "history-probe-control",
+        "#{pane_dead}|#{pane_title}"
+      ],
+      "at": 1790723809390
+    },
+    {
+      "args": [
+        "display-message",
+        "-p",
+        "-t",
+        "history-probe-control",
+        "#{pane_dead}|#{pane_title}"
+      ],
+      "at": 1790723809412
+    },
+    {
+      "args": [
+        "display-message",
+        "-p",
+        "-t",
+        "history-probe-control",
+        "#{pane_dead}|#{pane_title}"
+      ],
+      "at": 1790723809435
+    },
+    {
+      "args": [
+        "display-message",
+        "-p",
+        "-t",
+        "history-probe-control",
+        "#{pane_dead}|#{pane_title}"
+      ],
+      "at": 1790723809458
+    },
+    {
+      "args": [
+        "display-message",
+        "-p",
+        "-t",
+        "history-probe-control",
+        "#{pane_dead}|#{pane_title}"
+      ],
+      "at": 1790723809481
+    },
+    {
+      "args": [
+        "display-message",
+        "-p",
+        "-t",
+        "history-probe-control",
+        "#{pane_dead}|#{pane_title}"
+      ],
+      "at": 1790723809504
+    },
+    {
+      "args": [
+        "display-message",
+        "-p",
+        "-t",
+        "history-probe-control",
+        "#{pane_dead}|#{pane_title}"
+      ],
+      "at": 1790723809526
+    },
+    {
+      "args": [
+        "display-message",
+        "-p",
+        "-t",
+        "history-probe-control",
+        "#{pane_dead}|#{pane_title}"
+      ],
+      "at": 1790723809548
+    },
+    {
+      "args": [
+        "display-message",
+        "-p",
+        "-t",
+        "history-probe-control",
+        "#{pane_dead}|#{pane_title}"
+      ],
+      "at": 1790723809571
+    },
+    {
+      "args": [
+        "display-message",
+        "-p",
+        "-t",
+        "history-probe-control",
+        "#{pane_dead}|#{pane_title}"
+      ],
+      "at": 1790723809594
+    },
+    {
+      "args": [
+        "capture-pane",
+        "-p",
+        "-t",
+        "history-probe-control"
+      ],
+      "at": 1790723809597
+    },
+    {
+      "args": [
+        "capture-pane",
+        "-p",
+        "-S",
+        "-",
+        "-t",
+        "history-probe-control"
+      ],
+      "at": 1790723809600
+    },
+    {
+      "args": [
+        "display-message",
+        "-p",
+        "-t",
+        "history-probe-control",
+        "#{history_size}"
+      ],
+      "at": 1790723809602
+    },
+    {
+      "args": [
+        "send-keys",
+        "-t",
+        "history-probe-control",
+        "F6"
+      ],
+      "at": 1790723809604
+    },
+    {
+      "args": [
+        "display-message",
+        "-p",
+        "-t",
+        "history-probe-control",
+        "#{pane_dead}|#{pane_title}"
+      ],
+      "at": 1790723809607
+    },
+    {
+      "args": [
+        "display-message",
+        "-p",
+        "-t",
+        "history-probe-control",
+        "#{pane_dead}|#{pane_title}"
+      ],
+      "at": 1790723809629
+    },
+    {
+      "args": [
+        "capture-pane",
+        "-p",
+        "-t",
+        "history-probe-control"
+      ],
+      "at": 1790723809632
+    },
+    {
+      "args": [
+        "capture-pane",
+        "-p",
+        "-S",
+        "-",
+        "-t",
+        "history-probe-control"
+      ],
+      "at": 1790723809634
+    },
+    {
+      "args": [
+        "display-message",
+        "-p",
+        "-t",
+        "history-probe-control",
+        "#{history_size}"
+      ],
+      "at": 1790723809636
+    },
+    {
+      "args": [
+        "send-keys",
+        "-t",
+        "history-probe-control",
+        "F7"
+      ],
+      "at": 1790723809640
+    },
+    {
+      "args": [
+        "display-message",
+        "-p",
+        "-t",
+        "history-probe-control",
+        "#{pane_dead}|#{pane_title}"
+      ],
+      "at": 1790723809642
+    },
+    {
+      "args": [
+        "display-message",
+        "-p",
+        "-t",
+        "history-probe-control",
+        "#{pane_dead}|#{pane_title}"
+      ],
+      "at": 1790723809665
+    },
+    {
+      "args": [
+        "capture-pane",
+        "-p",
+        "-t",
+        "history-probe-control"
+      ],
+      "at": 1790723809767
+    },
+    {
+      "args": [
+        "capture-pane",
+        "-p",
+        "-S",
+        "-",
+        "-t",
+        "history-probe-control"
+      ],
+      "at": 1790723809769
+    },
+    {
+      "args": [
+        "display-message",
+        "-p",
+        "-t",
+        "history-probe-control",
+        "#{history_size}"
+      ],
+      "at": 1790723809771
+    },
+    {
+      "args": [
+        "send-keys",
+        "-t",
+        "history-probe-control",
+        "F8"
+      ],
+      "at": 1790723809774
+    },
+    {
+      "args": [
+        "display-message",
+        "-p",
+        "-t",
+        "history-probe-control",
+        "#{pane_dead}|#{pane_title}"
+      ],
+      "at": 1790723809777
+    },
+    {
+      "args": [
+        "display-message",
+        "-p",
+        "-t",
+        "history-probe-control",
+        "#{pane_dead}|#{pane_title}"
+      ],
+      "at": 1790723809800
+    },
+    {
+      "args": [
+        "capture-pane",
+        "-p",
+        "-t",
+        "history-probe-control"
+      ],
+      "at": 1790723809902
+    },
+    {
+      "args": [
+        "capture-pane",
+        "-p",
+        "-S",
+        "-",
+        "-t",
+        "history-probe-control"
+      ],
+      "at": 1790723809905
+    },
+    {
+      "args": [
+        "display-message",
+        "-p",
+        "-t",
+        "history-probe-control",
+        "#{history_size}"
+      ],
+      "at": 1790723809907
+    },
+    {
+      "args": [
+        "send-keys",
+        "-t",
+        "history-probe-control",
+        "F9"
+      ],
+      "at": 1790723809910
+    },
+    {
+      "args": [
+        "new-session",
+        "-d",
+        "-x",
+        "79",
+        "-y",
+        "39",
+        "-s",
+        "history-probe-resize",
+        "AUDIT_LOG='/root/projects/project-oh-my-pi-fork/issues/evidence/issue-023/verified-fix/history-probe-resize.jsonl' AUDIT_SCENARIO='history-probe' '/root/.bun/bin/bun' '/root/projects/project-oh-my-pi-fork/issues/evidence/issue-023/followup-driver.ts'"
+      ],
+      "at": 1790723809912
+    },
+    {
+      "args": [
+        "set-option",
+        "-w",
+        "-t",
+        "history-probe-resize",
+        "remain-on-exit",
+        "on"
+      ],
+      "at": 1790723809917
+    },
+    {
+      "args": [
+        "display-message",
+        "-p",
+        "-t",
+        "history-probe-resize",
+        "#{pane_dead}|#{pane_title}"
+      ],
+      "at": 1790723809919
+    },
+    {
+      "args": [
+        "display-message",
+        "-p",
+        "-t",
+        "history-probe-resize",
+        "#{pane_dead}|#{pane_title}"
+      ],
+      "at": 1790723809942
+    },
+    {
+      "args": [
+        "display-message",
+        "-p",
+        "-t",
+        "history-probe-resize",
+        "#{pane_dead}|#{pane_title}"
+      ],
+      "at": 1790723809965
+    },
+    {
+      "args": [
+        "display-message",
+        "-p",
+        "-t",
+        "history-probe-resize",
+        "#{pane_dead}|#{pane_title}"
+      ],
+      "at": 1790723809987
+    },
+    {
+      "args": [
+        "display-message",
+        "-p",
+        "-t",
+        "history-probe-resize",
+        "#{pane_dead}|#{pane_title}"
+      ],
+      "at": 1790723810010
+    },
+    {
+      "args": [
+        "display-message",
+        "-p",
+        "-t",
+        "history-probe-resize",
+        "#{pane_dead}|#{pane_title}"
+      ],
+      "at": 1790723810032
+    },
+    {
+      "args": [
+        "display-message",
+        "-p",
+        "-t",
+        "history-probe-resize",
+        "#{pane_dead}|#{pane_title}"
+      ],
+      "at": 1790723810054
+    },
+    {
+      "args": [
+        "display-message",
+        "-p",
+        "-t",
+        "history-probe-resize",
+        "#{pane_dead}|#{pane_title}"
+      ],
+      "at": 1790723810077
+    },
+    {
+      "args": [
+        "display-message",
+        "-p",
+        "-t",
+        "history-probe-resize",
+        "#{pane_dead}|#{pane_title}"
+      ],
+      "at": 1790723810099
+    },
+    {
+      "args": [
+        "display-message",
+        "-p",
+        "-t",
+        "history-probe-resize",
+        "#{pane_dead}|#{pane_title}"
+      ],
+      "at": 1790723810121
+    },
+    {
+      "args": [
+        "display-message",
+        "-p",
+        "-t",
+        "history-probe-resize",
+        "#{pane_dead}|#{pane_title}"
+      ],
+      "at": 1790723810144
+    },
+    {
+      "args": [
+        "display-message",
+        "-p",
+        "-t",
+        "history-probe-resize",
+        "#{pane_dead}|#{pane_title}"
+      ],
+      "at": 1790723810167
+    },
+    {
+      "args": [
+        "display-message",
+        "-p",
+        "-t",
+        "history-probe-resize",
+        "#{pane_dead}|#{pane_title}"
+      ],
+      "at": 1790723810190
+    },
+    {
+      "args": [
+        "display-message",
+        "-p",
+        "-t",
+        "history-probe-resize",
+        "#{pane_dead}|#{pane_title}"
+      ],
+      "at": 1790723810212
+    },
+    {
+      "args": [
+        "display-message",
+        "-p",
+        "-t",
+        "history-probe-resize",
+        "#{pane_dead}|#{pane_title}"
+      ],
+      "at": 1790723810235
+    },
+    {
+      "args": [
+        "display-message",
+        "-p",
+        "-t",
+        "history-probe-resize",
+        "#{pane_dead}|#{pane_title}"
+      ],
+      "at": 1790723810258
+    },
+    {
+      "args": [
+        "capture-pane",
+        "-p",
+        "-t",
+        "history-probe-resize"
+      ],
+      "at": 1790723810261
+    },
+    {
+      "args": [
+        "capture-pane",
+        "-p",
+        "-S",
+        "-",
+        "-t",
+        "history-probe-resize"
+      ],
+      "at": 1790723810263
+    },
+    {
+      "args": [
+        "display-message",
+        "-p",
+        "-t",
+        "history-probe-resize",
+        "#{history_size}"
+      ],
+      "at": 1790723810266
+    },
+    {
+      "args": [
+        "resize-window",
+        "-t",
+        "history-probe-resize",
+        "-x",
+        "79",
+        "-y",
+        "33"
+      ],
+      "at": 1790723810269
+    },
+    {
+      "args": [
+        "display-message",
+        "-p",
+        "-t",
+        "history-probe-resize",
+        "#{pane_dead}|#{pane_title}"
+      ],
+      "at": 1790723810271
+    },
+    {
+      "args": [
+        "display-message",
+        "-p",
+        "-t",
+        "history-probe-resize",
+        "#{pane_dead}|#{pane_title}"
+      ],
+      "at": 1790723810293
+    },
+    {
+      "args": [
+        "display-message",
+        "-p",
+        "-t",
+        "history-probe-resize",
+        "#{pane_dead}|#{pane_title}"
+      ],
+      "at": 1790723810316
+    },
+    {
+      "args": [
+        "display-message",
+        "-p",
+        "-t",
+        "history-probe-resize",
+        "#{pane_dead}|#{pane_title}"
+      ],
+      "at": 1790723810339
+    },
+    {
+      "args": [
+        "display-message",
+        "-p",
+        "-t",
+        "history-probe-resize",
+        "#{pane_dead}|#{pane_title}"
+      ],
+      "at": 1790723810361
+    },
+    {
+      "args": [
+        "display-message",
+        "-p",
+        "-t",
+        "history-probe-resize",
+        "#{pane_dead}|#{pane_title}"
+      ],
+      "at": 1790723810384
+    },
+    {
+      "args": [
+        "display-message",
+        "-p",
+        "-t",
+        "history-probe-resize",
+        "#{pane_dead}|#{pane_title}"
+      ],
+      "at": 1790723810406
+    },
+    {
+      "args": [
+        "capture-pane",
+        "-p",
+        "-t",
+        "history-probe-resize"
+      ],
+      "at": 1790723810409
+    },
+    {
+      "args": [
+        "capture-pane",
+        "-p",
+        "-S",
+        "-",
+        "-t",
+        "history-probe-resize"
+      ],
+      "at": 1790723810411
+    },
+    {
+      "args": [
+        "display-message",
+        "-p",
+        "-t",
+        "history-probe-resize",
+        "#{history_size}"
+      ],
+      "at": 1790723810414
+    },
+    {
+      "args": [
+        "resize-window",
+        "-t",
+        "history-probe-resize",
+        "-x",
+        "79",
+        "-y",
+        "39"
+      ],
+      "at": 1790723810418
+    },
+    {
+      "args": [
+        "display-message",
+        "-p",
+        "-t",
+        "history-probe-resize",
+        "#{pane_dead}|#{pane_title}"
+      ],
+      "at": 1790723810420
+    },
+    {
+      "args": [
+        "display-message",
+        "-p",
+        "-t",
+        "history-probe-resize",
+        "#{pane_dead}|#{pane_title}"
+      ],
+      "at": 1790723810443
+    },
+    {
+      "args": [
+        "display-message",
+        "-p",
+        "-t",
+        "history-probe-resize",
+        "#{pane_dead}|#{pane_title}"
+      ],
+      "at": 1790723810465
+    },
+    {
+      "args": [
+        "display-message",
+        "-p",
+        "-t",
+        "history-probe-resize",
+        "#{pane_dead}|#{pane_title}"
+      ],
+      "at": 1790723810488
+    },
+    {
+      "args": [
+        "display-message",
+        "-p",
+        "-t",
+        "history-probe-resize",
+        "#{pane_dead}|#{pane_title}"
+      ],
+      "at": 1790723810510
+    },
+    {
+      "args": [
+        "display-message",
+        "-p",
+        "-t",
+        "history-probe-resize",
+        "#{pane_dead}|#{pane_title}"
+      ],
+      "at": 1790723810533
+    },
+    {
+      "args": [
+        "display-message",
+        "-p",
+        "-t",
+        "history-probe-resize",
+        "#{pane_dead}|#{pane_title}"
+      ],
+      "at": 1790723810556
+    },
+    {
+      "args": [
+        "display-message",
+        "-p",
+        "-t",
+        "history-probe-resize",
+        "#{pane_dead}|#{pane_title}"
+      ],
+      "at": 1790723810578
+    },
+    {
+      "args": [
+        "display-message",
+        "-p",
+        "-t",
+        "history-probe-resize",
+        "#{pane_dead}|#{pane_title}"
+      ],
+      "at": 1790723810601
+    },
+    {
+      "args": [
+        "display-message",
+        "-p",
+        "-t",
+        "history-probe-resize",
+        "#{pane_dead}|#{pane_title}"
+      ],
+      "at": 1790723810624
+    },
+    {
+      "args": [
+        "display-message",
+        "-p",
+        "-t",
+        "history-probe-resize",
+        "#{pane_dead}|#{pane_title}"
+      ],
+      "at": 1790723810646
+    },
+    {
+      "args": [
+        "capture-pane",
+        "-p",
+        "-t",
+        "history-probe-resize"
+      ],
+      "at": 1790723810649
+    },
+    {
+      "args": [
+        "capture-pane",
+        "-p",
+        "-S",
+        "-",
+        "-t",
+        "history-probe-resize"
+      ],
+      "at": 1790723810651
+    },
+    {
+      "args": [
+        "display-message",
+        "-p",
+        "-t",
+        "history-probe-resize",
+        "#{history_size}"
+      ],
+      "at": 1790723810654
+    },
+    {
+      "args": [
+        "send-keys",
+        "-t",
+        "history-probe-resize",
+        "F6"
+      ],
+      "at": 1790723810657
+    },
+    {
+      "args": [
+        "display-message",
+        "-p",
+        "-t",
+        "history-probe-resize",
+        "#{pane_dead}|#{pane_title}"
+      ],
+      "at": 1790723810659
+    },
+    {
+      "args": [
+        "display-message",
+        "-p",
+        "-t",
+        "history-probe-resize",
+        "#{pane_dead}|#{pane_title}"
+      ],
+      "at": 1790723810682
+    },
+    {
+      "args": [
+        "capture-pane",
+        "-p",
+        "-t",
+        "history-probe-resize"
+      ],
+      "at": 1790723810684
+    },
+    {
+      "args": [
+        "capture-pane",
+        "-p",
+        "-S",
+        "-",
+        "-t",
+        "history-probe-resize"
+      ],
+      "at": 1790723810687
+    },
+    {
+      "args": [
+        "display-message",
+        "-p",
+        "-t",
+        "history-probe-resize",
+        "#{history_size}"
+      ],
+      "at": 1790723810689
+    },
+    {
+      "args": [
+        "send-keys",
+        "-t",
+        "history-probe-resize",
+        "F7"
+      ],
+      "at": 1790723810692
+    },
+    {
+      "args": [
+        "display-message",
+        "-p",
+        "-t",
+        "history-probe-resize",
+        "#{pane_dead}|#{pane_title}"
+      ],
+      "at": 1790723810694
+    },
+    {
+      "args": [
+        "display-message",
+        "-p",
+        "-t",
+        "history-probe-resize",
+        "#{pane_dead}|#{pane_title}"
+      ],
+      "at": 1790723810717
+    },
+    {
+      "args": [
+        "capture-pane",
+        "-p",
+        "-t",
+        "history-probe-resize"
+      ],
+      "at": 1790723810820
+    },
+    {
+      "args": [
+        "capture-pane",
+        "-p",
+        "-S",
+        "-",
+        "-t",
+        "history-probe-resize"
+      ],
+      "at": 1790723810822
+    },
+    {
+      "args": [
+        "display-message",
+        "-p",
+        "-t",
+        "history-probe-resize",
+        "#{history_size}"
+      ],
+      "at": 1790723810824
+    },
+    {
+      "args": [
+        "send-keys",
+        "-t",
+        "history-probe-resize",
+        "F8"
+      ],
+      "at": 1790723810828
+    },
+    {
+      "args": [
+        "display-message",
+        "-p",
+        "-t",
+        "history-probe-resize",
+        "#{pane_dead}|#{pane_title}"
+      ],
+      "at": 1790723810830
+    },
+    {
+      "args": [
+        "display-message",
+        "-p",
+        "-t",
+        "history-probe-resize",
+        "#{pane_dead}|#{pane_title}"
+      ],
+      "at": 1790723810852
+    },
+    {
+      "args": [
+        "capture-pane",
+        "-p",
+        "-t",
+        "history-probe-resize"
+      ],
+      "at": 1790723810955
+    },
+    {
+      "args": [
+        "capture-pane",
+        "-p",
+        "-S",
+        "-",
+        "-t",
+        "history-probe-resize"
+      ],
+      "at": 1790723810958
+    },
+    {
+      "args": [
+        "display-message",
+        "-p",
+        "-t",
+        "history-probe-resize",
+        "#{history_size}"
+      ],
+      "at": 1790723810961
+    },
+    {
+      "args": [
+        "send-keys",
+        "-t",
+        "history-probe-resize",
+        "F9"
+      ],
+      "at": 1790723810964
+    },
+    {
+      "args": [
+        "new-session",
+        "-d",
+        "-x",
+        "79",
+        "-y",
+        "39",
+        "-s",
+        "finalize-short-control",
+        "AUDIT_LOG='/root/projects/project-oh-my-pi-fork/issues/evidence/issue-023/verified-fix/finalize-short-control.jsonl' AUDIT_SCENARIO='finalize-short' '/root/.bun/bin/bun' '/root/projects/project-oh-my-pi-fork/issues/evidence/issue-023/followup-driver.ts'"
+      ],
+      "at": 1790723810967
+    },
+    {
+      "args": [
+        "set-option",
+        "-w",
+        "-t",
+        "finalize-short-control",
+        "remain-on-exit",
+        "on"
+      ],
+      "at": 1790723810971
+    },
+    {
+      "args": [
+        "display-message",
+        "-p",
+        "-t",
+        "finalize-short-control",
+        "#{pane_dead}|#{pane_title}"
+      ],
+      "at": 1790723810973
+    },
+    {
+      "args": [
+        "display-message",
+        "-p",
+        "-t",
+        "finalize-short-control",
+        "#{pane_dead}|#{pane_title}"
+      ],
+      "at": 1790723810996
+    },
+    {
+      "args": [
+        "display-message",
+        "-p",
+        "-t",
+        "finalize-short-control",
+        "#{pane_dead}|#{pane_title}"
+      ],
+      "at": 1790723811018
+    },
+    {
+      "args": [
+        "display-message",
+        "-p",
+        "-t",
+        "finalize-short-control",
+        "#{pane_dead}|#{pane_title}"
+      ],
+      "at": 1790723811041
+    },
+    {
+      "args": [
+        "display-message",
+        "-p",
+        "-t",
+        "finalize-short-control",
+        "#{pane_dead}|#{pane_title}"
+      ],
+      "at": 1790723811063
+    },
+    {
+      "args": [
+        "display-message",
+        "-p",
+        "-t",
+        "finalize-short-control",
+        "#{pane_dead}|#{pane_title}"
+      ],
+      "at": 1790723811086
+    },
+    {
+      "args": [
+        "display-message",
+        "-p",
+        "-t",
+        "finalize-short-control",
+        "#{pane_dead}|#{pane_title}"
+      ],
+      "at": 1790723811108
+    },
+    {
+      "args": [
+        "display-message",
+        "-p",
+        "-t",
+        "finalize-short-control",
+        "#{pane_dead}|#{pane_title}"
+      ],
+      "at": 1790723811131
+    },
+    {
+      "args": [
+        "display-message",
+        "-p",
+        "-t",
+        "finalize-short-control",
+        "#{pane_dead}|#{pane_title}"
+      ],
+      "at": 1790723811154
+    },
+    {
+      "args": [
+        "display-message",
+        "-p",
+        "-t",
+        "finalize-short-control",
+        "#{pane_dead}|#{pane_title}"
+      ],
+      "at": 1790723811176
+    },
+    {
+      "args": [
+        "display-message",
+        "-p",
+        "-t",
+        "finalize-short-control",
+        "#{pane_dead}|#{pane_title}"
+      ],
+      "at": 1790723811198
+    },
+    {
+      "args": [
+        "display-message",
+        "-p",
+        "-t",
+        "finalize-short-control",
+        "#{pane_dead}|#{pane_title}"
+      ],
+      "at": 1790723811221
+    },
+    {
+      "args": [
+        "display-message",
+        "-p",
+        "-t",
+        "finalize-short-control",
+        "#{pane_dead}|#{pane_title}"
+      ],
+      "at": 1790723811244
+    },
+    {
+      "args": [
+        "display-message",
+        "-p",
+        "-t",
+        "finalize-short-control",
+        "#{pane_dead}|#{pane_title}"
+      ],
+      "at": 1790723811267
+    },
+    {
+      "args": [
+        "display-message",
+        "-p",
+        "-t",
+        "finalize-short-control",
+        "#{pane_dead}|#{pane_title}"
+      ],
+      "at": 1790723811289
+    },
+    {
+      "args": [
+        "display-message",
+        "-p",
+        "-t",
+        "finalize-short-control",
+        "#{pane_dead}|#{pane_title}"
+      ],
+      "at": 1790723811312
+    },
+    {
+      "args": [
+        "capture-pane",
+        "-p",
+        "-t",
+        "finalize-short-control"
+      ],
+      "at": 1790723811314
+    },
+    {
+      "args": [
+        "capture-pane",
+        "-p",
+        "-S",
+        "-",
+        "-t",
+        "finalize-short-control"
+      ],
+      "at": 1790723811317
+    },
+    {
+      "args": [
+        "display-message",
+        "-p",
+        "-t",
+        "finalize-short-control",
+        "#{history_size}"
+      ],
+      "at": 1790723811319
+    },
+    {
+      "args": [
+        "send-keys",
+        "-t",
+        "finalize-short-control",
+        "F6"
+      ],
+      "at": 1790723811322
+    },
+    {
+      "args": [
+        "display-message",
+        "-p",
+        "-t",
+        "finalize-short-control",
+        "#{pane_dead}|#{pane_title}"
+      ],
+      "at": 1790723811324
+    },
+    {
+      "args": [
+        "display-message",
+        "-p",
+        "-t",
+        "finalize-short-control",
+        "#{pane_dead}|#{pane_title}"
+      ],
+      "at": 1790723811347
+    },
+    {
+      "args": [
+        "display-message",
+        "-p",
+        "-t",
+        "finalize-short-control",
+        "#{pane_dead}|#{pane_title}"
+      ],
+      "at": 1790723811369
+    },
+    {
+      "args": [
+        "capture-pane",
+        "-p",
+        "-t",
+        "finalize-short-control"
+      ],
+      "at": 1790723811372
+    },
+    {
+      "args": [
+        "capture-pane",
+        "-p",
+        "-S",
+        "-",
+        "-t",
+        "finalize-short-control"
+      ],
+      "at": 1790723811375
+    },
+    {
+      "args": [
+        "display-message",
+        "-p",
+        "-t",
+        "finalize-short-control",
+        "#{history_size}"
+      ],
+      "at": 1790723811377
+    },
+    {
+      "args": [
+        "send-keys",
+        "-t",
+        "finalize-short-control",
+        "F7"
+      ],
+      "at": 1790723811380
+    },
+    {
+      "args": [
+        "display-message",
+        "-p",
+        "-t",
+        "finalize-short-control",
+        "#{pane_dead}|#{pane_title}"
+      ],
+      "at": 1790723811382
+    },
+    {
+      "args": [
+        "display-message",
+        "-p",
+        "-t",
+        "finalize-short-control",
+        "#{pane_dead}|#{pane_title}"
+      ],
+      "at": 1790723811404
+    },
+    {
+      "args": [
+        "capture-pane",
+        "-p",
+        "-t",
+        "finalize-short-control"
+      ],
+      "at": 1790723811507
+    },
+    {
+      "args": [
+        "capture-pane",
+        "-p",
+        "-S",
+        "-",
+        "-t",
+        "finalize-short-control"
+      ],
+      "at": 1790723811510
+    },
+    {
+      "args": [
+        "display-message",
+        "-p",
+        "-t",
+        "finalize-short-control",
+        "#{history_size}"
+      ],
+      "at": 1790723811512
+    },
+    {
+      "args": [
+        "send-keys",
+        "-t",
+        "finalize-short-control",
+        "F8"
+      ],
+      "at": 1790723811515
+    },
+    {
+      "args": [
+        "display-message",
+        "-p",
+        "-t",
+        "finalize-short-control",
+        "#{pane_dead}|#{pane_title}"
+      ],
+      "at": 1790723811517
+    },
+    {
+      "args": [
+        "display-message",
+        "-p",
+        "-t",
+        "finalize-short-control",
+        "#{pane_dead}|#{pane_title}"
+      ],
+      "at": 1790723811539
+    },
+    {
+      "args": [
+        "capture-pane",
+        "-p",
+        "-t",
+        "finalize-short-control"
+      ],
+      "at": 1790723811642
+    },
+    {
+      "args": [
+        "capture-pane",
+        "-p",
+        "-S",
+        "-",
+        "-t",
+        "finalize-short-control"
+      ],
+      "at": 1790723811644
+    },
+    {
+      "args": [
+        "display-message",
+        "-p",
+        "-t",
+        "finalize-short-control",
+        "#{history_size}"
+      ],
+      "at": 1790723811647
+    },
+    {
+      "args": [
+        "send-keys",
+        "-t",
+        "finalize-short-control",
+        "F9"
+      ],
+      "at": 1790723811650
+    },
+    {
+      "args": [
+        "new-session",
+        "-d",
+        "-x",
+        "79",
+        "-y",
+        "39",
+        "-s",
+        "finalize-short-resize",
+        "AUDIT_LOG='/root/projects/project-oh-my-pi-fork/issues/evidence/issue-023/verified-fix/finalize-short-resize.jsonl' AUDIT_SCENARIO='finalize-short' '/root/.bun/bin/bun' '/root/projects/project-oh-my-pi-fork/issues/evidence/issue-023/followup-driver.ts'"
+      ],
+      "at": 1790723811652
+    },
+    {
+      "args": [
+        "set-option",
+        "-w",
+        "-t",
+        "finalize-short-resize",
+        "remain-on-exit",
+        "on"
+      ],
+      "at": 1790723811656
+    },
+    {
+      "args": [
+        "display-message",
+        "-p",
+        "-t",
+        "finalize-short-resize",
+        "#{pane_dead}|#{pane_title}"
+      ],
+      "at": 1790723811659
+    },
+    {
+      "args": [
+        "display-message",
+        "-p",
+        "-t",
+        "finalize-short-resize",
+        "#{pane_dead}|#{pane_title}"
+      ],
+      "at": 1790723811681
+    },
+    {
+      "args": [
+        "display-message",
+        "-p",
+        "-t",
+        "finalize-short-resize",
+        "#{pane_dead}|#{pane_title}"
+      ],
+      "at": 1790723811704
+    },
+    {
+      "args": [
+        "display-message",
+        "-p",
+        "-t",
+        "finalize-short-resize",
+        "#{pane_dead}|#{pane_title}"
+      ],
+      "at": 1790723811726
+    },
+    {
+      "args": [
+        "display-message",
+        "-p",
+        "-t",
+        "finalize-short-resize",
+        "#{pane_dead}|#{pane_title}"
+      ],
+      "at": 1790723811749
+    },
+    {
+      "args": [
+        "display-message",
+        "-p",
+        "-t",
+        "finalize-short-resize",
+        "#{pane_dead}|#{pane_title}"
+      ],
+      "at": 1790723811772
+    },
+    {
+      "args": [
+        "display-message",
+        "-p",
+        "-t",
+        "finalize-short-resize",
+        "#{pane_dead}|#{pane_title}"
+      ],
+      "at": 1790723811795
+    },
+    {
+      "args": [
+        "display-message",
+        "-p",
+        "-t",
+        "finalize-short-resize",
+        "#{pane_dead}|#{pane_title}"
+      ],
+      "at": 1790723811817
+    },
+    {
+      "args": [
+        "display-message",
+        "-p",
+        "-t",
+        "finalize-short-resize",
+        "#{pane_dead}|#{pane_title}"
+      ],
+      "at": 1790723811839
+    },
+    {
+      "args": [
+        "display-message",
+        "-p",
+        "-t",
+        "finalize-short-resize",
+        "#{pane_dead}|#{pane_title}"
+      ],
+      "at": 1790723811861
+    },
+    {
+      "args": [
+        "display-message",
+        "-p",
+        "-t",
+        "finalize-short-resize",
+        "#{pane_dead}|#{pane_title}"
+      ],
+      "at": 1790723811884
+    },
+    {
+      "args": [
+        "display-message",
+        "-p",
+        "-t",
+        "finalize-short-resize",
+        "#{pane_dead}|#{pane_title}"
+      ],
+      "at": 1790723811906
+    },
+    {
+      "args": [
+        "display-message",
+        "-p",
+        "-t",
+        "finalize-short-resize",
+        "#{pane_dead}|#{pane_title}"
+      ],
+      "at": 1790723811929
+    },
+    {
+      "args": [
+        "display-message",
+        "-p",
+        "-t",
+        "finalize-short-resize",
+        "#{pane_dead}|#{pane_title}"
+      ],
+      "at": 1790723811952
+    },
+    {
+      "args": [
+        "display-message",
+        "-p",
+        "-t",
+        "finalize-short-resize",
+        "#{pane_dead}|#{pane_title}"
+      ],
+      "at": 1790723811975
+    },
+    {
+      "args": [
+        "capture-pane",
+        "-p",
+        "-t",
+        "finalize-short-resize"
+      ],
+      "at": 1790723811977
+    },
+    {
+      "args": [
+        "capture-pane",
+        "-p",
+        "-S",
+        "-",
+        "-t",
+        "finalize-short-resize"
+      ],
+      "at": 1790723811979
+    },
+    {
+      "args": [
+        "display-message",
+        "-p",
+        "-t",
+        "finalize-short-resize",
+        "#{history_size}"
+      ],
+      "at": 1790723811981
+    },
+    {
+      "args": [
+        "resize-window",
+        "-t",
+        "finalize-short-resize",
+        "-x",
+        "79",
+        "-y",
+        "33"
+      ],
+      "at": 1790723811984
+    },
+    {
+      "args": [
+        "display-message",
+        "-p",
+        "-t",
+        "finalize-short-resize",
+        "#{pane_dead}|#{pane_title}"
+      ],
+      "at": 1790723811986
+    },
+    {
+      "args": [
+        "display-message",
+        "-p",
+        "-t",
+        "finalize-short-resize",
+        "#{pane_dead}|#{pane_title}"
+      ],
+      "at": 1790723812008
+    },
+    {
+      "args": [
+        "display-message",
+        "-p",
+        "-t",
+        "finalize-short-resize",
+        "#{pane_dead}|#{pane_title}"
+      ],
+      "at": 1790723812031
+    },
+    {
+      "args": [
+        "display-message",
+        "-p",
+        "-t",
+        "finalize-short-resize",
+        "#{pane_dead}|#{pane_title}"
+      ],
+      "at": 1790723812054
+    },
+    {
+      "args": [
+        "display-message",
+        "-p",
+        "-t",
+        "finalize-short-resize",
+        "#{pane_dead}|#{pane_title}"
+      ],
+      "at": 1790723812077
+    },
+    {
+      "args": [
+        "display-message",
+        "-p",
+        "-t",
+        "finalize-short-resize",
+        "#{pane_dead}|#{pane_title}"
+      ],
+      "at": 1790723812099
+    },
+    {
+      "args": [
+        "display-message",
+        "-p",
+        "-t",
+        "finalize-short-resize",
+        "#{pane_dead}|#{pane_title}"
+      ],
+      "at": 1790723812121
+    },
+    {
+      "args": [
+        "capture-pane",
+        "-p",
+        "-t",
+        "finalize-short-resize"
+      ],
+      "at": 1790723812124
+    },
+    {
+      "args": [
+        "capture-pane",
+        "-p",
+        "-S",
+        "-",
+        "-t",
+        "finalize-short-resize"
+      ],
+      "at": 1790723812126
+    },
+    {
+      "args": [
+        "display-message",
+        "-p",
+        "-t",
+        "finalize-short-resize",
+        "#{history_size}"
+      ],
+      "at": 1790723812129
+    },
+    {
+      "args": [
+        "resize-window",
+        "-t",
+        "finalize-short-resize",
+        "-x",
+        "79",
+        "-y",
+        "39"
+      ],
+      "at": 1790723812132
+    },
+    {
+      "args": [
+        "display-message",
+        "-p",
+        "-t",
+        "finalize-short-resize",
+        "#{pane_dead}|#{pane_title}"
+      ],
+      "at": 1790723812134
+    },
+    {
+      "args": [
+        "display-message",
+        "-p",
+        "-t",
+        "finalize-short-resize",
+        "#{pane_dead}|#{pane_title}"
+      ],
+      "at": 1790723812157
+    },
+    {
+      "args": [
+        "display-message",
+        "-p",
+        "-t",
+        "finalize-short-resize",
+        "#{pane_dead}|#{pane_title}"
+      ],
+      "at": 1790723812179
+    },
+    {
+      "args": [
+        "display-message",
+        "-p",
+        "-t",
+        "finalize-short-resize",
+        "#{pane_dead}|#{pane_title}"
+      ],
+      "at": 1790723812202
+    },
+    {
+      "args": [
+        "display-message",
+        "-p",
+        "-t",
+        "finalize-short-resize",
+        "#{pane_dead}|#{pane_title}"
+      ],
+      "at": 1790723812225
+    },
+    {
+      "args": [
+        "display-message",
+        "-p",
+        "-t",
+        "finalize-short-resize",
+        "#{pane_dead}|#{pane_title}"
+      ],
+      "at": 1790723812248
+    },
+    {
+      "args": [
+        "display-message",
+        "-p",
+        "-t",
+        "finalize-short-resize",
+        "#{pane_dead}|#{pane_title}"
+      ],
+      "at": 1790723812271
+    },
+    {
+      "args": [
+        "display-message",
+        "-p",
+        "-t",
+        "finalize-short-resize",
+        "#{pane_dead}|#{pane_title}"
+      ],
+      "at": 1790723812294
+    },
+    {
+      "args": [
+        "display-message",
+        "-p",
+        "-t",
+        "finalize-short-resize",
+        "#{pane_dead}|#{pane_title}"
+      ],
+      "at": 1790723812317
+    },
+    {
+      "args": [
+        "display-message",
+        "-p",
+        "-t",
+        "finalize-short-resize",
+        "#{pane_dead}|#{pane_title}"
+      ],
+      "at": 1790723812340
+    },
+    {
+      "args": [
+        "display-message",
+        "-p",
+        "-t",
+        "finalize-short-resize",
+        "#{pane_dead}|#{pane_title}"
+      ],
+      "at": 1790723812363
+    },
+    {
+      "args": [
+        "capture-pane",
+        "-p",
+        "-t",
+        "finalize-short-resize"
+      ],
+      "at": 1790723812365
+    },
+    {
+      "args": [
+        "capture-pane",
+        "-p",
+        "-S",
+        "-",
+        "-t",
+        "finalize-short-resize"
+      ],
+      "at": 1790723812368
+    },
+    {
+      "args": [
+        "display-message",
+        "-p",
+        "-t",
+        "finalize-short-resize",
+        "#{history_size}"
+      ],
+      "at": 1790723812370
+    },
+    {
+      "args": [
+        "send-keys",
+        "-t",
+        "finalize-short-resize",
+        "F6"
+      ],
+      "at": 1790723812373
+    },
+    {
+      "args": [
+        "display-message",
+        "-p",
+        "-t",
+        "finalize-short-resize",
+        "#{pane_dead}|#{pane_title}"
+      ],
+      "at": 1790723812375
+    },
+    {
+      "args": [
+        "display-message",
+        "-p",
+        "-t",
+        "finalize-short-resize",
+        "#{pane_dead}|#{pane_title}"
+      ],
+      "at": 1790723812397
+    },
+    {
+      "args": [
+        "capture-pane",
+        "-p",
+        "-t",
+        "finalize-short-resize"
+      ],
+      "at": 1790723812400
+    },
+    {
+      "args": [
+        "capture-pane",
+        "-p",
+        "-S",
+        "-",
+        "-t",
+        "finalize-short-resize"
+      ],
+      "at": 1790723812403
+    },
+    {
+      "args": [
+        "display-message",
+        "-p",
+        "-t",
+        "finalize-short-resize",
+        "#{history_size}"
+      ],
+      "at": 1790723812406
+    },
+    {
+      "args": [
+        "send-keys",
+        "-t",
+        "finalize-short-resize",
+        "F7"
+      ],
+      "at": 1790723812408
+    },
+    {
+      "args": [
+        "display-message",
+        "-p",
+        "-t",
+        "finalize-short-resize",
+        "#{pane_dead}|#{pane_title}"
+      ],
+      "at": 1790723812410
+    },
+    {
+      "args": [
+        "display-message",
+        "-p",
+        "-t",
+        "finalize-short-resize",
+        "#{pane_dead}|#{pane_title}"
+      ],
+      "at": 1790723812432
+    },
+    {
+      "args": [
+        "capture-pane",
+        "-p",
+        "-t",
+        "finalize-short-resize"
+      ],
+      "at": 1790723812536
+    },
+    {
+      "args": [
+        "capture-pane",
+        "-p",
+        "-S",
+        "-",
+        "-t",
+        "finalize-short-resize"
+      ],
+      "at": 1790723812539
+    },
+    {
+      "args": [
+        "display-message",
+        "-p",
+        "-t",
+        "finalize-short-resize",
+        "#{history_size}"
+      ],
+      "at": 1790723812542
+    },
+    {
+      "args": [
+        "send-keys",
+        "-t",
+        "finalize-short-resize",
+        "F8"
+      ],
+      "at": 1790723812545
+    },
+    {
+      "args": [
+        "display-message",
+        "-p",
+        "-t",
+        "finalize-short-resize",
+        "#{pane_dead}|#{pane_title}"
+      ],
+      "at": 1790723812547
+    },
+    {
+      "args": [
+        "display-message",
+        "-p",
+        "-t",
+        "finalize-short-resize",
+        "#{pane_dead}|#{pane_title}"
+      ],
+      "at": 1790723812569
+    },
+    {
+      "args": [
+        "capture-pane",
+        "-p",
+        "-t",
+        "finalize-short-resize"
+      ],
+      "at": 1790723812672
+    },
+    {
+      "args": [
+        "capture-pane",
+        "-p",
+        "-S",
+        "-",
+        "-t",
+        "finalize-short-resize"
+      ],
+      "at": 1790723812674
+    },
+    {
+      "args": [
+        "display-message",
+        "-p",
+        "-t",
+        "finalize-short-resize",
+        "#{history_size}"
+      ],
+      "at": 1790723812677
+    },
+    {
+      "args": [
+        "send-keys",
+        "-t",
+        "finalize-short-resize",
+        "F9"
+      ],
+      "at": 1790723812680
+    },
+    {
+      "args": [
+        "new-session",
+        "-d",
+        "-x",
+        "79",
+        "-y",
+        "19",
+        "-s",
+        "raw-scroll-control",
+        "AUDIT_LOG='/root/projects/project-oh-my-pi-fork/issues/evidence/issue-023/verified-fix/raw-scroll-control.jsonl' AUDIT_SCENARIO='raw-scroll' '/root/.bun/bin/bun' '/root/projects/project-oh-my-pi-fork/issues/evidence/issue-023/followup-driver.ts'"
+      ],
+      "at": 1790723812682
+    },
+    {
+      "args": [
+        "set-option",
+        "-w",
+        "-t",
+        "raw-scroll-control",
+        "remain-on-exit",
+        "on"
+      ],
+      "at": 1790723812686
+    },
+    {
+      "args": [
+        "display-message",
+        "-p",
+        "-t",
+        "raw-scroll-control",
+        "#{pane_dead}|#{pane_title}"
+      ],
+      "at": 1790723812689
+    },
+    {
+      "args": [
+        "display-message",
+        "-p",
+        "-t",
+        "raw-scroll-control",
+        "#{pane_dead}|#{pane_title}"
+      ],
+      "at": 1790723812711
+    },
+    {
+      "args": [
+        "display-message",
+        "-p",
+        "-t",
+        "raw-scroll-control",
+        "#{pane_dead}|#{pane_title}"
+      ],
+      "at": 1790723812734
+    },
+    {
+      "args": [
+        "display-message",
+        "-p",
+        "-t",
+        "raw-scroll-control",
+        "#{pane_dead}|#{pane_title}"
+      ],
+      "at": 1790723812756
+    },
+    {
+      "args": [
+        "display-message",
+        "-p",
+        "-t",
+        "raw-scroll-control",
+        "#{pane_dead}|#{pane_title}"
+      ],
+      "at": 1790723812779
+    },
+    {
+      "args": [
+        "display-message",
+        "-p",
+        "-t",
+        "raw-scroll-control",
+        "#{pane_dead}|#{pane_title}"
+      ],
+      "at": 1790723812802
+    },
+    {
+      "args": [
+        "display-message",
+        "-p",
+        "-t",
+        "raw-scroll-control",
+        "#{pane_dead}|#{pane_title}"
+      ],
+      "at": 1790723812824
+    },
+    {
+      "args": [
+        "display-message",
+        "-p",
+        "-t",
+        "raw-scroll-control",
+        "#{pane_dead}|#{pane_title}"
+      ],
+      "at": 1790723812847
+    },
+    {
+      "args": [
+        "display-message",
+        "-p",
+        "-t",
+        "raw-scroll-control",
+        "#{pane_dead}|#{pane_title}"
+      ],
+      "at": 1790723812869
+    },
+    {
+      "args": [
+        "display-message",
+        "-p",
+        "-t",
+        "raw-scroll-control",
+        "#{pane_dead}|#{pane_title}"
+      ],
+      "at": 1790723812892
+    },
+    {
+      "args": [
+        "display-message",
+        "-p",
+        "-t",
+        "raw-scroll-control",
+        "#{pane_dead}|#{pane_title}"
+      ],
+      "at": 1790723812915
+    },
+    {
+      "args": [
+        "display-message",
+        "-p",
+        "-t",
+        "raw-scroll-control",
+        "#{pane_dead}|#{pane_title}"
+      ],
+      "at": 1790723812938
+    },
+    {
+      "args": [
+        "display-message",
+        "-p",
+        "-t",
+        "raw-scroll-control",
+        "#{pane_dead}|#{pane_title}"
+      ],
+      "at": 1790723812960
+    },
+    {
+      "args": [
+        "display-message",
+        "-p",
+        "-t",
+        "raw-scroll-control",
+        "#{pane_dead}|#{pane_title}"
+      ],
+      "at": 1790723812983
+    },
+    {
+      "args": [
+        "display-message",
+        "-p",
+        "-t",
+        "raw-scroll-control",
+        "#{pane_dead}|#{pane_title}"
+      ],
+      "at": 1790723813006
+    },
+    {
+      "args": [
+        "capture-pane",
+        "-p",
+        "-t",
+        "raw-scroll-control"
+      ],
+      "at": 1790723813008
+    },
+    {
+      "args": [
+        "capture-pane",
+        "-p",
+        "-S",
+        "-",
+        "-t",
+        "raw-scroll-control"
+      ],
+      "at": 1790723813010
+    },
+    {
+      "args": [
+        "display-message",
+        "-p",
+        "-t",
+        "raw-scroll-control",
+        "#{history_size}"
+      ],
+      "at": 1790723813012
+    },
+    {
+      "args": [
+        "send-keys",
+        "-t",
+        "raw-scroll-control",
+        "F6"
+      ],
+      "at": 1790723813015
+    },
+    {
+      "args": [
+        "display-message",
+        "-p",
+        "-t",
+        "raw-scroll-control",
+        "#{pane_dead}|#{pane_title}"
+      ],
+      "at": 1790723813018
+    },
+    {
+      "args": [
+        "display-message",
+        "-p",
+        "-t",
+        "raw-scroll-control",
+        "#{pane_dead}|#{pane_title}"
+      ],
+      "at": 1790723813040
+    },
+    {
+      "args": [
+        "capture-pane",
+        "-p",
+        "-t",
+        "raw-scroll-control"
+      ],
+      "at": 1790723813042
+    },
+    {
+      "args": [
+        "capture-pane",
+        "-p",
+        "-S",
+        "-",
+        "-t",
+        "raw-scroll-control"
+      ],
+      "at": 1790723813045
+    },
+    {
+      "args": [
+        "display-message",
+        "-p",
+        "-t",
+        "raw-scroll-control",
+        "#{history_size}"
+      ],
+      "at": 1790723813047
+    },
+    {
+      "args": [
+        "send-keys",
+        "-t",
+        "raw-scroll-control",
+        "F7"
+      ],
+      "at": 1790723813050
+    },
+    {
+      "args": [
+        "display-message",
+        "-p",
+        "-t",
+        "raw-scroll-control",
+        "#{pane_dead}|#{pane_title}"
+      ],
+      "at": 1790723813052
+    },
+    {
+      "args": [
+        "display-message",
+        "-p",
+        "-t",
+        "raw-scroll-control",
+        "#{pane_dead}|#{pane_title}"
+      ],
+      "at": 1790723813074
+    },
+    {
+      "args": [
+        "capture-pane",
+        "-p",
+        "-t",
+        "raw-scroll-control"
+      ],
+      "at": 1790723813177
+    },
+    {
+      "args": [
+        "capture-pane",
+        "-p",
+        "-S",
+        "-",
+        "-t",
+        "raw-scroll-control"
+      ],
+      "at": 1790723813180
+    },
+    {
+      "args": [
+        "display-message",
+        "-p",
+        "-t",
+        "raw-scroll-control",
+        "#{history_size}"
+      ],
+      "at": 1790723813183
+    },
+    {
+      "args": [
+        "send-keys",
+        "-t",
+        "raw-scroll-control",
+        "F8"
+      ],
+      "at": 1790723813186
+    },
+    {
+      "args": [
+        "display-message",
+        "-p",
+        "-t",
+        "raw-scroll-control",
+        "#{pane_dead}|#{pane_title}"
+      ],
+      "at": 1790723813188
+    },
+    {
+      "args": [
+        "capture-pane",
+        "-p",
+        "-t",
+        "raw-scroll-control"
+      ],
+      "at": 1790723813290
+    },
+    {
+      "args": [
+        "capture-pane",
+        "-p",
+        "-S",
+        "-",
+        "-t",
+        "raw-scroll-control"
+      ],
+      "at": 1790723813293
+    },
+    {
+      "args": [
+        "display-message",
+        "-p",
+        "-t",
+        "raw-scroll-control",
+        "#{history_size}"
+      ],
+      "at": 1790723813295
+    },
+    {
+      "args": [
+        "send-keys",
+        "-t",
+        "raw-scroll-control",
+        "F9"
+      ],
+      "at": 1790723813298
+    },
+    {
+      "args": [
+        "new-session",
+        "-d",
+        "-x",
+        "79",
+        "-y",
+        "19",
+        "-s",
+        "raw-scroll-resize",
+        "AUDIT_LOG='/root/projects/project-oh-my-pi-fork/issues/evidence/issue-023/verified-fix/raw-scroll-resize.jsonl' AUDIT_SCENARIO='raw-scroll' '/root/.bun/bin/bun' '/root/projects/project-oh-my-pi-fork/issues/evidence/issue-023/followup-driver.ts'"
+      ],
+      "at": 1790723813300
+    },
+    {
+      "args": [
+        "set-option",
+        "-w",
+        "-t",
+        "raw-scroll-resize",
+        "remain-on-exit",
+        "on"
+      ],
+      "at": 1790723813304
+    },
+    {
+      "args": [
+        "display-message",
+        "-p",
+        "-t",
+        "raw-scroll-resize",
+        "#{pane_dead}|#{pane_title}"
+      ],
+      "at": 1790723813306
+    },
+    {
+      "args": [
+        "display-message",
+        "-p",
+        "-t",
+        "raw-scroll-resize",
+        "#{pane_dead}|#{pane_title}"
+      ],
+      "at": 1790723813328
+    },
+    {
+      "args": [
+        "display-message",
+        "-p",
+        "-t",
+        "raw-scroll-resize",
+        "#{pane_dead}|#{pane_title}"
+      ],
+      "at": 1790723813351
+    },
+    {
+      "args": [
+        "display-message",
+        "-p",
+        "-t",
+        "raw-scroll-resize",
+        "#{pane_dead}|#{pane_title}"
+      ],
+      "at": 1790723813374
+    },
+    {
+      "args": [
+        "display-message",
+        "-p",
+        "-t",
+        "raw-scroll-resize",
+        "#{pane_dead}|#{pane_title}"
+      ],
+      "at": 1790723813396
+    },
+    {
+      "args": [
+        "display-message",
+        "-p",
+        "-t",
+        "raw-scroll-resize",
+        "#{pane_dead}|#{pane_title}"
+      ],
+      "at": 1790723813418
+    },
+    {
+      "args": [
+        "display-message",
+        "-p",
+        "-t",
+        "raw-scroll-resize",
+        "#{pane_dead}|#{pane_title}"
+      ],
+      "at": 1790723813441
+    },
+    {
+      "args": [
+        "display-message",
+        "-p",
+        "-t",
+        "raw-scroll-resize",
+        "#{pane_dead}|#{pane_title}"
+      ],
+      "at": 1790723813463
+    },
+    {
+      "args": [
+        "display-message",
+        "-p",
+        "-t",
+        "raw-scroll-resize",
+        "#{pane_dead}|#{pane_title}"
+      ],
+      "at": 1790723813485
+    },
+    {
+      "args": [
+        "display-message",
+        "-p",
+        "-t",
+        "raw-scroll-resize",
+        "#{pane_dead}|#{pane_title}"
+      ],
+      "at": 1790723813508
+    },
+    {
+      "args": [
+        "display-message",
+        "-p",
+        "-t",
+        "raw-scroll-resize",
+        "#{pane_dead}|#{pane_title}"
+      ],
+      "at": 1790723813530
+    },
+    {
+      "args": [
+        "display-message",
+        "-p",
+        "-t",
+        "raw-scroll-resize",
+        "#{pane_dead}|#{pane_title}"
+      ],
+      "at": 1790723813553
+    },
+    {
+      "args": [
+        "display-message",
+        "-p",
+        "-t",
+        "raw-scroll-resize",
+        "#{pane_dead}|#{pane_title}"
+      ],
+      "at": 1790723813575
+    },
+    {
+      "args": [
+        "display-message",
+        "-p",
+        "-t",
+        "raw-scroll-resize",
+        "#{pane_dead}|#{pane_title}"
+      ],
+      "at": 1790723813598
+    },
+    {
+      "args": [
+        "display-message",
+        "-p",
+        "-t",
+        "raw-scroll-resize",
+        "#{pane_dead}|#{pane_title}"
+      ],
+      "at": 1790723813621
+    },
+    {
+      "args": [
+        "capture-pane",
+        "-p",
+        "-t",
+        "raw-scroll-resize"
+      ],
+      "at": 1790723813623
+    },
+    {
+      "args": [
+        "capture-pane",
+        "-p",
+        "-S",
+        "-",
+        "-t",
+        "raw-scroll-resize"
+      ],
+      "at": 1790723813626
+    },
+    {
+      "args": [
+        "display-message",
+        "-p",
+        "-t",
+        "raw-scroll-resize",
+        "#{history_size}"
+      ],
+      "at": 1790723813628
+    },
+    {
+      "args": [
+        "resize-window",
+        "-t",
+        "raw-scroll-resize",
+        "-x",
+        "79",
+        "-y",
+        "13"
+      ],
+      "at": 1790723813630
+    },
+    {
+      "args": [
+        "display-message",
+        "-p",
+        "-t",
+        "raw-scroll-resize",
+        "#{pane_dead}|#{pane_title}"
+      ],
+      "at": 1790723813633
+    },
+    {
+      "args": [
+        "display-message",
+        "-p",
+        "-t",
+        "raw-scroll-resize",
+        "#{pane_dead}|#{pane_title}"
+      ],
+      "at": 1790723813656
+    },
+    {
+      "args": [
+        "display-message",
+        "-p",
+        "-t",
+        "raw-scroll-resize",
+        "#{pane_dead}|#{pane_title}"
+      ],
+      "at": 1790723813678
+    },
+    {
+      "args": [
+        "display-message",
+        "-p",
+        "-t",
+        "raw-scroll-resize",
+        "#{pane_dead}|#{pane_title}"
+      ],
+      "at": 1790723813700
+    },
+    {
+      "args": [
+        "display-message",
+        "-p",
+        "-t",
+        "raw-scroll-resize",
+        "#{pane_dead}|#{pane_title}"
+      ],
+      "at": 1790723813722
+    },
+    {
+      "args": [
+        "display-message",
+        "-p",
+        "-t",
+        "raw-scroll-resize",
+        "#{pane_dead}|#{pane_title}"
+      ],
+      "at": 1790723813745
+    },
+    {
+      "args": [
+        "display-message",
+        "-p",
+        "-t",
+        "raw-scroll-resize",
+        "#{pane_dead}|#{pane_title}"
+      ],
+      "at": 1790723813767
+    },
+    {
+      "args": [
+        "capture-pane",
+        "-p",
+        "-t",
+        "raw-scroll-resize"
+      ],
+      "at": 1790723813770
+    },
+    {
+      "args": [
+        "capture-pane",
+        "-p",
+        "-S",
+        "-",
+        "-t",
+        "raw-scroll-resize"
+      ],
+      "at": 1790723813773
+    },
+    {
+      "args": [
+        "display-message",
+        "-p",
+        "-t",
+        "raw-scroll-resize",
+        "#{history_size}"
+      ],
+      "at": 1790723813775
+    },
+    {
+      "args": [
+        "resize-window",
+        "-t",
+        "raw-scroll-resize",
+        "-x",
+        "79",
+        "-y",
+        "19"
+      ],
+      "at": 1790723813778
+    },
+    {
+      "args": [
+        "display-message",
+        "-p",
+        "-t",
+        "raw-scroll-resize",
+        "#{pane_dead}|#{pane_title}"
+      ],
+      "at": 1790723813780
+    },
+    {
+      "args": [
+        "display-message",
+        "-p",
+        "-t",
+        "raw-scroll-resize",
+        "#{pane_dead}|#{pane_title}"
+      ],
+      "at": 1790723813802
+    },
+    {
+      "args": [
+        "display-message",
+        "-p",
+        "-t",
+        "raw-scroll-resize",
+        "#{pane_dead}|#{pane_title}"
+      ],
+      "at": 1790723813824
+    },
+    {
+      "args": [
+        "display-message",
+        "-p",
+        "-t",
+        "raw-scroll-resize",
+        "#{pane_dead}|#{pane_title}"
+      ],
+      "at": 1790723813847
+    },
+    {
+      "args": [
+        "display-message",
+        "-p",
+        "-t",
+        "raw-scroll-resize",
+        "#{pane_dead}|#{pane_title}"
+      ],
+      "at": 1790723813870
+    },
+    {
+      "args": [
+        "display-message",
+        "-p",
+        "-t",
+        "raw-scroll-resize",
+        "#{pane_dead}|#{pane_title}"
+      ],
+      "at": 1790723813892
+    },
+    {
+      "args": [
+        "display-message",
+        "-p",
+        "-t",
+        "raw-scroll-resize",
+        "#{pane_dead}|#{pane_title}"
+      ],
+      "at": 1790723813915
+    },
+    {
+      "args": [
+        "display-message",
+        "-p",
+        "-t",
+        "raw-scroll-resize",
+        "#{pane_dead}|#{pane_title}"
+      ],
+      "at": 1790723813938
+    },
+    {
+      "args": [
+        "display-message",
+        "-p",
+        "-t",
+        "raw-scroll-resize",
+        "#{pane_dead}|#{pane_title}"
+      ],
+      "at": 1790723813961
+    },
+    {
+      "args": [
+        "display-message",
+        "-p",
+        "-t",
+        "raw-scroll-resize",
+        "#{pane_dead}|#{pane_title}"
+      ],
+      "at": 1790723813984
+    },
+    {
+      "args": [
+        "display-message",
+        "-p",
+        "-t",
+        "raw-scroll-resize",
+        "#{pane_dead}|#{pane_title}"
+      ],
+      "at": 1790723814006
+    },
+    {
+      "args": [
+        "capture-pane",
+        "-p",
+        "-t",
+        "raw-scroll-resize"
+      ],
+      "at": 1790723814009
+    },
+    {
+      "args": [
+        "capture-pane",
+        "-p",
+        "-S",
+        "-",
+        "-t",
+        "raw-scroll-resize"
+      ],
+      "at": 1790723814011
+    },
+    {
+      "args": [
+        "display-message",
+        "-p",
+        "-t",
+        "raw-scroll-resize",
+        "#{history_size}"
+      ],
+      "at": 1790723814014
+    },
+    {
+      "args": [
+        "send-keys",
+        "-t",
+        "raw-scroll-resize",
+        "F6"
+      ],
+      "at": 1790723814017
+    },
+    {
+      "args": [
+        "display-message",
+        "-p",
+        "-t",
+        "raw-scroll-resize",
+        "#{pane_dead}|#{pane_title}"
+      ],
+      "at": 1790723814019
+    },
+    {
+      "args": [
+        "display-message",
+        "-p",
+        "-t",
+        "raw-scroll-resize",
+        "#{pane_dead}|#{pane_title}"
+      ],
+      "at": 1790723814042
+    },
+    {
+      "args": [
+        "capture-pane",
+        "-p",
+        "-t",
+        "raw-scroll-resize"
+      ],
+      "at": 1790723814044
+    },
+    {
+      "args": [
+        "capture-pane",
+        "-p",
+        "-S",
+        "-",
+        "-t",
+        "raw-scroll-resize"
+      ],
+      "at": 1790723814047
+    },
+    {
+      "args": [
+        "display-message",
+        "-p",
+        "-t",
+        "raw-scroll-resize",
+        "#{history_size}"
+      ],
+      "at": 1790723814049
+    },
+    {
+      "args": [
+        "send-keys",
+        "-t",
+        "raw-scroll-resize",
+        "F7"
+      ],
+      "at": 1790723814052
+    },
+    {
+      "args": [
+        "display-message",
+        "-p",
+        "-t",
+        "raw-scroll-resize",
+        "#{pane_dead}|#{pane_title}"
+      ],
+      "at": 1790723814055
+    },
+    {
+      "args": [
+        "display-message",
+        "-p",
+        "-t",
+        "raw-scroll-resize",
+        "#{pane_dead}|#{pane_title}"
+      ],
+      "at": 1790723814077
+    },
+    {
+      "args": [
+        "capture-pane",
+        "-p",
+        "-t",
+        "raw-scroll-resize"
+      ],
+      "at": 1790723814180
+    },
+    {
+      "args": [
+        "capture-pane",
+        "-p",
+        "-S",
+        "-",
+        "-t",
+        "raw-scroll-resize"
+      ],
+      "at": 1790723814183
+    },
+    {
+      "args": [
+        "display-message",
+        "-p",
+        "-t",
+        "raw-scroll-resize",
+        "#{history_size}"
+      ],
+      "at": 1790723814185
+    },
+    {
+      "args": [
+        "send-keys",
+        "-t",
+        "raw-scroll-resize",
+        "F8"
+      ],
+      "at": 1790723814188
+    },
+    {
+      "args": [
+        "display-message",
+        "-p",
+        "-t",
+        "raw-scroll-resize",
+        "#{pane_dead}|#{pane_title}"
+      ],
+      "at": 1790723814190
+    },
+    {
+      "args": [
+        "capture-pane",
+        "-p",
+        "-t",
+        "raw-scroll-resize"
+      ],
+      "at": 1790723814293
+    },
+    {
+      "args": [
+        "capture-pane",
+        "-p",
+        "-S",
+        "-",
+        "-t",
+        "raw-scroll-resize"
+      ],
+      "at": 1790723814295
+    },
+    {
+      "args": [
+        "display-message",
+        "-p",
+        "-t",
+        "raw-scroll-resize",
+        "#{history_size}"
+      ],
+      "at": 1790723814298
+    },
+    {
+      "args": [
+        "send-keys",
+        "-t",
+        "raw-scroll-resize",
+        "F9"
+      ],
+      "at": 1790723814300
+    }
+  ],
+  "results": [
+    {
+      "name": "tool-control",
+      "stage": "initial",
+      "draft": "",
+      "viewportRows": 19,
+      "historySize": 0,
+      "physicalStatus": 1,
+      "plannedStatus": 1,
+      "oldPreviewLive": true,
+      "oldPreviewPlanned": true,
+      "oldPreviewHistory": false,
+      "oldLiveHistory": false
+    },
+    {
+      "name": "tool-control",
+      "stage": "contract",
+      "draft": "",
+      "viewportRows": 7,
+      "historySize": 0,
+      "physicalStatus": 1,
+      "plannedStatus": 1,
+      "oldPreviewLive": false,
+      "oldPreviewPlanned": false,
+      "oldPreviewHistory": false,
+      "oldLiveHistory": false
+    },
+    {
+      "name": "tool-control",
+      "stage": "assistant",
+      "draft": "",
+      "viewportRows": 10,
+      "historySize": 0,
+      "physicalStatus": 1,
+      "plannedStatus": 1,
+      "oldPreviewLive": false,
+      "oldPreviewPlanned": false,
+      "oldPreviewHistory": false,
+      "oldLiveHistory": false
+    },
+    {
+      "name": "tool-control",
+      "stage": "scroll",
+      "draft": "",
+      "viewportRows": 2,
+      "historySize": 20,
+      "physicalStatus": 1,
+      "plannedStatus": 1,
+      "oldPreviewLive": false,
+      "oldPreviewPlanned": false,
+      "oldPreviewHistory": false,
+      "oldLiveHistory": false
+    },
+    {
+      "name": "tool-resize",
+      "stage": "initial",
+      "draft": "",
+      "viewportRows": 19,
+      "historySize": 0,
+      "physicalStatus": 1,
+      "plannedStatus": 1,
+      "oldPreviewLive": true,
+      "oldPreviewPlanned": true,
+      "oldPreviewHistory": false,
+      "oldLiveHistory": false
+    },
+    {
+      "name": "tool-resize",
+      "stage": "shrunk",
+      "draft": "",
+      "viewportRows": 19,
+      "historySize": 0,
+      "physicalStatus": 1,
+      "plannedStatus": 1,
+      "oldPreviewLive": true,
+      "oldPreviewPlanned": true,
+      "oldPreviewHistory": false,
+      "oldLiveHistory": false
+    },
+    {
+      "name": "tool-resize",
+      "stage": "settled",
+      "draft": "",
+      "viewportRows": 19,
+      "historySize": 0,
+      "physicalStatus": 1,
+      "plannedStatus": 1,
+      "oldPreviewLive": true,
+      "oldPreviewPlanned": true,
+      "oldPreviewHistory": false,
+      "oldLiveHistory": false
+    },
+    {
+      "name": "tool-resize",
+      "stage": "contract",
+      "draft": "",
+      "viewportRows": 7,
+      "historySize": 0,
+      "physicalStatus": 1,
+      "plannedStatus": 1,
+      "oldPreviewLive": false,
+      "oldPreviewPlanned": false,
+      "oldPreviewHistory": false,
+      "oldLiveHistory": false
+    },
+    {
+      "name": "tool-resize",
+      "stage": "assistant",
+      "draft": "",
+      "viewportRows": 10,
+      "historySize": 0,
+      "physicalStatus": 1,
+      "plannedStatus": 1,
+      "oldPreviewLive": false,
+      "oldPreviewPlanned": false,
+      "oldPreviewHistory": false,
+      "oldLiveHistory": false
+    },
+    {
+      "name": "tool-resize",
+      "stage": "scroll",
+      "draft": "",
+      "viewportRows": 2,
+      "historySize": 20,
+      "physicalStatus": 1,
+      "plannedStatus": 1,
+      "oldPreviewLive": false,
+      "oldPreviewPlanned": false,
+      "oldPreviewHistory": false,
+      "oldLiveHistory": false
+    },
+    {
+      "name": "typing-control",
+      "stage": "initial",
+      "draft": "",
+      "viewportRows": 19,
+      "historySize": 0,
+      "physicalStatus": 1,
+      "plannedStatus": 1,
+      "oldPreviewLive": true,
+      "oldPreviewPlanned": true,
+      "oldPreviewHistory": false,
+      "oldLiveHistory": false
+    },
+    {
+      "name": "typing-control",
+      "stage": "typed",
+      "draft": "INPUT-ONCE-alpha beta gamma delta epsilon zeta eta theta iota kappa lambda mu nu xi omicron pi rho sigma END-ONCE",
+      "viewportRows": 8,
+      "historySize": 0,
+      "physicalStatus": 1,
+      "plannedStatus": 1,
+      "oldPreviewLive": false,
+      "oldPreviewPlanned": false,
+      "oldPreviewHistory": false,
+      "oldLiveHistory": false
+    },
+    {
+      "name": "typing-control",
+      "stage": "cleared",
+      "draft": "",
+      "viewportRows": 7,
+      "historySize": 0,
+      "physicalStatus": 1,
+      "plannedStatus": 1,
+      "oldPreviewLive": false,
+      "oldPreviewPlanned": false,
+      "oldPreviewHistory": false,
+      "oldLiveHistory": false
+    },
+    {
+      "name": "typing-control",
+      "stage": "contract",
+      "draft": "",
+      "viewportRows": 7,
+      "historySize": 0,
+      "physicalStatus": 1,
+      "plannedStatus": 1,
+      "oldPreviewLive": false,
+      "oldPreviewPlanned": false,
+      "oldPreviewHistory": false,
+      "oldLiveHistory": false
+    },
+    {
+      "name": "typing-control",
+      "stage": "assistant",
+      "draft": "",
+      "viewportRows": 10,
+      "historySize": 0,
+      "physicalStatus": 1,
+      "plannedStatus": 1,
+      "oldPreviewLive": false,
+      "oldPreviewPlanned": false,
+      "oldPreviewHistory": false,
+      "oldLiveHistory": false
+    },
+    {
+      "name": "typing-control",
+      "stage": "scroll",
+      "draft": "",
+      "viewportRows": 2,
+      "historySize": 20,
+      "physicalStatus": 1,
+      "plannedStatus": 1,
+      "oldPreviewLive": false,
+      "oldPreviewPlanned": false,
+      "oldPreviewHistory": false,
+      "oldLiveHistory": false
+    },
+    {
+      "name": "typing-resize",
+      "stage": "initial",
+      "draft": "",
+      "viewportRows": 19,
+      "historySize": 0,
+      "physicalStatus": 1,
+      "plannedStatus": 1,
+      "oldPreviewLive": true,
+      "oldPreviewPlanned": true,
+      "oldPreviewHistory": false,
+      "oldLiveHistory": false
+    },
+    {
+      "name": "typing-resize",
+      "stage": "shrunk",
+      "draft": "",
+      "viewportRows": 19,
+      "historySize": 0,
+      "physicalStatus": 1,
+      "plannedStatus": 1,
+      "oldPreviewLive": true,
+      "oldPreviewPlanned": true,
+      "oldPreviewHistory": false,
+      "oldLiveHistory": false
+    },
+    {
+      "name": "typing-resize",
+      "stage": "settled",
+      "draft": "",
+      "viewportRows": 19,
+      "historySize": 0,
+      "physicalStatus": 1,
+      "plannedStatus": 1,
+      "oldPreviewLive": true,
+      "oldPreviewPlanned": true,
+      "oldPreviewHistory": false,
+      "oldLiveHistory": false
+    },
+    {
+      "name": "typing-resize",
+      "stage": "typed",
+      "draft": "INPUT-ONCE-alpha beta gamma delta epsilon zeta eta theta iota kappa lambda mu nu xi omicron pi rho sigma END-ONCE",
+      "viewportRows": 8,
+      "historySize": 0,
+      "physicalStatus": 1,
+      "plannedStatus": 1,
+      "oldPreviewLive": false,
+      "oldPreviewPlanned": false,
+      "oldPreviewHistory": false,
+      "oldLiveHistory": false
+    },
+    {
+      "name": "typing-resize",
+      "stage": "cleared",
+      "draft": "",
+      "viewportRows": 7,
+      "historySize": 0,
+      "physicalStatus": 1,
+      "plannedStatus": 1,
+      "oldPreviewLive": false,
+      "oldPreviewPlanned": false,
+      "oldPreviewHistory": false,
+      "oldLiveHistory": false
+    },
+    {
+      "name": "typing-resize",
+      "stage": "contract",
+      "draft": "",
+      "viewportRows": 7,
+      "historySize": 0,
+      "physicalStatus": 1,
+      "plannedStatus": 1,
+      "oldPreviewLive": false,
+      "oldPreviewPlanned": false,
+      "oldPreviewHistory": false,
+      "oldLiveHistory": false
+    },
+    {
+      "name": "typing-resize",
+      "stage": "assistant",
+      "draft": "",
+      "viewportRows": 10,
+      "historySize": 0,
+      "physicalStatus": 1,
+      "plannedStatus": 1,
+      "oldPreviewLive": false,
+      "oldPreviewPlanned": false,
+      "oldPreviewHistory": false,
+      "oldLiveHistory": false
+    },
+    {
+      "name": "typing-resize",
+      "stage": "scroll",
+      "draft": "",
+      "viewportRows": 2,
+      "historySize": 20,
+      "physicalStatus": 1,
+      "plannedStatus": 1,
+      "oldPreviewLive": false,
+      "oldPreviewPlanned": false,
+      "oldPreviewHistory": false,
+      "oldLiveHistory": false
+    },
+    {
+      "name": "history-probe-control",
+      "stage": "initial",
+      "draft": "",
+      "viewportRows": 19,
+      "historySize": 44,
+      "physicalStatus": 1,
+      "plannedStatus": 1,
+      "oldPreviewLive": true,
+      "oldPreviewPlanned": true,
+      "oldPreviewHistory": false,
+      "oldLiveHistory": false
+    },
+    {
+      "name": "history-probe-control",
+      "stage": "contract",
+      "draft": "",
+      "viewportRows": 7,
+      "historySize": 44,
+      "physicalStatus": 1,
+      "plannedStatus": 1,
+      "oldPreviewLive": false,
+      "oldPreviewPlanned": false,
+      "oldPreviewHistory": false,
+      "oldLiveHistory": false
+    },
+    {
+      "name": "history-probe-control",
+      "stage": "assistant",
+      "draft": "",
+      "viewportRows": 10,
+      "historySize": 44,
+      "physicalStatus": 1,
+      "plannedStatus": 1,
+      "oldPreviewLive": false,
+      "oldPreviewPlanned": false,
+      "oldPreviewHistory": false,
+      "oldLiveHistory": false
+    },
+    {
+      "name": "history-probe-control",
+      "stage": "scroll",
+      "draft": "",
+      "viewportRows": 2,
+      "historySize": 84,
+      "physicalStatus": 1,
+      "plannedStatus": 1,
+      "oldPreviewLive": false,
+      "oldPreviewPlanned": false,
+      "oldPreviewHistory": false,
+      "oldLiveHistory": false
+    },
+    {
+      "name": "history-probe-resize",
+      "stage": "initial",
+      "draft": "",
+      "viewportRows": 19,
+      "historySize": 44,
+      "physicalStatus": 1,
+      "plannedStatus": 1,
+      "oldPreviewLive": true,
+      "oldPreviewPlanned": true,
+      "oldPreviewHistory": false,
+      "oldLiveHistory": false
+    },
+    {
+      "name": "history-probe-resize",
+      "stage": "shrunk",
+      "draft": "",
+      "viewportRows": 19,
+      "historySize": 50,
+      "physicalStatus": 1,
+      "plannedStatus": 1,
+      "oldPreviewLive": true,
+      "oldPreviewPlanned": true,
+      "oldPreviewHistory": false,
+      "oldLiveHistory": false
+    },
+    {
+      "name": "history-probe-resize",
+      "stage": "settled",
+      "draft": "",
+      "viewportRows": 19,
+      "historySize": 44,
+      "physicalStatus": 1,
+      "plannedStatus": 1,
+      "oldPreviewLive": true,
+      "oldPreviewPlanned": true,
+      "oldPreviewHistory": false,
+      "oldLiveHistory": false
+    },
+    {
+      "name": "history-probe-resize",
+      "stage": "contract",
+      "draft": "",
+      "viewportRows": 7,
+      "historySize": 44,
+      "physicalStatus": 1,
+      "plannedStatus": 1,
+      "oldPreviewLive": false,
+      "oldPreviewPlanned": false,
+      "oldPreviewHistory": false,
+      "oldLiveHistory": false
+    },
+    {
+      "name": "history-probe-resize",
+      "stage": "assistant",
+      "draft": "",
+      "viewportRows": 10,
+      "historySize": 44,
+      "physicalStatus": 1,
+      "plannedStatus": 1,
+      "oldPreviewLive": false,
+      "oldPreviewPlanned": false,
+      "oldPreviewHistory": false,
+      "oldLiveHistory": false
+    },
+    {
+      "name": "history-probe-resize",
+      "stage": "scroll",
+      "draft": "",
+      "viewportRows": 2,
+      "historySize": 84,
+      "physicalStatus": 1,
+      "plannedStatus": 1,
+      "oldPreviewLive": false,
+      "oldPreviewPlanned": false,
+      "oldPreviewHistory": false,
+      "oldLiveHistory": false
+    },
+    {
+      "name": "finalize-short-control",
+      "stage": "initial",
+      "draft": "",
+      "viewportRows": 13,
+      "historySize": 0,
+      "physicalStatus": 1,
+      "plannedStatus": 1,
+      "oldPreviewLive": true,
+      "oldPreviewPlanned": true,
+      "oldPreviewHistory": false,
+      "oldLiveHistory": false
+    },
+    {
+      "name": "finalize-short-control",
+      "stage": "contract",
+      "draft": "",
+      "viewportRows": 12,
+      "historySize": 0,
+      "physicalStatus": 1,
+      "plannedStatus": 1,
+      "oldPreviewLive": true,
+      "oldPreviewPlanned": true,
+      "oldPreviewHistory": false,
+      "oldLiveHistory": false
+    },
+    {
+      "name": "finalize-short-control",
+      "stage": "assistant",
+      "draft": "",
+      "viewportRows": 10,
+      "historySize": 0,
+      "physicalStatus": 1,
+      "plannedStatus": 1,
+      "oldPreviewLive": false,
+      "oldPreviewPlanned": false,
+      "oldPreviewHistory": false,
+      "oldLiveHistory": false
+    },
+    {
+      "name": "finalize-short-control",
+      "stage": "scroll",
+      "draft": "",
+      "viewportRows": 2,
+      "historySize": 20,
+      "physicalStatus": 1,
+      "plannedStatus": 1,
+      "oldPreviewLive": false,
+      "oldPreviewPlanned": false,
+      "oldPreviewHistory": false,
+      "oldLiveHistory": false
+    },
+    {
+      "name": "finalize-short-resize",
+      "stage": "initial",
+      "draft": "",
+      "viewportRows": 13,
+      "historySize": 0,
+      "physicalStatus": 1,
+      "plannedStatus": 1,
+      "oldPreviewLive": true,
+      "oldPreviewPlanned": true,
+      "oldPreviewHistory": false,
+      "oldLiveHistory": false
+    },
+    {
+      "name": "finalize-short-resize",
+      "stage": "shrunk",
+      "draft": "",
+      "viewportRows": 13,
+      "historySize": 0,
+      "physicalStatus": 1,
+      "plannedStatus": 1,
+      "oldPreviewLive": true,
+      "oldPreviewPlanned": true,
+      "oldPreviewHistory": false,
+      "oldLiveHistory": false
+    },
+    {
+      "name": "finalize-short-resize",
+      "stage": "settled",
+      "draft": "",
+      "viewportRows": 13,
+      "historySize": 0,
+      "physicalStatus": 1,
+      "plannedStatus": 1,
+      "oldPreviewLive": true,
+      "oldPreviewPlanned": true,
+      "oldPreviewHistory": false,
+      "oldLiveHistory": false
+    },
+    {
+      "name": "finalize-short-resize",
+      "stage": "contract",
+      "draft": "",
+      "viewportRows": 12,
+      "historySize": 0,
+      "physicalStatus": 1,
+      "plannedStatus": 1,
+      "oldPreviewLive": true,
+      "oldPreviewPlanned": true,
+      "oldPreviewHistory": false,
+      "oldLiveHistory": false
+    },
+    {
+      "name": "finalize-short-resize",
+      "stage": "assistant",
+      "draft": "",
+      "viewportRows": 10,
+      "historySize": 0,
+      "physicalStatus": 1,
+      "plannedStatus": 1,
+      "oldPreviewLive": false,
+      "oldPreviewPlanned": false,
+      "oldPreviewHistory": false,
+      "oldLiveHistory": false
+    },
+    {
+      "name": "finalize-short-resize",
+      "stage": "scroll",
+      "draft": "",
+      "viewportRows": 2,
+      "historySize": 20,
+      "physicalStatus": 1,
+      "plannedStatus": 1,
+      "oldPreviewLive": false,
+      "oldPreviewPlanned": false,
+      "oldPreviewHistory": false,
+      "oldLiveHistory": false
+    },
+    {
+      "name": "raw-scroll-control",
+      "stage": "initial",
+      "viewportRows": 12,
+      "historySize": 0,
+      "physicalStatus": 0,
+      "plannedStatus": 0,
+      "oldPreviewLive": false,
+      "oldPreviewPlanned": false,
+      "oldPreviewHistory": false,
+      "oldLiveHistory": false
+    },
+    {
+      "name": "raw-scroll-control",
+      "stage": "contract",
+      "viewportRows": 2,
+      "historySize": 0,
+      "physicalStatus": 0,
+      "plannedStatus": 0,
+      "oldPreviewLive": false,
+      "oldPreviewPlanned": false,
+      "oldPreviewHistory": false,
+      "oldLiveHistory": false
+    },
+    {
+      "name": "raw-scroll-control",
+      "stage": "scroll",
+      "viewportRows": 2,
+      "historySize": 13,
+      "physicalStatus": 0,
+      "plannedStatus": 0,
+      "oldPreviewLive": false,
+      "oldPreviewPlanned": false,
+      "oldPreviewHistory": false,
+      "oldLiveHistory": false
+    },
+    {
+      "name": "raw-scroll-control",
+      "stage": "grow",
+      "viewportRows": 18,
+      "historySize": 29,
+      "physicalStatus": 0,
+      "plannedStatus": 0,
+      "oldPreviewLive": false,
+      "oldPreviewPlanned": false,
+      "oldPreviewHistory": false,
+      "oldLiveHistory": false
+    },
+    {
+      "name": "raw-scroll-resize",
+      "stage": "initial",
+      "viewportRows": 12,
+      "historySize": 0,
+      "physicalStatus": 0,
+      "plannedStatus": 0,
+      "oldPreviewLive": false,
+      "oldPreviewPlanned": false,
+      "oldPreviewHistory": false,
+      "oldLiveHistory": false
+    },
+    {
+      "name": "raw-scroll-resize",
+      "stage": "shrunk",
+      "viewportRows": 12,
+      "historySize": 0,
+      "physicalStatus": 0,
+      "plannedStatus": 0,
+      "oldPreviewLive": false,
+      "oldPreviewPlanned": false,
+      "oldPreviewHistory": false,
+      "oldLiveHistory": false
+    },
+    {
+      "name": "raw-scroll-resize",
+      "stage": "settled",
+      "viewportRows": 12,
+      "historySize": 0,
+      "physicalStatus": 0,
+      "plannedStatus": 0,
+      "oldPreviewLive": false,
+      "oldPreviewPlanned": false,
+      "oldPreviewHistory": false,
+      "oldLiveHistory": false
+    },
+    {
+      "name": "raw-scroll-resize",
+      "stage": "contract",
+      "viewportRows": 2,
+      "historySize": 0,
+      "physicalStatus": 0,
+      "plannedStatus": 0,
+      "oldPreviewLive": false,
+      "oldPreviewPlanned": false,
+      "oldPreviewHistory": false,
+      "oldLiveHistory": false
+    },
+    {
+      "name": "raw-scroll-resize",
+      "stage": "scroll",
+      "viewportRows": 2,
+      "historySize": 13,
+      "physicalStatus": 0,
+      "plannedStatus": 0,
+      "oldPreviewLive": false,
+      "oldPreviewPlanned": false,
+      "oldPreviewHistory": false,
+      "oldLiveHistory": false
+    },
+    {
+      "name": "raw-scroll-resize",
+      "stage": "grow",
+      "viewportRows": 18,
+      "historySize": 29,
+      "physicalStatus": 0,
+      "plannedStatus": 0,
+      "oldPreviewLive": false,
+      "oldPreviewPlanned": false,
+      "oldPreviewHistory": false,
+      "oldLiveHistory": false
+    }
+  ]
+}

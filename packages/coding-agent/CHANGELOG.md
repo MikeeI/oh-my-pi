@@ -106,6 +106,14 @@
 - Fixed `readlink` in the bash tool printing a provider-backed path (e.g. `local://file`) with a `\\?\` prefix on Windows
 - Fixed the daemon broker on Windows dying with the omp process that started it, which stopped the shared browser relay (and every other broker daemon) while other omp sessions were still using it
 - Fixed the `browser` tool's Tern backend being refused by any Tern newer than the protocol omp was built against; it now speaks Tern's JSON script protocol, which no Tern build ties it to, and a Tern from before it reports as unavailable (update Tern) so the Chromium fallback takes over.
+### Changed
+
+- Startup fails clearly when a configured default remains unavailable instead of silently selecting another model.
+
+### Fixed
+
+- Cold starts discover configured built-in account models before selecting the initial model.
+- Snapshot forks reject active routines between turns instead of splitting their transcript.
 
 ## [18.4.12] - 2026-10-02
 
@@ -189,6 +197,13 @@
 - Fixed the Darwin Nix flake / NixOS module build producing an `omp` that fails to start after `nix-collect-garbage` with `Library not loaded: /nix/store/…-libiconv-…` by repointing the embedded native addon's `libiconv` install name at the system library and failing the build if the addon references any `/nix/store` path ([#13992](https://github.com/can1357/oh-my-pi/pull/13992) by [@krzysztofkusmierczyk](https://github.com/krzysztofkusmierczyk)).
 - Fixed `/context` and clicks on the status-line context meter stacking a new Context Usage card every time; the existing card is refreshed in place, or moved to the bottom if newer blocks follow it
 - Fixed the jevify keyword notice teaching the removed `judge()` handle API, so agents following it failed on the first judge cell; it now uses `judge_batch()` ([#13588](https://github.com/can1357/oh-my-pi/issues/13588), [#13698](https://github.com/can1357/oh-my-pi/pull/13698) by [@holny](https://github.com/holny))
+### Added
+
+- Added opt-in colored response text through `tui.textColors`, with conditional model guidance for Main UI sessions.
+
+### Fixed
+
+- Fixed false fallback-model warnings appearing before initial model discovery completes.
 
 ## [18.4.9] - 2026-10-01
 
@@ -331,6 +346,9 @@
 ### Removed
 
 - Removed the bash tool's `env` parameter; services inherit the configured shell environment
+### Fixed
+
+- Fixed tmux resize bursts duplicating unfinished rows or hiding finalized replies when a session stops.
 
 ## [18.4.3] - 2026-09-28
 
@@ -552,6 +570,7 @@
 
 ### Fixed
 
+- Fixed `ast_grep` pagination guidance to give agents the next usable `skip` offset instead of an unavailable `limit` option.
 - Preserved MCP `structuredContent` in live tool-result details so evaluation callers can consume server data without reparsing model-facing JSON; spilled results continue to retain an artifact reference without duplicating the payload in session history.
 - Fixed Collab hosts becoming unable to reclaim a room after a brief network interruption; hosts now retry room recovery without losing guests or queued updates.
 - Fixed one-shot commands that stopped before completing, such as `omp config set` on a fresh Windows profile, incorrectly exiting successfully without output; they now report failure with diagnostic guidance.

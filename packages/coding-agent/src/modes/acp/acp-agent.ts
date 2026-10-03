@@ -44,7 +44,7 @@ import {
 	type SetSessionModeResponse,
 	type Usage,
 } from "@oh-my-pi/pi-utils/acp";
-import { disableProvider, enableProvider } from "../../capability";
+import { disableProvider, enableProvider, reset as resetCapabilities } from "../../capability";
 import { Settings } from "../../config/settings";
 import { clearPluginRootsAndCaches, resolveActiveProjectRegistryPath } from "../../discovery/helpers";
 import {
@@ -56,6 +56,7 @@ import {
 import { runExtensionCompact } from "../../extensibility/extensions/compact-handler";
 import { getSessionSlashCommands } from "../../extensibility/extensions/get-commands-handler";
 import { buildSkillPromptMessage, parseSkillInvocation } from "../../extensibility/skills";
+
 import { MCPManager } from "../../mcp/manager";
 import type { MCPServerConfig } from "../../mcp/types";
 import { loadAllExtensions } from "../../modes/components/extensions/state-manager";
@@ -2138,12 +2139,15 @@ export class AcpAgent implements Agent {
 		});
 	}
 
-	async #emitAvailableCommandsUpdate(record: ManagedSessionRecord): Promise<void> {
+	async #emitAvailableCommandsUpdate(
+		record: ManagedSessionRecord,
+		availableCommands?: AvailableCommand[],
+	): Promise<void> {
 		await this.#connection.sessionUpdate({
 			sessionId: record.session.sessionId,
 			update: {
 				sessionUpdate: "available_commands_update",
-				availableCommands: await this.#buildAvailableCommands(record.session),
+				availableCommands: availableCommands ?? (await this.#buildAvailableCommands(record.session)),
 			},
 		});
 	}
@@ -2159,9 +2163,11 @@ export class AcpAgent implements Agent {
 		const cwd = record.session.sessionManager.getCwd();
 		const projectPath = await resolveActiveProjectRegistryPath(cwd);
 		clearPluginRootsAndCaches(projectPath ? [projectPath] : undefined);
-		await refreshAgentDiscovery(cwd, record.session.effectiveExtensionRoots);
-		await record.session.refreshSkillsAndCommands();
-		await this.#emitAvailableCommandsUpdate(record);
+		await refreshAgentDiscovery(cwd, record.session.effectiveExtensionRoots, record.session.settings.getAgentDir());
+		resetCapabilities();
+		await record.session.refreshSkills();
+		const availableCommands = await this.#buildAvailableCommands(record.session);
+		await this.#emitAvailableCommandsUpdate(record, availableCommands);
 	}
 
 	async #emitEndOfTurnUpdates(record: ManagedSessionRecord): Promise<void> {

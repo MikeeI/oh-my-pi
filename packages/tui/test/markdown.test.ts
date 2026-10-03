@@ -1748,6 +1748,55 @@ bar`,
 	});
 });
 
+describe("Inline foreground spans", () => {
+	it("keeps nested streaming colors scoped through wrapping and preserves disabled rendering", () => {
+		clearRenderCache();
+		const format = TERMINAL.trueColor ? "ansi-16m" : "ansi-256";
+		const green = Bun.color("#22c55e", format)!;
+		const pink = Bun.color("#e01075", format)!;
+		const reset = "\x1b[39m";
+		const colorTheme = { ...defaultMarkdownTheme, textColors: true };
+		let source = 'plain <span style="color:#22c55e">outer';
+		const markdown = new Markdown(source, 0, 0, colorTheme);
+		markdown.transientRenderCache = true;
+		markdown.render(80);
+
+		// An inert append used to take the scope-unaware row-splice path.
+		source += " tail";
+		markdown.setText(source);
+		expect(markdown.render(80).join("\n")).toContain(`${green}outer tail${reset}`);
+
+		source += ' **bold** <span style="color:#e01075">inner</span> restored</span> after';
+		markdown.setText(source);
+		const streamed = markdown.render(80).join("\n");
+		expect(streamed).toContain(`${green}bold${reset}`);
+		expect(streamed).toContain(`${pink}inner${reset}`);
+		expect(streamed).toContain(`${green} restored${reset} after`);
+
+		source += "\n\nplain next";
+		markdown.setText(source);
+		const wrapped = markdown.render(18);
+		const terminal = new VirtualTerminal(18, 12);
+		terminal.write(wrapped.join("\r\n"));
+		const viewport = terminal.getViewport();
+		const continuedRow = viewport.findIndex(line => line.includes("bold"));
+		const plainRow = viewport.findIndex(line => line.trim() === "plain next");
+		expect(continuedRow).toBeGreaterThan(0);
+		expect(terminal.getViewportRowForegroundColumns(continuedRow).length).toBeGreaterThan(0);
+		expect(plainRow).toBeGreaterThan(continuedRow);
+		expect(terminal.getViewportRowForegroundColumns(plainRow)).toEqual([]);
+
+		markdown.transientRenderCache = false;
+		const finalized = markdown.render(18);
+		clearRenderCache();
+		expect(finalized).toEqual(new Markdown(source, 0, 0, colorTheme).render(18));
+		const disabled = new Markdown(source, 0, 0, defaultMarkdownTheme).render(80).join("\n");
+		expect(disabled).not.toContain(green);
+		expect(disabled).not.toContain(pink);
+		expect(stripVTControlCharacters(disabled)).toContain("outer tail bold inner restored after");
+	});
+});
+
 describe("Inline color swatches", () => {
 	const FMT = TERMINAL.trueColor ? "ansi-16m" : "ansi-256";
 	// defaultMarkdownTheme supplies no `colorSwatch` symbol, so the renderer uses its ■ default.

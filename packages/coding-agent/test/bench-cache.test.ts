@@ -32,8 +32,8 @@ const piNativeModel = {
 const codexModel = {
 	...model,
 	provider: "openai-codex",
-	id: "gpt-cache-codex-test",
-	name: "gpt-cache-codex-test",
+	id: "gpt-5.6-luna",
+	name: "gpt-5.6-luna",
 	api: "openai-codex-responses",
 } as unknown as Model<Api>;
 
@@ -145,6 +145,63 @@ describe("bench cache mode", () => {
 		expect(stdout).not.toContain("bench-cache:");
 		expect(stdout).not.toContain("Cache benchmark suffix");
 	});
+	it("keeps the cache key stable while probing explicit breakpoints across Codex sessions", async () => {
+		const calls: Array<{ context: Context; options: SimpleStreamOptions }> = [];
+		let id = 0;
+		const summary = await runBenchCommand(
+			{ models: ["openai-codex/gpt-5.6-luna"], flags: { codexCacheBreakpointProbe: true, json: true } },
+			{
+				createRuntime: async () => ({
+					modelRegistry: { ...registry, getAll: () => [codexModel] },
+					close: () => {},
+				}),
+				randomSessionId: () => `session-${++id}`,
+				writeStdout: () => {},
+				writeStderr: () => {},
+				setExitCode: () => {},
+				streamSimple: (_model, context, options) => {
+					const phase = calls.length === 0 ? "cold" : "warm";
+					calls.push({ context, options: options! });
+					void options?.onPayload?.({
+						prompt_cache_options: { mode: "explicit", ttl: "30m" },
+						input: [
+							{
+								role: "user",
+								content: [
+									{
+										type: "input_text",
+										text: context.messages[0]?.content,
+										prompt_cache_breakpoint: { mode: "explicit" },
+									},
+								],
+							},
+						],
+					});
+					const message = successfulMessage(phase === "warm" ? 100 : 0, phase === "cold" ? 100 : 0);
+					return streamWithMessage(message);
+				},
+				stdoutIsTTY: false,
+			},
+		);
+
+		expect(summary.cache).toEqual({ pairs: 1, concurrency: 1, probe: "codex-explicit-breakpoint" });
+		expect(calls).toHaveLength(2);
+		expect(calls[0]?.options.promptCacheKey).toBe(calls[1]?.options.promptCacheKey);
+		expect(calls[0]?.options.sessionId).not.toBe(calls[1]?.options.sessionId);
+		expect(calls[0]?.options.promptCache).toEqual({
+			mode: "explicit",
+			ttl: "30m",
+			breakpoint: "latest-stable-message",
+		});
+		expect(calls[0]?.options.preferWebsockets).toBe(false);
+		expect(calls[1]?.options.preferWebsockets).toBe(false);
+		expect(calls[0]?.context.messages?.[0]?.content).toBe(calls[1]?.context.messages?.[0]?.content);
+		const pair = summary.models[0]?.cachePairs?.[0];
+		expect(pair?.providerSessionIdsDistinct).toBe(true);
+		expect(pair?.endpointAccepted).toBe(true);
+		expect(pair?.explicitBreakpointRequested).toBe(true);
+		expect(pair?.explicitBreakpointWireFields).toBe(true);
+	});
 
 	it("keeps pi-native credential affinity while marking gateway-hidden payload diagnostics unavailable", async () => {
 		const calls: SimpleStreamOptions[] = [];
@@ -191,7 +248,7 @@ describe("bench cache mode", () => {
 		let credentialLookups = 0;
 		await expect(
 			runBenchCommand(
-				{ models: ["openai-codex/gpt-cache-codex-test"], flags: { cache: true } },
+				{ models: ["openai-codex/gpt-5.6-luna"], flags: { cache: true } },
 				{
 					createRuntime: async () => ({
 						modelRegistry: {

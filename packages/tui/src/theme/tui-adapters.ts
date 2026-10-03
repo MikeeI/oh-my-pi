@@ -184,10 +184,17 @@ export function getSymbolTheme(): SymbolTheme {
 let cachedMarkdownTheme: MarkdownTheme | undefined;
 let cachedMarkdownThemeRef: Theme | undefined;
 let markdownMermaidRendering = true;
+let markdownTextColors: boolean | undefined;
 
 export function setMarkdownMermaidRendering(enabled: boolean): void {
 	if (markdownMermaidRendering === enabled) return;
 	markdownMermaidRendering = enabled;
+	cachedMarkdownTheme = undefined;
+}
+
+export function setMarkdownTextColors(enabled: boolean): void {
+	if (markdownTextColors === enabled) return;
+	markdownTextColors = enabled;
 	cachedMarkdownTheme = undefined;
 }
 
@@ -214,6 +221,7 @@ export function getMarkdownTheme(): MarkdownTheme {
 			})()
 		: undefined;
 	const markdownTheme: MarkdownTheme = {
+		textColors: markdownTextColors,
 		heading: (text: string) => theme.fg("mdHeading", text),
 		link: (text: string) => theme.fg("mdLink", text),
 		linkUrl: (text: string) => theme.fg("mdLinkUrl", text),

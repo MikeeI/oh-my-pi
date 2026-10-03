@@ -1856,6 +1856,7 @@ function supportsExplicitOpenAIResponsesPromptCache(compat: unknown): boolean {
 function isOpenAIResponsesPromptCacheSurface<TApi extends Api>(model: Model<TApi>): boolean {
 	return (
 		model.api === "openai-responses" ||
+		model.api === "openai-codex-responses" ||
 		model.api === "azure-openai-responses" ||
 		(model.api === "openrouter" && $env.PI_OPENROUTER_RESPONSES !== "0")
 	);
@@ -2188,6 +2189,7 @@ function mapOptionsForApi<TApi extends Api>(
 				reasoningSummary: options?.hideThinkingSummary ? null : undefined,
 				textVerbosity: options?.textVerbosity,
 				forceReasoningOff: options?.forceReasoningOff,
+				promptCache: options?.promptCache,
 			});
 
 		case "google-generative-ai": {

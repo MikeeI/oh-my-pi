@@ -37,6 +37,7 @@ describe("readToolRenderer hyperlinks", () => {
 					resolvedPath: handoffPath,
 					displayContent: { text: "second line", startLine: 2 },
 					contentType: "text/plain",
+					readTextTokens: 14_823,
 				},
 			},
 			{ expanded: false, isPartial: false },
@@ -47,6 +48,7 @@ describe("readToolRenderer hyperlinks", () => {
 		const rendered = component.render(200).join("\n");
 		expect(rendered).toContain("local://handoff.md");
 		expect(rendered).toContain(":2");
+		expect(Bun.stripANSI(rendered)).toContain("Read local://handoff.md:2 · 14,823 Read Tokens");
 		const handoffUri = url.pathToFileURL(path.resolve(handoffPath)).href;
 		expect(extractLinkUris(rendered)).toContain(handoffUri);
 		expect(extractLinkTexts(rendered)).toContain("local://handoff.md");
@@ -89,6 +91,7 @@ describe("readToolRenderer hyperlinks", () => {
 					method: "fetch",
 					truncated: false,
 					notes: [],
+					readTextTokens: 321,
 				},
 			} as never,
 			{ expanded: false, isPartial: false },
@@ -98,6 +101,7 @@ describe("readToolRenderer hyperlinks", () => {
 
 		const rendered = component.render(200).join("\n");
 		expect(rendered).toContain("example.com /final");
+		expect(Bun.stripANSI(rendered)).toContain("· 321 Read Tokens");
 		expect(extractLinkUris(rendered)).toContain("http://example.com/final");
 	});
 });
@@ -197,6 +201,7 @@ describe("readToolRenderer error sanitization", () => {
 					},
 				],
 				isError: true,
+				details: { readTextTokens: 17 },
 			},
 			{ expanded: false, isPartial: false },
 			theme!,
@@ -208,6 +213,7 @@ describe("readToolRenderer error sanitization", () => {
 		expect(raw).not.toContain("\r");
 		const stripped = Bun.stripANSI(raw);
 		expect(stripped).toContain("SHA256:abc");
+		expect(stripped).toContain("· 17 Read Tokens");
 		expect(stripped).toContain("Host key verification failed.");
 	});
 
@@ -271,7 +277,7 @@ describe("readToolRenderer success-path sanitization", () => {
 					{ type: "text", text: "a\tb" },
 					{ type: "image", data: "", mimeType: "image/png" },
 				],
-				details: { contentType: "image/png" },
+				details: { contentType: "image/png", readTextTokens: 1_284 },
 				isError: false,
 			} as never,
 			{ expanded: false, isPartial: false },
@@ -283,5 +289,6 @@ describe("readToolRenderer success-path sanitization", () => {
 		expect(raw).not.toContain("\t");
 		expect(raw).not.toContain("\r");
 		expect(Bun.stripANSI(raw)).toContain("a");
+		expect(Bun.stripANSI(raw)).toContain("· 1,284 Read Tokens");
 	});
 });

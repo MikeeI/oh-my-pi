@@ -18,6 +18,7 @@ import type { CustomTool, CustomToolContext } from "../../extensibility/custom-t
 import webSearchSystemPrompt from "../../prompts/system/web-search.md" with { type: "text" };
 import webSearchDescription from "../../prompts/tools/web-search.md" with { type: "text" };
 import { resolveConfiguredModelTarget } from "../../session/role-models";
+import { resolveUserToolPromptSource } from "../../prompts/tool-prompt-source";
 import { discoverAuthStorage } from "../../sdk";
 import type { ToolSession } from "../../tools";
 import { throwIfAborted } from "../../tools/tool-errors";
@@ -355,6 +356,16 @@ export async function runSearchQuery(
 	}
 }
 
+function renderWebSearchDescription(agentDir: string): string {
+	return prompt.render(
+		resolveUserToolPromptSource({
+			agentDir,
+			toolName: "web-search",
+			bundledSource: webSearchDescription,
+		}),
+	);
+}
+
 /**
  * Web search tool implementation.
  *
@@ -374,7 +385,7 @@ export class WebSearchTool implements AgentTool<typeof webSearchSchema, SearchRe
 
 	constructor(session: ToolSession) {
 		this.#session = session;
-		this.description = prompt.render(webSearchDescription);
+		this.description = renderWebSearchDescription(session.settings.getAgentDir());
 	}
 
 	async execute(
@@ -400,7 +411,9 @@ export class WebSearchTool implements AgentTool<typeof webSearchSchema, SearchRe
 export const webSearchCustomTool: CustomTool<typeof webSearchSchema, SearchResultDetails> = {
 	name: "web_search",
 	label: "Web Search",
-	description: prompt.render(webSearchDescription),
+	get description() {
+		return renderWebSearchDescription(settings.getAgentDir());
+	},
 	parameters: webSearchSchema,
 
 	approval: "read",
