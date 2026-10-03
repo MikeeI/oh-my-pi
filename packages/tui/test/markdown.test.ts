@@ -1795,6 +1795,11 @@ describe("Inline foreground spans", () => {
 		expect(disabled).not.toContain(pink);
 		expect(stripVTControlCharacters(disabled)).toContain("outer tail bold inner restored after");
 	});
+	it("preserves new-line trimming across foreground tags without joining words", () => {
+		const source = 'p  \n<span style="color:#22c55e"> c</span> b';
+		const markdown = new Markdown(source, 0, 0, { ...defaultMarkdownTheme, textColors: true });
+		expect(markdown.render(60).map(line => stripVTControlCharacters(line).trimEnd())).toEqual(["p", "c b"]);
+	});
 });
 
 describe("Inline color swatches", () => {

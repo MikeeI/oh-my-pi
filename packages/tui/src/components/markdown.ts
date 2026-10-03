@@ -3695,6 +3695,8 @@ export class Markdown implements Component {
 					if ("raw" in token && typeof token.raw === "string") {
 						if (this.#theme.textColors) {
 							const tag = token.raw.trim();
+							// Scope tags occupy no cells, so they must not consume upstream's
+							// pending hard-break whitespace trim before the next text token.
 							if (SPAN_OPEN_REGEX.test(tag) && !/\/\s*>$/.test(tag)) {
 								const color = COLOR_SPAN_OPEN_REGEX.exec(tag)?.[2];
 								// Unsupported or unstyled spans inherit their parent.
@@ -3703,10 +3705,12 @@ export class Markdown implements Component {
 										? colorToAnsi(color, TERMINAL.trueColor ? "truecolor" : "256color")
 										: (foregrounds.at(-1) ?? ""),
 								);
+								trimLeadingWhitespace = lineStart;
 								break;
 							}
 							if (SPAN_CLOSE_REGEX.test(tag)) {
 								foregrounds.pop();
+								trimLeadingWhitespace = lineStart;
 								break;
 							}
 						}

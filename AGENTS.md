@@ -382,13 +382,16 @@ Each entry names its disposition, observable behavior, implementation owner, and
 - Owner: `src/task/command-templates.ts` owns the embedded command-template source that keeps routine discovery acyclic.
 - Owner: `src/session/agent-session.ts` owns execution and lifecycle serialization.
 - Owner: upstream `src/session/agent-session.ts#isBusyForSnapshot` owns the shared snapshot busy decision.
+- Owner: upstream `src/modes/rpc/wire/state.ts#stateDefs` owns the command-source enum for every generated RPC SDK.
 - Reason: current upstream has no routine capability, routine registry, or sequential routine execution workflow.
 - Required action: retain one MOMP routine capability and its transport integrations.
+- Required action: include routine sources through the wire registry and regenerate its TypeScript, Python, Rust, and Go clients.
 - Proof: `test/routines.test.ts`.
 - Proof: `test/agent-session-routine-lock.test.ts`.
 - Proof: `test/input-controller-routine.test.ts`.
 - Proof: `test/interactive-mode-routine-autocomplete.test.ts`.
 - Proof: routine cases in `test/rpc.test.ts` and ACP tests.
+- Proof: `test/rpc-wire/conformance.types.ts` and `test/rpc-wire/generated.test.ts`.
 
 #### `MOMP-COMMAND-UX` — Rename, argument completion, and slash-list display
 
@@ -704,6 +707,7 @@ Each entry names its disposition, observable behavior, implementation owner, and
 - Contract: enabling it renders inline `<span style="color:#RRGGBB">text</span>` foreground colors.
 - Contract: nested spans inherit or override foreground color; closing spans restore their parent.
 - Contract: logical scopes end at inline-block boundaries; emitted color runs close during streaming.
+- Contract: foreground tags preserve hard-line-break whitespace trimming without joining adjacent words.
 - Contract: only interpreted foreground spans disable the scope-unaware streaming row splice.
 - Contract: disabled rendering, inline code, hex swatches, block HTML, and compact inline rendering remain unchanged.
 - Contract: native Markdown uses the existing rendered-row fallback while foreground colors are enabled.
@@ -717,8 +721,9 @@ Each entry names its disposition, observable behavior, implementation owner, and
 - Owner: `src/system-prompt.ts` and `src/sdk.ts` own render inputs and session-scoped prompt rebuilds.
 - Owner: project-settings `SYSTEM.template.md` owns guidance inside `{{#if textColors}}`.
 - Reason: upstream strips span attributes and has no opt-in foreground-span or model-guidance contract.
+- Reason: upstream v18.5.1 consumes line-start trimming per token, so zero-width foreground tags must pass it on.
 - Required action: retain the minimal setting, renderer, and conditional-template closure at existing owners.
-- Proof: nested streaming, wrap/reset, and disabled-rendering cases in `packages/tui/test/markdown.test.ts`.
+- Proof: span scope, wrap/reset, line-break trimming, and disabled rendering in `packages/tui/test/markdown.test.ts`.
 - Proof: live Main UI and headless prompt cases in `test/system-prompt-templates.test.ts`.
 - Proof: render both deployed template branches and interact with the actual TUI.
 

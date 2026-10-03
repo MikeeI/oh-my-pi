@@ -2,6 +2,10 @@
 
 ## [Unreleased]
 
+### Fixed
+
+- Fixed leading whitespace after hard line breaks when foreground-color spans are enabled.
+
 ## [18.5.1] - 2026-10-03
 
 ### Added
