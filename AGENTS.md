@@ -137,6 +137,7 @@ Each entry names its disposition, observable behavior, implementation owner, and
 - Reason: current upstream has no Child base-template and wrapper-template composition capability.
 - Reason: upstream v18.4.10 warm revivers retain plain spawn inputs rather than the executor's live run graph.
 - Required action: retain Child template composition at the current upstream fresh-Child construction seams.
+- Required action: pass normalized parent task depth to upstream v18.5.0 completion-probe gating after capability resolution.
 - Required action: keep source snapshots in that spec and recreate transforms without retaining live sessions.
 - Proof: `test/task/subagent-system-template.test.ts`.
 - Proof: `test/context-file-inheritance.test.ts`.

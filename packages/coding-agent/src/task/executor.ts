@@ -3822,7 +3822,7 @@ export async function runSubprocess(options: ExecutorOptions): Promise<SingleRes
 		softRequestBudget,
 		softRequestBudgetNotice,
 		maxRuntimeMs,
-		completionProbe: isCompletionProbeEnabled(settings, parentDepth),
+		completionProbe: isCompletionProbeEnabled(settings, options.taskDepth ?? 0),
 	});
 	const progress = monitor.progress;
 	let unsubscribe: (() => void) | null = null;
