@@ -38,9 +38,6 @@
 ### Fixed
 
 - Fixed new Fireworks sessions failing on the first turn by updating the default model to `kimi-k3`, which is currently supported by Fireworks.
-### Fixed
-
-- Concurrent versions no longer overwrite model-catalog payloads or freshness from incompatible cache policies.
 
 ## [18.4.10] - 2026-10-02
 

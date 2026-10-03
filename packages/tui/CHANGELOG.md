@@ -104,9 +104,6 @@
 
 - Removed the internal `urlTokenPossible` export ([#13961](https://github.com/can1357/oh-my-pi/pull/13961) by [@sjawhar](https://github.com/sjawhar)).
 - Removed the internal `autolinkSchemeScanIndex` export ([#13961](https://github.com/can1357/oh-my-pi/pull/13961) by [@sjawhar](https://github.com/sjawhar)).
-### Added
-
-- Added opt-in inline RGB foreground spans with nested scopes and streaming-safe color resets.
 
 ## [18.4.9] - 2026-10-01
 
@@ -179,11 +176,6 @@
 - Fixed home directories next to shell redirections, control operators or Markdown emphasis (`<`, `>`, `&`, `|`, `*`, `_`) leaking the full path in display-only text ([#11210](https://github.com/can1357/oh-my-pi/pull/11210) by [@DarkPhilosophy](https://github.com/DarkPhilosophy)).
 - Fixed the subagent task card showing full home paths in tool intents and arguments, while keeping search patterns literal ([#11210](https://github.com/can1357/oh-my-pi/pull/11210) by [@DarkPhilosophy](https://github.com/DarkPhilosophy)).
 - Fixed Enter doing nothing on a fully typed slash-command argument while its completion popup was open (e.g. `/mcp list`): it now submits instead of re-accepting the identical completion; subcommands that still need a required argument (e.g. `/mcp test`) keep inserting the subcommand so you can type it ([#13885](https://github.com/can1357/oh-my-pi/pull/13885) by [@H4vC](https://github.com/H4vC)).
-### Fixed
-
-- Fixed duplicate editor/status boxes and stale tool-preview rows after tmux resizes.
-- Fixed accepted transcript rows being overwritten when tmux resized before delivering SIGWINCH.
-- Fixed fullscreen resize recovery accepting stale cursor replies, including net-zero resize bursts.
 
 ## [18.4.4] - 2026-09-29
 
@@ -193,10 +185,6 @@
 - Redesigned transcript, chat, dashboard, and picker UI components for native wire representation
 - `HookEditorComponent` accepts pasted images when constructed with `acceptImages`; the ask dialog returns them as `customInputImages` / `noteImages` ([#13774](https://github.com/can1357/oh-my-pi/pull/13774) by [@DrFaustus-vic](https://github.com/DrFaustus-vic))
 - Added `formatFileMatches` and `FileMatchSection` to `tools/grouped-file-output` for rendering per-file grep/ast-grep matches in grouped or flat mode.
-### Fixed
-
-- Fixed tmux width changes duplicating an unfinished transcript row in native history.
-- Fixed fast tmux height changes deleting finalized rows or overwriting them when a session stops.
 
 ### Fixed
 
@@ -302,9 +290,6 @@
 ### Added
 
 - Added an "OpenAI API" option to the setup wizard's web-search step; the existing ChatGPT-OAuth option is now labeled "OpenAI Codex" ([#13467](https://github.com/can1357/oh-my-pi/pull/13467) by [@anatoli-tsinovoy](https://github.com/anatoli-tsinovoy)).
-### Fixed
-
-- Fixed AST search results to display the next `skip` offset while older results advise narrowing the path.
 
 ## [18.3.3] - 2026-09-27
 
