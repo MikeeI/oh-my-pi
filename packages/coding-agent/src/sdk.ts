@@ -13,6 +13,7 @@ import {
 	type ThinkingLevel,
 } from "@oh-my-pi/pi-agent-core";
 import type {
+	AssistantMessage,
 	Context,
 	CredentialDisabledEvent,
 	Effort,
@@ -30,6 +31,7 @@ import type { Dialect } from "@oh-my-pi/pi-ai/dialect";
 import { prewarmOpenAICodexResponses } from "@oh-my-pi/pi-ai/providers/openai-codex-responses";
 import { isOpenAICodexWebSocketPreferred } from "@oh-my-pi/pi-ai/providers/openai-codex-transport";
 import { withCredentialRedaction } from "@oh-my-pi/pi-ai/providers/transform-messages";
+import { AssistantMessageEventStream } from "@oh-my-pi/pi-ai/utils/event-stream";
 import { FALLBACK_DIALECT, preferredDialect } from "@oh-my-pi/pi-catalog/identity";
 import type { Component } from "@oh-my-pi/pi-tui";
 import { $env } from "@oh-my-pi/pi-utils/env";
@@ -123,6 +125,7 @@ import {
 	type ToolDefinition,
 	wrapRegisteredTools,
 } from "./extensibility/extensions";
+import { loadRoutines as loadRoutinesInternal, type Routine } from "./extensibility/routines";
 import {
 	createSkillDescriptionCompressor,
 	openSessionSkillDescriptionStore,
@@ -221,10 +224,12 @@ import { createSnapcompactSavingsRecorder } from "./session/snapcompact-savings-
 import { createSpeculativeToolExecutionConfig } from "./speculation/host";
 import { closeAllConnections } from "./ssh/connection-manager";
 import {
+	type AppendSystemPromptPart,
 	type BuildSystemPromptResult,
 	buildSystemPrompt as buildSystemPromptInternal,
 	cfgSystemPromptInputs,
 	composeAppendPrompt,
+	type DynamicPromptPart,
 	loadProjectContextFiles as loadContextFilesInternal,
 	projectSystemPromptToolMetadata,
 } from "./system-prompt";
@@ -248,6 +253,7 @@ import {
 import {
 	BashTool,
 	BUILTIN_TOOLS,
+	type ContextFileEntry,
 	createTools,
 	createVibeTools,
 	createXdevState,
@@ -368,6 +374,7 @@ import {
 	cfgTuiAutoGraph,
 	cfgTuiRenderMermaid,
 	cfgTuiRenderSvg,
+	cfgTuiTextColors,
 } from "./modes/settings";
 import { cfgLspEnabled, cfgLspLazy, cfgLspShared } from "./lsp/settings";
 import {
@@ -524,6 +531,8 @@ function applyMCPEnvironment(result: { exaApiKeys: string[] }): void {
 }
 
 // Types
+export type SystemPromptTransform = (result: BuildSystemPromptResult) => BuildSystemPromptResult;
+
 export interface CreateAgentSessionOptions {
 	/** Working directory for project-local discovery. Default: getProjectDir() */
 	cwd?: string;
@@ -626,12 +635,18 @@ export interface CreateAgentSessionOptions {
 
 	/** Provider-facing system prompt override. Replaces the fully rendered default blocks. */
 	systemPrompt?: string | string[] | ((defaultPrompt: string[]) => string | string[]);
-	/** Raw Handlebars template replacing the bundled default system prompt rendering. */
-	systemPromptTemplate?: string;
+	/** Structured system prompt transform applied before the raw provider-facing override. */
+	systemPromptTransform?: SystemPromptTransform;
 	/** Already-loaded custom prompt text rendered through the bundled custom system prompt template. */
 	customSystemPrompt?: string;
 	/** Already-loaded text appended through the bundled system prompt templates. */
 	appendSystemPrompt?: string;
+	/** Optional Handlebars system prompt template. Raw SYSTEM.md/--system-prompt must use systemPrompt. */
+	systemPromptTemplate?: string;
+	/** Capture source-attributed prompt fragments for diagnostic inspection. */
+	captureDynamicPromptParts?: boolean;
+	/** Capture the final provider context and stream options, then return a synthetic response without network I/O. */
+	captureProviderContext?: (context: Context, model: Model, options: SimpleStreamOptions | undefined) => void;
 	/**
 	 * Already-loaded title-generation system prompt override (typically
 	 * {@link discoverTitleSystemPromptFile} → {@link resolvePromptInput}). When
@@ -727,13 +742,17 @@ export interface CreateAgentSessionOptions {
 	/** Rules. Default: discovered from multiple locations */
 	rules?: Rule[];
 	/** Context files (AGENTS.md content). Default: discovered walking up from cwd */
-	contextFiles?: Array<{ path: string; content: string }>;
+	contextFiles?: ContextFileEntry[];
+	/** File path replacing discovered user-level context while retaining project discovery. */
+	userAgentsFile?: string;
 	/** Pre-built workspace tree (skips re-scanning; passed by parents to subagents). */
 	workspaceTree?: WorkspaceTree;
 	/** Prompt templates. Default: discovered from cwd/.omp/prompts/ + agentDir/prompts/ */
 	promptTemplates?: PromptTemplate[];
 	/** File-based slash commands. Default: discovered from commands/ directories */
 	slashCommands?: FileSlashCommand[];
+	/** User-defined routines. Default: discovered from user routines directory */
+	routines?: Routine[];
 
 	/**
 	 * Enable MCP capabilities. `false` skips MCP discovery and ignores
@@ -915,6 +934,8 @@ export interface CreateAgentSessionResult {
 	modelFallbackMessage?: string;
 	/** LSP servers detected for startup; warmup may continue in the background */
 	lspServers?: LspStartupServerInfo[];
+	/** Last default system prompt build result, including debug metadata. */
+	systemPromptResult?: BuildSystemPromptResult;
 	/** Start cache-aware online runtime model discovery after the first UI paint. */
 	startBackgroundModelDiscovery?: () => Promise<void>;
 	/** Shared event bus for tool/extension communication */
@@ -1220,14 +1241,20 @@ export async function discoverSkills(
  * Discover context files (AGENTS.md) walking up from cwd.
  * Returns files sorted by depth (farther from cwd first, so closer files appear last/more prominent).
  */
+export interface DiscoverContextFilesOptions {
+	userAgentsFile?: string;
+	disabledExtensions?: string[];
+}
+
 export async function discoverContextFiles(
 	cwd?: string,
 	_agentDir?: string,
-	disabledExtensions?: string[],
-): Promise<Array<{ path: string; content: string; depth?: number }>> {
+	options: DiscoverContextFilesOptions = {},
+): Promise<ContextFileEntry[]> {
 	return await loadContextFilesInternal({
 		cwd: cwd ?? getProjectDir(),
-		disabledExtensions,
+		disabledExtensions: options.disabledExtensions,
+		userAgentsFile: options.userAgentsFile,
 	});
 }
 
@@ -1246,6 +1273,13 @@ export async function discoverPromptTemplates(cwd?: string, agentDir?: string): 
  */
 export async function discoverSlashCommands(cwd?: string): Promise<FileSlashCommand[]> {
 	return loadSlashCommandsInternal({ cwd: cwd ?? getProjectDir() });
+}
+
+/**
+ * Discover user-defined routines.
+ */
+export async function discoverRoutines(cwd?: string): Promise<Routine[]> {
+	return loadRoutinesInternal({ cwd: cwd ?? getProjectDir() });
 }
 
 /**
@@ -1285,6 +1319,8 @@ export interface BuildSystemPromptOptions {
 	appendPrompt?: string;
 	inlineToolDescriptors?: boolean;
 	includeWorkspaceTree?: boolean;
+	/** Capture source-attributed prompt fragments for diagnostic inspection. */
+	captureDynamicParts?: boolean;
 	/** Include the read-only security:// resource inventory entry. Default: false. */
 	securityEnabled?: boolean;
 	/** Eval preludes to advertise; each contributes its `guidance` block. Default: none. */
@@ -1315,6 +1351,7 @@ export async function buildSystemPrompt(options: BuildSystemPromptOptions = {}):
 		appendSystemPrompt: options.appendPrompt,
 		inlineToolDescriptors: options.inlineToolDescriptors,
 		includeWorkspaceTree: options.includeWorkspaceTree,
+		captureDynamicParts: options.captureDynamicParts,
 		securityEnabled: options.securityEnabled,
 		evalPreludes: options.evalPreludes,
 		toolNames,
@@ -1685,6 +1722,9 @@ async function createAgentSessionScoped(options: CreateAgentSessionOptions): Pro
 	if (options.systemPromptTemplate !== undefined && options.customSystemPrompt !== undefined) {
 		throw new Error("systemPromptTemplate cannot be combined with a literal custom system prompt");
 	}
+	if (options.contextFiles && options.userAgentsFile !== undefined) {
+		throw new Error("contextFiles and userAgentsFile cannot be used together");
+	}
 	const cwd = options.cwd ?? getProjectDir();
 	const agentDir = options.agentDir ?? getAgentDir();
 	const eventBus = options.eventBus ?? new EventBus();
@@ -1803,7 +1843,9 @@ async function createAgentSessionScoped(options: CreateAgentSessionOptions): Pro
 	// session-context build, tool creation, MCP discovery, and extension discovery.
 	const contextFilesPromise = options.contextFiles
 		? Promise.resolve(options.contextFiles)
-		: logger.time("discoverContextFiles", discoverContextFiles, cwd, agentDir);
+		: logger.time("discoverContextFiles", discoverContextFiles, cwd, agentDir, {
+				userAgentsFile: options.userAgentsFile,
+			});
 	contextFilesPromise.catch(() => {});
 	const resolveRepoContext = async (repoCwd: string) => {
 		try {
@@ -1832,6 +1874,10 @@ async function createAgentSessionScoped(options: CreateAgentSessionOptions): Pro
 			? Promise.resolve<CustomCommandsLoadResult>({ commands: [], errors: [] })
 			: logger.time("discoverCustomCommands", loadCustomCommandsInternal, { cwd, agentDir });
 	customCommandsPromise.catch(() => {});
+	const routinesPromise = options.routines
+		? Promise.resolve(options.routines)
+		: logger.time("discoverRoutines", discoverRoutines, cwd);
+	routinesPromise.catch(() => {});
 	const skillsSettings = cfgSkills.get(settings);
 	const disabledExtensionIds = cfgDisabledExtensions.get(settings);
 	const discoveredSkillsPromise =
@@ -1889,6 +1935,7 @@ async function createAgentSessionScoped(options: CreateAgentSessionOptions): Pro
 		options.customSystemPrompt !== undefined ||
 		options.appendSystemPrompt !== undefined ||
 		options.toolNames !== undefined ||
+		options.userAgentsFile !== undefined ||
 		options.customTools !== undefined ||
 		options.mcpTools !== undefined;
 	const inheritedPromptCacheKey = forkCacheShapeChanged
@@ -2105,6 +2152,7 @@ async function createAgentSessionScoped(options: CreateAgentSessionOptions): Pro
 	const tuiTranscript = options.tuiTranscript === true && !isSubagentSession;
 	const resolvedAgentName = (options.agentName ?? agentKind).trim().toLowerCase();
 
+	const routines = await routinesPromise;
 	// Discover rules and bucket them in one pass to avoid repeated scans over large rule sets.
 	const discovered = await logger.time("discoverTtsrRules", async () => {
 		const { TtsrManager } = await import("./export/ttsr");
@@ -3183,12 +3231,12 @@ async function createAgentSessionScoped(options: CreateAgentSessionOptions): Pro
 				// configured (must win over `pick`) or nothing resolved at all.
 				// The common path — role already resolved, or a `pick` with no
 				// configured default — never pays for it.
-				const defaultRoleConfigured = Boolean(settings.getModelRole("default"));
-				if (
-					!hasExplicitModel &&
-					(defaultRoleConfigured || !pick) &&
-					modelRegistry.getDiscoverableProviders().length > 0
-				) {
+				const configuredDefault = settings.getModelRole("default");
+				const defaultRoleConfigured = Boolean(configuredDefault);
+				// Built-in account discovery is absent from getDiscoverableProviders().
+				// An unresolved configured default must be discovered before
+				// accepting an unrelated authenticated provider's model.
+				if (!hasExplicitModel && (defaultRoleConfigured || !pick)) {
 					await logger.time("resolveModelDiscoveryFallback", () => modelRegistry.refresh("online-if-uncached"));
 					if (!(await tryResolveDefaultRole()) && !model) {
 						const refreshedCandidates = await resolveAllowedModels(
@@ -3200,6 +3248,11 @@ async function createAgentSessionScoped(options: CreateAgentSessionOptions): Pro
 							modelRegistry.hasConcreteAuth(provider),
 						);
 					}
+				}
+				if (!hasExplicitModel && defaultRoleConfigured && !model) {
+					throw new Error(
+						`Configured default model "${configuredDefault}" could not be resolved after discovery. Check the selector, credentials, disabledProviders, and enabledModels.`,
+					);
 				}
 
 				if (!model && pick) {
@@ -3750,9 +3803,10 @@ async function createAgentSessionScoped(options: CreateAgentSessionOptions): Pro
 				? await logger.time("resolveActiveRepoContext", resolveRepoContext, promptCwd)
 				: initialActiveRepoContext;
 			if (hasSession && options.contextFiles === undefined) {
-				contextFiles = await logger.time("discoverContextFiles", discoverContextFiles, promptCwd, agentDir, [
-					...cfgDisabledExtensions.get(settings),
-				]);
+				contextFiles = await logger.time("discoverContextFiles", discoverContextFiles, promptCwd, agentDir, {
+					disabledExtensions: [...cfgDisabledExtensions.get(settings)],
+					userAgentsFile: options.userAgentsFile,
+				});
 				toolSession.contextFiles = contextFiles;
 				session.setAdvisorContextPrompt(formatAdvisorContextPrompt(contextFiles));
 			}
@@ -3811,15 +3865,14 @@ async function createAgentSessionScoped(options: CreateAgentSessionOptions): Pro
 			if (options.systemPrompt !== undefined && typeof options.systemPrompt !== "function") {
 				return {
 					systemPrompt: typeof options.systemPrompt === "string" ? [options.systemPrompt] : options.systemPrompt,
+					dynamicParts: [],
 				};
 			}
 
-			// Build combined append prompt: memory instructions + auto-learn guidance
-			// + mounted MCP route guidance + optional MCP server instructions. For UI
-			// sessions MCP discovery is deferred, so the initial registry and
-			// `getServerInstructions()` are empty until the background connect
-			// completes; the rebuild that `refreshMCPTools` triggers post-discovery
-			// then picks up the mounted routes and any connected-server instructions.
+			// Build combined raw append prompt from trusted internal instructions: memory,
+			// auto-learn guidance, mounted MCP route guidance, and optional MCP server instructions.
+			// UI sessions discover MCP state later; refreshMCPTools rebuilds the prompt after connect.
+			// User append prompts use CreateAgentSessionOptions.systemPrompt and remain raw.
 			const serverInstructions = mcpManager?.getServerInstructions();
 			// Drive guidance off the auto-learn BUILTINS currently registered (provenance,
 			// not just an active name): a custom/extension tool that merely shares the
@@ -3835,11 +3888,20 @@ async function createAgentSessionScoped(options: CreateAgentSessionOptions): Pro
 						learn: hasSession ? session.hasBuiltInTool("learn") : builtInRegistryToolNames.has("learn"),
 					});
 			const appendParts: string[] = [];
-			if (memoryInstructions) appendParts.push(memoryInstructions);
-			if (autoLearnInstructions) appendParts.push(autoLearnInstructions);
-			// List each mounted MCP tool once. A routed tool that the xd:// catalog
-			// would list carries its catalog summary on the route line and gets no
-			// catalog line; a tool the route bound omits keeps its catalog line.
+			const appendPromptParts: AppendSystemPromptPart[] = [];
+			if (memoryInstructions) {
+				appendParts.push(memoryInstructions);
+				appendPromptParts.push({ id: "memory-instructions", source: "memory", text: memoryInstructions });
+			}
+			if (autoLearnInstructions) {
+				appendParts.push(autoLearnInstructions);
+				appendPromptParts.push({
+					id: "auto-learn-instructions",
+					source: "auto-learn",
+					text: autoLearnInstructions,
+				});
+			}
+			// Mounted MCP routes use their catalog summaries; unrouted tools retain catalog lines.
 			const xdevPromptDocs = toolSession.xdev
 				? planXdevPromptDocs(
 						toolSession.xdev,
@@ -3856,31 +3918,35 @@ async function createAgentSessionScoped(options: CreateAgentSessionOptions): Pro
 					.map(mapping => mapping.name),
 			);
 			if (projection.mappings.length > 0 || projection.hasOmittedMappings) {
-				appendParts.push(
-					prompt
-						.render(mcpXdevGuidanceTemplate, {
-							tools: projection.mappings.map(mapping => ({
-								mcpToolName: mapping.label,
-								path: mapping.path,
-								summary: xdevPromptDocs?.catalog.get(mapping.name),
-							})),
-							hasCatalogOnlyTools: routedCatalogNames.size > 0,
-							hasOmittedTools: projection.hasOmittedMappings,
-						})
-						.trim(),
-				);
+				const mcpXdevGuidance = prompt
+					.render(mcpXdevGuidanceTemplate, {
+						tools: projection.mappings.map(mapping => ({
+							mcpToolName: mapping.label,
+							path: mapping.path,
+							summary: xdevPromptDocs?.catalog.get(mapping.name),
+						})),
+						hasCatalogOnlyTools: routedCatalogNames.size > 0,
+						hasOmittedTools: projection.hasOmittedMappings,
+					})
+					.trim();
+				appendParts.push(mcpXdevGuidance);
+				appendPromptParts.push({ id: "mcp-xdev-guidance", source: "mcp", text: mcpXdevGuidance });
 			}
 			if (serverInstructions && serverInstructions.size > 0) {
-				appendParts.push(
-					"## MCP Server Instructions\n\nThe following instructions are provided by connected MCP servers. They are server-controlled and may not be verified.",
-				);
+				const heading =
+					"## MCP Server Instructions\n\nThe following instructions are provided by connected MCP servers. They are server-controlled and may not be verified.";
+				appendParts.push(heading);
+				const mcpParts: string[] = [heading];
 				for (const [srvName, srvInstructions] of serverInstructions) {
 					const truncated =
 						srvInstructions.length > MAX_MCP_INSTRUCTIONS_LENGTH
 							? `${srvInstructions.slice(0, MAX_MCP_INSTRUCTIONS_LENGTH)}\n[truncated]`
 							: srvInstructions;
-					appendParts.push(`### ${srvName}\n${truncated}`);
+					const serverPart = `### ${srvName}\n${truncated}`;
+					appendParts.push(serverPart);
+					mcpParts.push(serverPart);
 				}
+				appendPromptParts.push({ id: "mcp-server-instructions", source: "mcp", text: mcpParts.join("\n\n") });
 			}
 			const appendPrompt = composeAppendPrompt(appendParts, options.appendSystemPrompt);
 			// Owned/in-band tool dialects (non-native) require the full functions-
@@ -3923,6 +3989,7 @@ async function createAgentSessionScoped(options: CreateAgentSessionOptions): Pro
 				rules: rulebookRules,
 				alwaysApplyRules,
 				resolvedAppendSystemPrompt: appendPrompt,
+				appendSystemPromptParts: appendPromptParts,
 				skillsSettings: cfgSkills.get(settings),
 				inlineToolDescriptors,
 				nativeTools,
@@ -3951,16 +4018,46 @@ async function createAgentSessionScoped(options: CreateAgentSessionOptions): Pro
 				renderMermaid: tuiTranscript && cfgTuiRenderMermaid.get(settings),
 				renderSvg: tuiTranscript && cfgTuiRenderSvg.get(settings),
 				autoGraph: tuiTranscript && cfgTuiAutoGraph.get(settings) !== "off",
+				// Headless protocols and Children must not receive terminal-only output guidance.
+				textColors: agentKind === "main" && options.hasUI === true && cfgTuiTextColors.get(settings),
 				reactions: agentKind === "main" && options.hasUI === true && cfgTuiReactions.get(settings),
 				activeRepoContext,
+				captureDynamicParts: options.captureDynamicPromptParts,
 			});
+			const transformedPrompt = options.systemPromptTransform?.(defaultPrompt) ?? defaultPrompt;
 
-			if (typeof options.systemPrompt !== "function") {
-				return defaultPrompt;
+			if (options.systemPrompt === undefined) {
+				return transformedPrompt;
 			}
-			const customPrompt = options.systemPrompt(defaultPrompt.systemPrompt);
+			const customPrompt =
+				typeof options.systemPrompt === "function"
+					? options.systemPrompt(transformedPrompt.systemPrompt)
+					: options.systemPrompt;
+			const customSystemPrompt = typeof customPrompt === "string" ? [customPrompt] : customPrompt;
+			const defaultSystemBlockPreserved = customSystemPrompt[0] === transformedPrompt.systemPrompt[0];
+			const dynamicParts: DynamicPromptPart[] =
+				typeof options.systemPrompt === "function"
+					? transformedPrompt.dynamicParts.filter(
+							part => defaultSystemBlockPreserved || part.providerBlockIndex !== 0,
+						)
+					: [];
+			if (
+				typeof options.systemPrompt === "function" &&
+				customSystemPrompt.length > transformedPrompt.systemPrompt.length
+			) {
+				for (const [index, text] of customSystemPrompt.slice(transformedPrompt.systemPrompt.length).entries()) {
+					dynamicParts.push({
+						id: index === 0 ? "append-system-prompt" : `append-system-prompt-${index + 1}`,
+						source: "append-system-prompt",
+						providerBlockIndex: transformedPrompt.systemPrompt.length + index,
+						text,
+					});
+				}
+			}
 			return {
-				systemPrompt: typeof customPrompt === "string" ? [customPrompt] : customPrompt,
+				...transformedPrompt,
+				systemPrompt: customSystemPrompt,
+				dynamicParts,
 			};
 		};
 
@@ -4108,12 +4205,13 @@ async function createAgentSessionScoped(options: CreateAgentSessionOptions): Pro
 		}
 
 		setSessionActiveToolNames(initialToolNames);
-		const { systemPrompt } = await logger.time(
+		const systemPromptResult = await logger.time(
 			"buildSystemPrompt",
 			rebuildSystemPrompt,
 			initialToolNames,
 			toolRegistry,
 		);
+		const { systemPrompt } = systemPromptResult;
 
 		const promptTemplates = await promptTemplatesPromise;
 		toolSession.promptTemplates = promptTemplates;
@@ -4249,6 +4347,7 @@ async function createAgentSessionScoped(options: CreateAgentSessionOptions): Pro
 		// One-shot launch-latency marker: fired the first time the loop dispatches
 		// a chat request to the provider transport. See onFirstChatDispatch.
 		let notifyFirstChatDispatch = options.onFirstChatDispatch;
+		let providerContextCaptured = false;
 		// Shared, settings-aware stream wrapper used by the main agent, advisor,
 		// and side-channel requests (`/btw`, `/omfg`, IRC auto-replies, handoff).
 		// Keeps OpenRouter sticky-routing variants, antigravity endpoint routing,
@@ -4278,15 +4377,54 @@ async function createAgentSessionScoped(options: CreateAgentSessionOptions): Pro
 		// Primary-agent (and its auto-learn capture twin) provider options read per
 		// request, so `/settings` changes to budgets, Kimi format, or the Codex
 		// websocket policy reach the next call without a session recreate.
-		const primaryStreamFn: StreamFn = (streamModel, context, streamOptions) => {
+		const resolvePrimaryStreamOptions = (streamOptions: SimpleStreamOptions | undefined): SimpleStreamOptions => {
 			const kimiApiFormat = cfgProvidersKimiApiFormat.get(settings);
-			return settingsAwareStreamFn(streamModel, context, {
+			return {
 				...streamOptions,
 				thinkingBudgets: streamOptions?.thinkingBudgets ?? cfgThinkingBudgets.get(settings),
 				kimiApiFormat: streamOptions?.kimiApiFormat ?? (kimiApiFormat === "auto" ? undefined : kimiApiFormat),
 				preferWebsockets: streamOptions?.preferWebsockets ?? resolveOpenAIWebsocketPreference(settings),
-			});
+			};
 		};
+		const primaryStreamFn: StreamFn = (streamModel, context, streamOptions) =>
+			settingsAwareStreamFn(streamModel, context, resolvePrimaryStreamOptions(streamOptions));
+		const captureProviderContext = options.captureProviderContext;
+		// Use the same settings decorator with a capture-only sink, never the transport/concurrency wrappers.
+		const captureStreamFn = captureProviderContext
+			? createSettingsAwareStreamFn(settings, (streamModel, context, streamOptions) => {
+					if (!providerContextCaptured) {
+						providerContextCaptured = true;
+						captureProviderContext(context, streamModel, streamOptions);
+					}
+					const stream = new AssistantMessageEventStream();
+					const text = "Provider request captured.";
+					const message: AssistantMessage = {
+						role: "assistant",
+						content: [{ type: "text", text }],
+						api: streamModel.api,
+						provider: streamModel.provider,
+						model: streamModel.id,
+						usage: {
+							input: 0,
+							output: 0,
+							cacheRead: 0,
+							cacheWrite: 0,
+							totalTokens: 0,
+							cost: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0, total: 0 },
+						},
+						stopReason: "stop",
+						timestamp: Date.now(),
+					};
+					queueMicrotask(() => {
+						stream.push({ type: "start", partial: message });
+						stream.push({ type: "text_start", contentIndex: 0, partial: message });
+						stream.push({ type: "text_delta", contentIndex: 0, delta: text, partial: message });
+						stream.push({ type: "text_end", contentIndex: 0, content: text, partial: message });
+						stream.push({ type: "done", reason: "stop", message });
+					});
+					return stream;
+				})
+			: undefined;
 		// Prompt-cache warmer for the main agent loop only: replays the last
 		// request through the same primary wrapper just before the entry would
 		// expire, so idle gaps do not force a full-prefix cache re-write.
@@ -4363,7 +4501,6 @@ async function createAgentSessionScoped(options: CreateAgentSessionOptions): Pro
 					cfgExternalThinking.get(settings) &&
 					agent.state.tools.some(tool => tool.name === "think") &&
 					supportsExternalThinking(streamModel);
-				const fallbackCreditRedemption = session?.consumeActiveFallbackCreditRedemption(streamModel);
 				const merged: SimpleStreamOptions = {
 					...streamOptions,
 					forceReasoningOff: externalThinking || streamOptions?.forceReasoningOff,
@@ -4371,6 +4508,11 @@ async function createAgentSessionScoped(options: CreateAgentSessionOptions): Pro
 						? {}
 						: { toolNamespacesInfo: codeModeState.namespacesInfo }),
 				};
+				// Capture completes non-consuming options but must not redeem credits, dispatch, or warm the cache.
+				if (captureStreamFn) {
+					return captureStreamFn(streamModel, context, resolvePrimaryStreamOptions(merged));
+				}
+				const fallbackCreditRedemption = session?.consumeActiveFallbackCreditRedemption(streamModel);
 				const stream = primaryStreamFn(streamModel, context, {
 					...merged,
 					...(fallbackCreditRedemption !== undefined ? { fallbackCreditRedemption } : {}),
@@ -4568,6 +4710,7 @@ async function createAgentSessionScoped(options: CreateAgentSessionOptions): Pro
 			inheritedSessionAgents: options.inheritedSessionAgents,
 			promptTemplates,
 			slashCommands,
+			routines,
 			extensionRunner,
 			getEvalPreludes,
 			evalToolSession: toolSession,
@@ -4613,6 +4756,7 @@ async function createAgentSessionScoped(options: CreateAgentSessionOptions): Pro
 			advisorStreamFn: settingsAwareStreamFn,
 			convertToLlm: convertToLlmFinal,
 			rebuildSystemPrompt,
+			initialSystemPromptResult: systemPromptResult,
 			getXdevToolEntries: () => (toolSession.xdev ? xdevEntries(toolSession.xdev) : []),
 			xdev: toolSession.xdev,
 			presentationPinnedToolNames: explicitlyRequestedToolNameSet,
@@ -5347,6 +5491,7 @@ async function createAgentSessionScoped(options: CreateAgentSessionOptions): Pro
 			modelFallbackMessage,
 			lspServers,
 			startBackgroundModelDiscovery: startRuntimeDiscovery,
+			systemPromptResult,
 			eventBus,
 			subagentEventBus,
 		};

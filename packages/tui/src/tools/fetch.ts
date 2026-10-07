@@ -20,9 +20,10 @@ import {
 } from "../render/render-utils";
 import { applyListLimit } from "./list-limit";
 import { formatFullOutputReference, formatStyledArtifactReference } from "./output-meta";
+import { formatReadTokenLabel, formatReadTokenSuffix, type ReadTokenDetails } from "./read-token";
 
 /** Display metadata for fetch tool results. */
-export interface ReadUrlToolDetails {
+export interface ReadUrlToolDetails extends ReadTokenDetails {
 	kind: "url";
 	url: string;
 	finalUrl: string;
@@ -159,11 +160,12 @@ export function describeReadUrlResult(result: {
 	isError?: boolean;
 }): NativeToolView {
 	const details = result.details;
+	const tokenLabel = formatReadTokenLabel(details?.readTextTokens);
 	if (result.isError || !details) {
 		const urlText = details?.finalUrl ?? details?.url ?? "";
 		const message = plainText(resultText(result) || "No response data").replace(/^Error:\s*/, "");
 		return {
-			tool: readUrlHead(urlText),
+			tool: readUrlHead(urlText, tokenLabel ? [tokenLabel] : []),
 			tone: "error",
 			body: [errorText(message.trim() || "Read failed")],
 		};
@@ -191,7 +193,10 @@ export function describeReadUrlResult(result: {
 		].filter(Boolean),
 	);
 	return {
-		tool: readUrlHead(details.finalUrl, redirected ? [`from ${plainText(getDomain(details.url))}`] : []),
+		tool: readUrlHead(details.finalUrl, [
+			...(redirected ? [`from ${plainText(getDomain(details.url))}`] : []),
+			...(tokenLabel ? [tokenLabel] : []),
+		]),
 		tone: truncated ? "warning" : undefined,
 		body: compact([
 			shown.length > 0
@@ -227,8 +232,10 @@ export function renderReadUrlResult(
 		const rawErrorText = result.content?.find(c => c.type === "text")?.text ?? "";
 		const errorText = (rawErrorText || "No response data").replace(/^Error:\s*/, "");
 		const urlText = details?.finalUrl ?? details?.url ?? "";
-		const description = urlText ? formatReadUrlDescription(urlText) : undefined;
-		const header = renderStatusLine({ icon: "error", title: "Read", description }, uiTheme);
+		const tokenSuffix = formatReadTokenSuffix(details?.readTextTokens, uiTheme);
+		const description = urlText ? `${formatReadUrlDescription(urlText)}${tokenSuffix}` : undefined;
+		const title = urlText ? "Read" : `Read${tokenSuffix}`;
+		const header = renderStatusLine({ icon: "error", title, description }, uiTheme);
 		const errorLines = sanitizeDisplayLines(errorText).map(line => uiTheme.fg("error", line));
 		return framedToolCard(uiTheme, () => ({
 			header,
@@ -237,7 +244,7 @@ export function renderReadUrlResult(
 		}));
 	}
 
-	const description = formatReadUrlDescription(details.finalUrl);
+	const description = `${formatReadUrlDescription(details.finalUrl)}${formatReadTokenSuffix(details.readTextTokens, uiTheme)}`;
 	const hasRedirect = details.url !== details.finalUrl;
 	const hasNotes = details.notes.length > 0;
 	const truncation = details.meta?.truncation;

@@ -218,6 +218,35 @@
 - Fixed slowdowns when processing long evaluation output, large Python kernel results, compiler/linter output, and ephemeral side-channel replies.
 - Fixed documents served as `application/octet-stream` being downloaded twice.
 - Fixed collaboration guests rebuilding the transcript excessively during streaming.
+### Changed
+
+- Subagent LSP now follows the upstream disabled default; set `task.enableLsp: true` to enable it, as synchronized MOMP profiles already do.
+- Runtime audits now record source, effective settings, and the exact compiled artifact identity.
+- Updated default URL-fetch browser identities to Chrome 155.
+
+### Fixed
+
+- Fixed dynamic prompt inspection omitting SVG and table-chart guidance.
+- Fixed conversation search missing exact whitespace phrases and returning inconsistent leading hits across result limits.
+- Fixed automatic remote compaction cancelling its running background request at the context limit instead of awaiting a usable result.
+- Removed unused chart and long-range detail queries from `stats --summary`.
+- Fixed conversation-search excerpts missing matches after Unicode lowercase expansions.
+- Fixed routine reloads losing commands or terminating RPC when candidate discovery fails.
+- Fixed folder rankings and omitted counts in `stats --summary` for more than 2,000 folders.
+- Fixed published CLI bundles loading unpatched Puppeteer instead of the workspace's patched version.
+- Fixed Codex cache probes using WebSockets when their SSE transport is overridden by the environment.
+- Fixed empty explicit AGENTS files, blank inline templates, and dangling mandatory templates silently losing guidance.
+- Fixed tagged-model and Vibe agents loading overrides from the wrong session profile.
+- Fixed RPC plugin reloads advertising stale profile agent descriptions.
+- Fixed prompt inspection omitting in-band tool blocks, their attribution, and final SDK request options.
+- Fixed blank `/rename` requests to use transcript-specific guidance that excludes unanswered Assistant follow-up questions.
+- Fixed conversation search and its benchmark reporting complete coverage after session discovery failures.
+- Fixed routine completion after terminal step failures or cancellation.
+- Fixed agent usage summaries showing zero-dollar costs for entirely unpriced usage.
+
+### Removed
+
+- Removed the unused `generateSessionTitleFromRecentTranscript` helper and its alternate title-selection options.
 
 ## [18.7.0] - 2026-10-06
 

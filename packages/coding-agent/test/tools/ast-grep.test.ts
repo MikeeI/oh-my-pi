@@ -4,6 +4,8 @@ import * as os from "node:os";
 import * as path from "node:path";
 import { Settings } from "@oh-my-pi/pi-coding-agent/config/settings";
 import { createTools, type ToolSession } from "@oh-my-pi/pi-coding-agent/tools";
+import { astGrepToolRenderer } from "@oh-my-pi/pi-tui/tools/ast-grep";
+import { getThemeByName, initTheme } from "@oh-my-pi/pi-tui/theme";
 import { removeWithRetries } from "@oh-my-pi/pi-utils";
 
 function createTestSession(cwd = "/tmp/test", overrides: Partial<ToolSession> = {}): ToolSession {
@@ -149,6 +151,49 @@ describe("ast_grep parse errors", () => {
 			expect(details?.limitReached).toBe(false);
 			expect(text).toContain("z.ts");
 			expect(text).not.toContain("a.ts");
+		} finally {
+			await removeWithRetries(tempDir);
+		}
+	});
+
+	it("gives the model and TUI the next page offset after normalizing skip", async () => {
+		const tempDir = await fs.mkdtemp(path.join(os.tmpdir(), "ast-grep-page-"));
+		try {
+			const filePath = path.join(tempDir, "page.ts");
+			await Bun.write(filePath, Array.from({ length: 106 }, () => 'console.log("page");').join("\n"));
+			const tool = (await createTools(createTestSession(tempDir), ["ast_grep"])).find(
+				entry => entry.name === "ast_grep",
+			);
+			if (!tool) throw new Error("ast_grep unavailable");
+
+			const result = await tool.execute("ast-grep-page", {
+				pat: 'console.log("page")',
+				path: filePath,
+				skip: 50.9,
+			});
+			const details = result.details as { nextSkip?: number; limitReached?: boolean } | undefined;
+			const modelText = result.content.find(content => content.type === "text")?.text ?? "";
+			expect(details?.limitReached).toBe(true);
+			expect(details?.nextSkip).toBe(100);
+			expect(modelText).toContain("skip=100");
+
+			await initTheme(false);
+			const theme = await getThemeByName("dark");
+			if (!theme) throw new Error("dark theme unavailable");
+			const tuiText = astGrepToolRenderer
+				.renderResult(result, { expanded: true, isPartial: false }, theme, {
+					pat: 'console.log("page")',
+					skip: 50.9,
+				})
+				.render(240)
+				.join("\n");
+			expect(tuiText).toContain("skip=100");
+			const native = astGrepToolRenderer.describeResult(
+				result,
+				{ expanded: true, isPartial: false },
+				{ pat: 'console.log("page")', skip: 50.9 },
+			);
+			expect(JSON.stringify(native)).toContain("skip=100");
 		} finally {
 			await removeWithRetries(tempDir);
 		}

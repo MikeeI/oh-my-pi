@@ -20,6 +20,7 @@ import type { ImageContent } from "@oh-my-pi/pi-ai";
 import { toolWireSchema } from "@oh-my-pi/pi-ai/utils/schema";
 import { modelsAreEqual } from "@oh-my-pi/pi-catalog/models";
 import { $env, isRecord, logger, Snowflake, toError } from "@oh-my-pi/pi-utils";
+import { reset as resetCapabilities } from "../../capability";
 import { clearPluginRootsAndCaches, resolveActiveProjectRegistryPath } from "../../discovery/helpers";
 import {
 	type ExtensionAskDialogQuestion,
@@ -56,6 +57,7 @@ import { SKILL_PROMPT_MESSAGE_TYPE, USER_INTERRUPT_LABEL } from "../../session/m
 import { executeAcpBuiltinSlashCommand } from "../../slash-commands/acp-builtins";
 import { buildAvailableSlashCommands } from "../../slash-commands/available-commands";
 import { listLogoutAccounts, logoutCredential } from "../../slash-commands/helpers/logout";
+import { refreshAgentDiscovery } from "../../task";
 import { defaultLoadModeForToolName } from "../../tools/essential-tools";
 import type { EventBus } from "../../utils/event-bus";
 import { selectRpcEntries } from "./rpc-compat";
@@ -1732,21 +1734,51 @@ export async function runRpcMode(session: AgentSession, options: RpcModeOptions 
 		process.exit(0);
 	};
 
-	const getAvailableCommands = async () => buildAvailableSlashCommands(session);
-	const reloadPluginState = async () => {
-		const cwd = session.sessionManager.getCwd();
-		const projectPath = await resolveActiveProjectRegistryPath(cwd);
-		clearPluginRootsAndCaches(projectPath ? [projectPath] : undefined);
-		await session.refreshSkillsAndCommands();
-		await emitAvailableCommandsUpdate();
-	};
+	let availableCommands = await buildAvailableSlashCommands(session);
+	let commandRegistryChange = Promise.resolve();
+	let pluginReloadInProgress = false;
 	const emitAvailableCommandsUpdate = async () => {
-		output({ type: "available_commands_update", commands: await getAvailableCommands() });
+		const commands = await buildAvailableSlashCommands(session);
+		availableCommands = commands;
+		output({ type: "available_commands_update", commands });
 	};
+	const serializeCommandRegistryChange = (change: () => Promise<void>): Promise<void> => {
+		const pending = commandRegistryChange.then(change);
+		// The caller observes rejection; a rejected candidate must not poison
+		// later reloads or replace the last successfully advertised registry.
+		commandRegistryChange = pending.catch(() => undefined);
+		return pending;
+	};
+	const refreshCommands = () => serializeCommandRegistryChange(emitAvailableCommandsUpdate);
+	const reloadPluginState = () =>
+		serializeCommandRegistryChange(async () => {
+			pluginReloadInProgress = true;
+			try {
+				const cwd = session.sessionManager.getCwd();
+				const projectPath = await resolveActiveProjectRegistryPath(cwd);
+				clearPluginRootsAndCaches(projectPath ? [projectPath] : undefined);
+				resetCapabilities();
+				// Refresh the advertised Task snapshot before rebuilding descriptions and publishing command metadata.
+				await refreshAgentDiscovery(cwd, session.effectiveExtensionRoots, session.settings.getAgentDir());
+				await session.refreshSkills();
+				await emitAvailableCommandsUpdate();
+			} finally {
+				pluginReloadInProgress = false;
+			}
+		});
 	session.subscribeCommandMetadataChanged(() => {
-		void emitAvailableCommandsUpdate();
+		// refreshSkills emits metadata before the reload candidate is validated.
+		// The explicit reload owns that notification and its failure response.
+		if (pluginReloadInProgress) return;
+		shutdownCoordinator.track(
+			refreshCommands().catch(error => {
+				const message = toError(error).message;
+				logger.error("RPC command registry refresh failed", { error });
+				output({ type: "notice", level: "error", message, source: "commands" });
+			}),
+		);
 	});
-	await emitAvailableCommandsUpdate();
+	output({ type: "available_commands_update", commands: availableCommands });
 
 	const inputGate = new RpcUserInputGate();
 	type OrderedUserInput = Extract<RpcCommand, { type: "prompt" | "steer" | "follow_up" | "abort_and_prompt" }>;
@@ -1801,7 +1833,7 @@ export async function runRpcMode(session: AgentSession, options: RpcModeOptions 
 					settings: session.settings,
 					cwd: session.sessionManager.getCwd(),
 					output: commandOutput => output({ type: "command_output", text: commandOutput }),
-					refreshCommands: emitAvailableCommandsUpdate,
+					refreshCommands,
 					reloadPlugins: reloadPluginState,
 					runCommandInBackground: task => shutdownCoordinator.track(task()),
 					notifyTitleChanged: async () => {
@@ -2097,7 +2129,7 @@ export async function runRpcMode(session: AgentSession, options: RpcModeOptions 
 			}
 
 			case "get_available_commands": {
-				return success(id, "get_available_commands", { commands: await getAvailableCommands() });
+				return success(id, "get_available_commands", { commands: availableCommands });
 			}
 
 			case "get_entries": {

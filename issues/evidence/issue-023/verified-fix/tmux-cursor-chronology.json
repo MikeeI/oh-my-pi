@@ -1,0 +1,118 @@
+{
+  "source": "tmux-baseline-server.log.gz",
+  "baselineRevision": "77adac703fc417e0692d0f1e2946ece747d83421",
+  "events": [
+    {
+      "line": 118402,
+      "text": "1790723048.975201 window_pane_resize: %1 resize 79x39"
+    },
+    {
+      "line": 118403,
+      "text": "1790723048.975204 screen_resize_cursor: new size 79x39, now 79x33 (cursor 3,32 = 3,82)"
+    },
+    {
+      "line": 118404,
+      "text": "1790723048.975208 screen_resize_cursor: cursor finished at 3,38 = 3,82"
+    },
+    {
+      "line": 118888,
+      "text": "1790723048.980000 input_csi_dispatch: 'H' \"\" \"30;1\""
+    },
+    {
+      "line": 118892,
+      "text": "1790723048.980011 input_csi_dispatch: 'm' \"\" \"0\""
+    },
+    {
+      "line": 118894,
+      "text": "1790723048.980017 input_csi_dispatch: 'K' \"\" \"\""
+    },
+    {
+      "line": 118895,
+      "text": "1790723048.980022 input_csi_dispatch: 'm' \"\" \"48;2;29;33;41;38;2;61;66;74\""
+    },
+    {
+      "line": 118911,
+      "text": "1790723048.980068 input_csi_dispatch: 'm' \"\" \"39\""
+    },
+    {
+      "line": 119073,
+      "text": "1790723048.980401 input_csi_dispatch: 'm' \"\" \"38;2;61;66;74\""
+    },
+    {
+      "line": 119087,
+      "text": "1790723048.980427 input_csi_dispatch: 'm' \"\" \"39;49\""
+    },
+    {
+      "line": 119090,
+      "text": "1790723048.980432 input_csi_dispatch: 'm' \"\" \"0\""
+    },
+    {
+      "line": 119093,
+      "text": "1790723048.980437 input_csi_dispatch: 'H' \"\" \"33;4\""
+    },
+    {
+      "line": 119097,
+      "text": "1790723048.980445 input_csi_dispatch: 'h' \"?\" \"25\""
+    },
+    {
+      "line": 119100,
+      "text": "1790723048.980450 input_csi_dispatch: 'h' \"?\" \"7\""
+    },
+    {
+      "line": 120249,
+      "text": "1790723049.060218 input_csi_dispatch: 'l' \"?\" \"25\""
+    },
+    {
+      "line": 120252,
+      "text": "1790723049.060227 input_csi_dispatch: 'l' \"?\" \"7\""
+    },
+    {
+      "line": 120255,
+      "text": "1790723049.060234 input_csi_dispatch: 'H' \"\" \"30;1\""
+    },
+    {
+      "line": 120259,
+      "text": "1790723049.060244 input_csi_dispatch: 'm' \"\" \"0\""
+    },
+    {
+      "line": 120261,
+      "text": "1790723049.060249 input_csi_dispatch: 'K' \"\" \"\""
+    },
+    {
+      "line": 120262,
+      "text": "1790723049.060254 input_csi_dispatch: 'm' \"\" \"48;2;29;33;41;38;2;61;66;74\""
+    },
+    {
+      "line": 120278,
+      "text": "1790723049.060294 input_csi_dispatch: 'm' \"\" \"39\""
+    },
+    {
+      "line": 120440,
+      "text": "1790723049.060732 input_csi_dispatch: 'm' \"\" \"38;2;61;66;74\""
+    },
+    {
+      "line": 120454,
+      "text": "1790723049.060765 input_csi_dispatch: 'm' \"\" \"39;49\""
+    },
+    {
+      "line": 120457,
+      "text": "1790723049.060772 input_csi_dispatch: 'm' \"\" \"0\""
+    },
+    {
+      "line": 120460,
+      "text": "1790723049.060779 input_csi_dispatch: 'H' \"\" \"33;4\""
+    },
+    {
+      "line": 120464,
+      "text": "1790723049.060788 input_csi_dispatch: 'h' \"?\" \"25\""
+    },
+    {
+      "line": 120467,
+      "text": "1790723049.060799 input_csi_dispatch: 'h' \"?\" \"7\""
+    },
+    {
+      "line": 120535,
+      "text": "1790723049.067091 window_pane_send_resize: %1 resize to 79,39"
+    }
+  ]
+}

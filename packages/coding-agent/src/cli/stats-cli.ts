@@ -6,9 +6,16 @@
 
 import { formatKeyHint } from "@oh-my-pi/pi-tui/key-hint-format";
 import { truncateToWidth } from "@oh-my-pi/pi-tui/utils";
+import { APP_DISPLAY_NAME } from "../app-version";
 import chalk from "@oh-my-pi/pi-utils/chalk";
 import { openStandaloneJudge } from "../judgment/standalone";
 import { openPath } from "../utils/open";
+import {
+	loadStatsSummary,
+	renderStatsSummary,
+	type StatsOverallLoader,
+	type StatsSummaryLoader,
+} from "./stats-summary";
 
 /**
  * Single-line TTY progress bar. On a non-TTY stream we just stay quiet -
@@ -64,6 +71,42 @@ export interface StatsCommandArgs {
 }
 
 // =============================================================================
+// Argument Parser
+// =============================================================================
+
+/**
+ * Parse stats subcommand arguments.
+ * Returns undefined if not a stats command.
+ */
+export function parseStatsArgs(args: string[]): StatsCommandArgs | undefined {
+	if (args.length === 0 || args[0] !== "stats") {
+		return undefined;
+	}
+
+	const result: StatsCommandArgs = {
+		port: 3847,
+		host: "127.0.0.1",
+		json: false,
+		summary: false,
+	};
+
+	for (let i = 1; i < args.length; i++) {
+		const arg = args[i];
+		if (arg === "--json" || arg === "-j") {
+			result.json = true;
+		} else if (arg === "--summary" || arg === "-s") {
+			result.summary = true;
+		} else if ((arg === "--port" || arg === "-p") && i + 1 < args.length) {
+			result.port = parseInt(args[++i], 10);
+		} else if (arg.startsWith("--port=")) {
+			result.port = parseInt(arg.split("=")[1], 10);
+		}
+	}
+
+	return result;
+}
+
+// =============================================================================
 // Command Handler
 // =============================================================================
 
@@ -73,8 +116,9 @@ export async function runStatsCommand(cmd: StatsCommandArgs): Promise<void> {
 		closeDb,
 		formatStatsDashboardUrl,
 		getDashboardStats,
+		getOverallStatsForRange,
+		getSummaryStats,
 		getTotalMessageCount,
-		printStatsSummary,
 		refreshRollups,
 		startServer,
 		syncAllSessions,
@@ -92,7 +136,7 @@ export async function runStatsCommand(cmd: StatsCommandArgs): Promise<void> {
 		if (cmd.json) {
 			console.log(JSON.stringify(await getDashboardStats(), null, 2));
 		} else {
-			await printStatsSummary();
+			await printStatsSummary(getSummaryStats, getOverallStatsForRange);
 		}
 		return;
 	}
@@ -121,4 +165,9 @@ export async function runStatsCommand(cmd: StatsCommandArgs): Promise<void> {
 
 	// Keep the process alive
 	await new Promise(() => {});
+}
+
+async function printStatsSummary(loadSummary: StatsSummaryLoader, loadOverall: StatsOverallLoader): Promise<void> {
+	const statsByRange = await loadStatsSummary(loadSummary, loadOverall);
+	console.log(renderStatsSummary(statsByRange, { dashboardCommand: `${APP_DISPLAY_NAME} stats` }));
 }

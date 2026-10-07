@@ -29,6 +29,116 @@ const isCompactionEntry = (entry: FileEntry): entry is CompactionEntry => entry.
 /**
  * RPC mode tests.
  */
+describe("RPC plugin reload", () => {
+	test("refreshes profile agent descriptions on /reload-plugins", async () => {
+		const root = await fs.promises.mkdtemp(path.join(os.tmpdir(), "omp-rpc-agent-reload-"));
+		const agentDir = path.join(root, "agent");
+		const projectDir = path.join(root, "project");
+		const scoutPath = path.join(agentDir, "prompts", "agents", "scout.md");
+		const rpcClient = new RpcClient({
+			cliPath: path.join(import.meta.dir, "..", "src", "cli.ts"),
+			cwd: projectDir,
+			env: {
+				ANTHROPIC_API_KEY: "test-key",
+				PI_CODING_AGENT_DIR: agentDir,
+				PI_NO_TITLE: "1",
+			},
+			provider: "anthropic",
+			model: "claude-sonnet-4-20250514",
+		});
+		const scoutSource = (sentinel: string) =>
+			`---\nname: scout\ndescription: ${sentinel}\ntools: read\n---\n${sentinel} body.\n`;
+		const taskDescription = async () => {
+			const task = (await rpcClient.getState()).dumpTools?.find(tool => tool.name === "task");
+			if (!task) throw new Error("RPC state did not include the task tool");
+			return task.description;
+		};
+		try {
+			await fs.promises.mkdir(projectDir, { recursive: true });
+			await Bun.write(scoutPath, scoutSource("BeforeReloadSentinel"));
+			await rpcClient.start();
+			expect(await taskDescription()).toContain("BeforeReloadSentinel");
+
+			await Bun.write(scoutPath, scoutSource("AfterReloadSentinel"));
+			await rpcClient.prompt("/reload-plugins");
+			const after = await taskDescription();
+			expect(after).toContain("AfterReloadSentinel");
+			expect(after).not.toContain("BeforeReloadSentinel");
+		} finally {
+			await rpcClient.stop();
+			removeSyncWithRetries(root);
+		}
+	}, 30000);
+
+	test("keeps advertised commands when candidate routines conflict or their directory cannot be scanned", async () => {
+		const root = await fs.promises.mkdtemp(path.join(os.tmpdir(), "omp-rpc-reload-test-"));
+		const agentDir = path.join(root, "agent");
+		const projectDir = path.join(root, "project");
+		const commandsDir = path.join(agentDir, "commands");
+		const routinesDir = path.join(agentDir, "routines");
+		await fs.promises.mkdir(projectDir, { recursive: true });
+		await fs.promises.mkdir(commandsDir, { recursive: true });
+		await fs.promises.mkdir(routinesDir, { recursive: true });
+		await fs.promises.writeFile(
+			path.join(commandsDir, "stable.md"),
+			"---\ndescription: Stable command\n---\nStable $ARGUMENTS\n",
+		);
+		await fs.promises.writeFile(
+			path.join(routinesDir, "old-routine.yaml"),
+			"description: Old routine\nsteps:\n  - message: Old routine remains available\n",
+		);
+		const rpcClient = new RpcClient({
+			cliPath: path.join(import.meta.dir, "..", "src", "cli.ts"),
+			cwd: projectDir,
+			env: {
+				ANTHROPIC_API_KEY: "test-key",
+				PI_CODING_AGENT_DIR: agentDir,
+				PI_NO_TITLE: "1",
+			},
+			provider: "anthropic",
+			model: "claude-sonnet-4-20250514",
+		});
+		const updates: Array<Array<{ name: string }>> = [];
+		const unsubscribe = rpcClient.onAvailableCommandsUpdate(commands => {
+			updates.push(commands);
+		});
+
+		try {
+			await rpcClient.start();
+			const committed = (await rpcClient.getAvailableCommands()).map(command => command.name);
+			expect(committed).toContain("stable");
+			expect(committed).toContain("old-routine");
+			const updateCount = updates.length;
+			await fs.promises.writeFile(
+				path.join(routinesDir, "stable.yaml"),
+				"description: Rejected conflict\nsteps:\n  - message: Must not replace state\n",
+			);
+
+			await expect(rpcClient.prompt("/reload-plugins")).rejects.toThrow(
+				"Routine /stable conflicts with existing slash command /stable",
+			);
+
+			expect(updates).toHaveLength(updateCount);
+			expect(updates.at(-1)?.map(command => command.name)).toEqual(committed);
+
+			await fs.promises.rename(routinesDir, `${routinesDir}-backup`);
+			await fs.promises.writeFile(routinesDir, "Not a routine directory");
+			await expect(rpcClient.prompt("/reload-plugins")).rejects.toThrow("Failed to scan");
+			expect(updates).toHaveLength(updateCount);
+			expect((await rpcClient.getAvailableCommands()).map(command => command.name)).toEqual(committed);
+			await fs.promises.unlink(routinesDir);
+			await fs.promises.rename(`${routinesDir}-backup`, routinesDir);
+			await fs.promises.rename(path.join(routinesDir, "stable.yaml"), path.join(routinesDir, "new-routine.yaml"));
+			await rpcClient.prompt("/reload-plugins");
+			expect((await rpcClient.getAvailableCommands()).map(command => command.name)).toContain("new-routine");
+		} finally {
+			unsubscribe();
+			rpcClient.stop();
+			removeSyncWithRetries(root);
+		}
+	}, 30000);
+});
+
 describe.skipIf(!e2eApiKey("ANTHROPIC_API_KEY"))("RPC mode", () => {
 	let client: RpcClient;
 	let sessionDir: string;

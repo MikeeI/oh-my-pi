@@ -172,27 +172,11 @@ describe("subagent LSP availability", () => {
 		vi.restoreAllMocks();
 	});
 
-	it("disables LSP for subagents by default", async () => {
+	it("enables LSP for subagents when task.enableLsp is configured", async () => {
 		mockAgents({
 			name: "task",
 			description: "Task agent",
 			systemPrompt: "Use LSP when useful.",
-			source: "bundled",
-			tools: ["lsp"],
-		});
-		const { getOptions } = mockCreateAgentSession();
-
-		const tool = await TaskTool.create(createSession());
-		await tool.execute("tool-call", TEST_TASK);
-
-		expect(getOptions()?.enableLsp).toBe(false);
-	});
-
-	it("enables subagent LSP when task.enableLsp is set", async () => {
-		mockAgents({
-			name: "task",
-			description: "Task agent",
-			systemPrompt: "Use normal tools.",
 			source: "bundled",
 			tools: ["lsp"],
 		});
@@ -203,6 +187,22 @@ describe("subagent LSP availability", () => {
 
 		expect(getOptions()?.enableLsp).toBe(true);
 		expect(getOptions()?.toolNames).toContain("lsp");
+	});
+
+	it("disables subagent LSP through the global task.enableLsp switch", async () => {
+		mockAgents({
+			name: "task",
+			description: "Task agent",
+			systemPrompt: "Use normal tools.",
+			source: "bundled",
+			tools: ["lsp"],
+		});
+		const { getOptions } = mockCreateAgentSession();
+
+		const tool = await TaskTool.create(createSession({ taskEnableLsp: false }));
+		await tool.execute("tool-call", TEST_TASK);
+
+		expect(getOptions()?.enableLsp).toBe(false);
 	});
 
 	it("keeps subagent LSP disabled when the parent session disables LSP", async () => {
@@ -221,7 +221,25 @@ describe("subagent LSP availability", () => {
 		expect(getOptions()?.enableLsp).toBe(false);
 	});
 
-	it("disables LSP for isolated subagents by default", async () => {
+	it("enables declared code-intelligence tools for Scout when configured", async () => {
+		mockAgents({
+			name: "scout",
+			description: "Scout agent",
+			systemPrompt: "Use code-intelligence tools when useful.",
+			source: "bundled",
+			tools: ["read", "lsp", "ast_grep"],
+		});
+		const { getOptions } = mockCreateAgentSession();
+
+		const tool = await TaskTool.create(createSession({ taskEnableLsp: true }));
+		await tool.execute("tool-call", { agent: "scout", name: "CheckScout", task: "Map the code." });
+
+		expect(getOptions()?.enableLsp).toBe(true);
+		expect(getOptions()?.toolNames).toContain("lsp");
+		expect(getOptions()?.toolNames).toContain("ast_grep");
+	});
+
+	it("enables LSP for isolated subagents through the global switch", async () => {
 		mockAgents({
 			name: "task",
 			description: "Task agent",
@@ -232,11 +250,11 @@ describe("subagent LSP availability", () => {
 		mockIsolation();
 		const { getOptions } = mockCreateAgentSession();
 
-		const tool = await TaskTool.create(createSession({ isolationEnabled: true }));
+		const tool = await TaskTool.create(createSession({ isolationEnabled: true, taskEnableLsp: true }));
 		await tool.execute("tool-call", { ...TEST_TASK, isolated: true });
 
 		expect(getOptions()?.cwd).toBe("/tmp/isolated-subagent");
-		expect(getOptions()?.enableLsp).toBe(false);
+		expect(getOptions()?.enableLsp).toBe(true);
 	});
 
 	it("opens isolated persisted subagent sessions with the worktree cwd", async () => {

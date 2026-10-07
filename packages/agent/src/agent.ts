@@ -32,8 +32,10 @@ import {
 	agentLoop,
 	agentLoopContinue,
 	createSyntheticToolResultMessage,
+	type PreparedProviderCall,
 	normalizeMessagesForProvider,
 	normalizeTools,
+	prepareProviderCall,
 	resolveOwnedDialectFromEnv,
 	steeringQueueState,
 	unpairedToolCallTail,
@@ -891,6 +893,30 @@ export class Agent {
 			names.add(tool.name);
 		}
 		return merged ?? this.#state.tools;
+	}
+
+	/**
+	 * Prepare a configured main-loop request without dispatching or committing request-history state.
+	 * Side channels intentionally omit in-band tool markup; inspection must use the main-loop preparation owner.
+	 */
+	async prepareModelCall(messages: AgentMessage[], systemPrompt: string[]): Promise<PreparedProviderCall> {
+		const model = this.#state.model;
+		if (!model) throw new Error("No active model on agent");
+		// Append-only synchronization, sent-definition recording, and turn hooks belong only to a real dispatch.
+		return prepareProviderCall(
+			{ systemPrompt, messages: [...messages], tools: this.#toolsForModel(model) },
+			{
+				model,
+				convertToLlm: this.#convertToLlm,
+				transformContext: this.#transformContext,
+				transformProviderContext: this.#transformProviderContext,
+				intentTracing: this.#intentTracing,
+				pruneToolDescriptions: this.#pruneToolDescriptions,
+				dialect: this.#dialect,
+				getDialect: this.#dialectResolver,
+			},
+			undefined,
+		);
 	}
 
 	/**

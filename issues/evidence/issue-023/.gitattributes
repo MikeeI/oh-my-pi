@@ -1,0 +1,3 @@
+# Terminal padding, carriage returns, and escape bytes are evidence, not source formatting.
+*.log binary
+*.txt binary

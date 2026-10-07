@@ -21,10 +21,13 @@ import { AgentStorage } from "@oh-my-pi/pi-coding-agent/session/agent-storage";
 import type { AuthStorage } from "@oh-my-pi/pi-coding-agent/session/auth-storage";
 import { SessionManager } from "@oh-my-pi/pi-coding-agent/session/session-manager";
 import type { AgentDefinition } from "@oh-my-pi/pi-coding-agent/task/types";
-import { removeSyncWithRetries, Snowflake } from "@oh-my-pi/pi-utils";
+import { getAgentDir, removeSyncWithRetries, Snowflake } from "@oh-my-pi/pi-utils";
 import { createInMemoryAuthStorage } from "./helpers/agent-session-setup";
 
 import { cfgRetryFallbackChains } from "@oh-my-pi/pi-coding-agent/session/settings";
+
+// Keep this fixture discovery-only when upstream adds production Codex models to the bundled catalog.
+const COLD_DEFAULT_MODEL_ID = "gpt-6.1-sol-cold-discovery-fixture";
 
 describe("createAgentSession deferred model pattern resolution", () => {
 	let tempDir: string;
@@ -114,7 +117,7 @@ describe("createAgentSession deferred model pattern resolution", () => {
 		pi.registerProvider("runtime-provider", dynamicOnlyProviderConfig);
 	};
 
-	function buildSessionOptions(modelPattern: string | string[]) {
+	function buildSessionOptions(modelPattern?: string | string[]) {
 		// Reuse one empty registry across these model-only cases. Opening a fresh
 		// AuthStorage runs the full SQLite schema setup, while every session here
 		// registers and removes the same inline provider on its own lifecycle.
@@ -158,7 +161,7 @@ describe("createAgentSession deferred model pattern resolution", () => {
 	});
 
 	test("lets a child task spawn a model agent inherited from its parent", async () => {
-		const bundledTask = getBundledAgent("task");
+		const bundledTask = getBundledAgent("task", getAgentDir());
 		if (!bundledTask) throw new Error("Expected bundled task agent");
 		const modelAgent: AgentDefinition = {
 			...bundledTask,
@@ -459,6 +462,72 @@ describe("createAgentSession deferred model pattern resolution", () => {
 			expect(modelRegistry.find("deferred-runtime-provider", "deferred-runtime-model")).toBeDefined();
 		} finally {
 			await result.session.dispose();
+		}
+	});
+
+	// Built-in account discovery is not part of getDiscoverableProviders().
+	// A cold configured default must still beat a competing authenticated model.
+	function builtinDefaultOptions(discoveredModels: string[]) {
+		const authStorage = createInMemoryAuthStorage();
+		authStoragesToClose.push(authStorage);
+		authStorage.keys.setRuntime("openai-codex", "codex-test-token");
+		authStorage.keys.setRuntime("deepseek", "deepseek-test-key");
+		const settings = Settings.isolated({
+			modelRoles: { default: `openai-codex/${COLD_DEFAULT_MODEL_ID}:xhigh` },
+			enabledModels: [`openai-codex/${COLD_DEFAULT_MODEL_ID}`, "deepseek/deepseek-v4-pro"],
+			disabledProviders: ["ollama", "lm-studio", "llama.cpp"],
+			"retry.modelFallback": false,
+		});
+		const discoveryFetch: FetchImpl = async input => {
+			const url = new URL(String(input));
+			if (url.hostname === "chatgpt.com" && url.pathname.endsWith("/models")) {
+				return Response.json({
+					models: discoveredModels.map(slug => ({
+						slug,
+						supported_in_api: true,
+						default_reasoning_level: "high",
+						supported_reasoning_levels: ["low", "medium", "high", "xhigh"],
+					})),
+				});
+			}
+			return new Response("not found", { status: 404 });
+		};
+		const modelRegistry = new ModelRegistry(authStorage, path.join(tempDir, "models.yml"), {
+			settings,
+			fetch: discoveryFetch,
+		});
+		return {
+			...buildSessionOptions(),
+			authStorage,
+			modelRegistry,
+			settings,
+			extensions: [],
+			hasUI: true,
+		};
+	}
+
+	test("awaits cold built-in default discovery instead of starting on another provider", async () => {
+		const { session } = await createAgentSession(builtinDefaultOptions([COLD_DEFAULT_MODEL_ID]));
+		try {
+			expect(session.model?.provider).toBe("openai-codex");
+			expect(session.model?.id).toBe(COLD_DEFAULT_MODEL_ID);
+			expect(session.thinkingLevel).toBe(Effort.XHigh);
+		} finally {
+			await session.dispose();
+		}
+	});
+
+	test("rejects an unresolved configured default instead of using another authenticated provider", async () => {
+		const startup = createAgentSession(builtinDefaultOptions([]));
+		try {
+			await expect(startup).rejects.toThrow(
+				`Configured default model "openai-codex/${COLD_DEFAULT_MODEL_ID}:xhigh" could not be resolved after discovery`,
+			);
+		} finally {
+			await startup.then(
+				result => result.session.dispose(),
+				() => undefined,
+			);
 		}
 	});
 

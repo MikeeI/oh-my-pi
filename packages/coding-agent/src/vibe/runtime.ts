@@ -24,7 +24,7 @@ import {
 import * as fs from "node:fs/promises";
 import * as os from "node:os";
 import * as path from "node:path";
-import { logger, prompt, Snowflake } from "@oh-my-pi/pi-utils";
+import { getAgentDir, logger, prompt, Snowflake } from "@oh-my-pi/pi-utils";
 import type { AsyncJob, AsyncJobManager } from "../async/job-manager";
 import { validateAgentAccountPools } from "../config/account-pools";
 import { resolveAgentModelSelection } from "../config/model-resolver";
@@ -44,6 +44,7 @@ import { type AgentProgress, oneLineLabel, type SingleResult } from "@oh-my-pi/p
 import type { ToolSession } from "../tools";
 import { formatDuration } from "@oh-my-pi/pi-tui/render/render-utils";
 import { ToolError } from "@oh-my-pi/pi-tui/tools/tool-errors";
+import { isAgentsContextFile } from "../utils/context-files";
 import { calculateTokensPerSecond } from "../utils/token-rate";
 
 import {
@@ -292,7 +293,7 @@ export class VibeSessionRegistry {
 			ownerId: record.ownerId,
 			parentSessionId: scope.parentSessionId,
 			parentSessionFile: scope.parentSessionFile,
-			agent: getBundledAgent("sonic")!,
+			agent: getBundledAgent("sonic", getAgentDir())!,
 			state: record.state ?? "running",
 			createdAt: now,
 			lastActivityAt: now,
@@ -352,7 +353,7 @@ export class VibeSessionRegistry {
 
 	#resolveWorker(session: VibeParentSession, cli: VibeCli): ResolvedVibeWorker {
 		const agentName = VIBE_CLI_AGENT[cli];
-		const agent = getBundledAgent(agentName);
+		const agent = getBundledAgent(agentName, session.settings.getAgentDir());
 		if (!agent) {
 			throw new ToolError(`Bundled agent "${agentName}" for vibe cli "${cli}" is unavailable.`);
 		}
@@ -1311,7 +1312,7 @@ export class VibeSessionRegistry {
 			settings: session.settings,
 			inheritedSessionAgents: session.getSessionAgents?.(),
 			mcpManager: session.mcpManager ?? MCPManager.instance(),
-			contextFiles: session.contextFiles?.filter(file => path.basename(file.path).toLowerCase() !== "agents.md"),
+			contextFiles: session.contextFiles?.filter(file => !isAgentsContextFile(file)),
 			skills: [...(session.skills ?? [])],
 			workspaceTree: session.workspaceTree,
 			promptTemplates: session.promptTemplates,

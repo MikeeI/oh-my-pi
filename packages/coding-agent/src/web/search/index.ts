@@ -18,6 +18,7 @@ import type { CustomTool, CustomToolContext } from "../../extensibility/custom-t
 import webSearchSystemPrompt from "../../prompts/system/web-search.md" with { type: "text" };
 import webSearchDescription from "../../prompts/tools/web-search.md" with { type: "text" };
 import { resolveConfiguredModelTarget } from "../../session/role-models";
+import { resolveUserToolPromptSource } from "../../prompts/tool-prompt-source";
 import { discoverAuthStorage } from "../../sdk";
 import type { ToolSession } from "../../tools";
 import { throwIfAborted } from "../../tools/tool-errors";
@@ -372,15 +373,16 @@ export async function runSearchQuery(
 	}
 }
 
-/** Description without the X operators, for hosts without a model registry. */
-const plainDescription = prompt.render(webSearchDescription);
-
-/**
- * Description rendered on first read with a model registry, then reused for
- * the process: re-checking xAI auth per read would rewrite the tool
- * description, and invalidate the prompt cache, whenever auth changes.
- */
-let registryDescription: string | undefined;
+function renderWebSearchDescription(agentDir: string, xSearch: boolean): string {
+	return prompt.render(
+		resolveUserToolPromptSource({
+			agentDir,
+			toolName: "web-search",
+			bundledSource: webSearchDescription,
+		}),
+		{ xSearch },
+	);
+}
 
 /**
  * Web search tool implementation.
@@ -397,17 +399,24 @@ export class WebSearchTool implements AgentTool<typeof webSearchSchema, SearchRe
 	readonly summary = "Search the web for up-to-date information";
 
 	#session: ToolSession;
+	#description: string | undefined;
 
 	constructor(session: ToolSession) {
 		this.#session = session;
 	}
 
-	/** Advertises X search operators when xAI credentials existed at the process's first read. */
+	/**
+	 * Freeze auth-dependent guidance on first read so later auth changes do not
+	 * invalidate the prompt cache. Keep the snapshot instance-local: a process
+	 * can host tools from different profiles with different selected sources.
+	 */
 	get description(): string {
 		const modelRegistry = this.#session.modelRegistry;
-		if (!modelRegistry) return plainDescription;
-		registryDescription ??= prompt.render(webSearchDescription, { xSearch: xSearchAvailable(modelRegistry) });
-		return registryDescription;
+		this.#description ??= renderWebSearchDescription(
+			this.#session.settings.getAgentDir(),
+			modelRegistry ? xSearchAvailable(modelRegistry) : false,
+		);
+		return this.#description;
 	}
 
 	async execute(
@@ -433,7 +442,9 @@ export class WebSearchTool implements AgentTool<typeof webSearchSchema, SearchRe
 export const webSearchCustomTool: CustomTool<typeof webSearchSchema, SearchResultDetails> = {
 	name: "web_search",
 	label: "Web Search",
-	description: plainDescription,
+	get description() {
+		return renderWebSearchDescription(settings.getAgentDir(), false);
+	},
 	parameters: webSearchSchema,
 
 	approval: "read",

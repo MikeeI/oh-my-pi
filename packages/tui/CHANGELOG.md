@@ -84,6 +84,13 @@
 - Fixed slow Markdown processing for certain LaTeX environments and incomplete delimiters.
 - Fixed excessive slowdown when formatting long semicolon-free JavaScript evaluations.
 - Fixed prompt-editor lag in large drafts containing magic keywords.
+### Fixed
+
+- Fixed finalized response tails disappearing under viewport pressure while SVG figures finish rendering.
+- Fixed missing Read-token totals in settings and process Read cards.
+- Fixed duplicated accepted transcript prefixes and stale history after presentation resets.
+- Fixed leading whitespace after hard line breaks when foreground-color spans are enabled.
+- Fixed duplicate tool previews and editor rows when fullscreen return races a delayed tmux resize.
 
 ## [18.7.0] - 2026-10-06
 

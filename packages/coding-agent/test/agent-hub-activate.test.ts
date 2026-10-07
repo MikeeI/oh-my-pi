@@ -19,7 +19,7 @@ import type { AgentSession } from "@oh-my-pi/pi-coding-agent/session/agent-sessi
 import { visitEntriesFromFileStream } from "@oh-my-pi/pi-coding-agent/session/session-loader";
 import { SessionManager } from "@oh-my-pi/pi-coding-agent/session/session-manager";
 import { getBundledAgent } from "@oh-my-pi/pi-coding-agent/task/agents";
-import { TempDir } from "@oh-my-pi/pi-utils";
+import { getAgentDir, TempDir } from "@oh-my-pi/pi-utils";
 
 const AGENT_ID = "Worker";
 const TEST_CWD = path.resolve("agent-hub-cwd");
@@ -377,7 +377,7 @@ describe("Agent hub Enter activation", () => {
 					id: "init",
 					parentId: "model",
 					timestamp: createdAt,
-					systemPrompt: `base prompt\n\nROLE\n====\n${getBundledAgent("scout")?.systemPrompt}`,
+					systemPrompt: `base prompt\n\nROLE\n====\n${getBundledAgent("scout", getAgentDir())?.systemPrompt}`,
 					task: "Inspect persisted telemetry.",
 					tools: ["read", "grep"],
 				}),

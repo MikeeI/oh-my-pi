@@ -13,6 +13,7 @@ import { getSupportedEfforts } from "@oh-my-pi/pi-catalog/model-thinking";
 import { openaiCodexModelManagerOptions } from "@oh-my-pi/pi-catalog/provider-models/special";
 import { modelKind, type ModelSpec } from "@oh-my-pi/pi-catalog/types";
 import { resolveProviderModelReference } from "@oh-my-pi/pi-coding-agent/config/model-resolver";
+import { persistedModelCacheProviderId } from "./model-cache-fixture";
 
 describe("Codex model discovery", () => {
 	it("normalizes optional maximum context windows separately from the default window", async () => {
@@ -743,7 +744,9 @@ describe("Codex model discovery", () => {
 			);
 			const db = new Database(dbPath);
 			try {
-				db.run("UPDATE model_cache SET version = 7 WHERE provider_id = ?", ["openai-codex"]);
+				db.run("UPDATE model_cache SET version = 7 WHERE provider_id = ?", [
+					persistedModelCacheProviderId(db, "openai-codex"),
+				]);
 			} finally {
 				db.close();
 			}
@@ -815,7 +818,7 @@ describe("Codex model discovery", () => {
 				const row = inspect
 					.query<{ version: number }, [string]>("SELECT version FROM model_cache WHERE provider_id = ?")
 					.get("openai-codex");
-				expect(row?.version).not.toBe(2);
+				expect(row).toBeNull();
 			} finally {
 				inspect.close();
 			}

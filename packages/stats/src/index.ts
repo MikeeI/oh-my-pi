@@ -11,10 +11,13 @@ import { formatStatsDashboardUrl, startServer } from "./server";
 
 export {
 	getDashboardStats,
+	getOverallStatsForRange,
+	getSummaryStats,
 	getToolDashboardStats,
 	getTotalMessageCount,
 	type SyncOptions,
 	type SyncProgress,
+	type TimeRange,
 	smokeTestSyncWorker,
 	syncAllSessions,
 } from "./aggregator";

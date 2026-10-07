@@ -144,7 +144,9 @@ describe("eval tool description", () => {
 			["helpers", "budget.total"],
 			["helpers", "%load <path>"],
 		]) {
-			const result = await readTool.execute("read-eval-topic", { path: `xd://eval/${topic}` });
+			const result = await readTool.execute("read-eval-topic", {
+				path: `xd://eval/${topic}`,
+			});
 			expect(result.content.some(part => part.type === "text" && part.text.includes(signature))).toBe(true);
 		}
 	});

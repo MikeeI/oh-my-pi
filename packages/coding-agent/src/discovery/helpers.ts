@@ -8,6 +8,7 @@ import {
 	getConfigDirName,
 	getPluginsDir,
 	getProjectDir,
+	isEnoent,
 	normalizePathForComparison,
 	parseFrontmatter,
 	tryParseJson,
@@ -626,8 +627,17 @@ export async function loadFilesFromDir<T>(
 			recursive,
 		});
 		matches = result.matches;
-	} catch {
-		// Directory doesn't exist or isn't readable
+	} catch (err) {
+		// Native scan errors use GenericFailure even for ENOENT. Confirm only
+		// an absent root is optional; a failed scan must not erase a live registry.
+		let scanError = err;
+		try {
+			await fs.promises.stat(dir);
+		} catch (statError) {
+			if (isEnoent(statError)) return { items, warnings };
+			scanError = statError;
+		}
+		warnings.push(`Failed to scan ${dir}: ${scanError}`);
 		return { items, warnings };
 	}
 

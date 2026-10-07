@@ -622,9 +622,11 @@ export const BUILTIN_LIFECYCLE_SLASH_COMMANDS: ReadonlyArray<SlashCommandSpec> =
 		description: "Rename the current session (omit title to generate)",
 		inlineHint: "[title]",
 		allowArgs: true,
+		argumentCompletionMode: "exclusive",
 		handle: async (command, runtime) => {
 			const session = runtime.session;
 			const sessionManager = runtime.sessionManager;
+			const explicitTitle = command.args.trim();
 			const runRename = async (): Promise<void> => {
 				const sessionId = sessionManager.getSessionId();
 				const titleSignal = session.titleGenerationSignal;
@@ -634,19 +636,23 @@ export const BUILTIN_LIFECYCLE_SLASH_COMMANDS: ReadonlyArray<SlashCommandSpec> =
 					runtime.sessionManager === sessionManager &&
 					!runtime.signal?.aborted &&
 					// An interrupt cancels a generated title; a typed one applies regardless.
-					!(titleSignal.aborted && !command.args) &&
+					!(titleSignal.aborted && !explicitTitle) &&
 					sessionManager.getSessionId() === sessionId &&
 					sessionManager.titleRevision === titleRevision;
 				try {
-					const generation = session.renameTitle(command.args, runtime.signal);
+					const generation = session.renameTitle(explicitTitle, runtime.signal);
 					titleRevision = sessionManager.titleRevision;
 					const title = await generation;
 					if (!isCurrent() || title === undefined) return;
 					if (!title) {
-						await runtime.output("Could not generate a session title. Use /rename <title> to set one.");
+						await runtime.output("No conversation content to generate a title from.");
 						return;
 					}
-					const persistence = sessionManager.setSessionName(title, "user");
+					const persistence = sessionManager.setSessionName(
+						title,
+						explicitTitle ? "user" : "auto",
+						explicitTitle ? undefined : "rename",
+					);
 					titleRevision = sessionManager.titleRevision;
 					const ok = await persistence;
 					if (!isCurrent()) return;
@@ -659,11 +665,11 @@ export const BUILTIN_LIFECYCLE_SLASH_COMMANDS: ReadonlyArray<SlashCommandSpec> =
 					await runtime.output(`Session renamed to ${title}.`);
 				} catch (err) {
 					if (!isCurrent()) return;
-					if (command.args || !runtime.runCommandInBackground) throw err;
+					if (explicitTitle || !runtime.runCommandInBackground) throw err;
 					await runtime.output(`Rename failed: ${errorMessage(err)}`);
 				}
 			};
-			if (!command.args && runtime.runCommandInBackground) {
+			if (!explicitTitle && runtime.runCommandInBackground) {
 				runtime.runCommandInBackground(runRename);
 				return commandConsumed();
 			}
@@ -675,8 +681,9 @@ export const BUILTIN_LIFECYCLE_SLASH_COMMANDS: ReadonlyArray<SlashCommandSpec> =
 			const session = runtime.ctx.session;
 			const sessionManager = runtime.ctx.sessionManager;
 			const sessionId = sessionManager.getSessionId();
+			const explicitTitle = command.args.trim();
 			// `renameTitle` resolves undefined for a generated title an interrupt cancelled.
-			const generation = session.renameTitle(command.args.trim());
+			const generation = session.renameTitle(explicitTitle);
 			const titleRevision = sessionManager.titleRevision;
 			const title = await generation;
 			if (
@@ -688,10 +695,10 @@ export const BUILTIN_LIFECYCLE_SLASH_COMMANDS: ReadonlyArray<SlashCommandSpec> =
 			)
 				return;
 			if (!title) {
-				runtime.ctx.showStatus("Could not generate a session title. Use /rename <title> to set one.");
+				runtime.ctx.showStatus("No conversation content to generate a title from.");
 				return;
 			}
-			await runtime.ctx.handleRenameCommand(title);
+			await runtime.ctx.handleRenameCommand(title, !explicitTitle);
 		},
 	},
 	{

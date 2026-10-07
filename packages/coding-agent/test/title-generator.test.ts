@@ -8,6 +8,7 @@ import { Settings } from "@oh-my-pi/pi-coding-agent/config/settings";
 import { tinyTitleClient } from "@oh-my-pi/pi-coding-agent/tiny/title-client";
 import {
 	disposeTerminalTitleState,
+	formatRecentTitleTranscript,
 	generateSessionTitle,
 	initTerminalTitleState,
 	setExtensionTerminalTitle,
@@ -828,6 +829,43 @@ describe("title generator", () => {
 		expect(completeSimpleMock).toHaveBeenCalledTimes(2);
 		expect(completeSimpleMock.mock.calls[0]?.[0]).toBe(smolModel);
 		expect(completeSimpleMock.mock.calls[1]?.[0]).toBe(fallbackModel);
+	});
+
+	it("formats a recent text-only transcript for auto rename", () => {
+		const transcript = formatRecentTitleTranscript([
+			{ role: "user", content: [{ type: "text", text: "user 1 should be dropped" }] },
+			{ role: "assistant", content: [{ type: "text", text: "assistant 1 should be dropped" }] },
+			{ role: "toolResult", content: [{ type: "text", text: "tool output should be ignored" }] },
+			{
+				role: "user",
+				content: [{ type: "text", text: "user 2 implement rename\n```ts\nconst leaked = true;\n```" }],
+			},
+			{ role: "assistant", content: [{ type: "text", text: "assistant 2 discussed rename" }] },
+			{ role: "user", content: [{ type: "text", text: "user 3 wants smol" }] },
+			{ role: "assistant", content: [{ type: "text", text: "assistant 3 explains smol path" }] },
+			{ role: "user", content: [{ type: "text", text: "user 4 wants larger context" }] },
+			{ role: "assistant", content: [{ type: "text", text: "assistant 4 proposes 40000 chars" }] },
+			{ role: "user", content: [{ type: "text", text: "user 5 approves simple prompt" }] },
+			{ role: "assistant", content: [{ type: "text", text: "assistant 5 drops regex parsing" }] },
+			{ role: "user", content: [{ type: "text", text: "user 6 says continue" }] },
+			{
+				role: "assistant",
+				content: [
+					{ type: "thinking", thinking: "thinking leak" },
+					{ type: "text", text: "assistant 6 final rename plan" },
+					{ type: "toolCall", name: "search", arguments: { pattern: "leak" } },
+				],
+			},
+		] as never);
+
+		expect(transcript).toContain("<user>\nuser 2 implement rename\n</user>");
+		expect(transcript).toContain("<assistant>\nassistant 6 final rename plan\n</assistant>");
+		expect(transcript).not.toContain("user 1 should be dropped");
+		expect(transcript).not.toContain("assistant 1 should be dropped");
+		expect(transcript).not.toContain("tool output should be ignored");
+		expect(transcript).not.toContain("const leaked");
+		expect(transcript).not.toContain("thinking leak");
+		expect(transcript).not.toContain("search");
 	});
 });
 

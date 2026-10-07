@@ -2916,14 +2916,25 @@ export class ModelRegistry {
 	}
 
 	/**
-	 * Whether a config-declared discovery provider has not yet produced a
-	 * catalog in this process. A cold discovery cache (e.g. after `omp update`
-	 * bumps the cache namespace) leaves the provider in its initial `idle`
-	 * state with no models, so a selector the provider will supply looks
-	 * unknown until background discovery lands (#10048).
+	 * Whether initial discovery can still complete a provider's catalog.
+	 * Cold caches leave `idle` state (#10048), but a cached catalog can also
+	 * omit newer models, and built-in cache hydration may leave no state at all.
+	 * The initial-refresh barrier ends suppression even when discovery fails.
+	 * Non-cache terminal results also end it for hosts using refreshProvider.
 	 */
 	isProviderDiscoveryPending(provider: string): boolean {
-		return this.#providerDiscoveryStates.get(provider)?.status === "idle";
+		if (this.#initialRefreshSettled || this.#isProviderDisabled(provider)) return false;
+		const state = this.#providerDiscoveryStates.get(provider);
+		if (state) return state.status === "idle" || state.status === "cached";
+		if (this.getDiscoveryProviderId(provider) !== undefined) return true;
+		return (
+			MODELS_DEV_CATALOG_PROVIDER_ID_LOOKUP[provider] === true ||
+			(BUILT_IN_MODEL_MANAGER_PROVIDER_IDS[provider] === true &&
+				(this.#createProviderAvailabilityCheck()(provider) ||
+					PROVIDER_DESCRIPTORS.some(
+						descriptor => descriptor.providerId === provider && descriptor.allowUnauthenticated,
+					)))
+		);
 	}
 
 	/**

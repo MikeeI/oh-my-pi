@@ -46,6 +46,7 @@ import {
 } from "../internal-urls";
 import { isMarkdownPath } from "@oh-my-pi/pi-tui/lang-from-path";
 import readDescription from "../prompts/tools/read.md" with { type: "text" };
+import { resolveUserToolPromptSource } from "../prompts/tool-prompt-source";
 import type { ToolSession } from "../sdk";
 import {
 	DEFAULT_MAX_BYTES,
@@ -960,9 +961,10 @@ export class ReadTool implements AgentTool<typeof readSchema, ReadToolDetails> {
 	};
 	readonly label = "Read";
 	readonly loadMode = "essential";
+	readonly #descriptionSource: string;
 	/** Rendered per access so the hashline guidance follows a live `edit.mode` change. */
 	get description(): string {
-		return prompt.render(readDescription, {
+		return prompt.render(this.#descriptionSource, {
 			IS_HL_MODE: resolveFileDisplayMode(this.session).hashLines,
 			BINARY_VIEWS: cfgIdaAvailable.get(this.session.settings),
 		});
@@ -996,7 +998,13 @@ export class ReadTool implements AgentTool<typeof readSchema, ReadToolDetails> {
 	constructor(
 		private readonly session: ToolSession,
 		private readonly completeImageRequest: typeof completeSimple = completeSimple,
-	) {}
+	) {
+		this.#descriptionSource = resolveUserToolPromptSource({
+			agentDir: session.settings.getAgentDir(),
+			toolName: this.name,
+			bundledSource: readDescription,
+		});
+	}
 
 	/** Live `read.defaultLimit`, clamped to `[1, DEFAULT_MAX_LINES]`. */
 	get #defaultLimit(): number {

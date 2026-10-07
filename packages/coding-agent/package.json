@@ -532,7 +532,9 @@
 		"gen:bundle": "bun scripts/bundle-dist.ts",
 		"gen:rpc": "bun scripts/gen-rpc/index.ts",
 		"prepack": "bun run gen:tool-views && bun run gen:bundle",
-		"bench:guard": "bun scripts/bench-guard.ts"
+		"bench:conversation-search": "bun scripts/bench-conversation-search.ts",
+		"bench:guard": "bun scripts/bench-guard.ts",
+		"profile:runtime": "bun scripts/profile-runtime.ts"
 	},
 	"dependencies": {
 		"@babel/parser": "catalog:",

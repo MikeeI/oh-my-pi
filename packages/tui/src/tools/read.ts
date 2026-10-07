@@ -32,6 +32,7 @@ import {
 	renderReadUrlResult,
 } from "./fetch";
 import { formatFullOutputReference, formatStyledTruncationWarning, stripOutputNotice } from "./output-meta";
+import { formatReadTokenLabel, formatReadTokenSuffix } from "./read-token";
 import { formatBytes, sanitizeDisplayLines, shortenPath, wrapBrackets } from "../render/render-utils";
 
 import type { OutputMeta } from "./output-meta";
@@ -46,6 +47,8 @@ export type ReadTruncationStats = Omit<TruncationResult, "content">;
 
 /** Display metadata for file and URL reads. */
 export interface ReadToolDetails {
+	/** Exact native-token count of final sanitized text blocks after session-owned postprocessing. */
+	readTextTokens?: number;
 	kind?: "file" | "url";
 	proc?: ProcReadDetails;
 	cfg?: CfgReadDetails;
@@ -228,21 +231,24 @@ interface ReadUrlCard {
 	): Component;
 }
 
-/** Read cards keyed by URL scheme. */
+/**
+ * Read cards keyed by URL scheme.
+ * Exact-token metadata belongs to the outer Read result, not the scheme-owned details.
+ */
 const READ_URL_CARDS: Record<string, ReadUrlCard> = {
 	proc: {
 		label: "Process",
 		rootDetail: "jobs & services",
 		detailsKey: "proc",
 		render: (_url, target, result, details, options, uiTheme) =>
-			renderProcRead(target, result, details?.proc, options, uiTheme),
+			renderProcRead(target, result, details?.proc, options, uiTheme, details?.readTextTokens),
 	},
 	cfg: {
 		label: "Config",
 		rootDetail: "all settings",
 		detailsKey: "cfg",
 		render: (url, _target, result, details, options, uiTheme) =>
-			renderCfgRead(splitInternalUrlSel(url).path, result, details?.cfg, options, uiTheme),
+			renderCfgRead(splitInternalUrlSel(url).path, result, details?.cfg, options, uiTheme, details?.readTextTokens),
 	},
 };
 
@@ -356,6 +362,8 @@ function readNativeHead(rawPath: string, args: ReadRenderArgs | undefined, detai
 		const n = details.summary.elidedSpans;
 		meta.push(`summary: ${n} elided span${n === 1 ? "" : "s"}`);
 	}
+	const tokenLabel = formatReadTokenLabel(details?.readTextTokens);
+	if (tokenLabel) meta.push(tokenLabel);
 	const conflicts = details?.conflictCount ?? 0;
 	return {
 		title: "Read",
@@ -500,6 +508,7 @@ export const readToolRenderer = {
 				const endLine = args.limit !== undefined ? startLine + args.limit - 1 : "";
 				title += `:${startLine}${endLine ? `-${endLine}` : ""}`;
 			}
+			title += formatReadTokenSuffix(result.details?.readTextTokens, uiTheme);
 			const header = renderStatusLine({ icon: "error", title }, uiTheme);
 			const errorLines = sanitizeDisplayLines(errorText).map(line => uiTheme.fg("error", line));
 			return framedToolCard(uiTheme, () => ({
@@ -550,7 +559,11 @@ export const readToolRenderer = {
 			});
 			const correction = suffix ? ` ${uiTheme.fg("dim", `(corrected from ${shortenPath(suffix.from)})`)}` : "";
 			const header = renderStatusLine(
-				{ icon: suffix ? "warning" : "success", title: "Read", description: `${displayPath}${correction}` },
+				{
+					icon: suffix ? "warning" : "success",
+					title: "Read",
+					description: `${displayPath}${correction}${formatReadTokenSuffix(details?.readTextTokens, uiTheme)}`,
+				},
 				uiTheme,
 			);
 			const detailLines = contentText
@@ -594,6 +607,7 @@ export const readToolRenderer = {
 			const n = details.conflictCount;
 			title += ` ${uiTheme.fg("warning", `(⚠ ${n} conflict${n === 1 ? "" : "s"})`)}`;
 		}
+		title += formatReadTokenSuffix(details?.readTextTokens, uiTheme);
 		const rawRequested =
 			args?.raw === true || renderPath.sel?.split(":").some(chunk => chunk.toLowerCase() === "raw") === true;
 		const isMarkdown = details?.contentType === "text/markdown" && !rawRequested;
@@ -646,8 +660,8 @@ export const readToolRenderer = {
 	describeCall(args: ReadRenderArgs): NativeToolView {
 		const rawPath = readRawPath(args);
 		const routed = readUrlCard(rawPath);
-		if (routed?.card.detailsKey === "proc") return describeProcRead(routed.target, undefined, undefined);
-		if (routed) return describeCfgRead(splitInternalUrlSel(rawPath).path, undefined, undefined);
+		if (routed?.card.detailsKey === "proc") return describeProcRead(routed.target, undefined, undefined, undefined);
+		if (routed) return describeCfgRead(splitInternalUrlSel(rawPath).path, undefined, undefined, undefined);
 		if (isReadableUrlPath(rawPath)) return describeReadUrlCall({ path: rawPath, raw: args.raw });
 		return { tool: readNativeHead(rawPath, args), inline: true };
 	},
@@ -665,8 +679,10 @@ export const readToolRenderer = {
 		const details = result.details;
 		const rawPath = readRawPath(args);
 		const routed = readUrlCard(rawPath, details);
-		if (routed?.card.detailsKey === "proc") return describeProcRead(routed.target, result, details?.proc);
-		if (routed) return describeCfgRead(splitInternalUrlSel(rawPath).path, result, details?.cfg);
+		if (routed?.card.detailsKey === "proc")
+			return describeProcRead(routed.target, result, details?.proc, details?.readTextTokens);
+		if (routed)
+			return describeCfgRead(splitInternalUrlSel(rawPath).path, result, details?.cfg, details?.readTextTokens);
 		if (details?.kind === "url" || isReadableUrlPath(rawPath)) {
 			return describeReadUrlResult({
 				content: result.content,

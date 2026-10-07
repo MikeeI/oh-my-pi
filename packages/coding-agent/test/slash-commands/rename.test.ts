@@ -15,6 +15,7 @@ import type { SlashCommandRuntime } from "@oh-my-pi/pi-coding-agent/slash-comman
 import { DEFAULT_TINY_TITLE_LOCAL_MODEL_KEY } from "@oh-my-pi/pi-coding-agent/tiny/models";
 import { tinyTitleClient } from "@oh-my-pi/pi-coding-agent/tiny/title-client";
 import { cfgTitleIcons } from "@oh-my-pi/pi-coding-agent/utils/title-settings";
+import { TITLE_TRANSCRIPT_SYSTEM_PROMPT } from "@oh-my-pi/pi-coding-agent/utils/title-generator";
 import { createInMemoryAuthStorage } from "../helpers/agent-session-setup";
 import { createInteractiveModeContext } from "../helpers/interactive-mode-context";
 
@@ -71,7 +72,7 @@ function createRuntime(
 		showError: () => {},
 	});
 	const controller = new CommandController(ctx);
-	ctx.handleRenameCommand = title => controller.handleRenameCommand(title);
+	ctx.handleRenameCommand = (title, generated) => controller.handleRenameCommand(title, generated);
 	return {
 		session,
 		sessionManager,
@@ -125,21 +126,31 @@ it("cancels title inference without applying or announcing a late rename", async
 	}
 });
 
+it("passes transcript-specific guidance to inference for a blank rename", async () => {
+	const { session, execute } = createRuntime("headless");
+	const generate = vi.spyOn(tinyTitleClient, "generate").mockResolvedValue("Cache invalidation repair");
+
+	await execute("/rename");
+
+	expect(generate.mock.calls[0]?.[2]?.systemPrompt).toBe(TITLE_TRANSCRIPT_SYSTEM_PROMPT);
+	expect(session.sessionName).toBe("AUTO: Cache invalidation repair");
+});
+
 for (const mode of ["TUI", "headless"] as const) {
 	describe(`/rename (${mode})`, () => {
-		it("replaces a manual title from conversation context and protects the result from automatic titles", async () => {
+		it("replaces a manual title from conversation context and remains auto-owned", async () => {
 			const { session, sessionManager, execute } = createRuntime(mode);
 			await sessionManager.setSessionName("Old manually chosen title", "user");
 			const generate = vi.spyOn(tinyTitleClient, "generate").mockResolvedValue("Cache invalidation repair");
 
 			await execute("/rename   ");
 
-			expect(session.sessionName).toBe("Cache invalidation repair");
+			expect(session.sessionName).toBe("AUTO: Cache invalidation repair");
 			expect(generate).toHaveBeenCalledTimes(1);
 			const context = generate.mock.calls[0]?.[1];
 			expect(context).toContain("Repair cache invalidation after writes");
 			await sessionManager.setSessionName("Later automatic title", "auto");
-			expect(session.sessionName).toBe("Cache invalidation repair");
+			expect(session.sessionName).toBe("Later automatic title");
 		});
 
 		it("keeps the current title's card on a generated title without asking for a new one", async () => {
@@ -234,7 +245,7 @@ for (const mode of ["TUI", "headless"] as const) {
 					session.agent.replaceMessages(messages);
 					response.resolve("Cache invalidation repair");
 					await pending;
-					expect(session.sessionName).toBe("Cache invalidation repair");
+					expect(session.sessionName).toBe("AUTO: Cache invalidation repair");
 				} finally {
 					session.agent.replaceMessages(messages);
 					response.resolve(null);
@@ -450,7 +461,7 @@ it("aborts a background RPC rename silently and allows a later rename", async ()
 		generate.mockResolvedValue("Fresh RPC title");
 		await executeAcpBuiltinSlashCommand("/rename", runtime);
 		await backgroundTask;
-		expect(session.sessionName).toBe("Fresh RPC title");
+		expect(session.sessionName).toBe("AUTO: Fresh RPC title");
 	} finally {
 		response.resolve(null);
 		await backgroundTask;
@@ -477,10 +488,10 @@ it.each([true, false])("keeps the latest RPC rename request when older finishes 
 		const titles = ["Stale generated title", "Latest generated title"];
 		responses[first].resolve(titles[first]);
 		await pending[first];
-		expect(session.sessionName).toBe(olderFirst ? "Original title" : titles[1]);
+		expect(session.sessionName).toBe(olderFirst ? "Original title" : `AUTO: ${titles[1]}`);
 		responses[1 - first].resolve(titles[1 - first]);
 		await pending[1 - first];
-		expect(session.sessionName).toBe(titles[1]);
+		expect(session.sessionName).toBe(`AUTO: ${titles[1]}`);
 	} finally {
 		for (const response of responses) response.resolve(null);
 		await Promise.all(pending);
@@ -488,7 +499,7 @@ it.each([true, false])("keeps the latest RPC rename request when older finishes 
 });
 
 it.each(["TUI", "headless"] as const)(
-	"keeps a manual %s rename after an older automatic title completes",
+	"keeps a requested %s rename after an older automatic title completes",
 	async mode => {
 		const { session, sessionManager, execute } = createRuntime(mode);
 		const previousNoTitle = Bun.env.PI_NO_TITLE;
@@ -513,9 +524,9 @@ it.each(["TUI", "headless"] as const)(
 			await applied.promise;
 			manual.resolve("Requested manual title");
 			await pending;
-			expect(session.sessionName).toBe("Requested manual title");
+			expect(session.sessionName).toBe("AUTO: Requested manual title");
 			await sessionManager.setSessionName("Later automatic title", "auto");
-			expect(session.sessionName).toBe("Requested manual title");
+			expect(session.sessionName).toBe("Later automatic title");
 		} finally {
 			automatic.resolve(null);
 			manual.resolve(null);

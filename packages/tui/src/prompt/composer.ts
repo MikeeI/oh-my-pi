@@ -15,15 +15,15 @@ import {
 	type TUIOptions,
 	type ViewportSize,
 } from "../tui";
-import { wrapLiteralLine } from "../utils";
-import type { NativeChild, NativeSurface, NativeSurfaceProvider } from "../native/node";
-import { sameItems } from "../native/memo";
 import { postmortem } from "@oh-my-pi/pi-utils";
 import { CustomEditor } from "./custom-editor";
 import type { WordCompletionMethod } from "./word-completion";
 import { type AnimationFrame, TranscriptContainer } from "../chrome/transcript-container";
 import { WelcomeComponent } from "./welcome";
 import { ensureThemeSync, getEditorTheme, theme } from "../theme/theme";
+import { reflowHardRows } from "../render/terminal-row-reflow";
+import type { NativeChild, NativeSurface, NativeSurfaceProvider } from "../native/node";
+import { sameItems } from "../native/memo";
 
 const DOUBLE_INTERRUPT_MS = 500;
 
@@ -681,11 +681,13 @@ export class Composer implements TerminalFrameProvider, NativeSurfaceProvider {
 	): { id: number; rows: readonly string[]; kind: "append" | "replay" } | undefined {
 		if (this.#offeredHistory !== undefined) {
 			this.#rerenderOfferedHistory(width);
-			return {
-				id: this.#offeredHistory.id,
-				rows: this.#offeredHistory.rows,
-				kind: this.#offeredHistory.kind,
-			};
+			if (this.#offeredHistory !== undefined) {
+				return {
+					id: this.#offeredHistory.id,
+					rows: this.#offeredHistory.rows,
+					kind: this.#offeredHistory.kind,
+				};
+			}
 		}
 		if (this.#headerReplayPending) {
 			const transcriptReplay = transcript.peekReplayBatch(width);
@@ -764,6 +766,13 @@ export class Composer implements TerminalFrameProvider, NativeSurfaceProvider {
 			return;
 		}
 		const transcript = offered.source.transcript.rerenderOfferedBatch(width);
+		if (offered.source.transcriptId !== undefined && transcript?.id !== offered.source.transcriptId) {
+			// A destructive presentation reset invalidates the underlying offer.
+			// Never write its stale wrapper rows; retain header-only transactions.
+			this.#offeredHistory = undefined;
+			if (this.#historyReplayRequested) this.#startHistoryReplay();
+			return;
+		}
 		if (offered.source.header === "none") {
 			if (transcript !== undefined) offered.rows = transcript.rows;
 			return;
@@ -802,11 +811,7 @@ export class Composer implements TerminalFrameProvider, NativeSurfaceProvider {
 		const lines = this.#retiredHeaderRows;
 		if (!lines) return [];
 		if (isInsideTerminalMultiplexer()) return lines.slice(start);
-		const reflowed: string[] = [];
-		for (let index = start; index < lines.length; index++) {
-			reflowed.push(...wrapLiteralLine(lines[index]!, width));
-		}
-		return reflowed;
+		return reflowHardRows(lines.slice(start), width);
 	}
 
 	/** Live editor whose draft survives startup and session adoption. */

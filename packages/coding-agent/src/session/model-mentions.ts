@@ -3,6 +3,7 @@ import { isRecord, prompt } from "@oh-my-pi/pi-utils";
 import type { ModelRegistry } from "../config/model-registry";
 import { formatModelString } from "../config/model-resolver";
 import modelMentionDescription from "../prompts/agents/model-mention.md" with { type: "text" };
+import { resolveUserPromptSource } from "../prompts/user-prompt-source";
 import { getBundledAgent } from "../task/agents";
 import type { AgentDefinition } from "../task/types";
 import {
@@ -42,6 +43,7 @@ export function readModelMentions(entries: readonly SessionEntry[]): ModelMentio
 
 /** Session capabilities needed to authorize and persist model mentions. */
 export interface ModelMentionHost {
+	agentDir: string;
 	sessionManager: SessionManager;
 	modelRegistry: ModelRegistry;
 	scopedModels(): ReadonlyArray<Model>;
@@ -110,8 +112,14 @@ export class ModelMentionRegistry {
 
 	/** Expose inherited and session-tagged models as general-purpose task agents. */
 	sessionAgents(): AgentDefinition[] {
-		const task = getBundledAgent("task");
+		const task = getBundledAgent("task", this.#host.agentDir);
 		if (!task) throw new Error("Bundled task agent is unavailable");
+		const description = resolveUserPromptSource({
+			agentDir: this.#host.agentDir,
+			kind: "agent",
+			name: "model-mention",
+			bundledSource: modelMentionDescription,
+		}).source;
 		const inheritedNames = new Set(this.#inheritedAgents.map(agent => agent.name));
 		return [
 			...this.#inheritedAgents,
@@ -120,7 +128,7 @@ export class ModelMentionRegistry {
 				.map(mention => ({
 					...task,
 					name: mention.agent,
-					description: prompt.render(modelMentionDescription, { name: mention.name, selector: mention.selector }),
+					description: prompt.render(description, { name: mention.name, selector: mention.selector }),
 					model: [mention.selector],
 					filePath: undefined,
 				})),

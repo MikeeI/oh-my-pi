@@ -194,6 +194,7 @@ const cacheableMarkdownThemes = new WeakMap<
 >();
 const linkTargetSnapshots = new WeakMap<ReadonlyMap<string, string>, ReadonlyMap<string, string>>();
 let markdownMermaidRendering = true;
+let markdownTextColors: boolean | undefined;
 
 function ownFields(object: object): ReadonlyArray<readonly [PropertyKey, unknown]> {
 	return Reflect.ownKeys(object).map(key => [key, Object.getOwnPropertyDescriptor(object, key)?.value]);
@@ -258,6 +259,12 @@ export function setMarkdownMermaidRendering(enabled: boolean): void {
 	cachedMarkdownTheme = undefined;
 }
 
+export function setMarkdownTextColors(enabled: boolean): void {
+	if (markdownTextColors === enabled) return;
+	markdownTextColors = enabled;
+	cachedMarkdownTheme = undefined;
+}
+
 export function getMarkdownTheme(): MarkdownTheme {
 	ensureThemeSync();
 	if (cachedMarkdownTheme !== undefined && cachedMarkdownThemeRef === theme) {
@@ -281,6 +288,7 @@ export function getMarkdownTheme(): MarkdownTheme {
 			})()
 		: undefined;
 	const markdownTheme: MarkdownTheme = {
+		textColors: markdownTextColors,
 		heading: (text: string) => theme.fg("mdHeading", text),
 		link: (text: string) => theme.fg("mdLink", text),
 		linkUrl: (text: string) => theme.fg("mdLinkUrl", text),

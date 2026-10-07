@@ -20,6 +20,9 @@
 ### Changed
 
 - Improved performance when pruning tool output and capturing telemetry messages during long-running sessions.
+### Added
+
+- Added `Agent.prepareModelCall` to preview Main provider contexts without dispatching or committing request history.
 
 ## [18.7.0] - 2026-10-06
 

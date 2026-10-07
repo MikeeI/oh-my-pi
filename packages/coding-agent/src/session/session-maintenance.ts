@@ -32,6 +32,7 @@ import {
 	isTranscriptUsageAnchor,
 	NativeCompactionError,
 	prepareCompaction,
+	REMOTE_COMPACTION_TIMEOUT_MS,
 	RESCUE_SHAKE_CONFIG,
 	remotePreserveReusable,
 	resolveBudgetReserveTokens,
@@ -63,7 +64,7 @@ import * as AIError from "@oh-my-pi/pi-ai/error";
 import { resolvePromptCacheLookback } from "@oh-my-pi/pi-catalog/compat/prompt-cache-lookback";
 import { preferredDialect } from "@oh-my-pi/pi-catalog/identity";
 import { modelsAreEqual } from "@oh-my-pi/pi-catalog/models";
-import { isRecord, logger, prompt, Snowflake } from "@oh-my-pi/pi-utils";
+import { isRecord, logger, prompt, Snowflake, untilAborted } from "@oh-my-pi/pi-utils";
 import * as snapcompact from "@oh-my-pi/snapcompact";
 import { writeArtifact } from "./artifacts";
 import type { ModelRegistry } from "../config/model-registry";
@@ -357,6 +358,9 @@ interface SpeculationRun {
 	controller: AbortController;
 	promise: Promise<void>;
 	contextTokensAtStart: number;
+	method: "remote" | "handoff" | "soft";
+	startedAt: number;
+	failure?: { error: unknown };
 	armed?: ArmedSpeculation;
 }
 
@@ -2109,12 +2113,19 @@ export class SessionMaintenance {
 	/** Install and launch one background speculation run for `method`. */
 	#startSpeculationRun(contextTokens: number, method: "remote" | "handoff" | "soft"): void {
 		const controller = new AbortController();
-		const run: SpeculationRun = { controller, promise: Promise.resolve(), contextTokensAtStart: contextTokens };
+		const run: SpeculationRun = {
+			controller,
+			promise: Promise.resolve(),
+			contextTokensAtStart: contextTokens,
+			method,
+			startedAt: performance.now(),
+		};
 		const model = this.#model;
 		// Keyed now: the session can switch before the run settles.
 		const nativeKey = model && this.#nativeSpeculationKey(model);
 		this.#speculation = run;
 		run.promise = this.#runSpeculation(run, method, contextTokens).catch(error => {
+			run.failure = { error };
 			logger.debug("Speculative compaction failed", {
 				method,
 				error: error instanceof Error ? error.message : String(error),
@@ -2370,9 +2381,40 @@ export class SessionMaintenance {
 	}
 
 	/**
-	 * Consume the speculation slot for a real maintenance pass. An in-flight run
-	 * is aborted (the real pass supersedes it); an armed result is returned only
-	 * when still valid for the current branch, model, and settings.
+	 * Adopt the smaller remote snapshot instead of aborting it for a replacement
+	 * that may already exceed the window. The caller installs its maintenance
+	 * controller and emits start first, so input stays queued and Esc owns this wait.
+	 */
+	async #awaitRemoteSpeculation(run: SpeculationRun, owner: AbortController): Promise<void> {
+		// Charge time already spent in the background; taking ownership must not
+		// buy another full remote timeout. Provider deadlines remain in force too.
+		const remainingMs = Math.max(0, Math.ceil(REMOTE_COMPACTION_TIMEOUT_MS - (performance.now() - run.startedAt)));
+		const waitSignal = AbortSignal.any([owner.signal, run.controller.signal, AbortSignal.timeout(remainingMs)]);
+		const abortRun = () => run.controller.abort(owner.signal.reason);
+		const abortOwner = () => owner.abort(run.controller.signal.reason);
+		owner.signal.addEventListener("abort", abortRun, { once: true });
+		run.controller.signal.addEventListener("abort", abortOwner, { once: true });
+		try {
+			if (run.controller.signal.aborted) abortOwner();
+			await untilAborted(waitSignal, run.promise);
+			owner.signal.throwIfAborted();
+			if (run.failure) throw run.failure.error;
+		} finally {
+			owner.signal.removeEventListener("abort", abortRun);
+			run.controller.signal.removeEventListener("abort", abortOwner);
+			if (waitSignal.aborted) {
+				if (this.#speculation === run) this.#speculation = undefined;
+				// A wait timeout advances the method fallback, not user cancellation.
+				// Unlink the owner first so it retains that distinction.
+				run.controller.abort(waitSignal.reason);
+			}
+		}
+	}
+
+	/**
+	 * Consume the speculation slot for a real maintenance pass. Eligible running
+	 * remote work is awaited before claiming; other in-flight work is superseded.
+	 * An armed result must still be valid for the current branch, model, and settings.
 	 */
 	#claimArmedSpeculation(triggerContextTokens?: number, pendingContextTokens?: number): ArmedSpeculation | undefined {
 		const run = this.#speculation;
@@ -4352,14 +4394,21 @@ export class SessionMaintenance {
 
 		if (!method) return COMPACTION_CHECK_NONE;
 
-		// A speculative pass may have already produced this compaction's summary
-		// in the background. Claiming consumes the slot either way: an in-flight
-		// run is aborted (this real pass supersedes it) and an armed result is
-		// returned only when still valid for the current branch/model/settings.
-		// Snapcompact is local and instant, so an armed LLM summary (possible
-		// only when settings/model changed since arming) never overrides it.
-		const claimedSpec = this.#claimArmedSpeculation(options.triggerContextTokens, options.pendingContextTokens);
-		const armedSpec = method === "snapcompact" ? undefined : claimedSpec;
+		// Do not discard a running remote request merely because the grace band
+		// ended: the larger replacement may no longer fit. Other methods keep
+		// their existing supersession policy, including instant local snapcompact.
+		const pendingRemote =
+			method === "remote" &&
+			compactionSettings.asyncEnabled !== false &&
+			!this.#host.extensionRunner?.hasHandlers("session_before_compact") &&
+			this.#speculation?.method === "remote" &&
+			!this.#speculation.armed
+				? this.#speculation
+				: undefined;
+		const claimedSpec = pendingRemote
+			? undefined
+			: this.#claimArmedSpeculation(options.triggerContextTokens, options.pendingContextTokens);
+		let armedSpec = method === "snapcompact" ? undefined : claimedSpec;
 
 		const effectiveSettings = resolveMethodSettings(compactionSettings, method);
 		const fallbackFromShake = options.fallbackFromShake === true;
@@ -4408,6 +4457,15 @@ export class SessionMaintenance {
 			// queue, not the core steering queue (which handoff's agent.reset() would wipe).
 			const startEvent = { type: "auto_compaction_start" as const, reason, action };
 			await this.#emitLifecycleEvent(startEvent, false);
+			if (pendingRemote) {
+				await this.#awaitRemoteSpeculation(pendingRemote, autoCompactionAbortController);
+				// Revalidate after waiting: resets can invalidate the snapshot,
+				// while append-only growth must retain its uncovered tail.
+				armedSpec =
+					this.#speculation === pendingRemote
+						? this.#claimArmedSpeculation(options.triggerContextTokens, options.pendingContextTokens)
+						: undefined;
+			}
 			if (armedSpec) {
 				// A background speculation already produced this compaction's
 				// summary; splice it in instead of paying for a blocking

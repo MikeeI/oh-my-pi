@@ -12,6 +12,7 @@ import securityReviewerPrompt from "../prompts/agents/security-reviewer.md" with
 import securityCoordinatorPrompt from "../prompts/security/scan-coordinator.md" with { type: "text" };
 import securityRequestPrompt from "../prompts/security/scan-request.md" with { type: "text" };
 import securityPublishDescription from "../prompts/tools/security-publish.md" with { type: "text" };
+import { resolveUserPromptSource } from "../prompts/user-prompt-source";
 import { createAgentSession } from "../sdk";
 import type { AgentSession } from "../session/agent-session";
 import type { AuthStorage } from "../session/auth-storage";
@@ -46,12 +47,6 @@ import { cfgSecurityEnabled } from "../tools/settings";
 import { cfgTaskAgentModelOverrides, cfgTaskAgentPrewalk } from "../task/settings";
 
 const SECURITY_SESSION_TOOLS = ["read", "grep", "glob", "lsp", "ast_grep", "task", "security_publish"];
-const SECURITY_WORKFLOW_FINGERPRINT = createSecurityWorkflowFingerprint([
-	securityCoordinatorPrompt,
-	securityRequestPrompt,
-	securityReviewerPrompt,
-	securityPublishDescription,
-]);
 
 export type SecurityOperationPhase =
 	| "queued"
@@ -390,6 +385,23 @@ export class SecurityCoordinator {
 		this.#now = dependencies.now ?? (() => new Date());
 		this.#createOperationId = dependencies.createOperationId ?? createOperationId;
 	}
+
+	#workflowFingerprint(): string {
+		// Prompt edits must invalidate a plan prepared with a different reviewer policy.
+		const reviewer = resolveUserPromptSource({
+			agentDir: this.#host.settings.getAgentDir(),
+			kind: "agent",
+			name: "security-reviewer",
+			bundledSource: securityReviewerPrompt,
+		}).source;
+		return createSecurityWorkflowFingerprint([
+			securityCoordinatorPrompt,
+			securityRequestPrompt,
+			reviewer,
+			securityPublishDescription,
+		]);
+	}
+
 	async #ensureRecovered(): Promise<void> {
 		this.#recovery ??= this.#recoverInterruptedOperations();
 		await this.#recovery;
@@ -451,7 +463,7 @@ export class SecurityCoordinator {
 				model: modelRef,
 				account,
 				config: securityConfigSnapshot(this.#host.settings),
-				workflowFingerprint: SECURITY_WORKFLOW_FINGERPRINT,
+				workflowFingerprint: this.#workflowFingerprint(),
 				signal: input.signal,
 			},
 			this.#gitAdapter,
@@ -472,7 +484,7 @@ export class SecurityCoordinator {
 			plan,
 			{
 				config: securityConfigSnapshot(this.#host.settings),
-				workflowFingerprint: SECURITY_WORKFLOW_FINGERPRINT,
+				workflowFingerprint: this.#workflowFingerprint(),
 			},
 			this.#gitAdapter,
 		);

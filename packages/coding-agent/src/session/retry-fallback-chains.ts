@@ -240,12 +240,12 @@ function providerScopedPool(
 /**
  * Validates configured fallback chains and reports each warning via `warn`.
  *
- * `options.isDiscoveryPending` suppresses "unknown model" warnings for
- * selectors whose config-declared discovery provider has not yet populated the
- * registry (a cold discovery cache after `omp update` bumps the cache
- * namespace, #10048). Such selectors are re-checked once background discovery
- * settles. Logging is the caller's responsibility so a post-discovery re-run
- * does not double-log persistent warnings.
+ * `options.isDiscoveryPending` suppresses "unknown model" warnings while a
+ * discovery-backed catalog can still be completed, including cold caches
+ * after cache namespace changes (#10048) and partial warm caches.
+ * Such selectors are re-checked once background discovery settles.
+ * Logging is the caller's responsibility so a post-discovery re-run does not
+ * double-log persistent warnings.
  */
 export function validateRetryFallbackChains(
 	settings: Settings,
@@ -309,8 +309,12 @@ export function validateRetryFallbackChains(
 				if (resolvesForKindRole(selectorStr, providerScopedPool(modelRegistry, patterns))) continue;
 				kindRoleCatalog ??= modelRegistry.getAll("all");
 				if (resolvesForKindRole(selectorStr, kindRoleCatalog)) continue;
+				// A known model of the wrong kind is already incompatible; only
+				// unresolved selectors can become valid when discovery completes.
+				const knownModel = resolveModelRoleValue(selectorStr, kindRoleCatalog, { settings }).model;
 
 				const pending =
+					knownModel === undefined &&
 					patterns.length > 0 &&
 					patterns.every(pattern => {
 						const parsed = parseRetryFallbackSelector(pattern, modelRegistry);

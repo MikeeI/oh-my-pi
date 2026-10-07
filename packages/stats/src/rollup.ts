@@ -635,11 +635,13 @@ export function getStatsByAgentType(cutoff: number | null = null): AgentTypeStat
 		cache_read_tokens: number | null;
 		cache_write_tokens: number | null;
 		cost_total: number | null;
+		unpriced: number | null;
 	}>(
 		{ cutoff },
 		`f.agent_type AS agent_type, SUM(f.requests) AS requests, SUM(f.input_tokens) AS input_tokens,
 		 SUM(f.output_tokens) AS output_tokens, SUM(f.cache_read_tokens) AS cache_read_tokens,
-		 SUM(f.cache_write_tokens) AS cache_write_tokens, TOTAL(f.cost_total) AS cost_total`,
+		 SUM(f.cache_write_tokens) AS cache_write_tokens, TOTAL(f.cost_total) AS cost_total,
+		 SUM(f.unpriced) AS unpriced`,
 		"GROUP BY f.agent_type",
 	).map(row => ({
 		agentType: (row.agent_type as AgentType | null) ?? "main",
@@ -649,6 +651,7 @@ export function getStatsByAgentType(cutoff: number | null = null): AgentTypeStat
 		totalCacheReadTokens: row.cache_read_tokens ?? 0,
 		totalCacheWriteTokens: row.cache_write_tokens ?? 0,
 		totalCost: row.cost_total ?? 0,
+		unpricedRequests: row.unpriced ?? 0,
 	}));
 }
 

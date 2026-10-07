@@ -133,6 +133,70 @@ describe("resize anchoring inside a terminal multiplexer", () => {
 		else Bun.env.TMUX = previousTmux;
 	});
 
+	it("erases superseded mutable rows during and after resize without clearing the retained suffix", () => {
+		const { terminal, tui, provider, renderScheduler } = startRig();
+		tui.setResizeScrollback("preserve");
+		terminal.resize(40, 20);
+		// The normal buffer can contain accepted rows outside the last mutable
+		// window. The first settled paint must not treat that suffix as blank.
+		provider.liveRows = 2;
+		renderScheduler.settle();
+		terminal.write("\x1b[19;1Haccepted-tail\x1b[4;1H");
+		terminal.sendInput("\x1b[4;17R");
+		expect(terminal.getViewport().join("\n")).not.toContain("live-7");
+		expect(terminal.getViewport()[18]).toBe("accepted-tail");
+
+		provider.liveRows = 6;
+		tui.requestRender();
+		renderScheduler.settle();
+		expect(terminal.getViewport().join("\n")).toContain("live-5");
+		provider.liveRows = 1;
+		tui.requestRender();
+		renderScheduler.settle();
+		expect(terminal.getViewport().join("\n")).not.toContain("live-5");
+		expect(terminal.getViewport()[18]).toBe("accepted-tail");
+
+		provider.liveRows = 5;
+		tui.requestRender();
+		renderScheduler.settle();
+		provider.liveRows = 1;
+		tui.requestRender(true);
+		expect(terminal.getViewport().join("\n")).not.toContain("live-4");
+		expect(terminal.getViewport()[18]).toBe("accepted-tail");
+		tui.stop();
+		expect(terminal.getScrollBuffer().join("\n")).toContain("accepted-tail");
+	});
+
+	it("rejects pre-fullscreen cursor replies after covered resize epochs", () => {
+		const { terminal, tui, renderScheduler, writes } = startRig();
+		tui.setResizeScrollback("preserve");
+		terminal.resize(40, 20);
+		renderScheduler.settle();
+		renderScheduler.settle();
+		renderScheduler.settle(); // both replies dropped; the fallback parks at row 11
+		terminal.write("\x1b[6;1Haccepted-retained\x1b[12;1H");
+		const overlay = tui.showOverlay({ render: () => ["overlay"] }, { fullscreen: true });
+		renderScheduler.settle();
+		terminal.resize(40, 10);
+		terminal.resize(40, 26);
+		overlay.hide();
+		renderScheduler.settle();
+		// The old tag is still valid as an identity, but its geometry is not.
+		// Its obsolete row must not win over the restored-buffer reply below.
+		terminal.sendInput("\x1b[4;17R");
+		expect(terminal.getScrollBuffer().join("\n")).toContain("accepted-retained");
+		terminal.sendInput("\x1b[12;19R");
+		expect(terminal.getScrollBuffer().join("\n")).toContain("accepted-retained");
+		expect(
+			terminal.getViewport()[11],
+			JSON.stringify({
+				grid: terminal.getViewport(),
+				probes: writes.filter(write => write.includes("\x1b[6n")),
+			}),
+		).toBe("live-0");
+		tui.stop();
+	});
+
 	it("skips the SIGWINCH-side erase so a racing re-layout cannot blank popped scrollback", () => {
 		const { terminal, tui, renderScheduler, writes } = startRig();
 		writes.length = 0;
@@ -248,6 +312,22 @@ describe("resize anchoring inside a terminal multiplexer", () => {
 		const cup = repaint.match(/\x1b\[(\d+);1H/);
 		expect(cup).not.toBeNull();
 		expect(Number(cup![1])).toBe(4);
+		tui.stop();
+	});
+
+	it("does not scroll an old live row into tmux history when a full-height viewport reflows", () => {
+		const { terminal, tui, provider, renderScheduler, writes } = startRig();
+		provider.liveRows = 12;
+		provider.rowPad = 36;
+		tui.requestRender(true);
+		terminal.resize(20, 12);
+		renderScheduler.settle();
+		writes.length = 0;
+		terminal.sendInput("\x1b[2;17R");
+		const repaint = writes.join("");
+		const firstRow = repaint.match(/\x1b\[(\d+);1H/);
+		expect(firstRow).not.toBeNull();
+		expect(Number(firstRow![1])).toBe(1);
 		tui.stop();
 	});
 
@@ -505,6 +585,26 @@ describe("resize anchoring inside a terminal multiplexer", () => {
 		const cup = repaint.match(/\x1b\[(\d+);1H/);
 		expect(cup).not.toBeNull();
 		expect(Number(cup![1])).toBe(12);
+		tui.stop();
+	});
+
+	it("starts a new transaction for changed geometry during post-settle suppression", () => {
+		const { terminal, tui, renderScheduler, writes } = startRig();
+		terminal.resize(40, 16);
+		renderScheduler.settle();
+		renderScheduler.settle();
+		renderScheduler.settle();
+
+		writes.length = 0;
+		terminal.resize(40, 20);
+		expect(writes.join("")).toContain("\x1b[?1049h");
+
+		renderScheduler.settle();
+		renderScheduler.settle();
+		renderScheduler.settle();
+		writes.length = 0;
+		terminal.resize(40, 20);
+		expect(writes.join("")).not.toContain("\x1b[?1049h");
 		tui.stop();
 	});
 });

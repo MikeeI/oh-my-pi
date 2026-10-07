@@ -196,29 +196,26 @@ describe("buildWorkspaceTree", () => {
 		expect(tree.agentsMdFiles).toEqual(["src/AGENTS.md"]);
 	});
 
-	it("renders prompt-cache-stable absolute mtimes (not render-time relative ages)", async () => {
+	it("omits volatile metadata from the prompt tree while staying stable", async () => {
 		const cwd = await makeTempDir();
-		// Fixed mtime in the past so the absolute render is deterministic.
-		const fixedMtime = Date.UTC(2025, 0, 2, 3, 4, 0); // 2025-01-02 03:04 UTC
+		const fixedMtime = Date.UTC(2025, 0, 2, 3, 4, 0);
 		await writeFileWithMtime(path.join(cwd, "stable.txt"), "x", fixedMtime);
 
 		const first = await buildWorkspaceTree(cwd);
-		// A relative "ago" age would drift with the wall clock between builds;
-		// an absolute mtime must not. Two builds of an unchanged tree must be
-		// byte-identical so the system-prompt prefix stays cacheable.
 		const second = await buildWorkspaceTree(cwd);
 
 		expect(first.rendered).toBe(second.rendered);
-		expect(first.rendered).toContain("2025-01-02 03:04");
+		expect(first.rendered.split("\n").find(line => line.includes("stable.txt"))).toBe("  - stable.txt");
+		expect(first.rendered).not.toContain("2025-01-02 03:04");
 		expect(first.rendered).not.toContain("ago");
 	});
 
-	it("keeps relative ages for buildDirectoryTree (tool output, not cached)", async () => {
+	it("keeps relative ages with compact directory metadata spacing", async () => {
 		const cwd = await makeTempDir();
 		await writeFileWithMtime(path.join(cwd, "recent.txt"), "x", Date.now() - 5 * 60_000);
 
 		const tree = await buildDirectoryTree(cwd, { maxDepth: 1 });
 
-		expect(tree.rendered).toContain("ago");
+		expect(tree.rendered).toMatch(/^\.\n {2}- recent\.txt 1B \d+[smhdw]+ ago$/u);
 	});
 });

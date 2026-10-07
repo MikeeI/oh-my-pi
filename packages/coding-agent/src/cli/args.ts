@@ -8,6 +8,7 @@ import type { ServiceTierOpenAISettingValue } from "../config/service-tier";
 import { CLI_THINKING_LEVELS, type ConfiguredThinkingLevel, parseCliThinkingLevel } from "@oh-my-pi/pi-tui/thinking";
 import { BUILTIN_TOOL_NAMES, normalizeToolNames } from "../tools/builtin-names";
 import {
+	EXTENSION_SHADOWABLE_STRING_FLAGS,
 	OPTIONAL_FLAGS,
 	OPTIONAL_VALUE_FLAGS,
 	type ParseDeps,
@@ -45,8 +46,9 @@ export interface Args {
 	maxTime?: number;
 	apiKey?: string;
 	systemPrompt?: string;
-	systemPromptTemplate?: string;
+	systemTemplate?: string;
 	appendSystemPrompt?: string;
+	agentsFile?: string;
 	thinking?: ConfiguredThinkingLevel;
 	serviceTier?: ServiceTierOpenAISettingValue;
 	hideThinking?: boolean;
@@ -281,7 +283,12 @@ export function parseArgs(inputArgs: string[], extensionFlags?: Map<string, { ty
 				if (i + 1 < args.length && args[i + 1] !== PROFILE_BOOTSTRAP_BOUNDARY_ARG) i++;
 				continue;
 			}
-			if (i + 1 < args.length && args[i + 1] !== PROFILE_BOOTSTRAP_BOUNDARY_ARG) {
+			const next = args[i + 1];
+			if (next === undefined) {
+				if (!EXTENSION_SHADOWABLE_STRING_FLAGS.has(arg)) throw new Error(`${arg} requires a value`);
+			} else if (next === PROFILE_BOOTSTRAP_BOUNDARY_ARG) {
+				if (!EXTENSION_SHADOWABLE_STRING_FLAGS.has(arg)) throw new Error(`${arg} requires a value`);
+			} else {
 				const consumed = consumeBuiltInStringValue(arg, args, i + 1);
 				i = consumed.index;
 				STRING_SETTERS[arg](result, consumed.value, parseDeps);
@@ -400,9 +407,8 @@ export function parseArgs(inputArgs: string[], extensionFlags?: Map<string, { ty
 			throw new CliUsageError(`--trusted-extension requires an absolute path: ${trustedPath}`);
 		}
 	}
-
-	if (result.systemPrompt !== undefined && result.systemPromptTemplate !== undefined) {
-		throw new CliUsageError("--system-prompt and --system-prompt-template cannot be combined");
+	if (result.systemPrompt !== undefined && result.systemTemplate !== undefined) {
+		throw new CliUsageError("--system-prompt cannot be combined with --system-template");
 	}
 	return result;
 }
