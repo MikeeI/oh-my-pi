@@ -84,8 +84,8 @@ export class CacheInvalidationMarkerComponent extends MessageDividerComponent {
 				const tokens = info.reprocessedTokens;
 				return tokens > 0 ? `${head} ${theme.sep.dot.trim()} ${formatNumber(tokens)} tokens` : head;
 			},
-			labelColor: "muted",
-			ruleColor: "dim",
+			labelColor: "cacheMiss",
+			ruleColor: "cacheMiss",
 			ruleWidth: 10,
 			role: "omp.marker.cache-miss",
 			native: {

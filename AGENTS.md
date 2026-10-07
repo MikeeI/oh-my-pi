@@ -540,6 +540,22 @@ The upgrader validates these IDs against its executable and manual proof mapping
 - Required action: preserve discovery failures through benchmark validation.
 - Proof: `test/conversation-search-benchmark.test.ts`.
 
+#### `MOMP-CACHE-MISS-COLOR` — Prominent cache-miss foreground
+
+- Disposition: `UPSTREAM-INTEGRIERT`.
+- Contract: enabled cache-miss markers use lemon yellow `#FFFF00` for their terminal label and short rule by default.
+- Contract: native marker labels use the same semantic color; existing text, geometry, and detection remain unchanged.
+- Contract: optional theme color `cacheMiss` overrides only this marker without changing `muted`, `dim`, or `warning`.
+- Contract: themes without `cacheMiss` retain compatibility and receive the default in terminal, native, and export palettes.
+- Owner: upstream `packages/tui/src/chat/cache-invalidation-marker.ts` owns marker presentation.
+- Owner: `packages/tui/src/theme/schema.ts` owns the token and its default.
+- Owner: upstream `packages/tui/src/theme/color.ts#resolveThemeColors` materializes the optional default.
+- Owner: upstream `packages/tui/src/native/spans.ts` owns ANSI-to-native color mapping.
+- Reason: current upstream renders the marker label as `muted` and its rule as `dim`.
+- Required action: retain the marker-specific token and palette integration without changing general theme colors.
+- Proof: `packages/tui/test/cache-invalidation-marker.test.ts`.
+- Proof: render the real marker in a TUI and inspect its foreground and unchanged geometry.
+
 #### `MOMP-RUNTIME-AUDIT` — Repeatable local performance evidence
 
 - Disposition: `MOMP-EIGEN`.

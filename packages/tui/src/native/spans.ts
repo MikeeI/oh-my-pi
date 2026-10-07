@@ -21,7 +21,10 @@ import { span, text } from "./describe";
 import type { NativeNode } from "./node";
 
 /** Theme colour names in schema order; basic tokens (`accent`, `success`, …) precede derived ones, so they win ties. */
-const THEME_COLOR_NAMES: readonly ThemeColor[] = Object.keys(darkThemeJson.colors).filter(isValidThemeColor);
+const THEME_COLOR_NAMES: readonly ThemeColor[] = [
+	...Object.keys(darkThemeJson.colors).filter(isValidThemeColor),
+	"cacheMiss",
+];
 
 /** Background tokens in tie-breaking priority. */
 const THEME_BG_NAMES: readonly ThemeBg[] = [

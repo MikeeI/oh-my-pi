@@ -1,6 +1,6 @@
 import { paletteToRgb, rgbToHex } from "@oh-my-pi/pi-utils/color";
 import { detectTerminalId, getTerminalInfo } from "../terminal-capabilities";
-import type { ColorMode, ColorValue } from "./schema";
+import { type ColorMode, type ColorValue, DEFAULT_CACHE_MISS_COLOR } from "./schema";
 
 /** SGR reset for the foreground color only, leaving other attributes intact. */
 export const FG_RESET = "\x1b[39m";
@@ -79,12 +79,13 @@ export function resolveVarRefs(
 export function resolveThemeColors<T extends Record<string, ColorValue>>(
 	colors: T,
 	vars: Record<string, ColorValue> = {},
-): Record<keyof T, string | number> {
+): Record<keyof T | "cacheMiss", string | number> {
 	const resolved: Record<string, string | number> = {};
-	for (const [key, value] of Object.entries(colors)) {
+	// Supply the optional token here so terminal, native, and export palettes agree.
+	for (const [key, value] of Object.entries({ cacheMiss: DEFAULT_CACHE_MISS_COLOR, ...colors })) {
 		resolved[key] = resolveVarRefs(value, vars);
 	}
-	return resolved as Record<keyof T, string | number>;
+	return resolved as Record<keyof T | "cacheMiss", string | number>;
 }
 
 /**

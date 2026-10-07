@@ -33,7 +33,7 @@
 		},
 		"colors": {
 			"type": "object",
-			"description": "Theme color definitions (all required except thinkingMax)",
+			"description": "Theme color definitions (all required except thinkingMax and cacheMiss)",
 			"required": [
 				"accent",
 				"border",
@@ -130,6 +130,10 @@
 				"warning": {
 					"$ref": "#/$defs/colorValue",
 					"description": "Warning states"
+				},
+				"cacheMiss": {
+					"$ref": "#/$defs/colorValue",
+					"description": "Cache miss marker foreground; defaults to lemon yellow"
 				},
 				"muted": {
 					"$ref": "#/$defs/colorValue",
