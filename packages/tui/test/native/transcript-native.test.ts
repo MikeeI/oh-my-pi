@@ -19,7 +19,7 @@ import { TtsrNotificationComponent } from "@oh-my-pi/pi-tui/chat/ttsr-notificati
 import { CollapsedSyntheticMessageComponent, UserMessageComponent } from "@oh-my-pi/pi-tui/chat/user-message";
 import { text } from "@oh-my-pi/pi-tui/native/describe";
 import { setNativeRendering } from "@oh-my-pi/pi-tui/native/state";
-import { initTheme, theme } from "@oh-my-pi/pi-tui/theme";
+import { getMarkdownTheme, initTheme, setMarkdownTextColors, theme } from "@oh-my-pi/pi-tui/theme";
 import type { TspNode, TspOp } from "@oh-my-pi/pi-wire";
 import { TspHarness } from "./tsp-harness";
 
@@ -116,6 +116,28 @@ describe("native transcript", () => {
 		expect(final?.p).toMatchObject({ text: "Hello, streaming world" });
 		expect(final?.p).not.toHaveProperty("stream");
 		expect(h.errors).toEqual([]);
+	});
+
+	it("preserves enabled foreground spans through native assistant streaming and finalization", async () => {
+		const previous = getMarkdownTheme().textColors ?? false;
+		setMarkdownTextColors(true);
+		try {
+			const component = new AssistantMessageComponent();
+			const h = await startWith(h => h.tui.addChild(component));
+			const source = '<span style="color:#22c55e">Native green</span>';
+			component.updateContent(assistant([{ type: "text", text: source }]), { transient: true });
+			await h.render();
+			expect(String(h.find(node => node.k === "rows")?.p?.lines)).toContain("\x1b[38;2;34;197;94mNative green");
+			expect(h.find(node => node.k === "md")).toBeUndefined();
+
+			component.updateContent(assistant([{ type: "text", text: `${source} plain` }]));
+			component.markTranscriptBlockFinalized();
+			await h.render();
+			expect(String(h.find(node => node.k === "rows")?.p?.lines)).toContain("\x1b[38;2;34;197;94mNative green");
+			expect(h.errors).toEqual([]);
+		} finally {
+			setMarkdownTextColors(previous);
+		}
 	});
 
 	it("hands the terminal session-resolved targets for relative links once the segment closes", async () => {

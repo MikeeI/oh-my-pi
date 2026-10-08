@@ -18,6 +18,13 @@
 - Reduced memory retained by discarded TSP images and previews ([#14336](https://github.com/can1357/oh-my-pi/pull/14336) by [@iliaal](https://github.com/iliaal)).
 - Fixed startup capability probes printing as text in the prompt (e.g. `25a1;stsp;q;{…}pppppp`) on terminals that cannot parse them, such as macOS Terminal.app.
 - Fixed the `/resume` picker flashing while a search runs over a large session history: background fuzzy matches now land in one update instead of reordering the list dozens of times per keystroke.
+### Changed
+
+- Cache-miss markers now use lemon yellow, with a dedicated optional `cacheMiss` theme color.
+
+### Fixed
+
+- Enabled response foreground colors now remain visible in native Assistant rendering.
 
 ## [18.8.6] - 2026-10-08
 
@@ -52,9 +59,6 @@
 
 - Fixed relative file links in Tern assistant replies opening against the folder omp was started in; they now open the file in the session's working directory ([#14879](https://github.com/can1357/oh-my-pi/pull/14879) by [@H4vC](https://github.com/H4vC))
 - Fixed Tern modals with no clickable exit: BTW history, git shortcuts and autoresearch gain a Close button, plan review a Cancel button, the agent transcript viewer and `/annotate` review a top-right `esc` that runs Esc, and the `/move` dialog Accept, Cancel and Confirm buttons; new `escCloseButton()` builds the `esc` keycap button ([#14894](https://github.com/can1357/oh-my-pi/pull/14894) by [@H4vC](https://github.com/H4vC))
-### Changed
-
-- Cache-miss markers now use lemon yellow, with a dedicated optional `cacheMiss` theme color.
 
 ## [18.8.2] - 2026-10-07
 

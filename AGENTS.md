@@ -875,6 +875,7 @@ The upgrader validates these IDs against its executable and manual proof mapping
 - Contract: live setting changes rebuild the Main prompt and Markdown presentation through existing owners.
 - Owner: upstream `packages/tui/src/components/markdown.ts#Markdown` owns scopes, styling, and streaming.
 - Owner: upstream `packages/tui/src/theme/tui-adapters.ts` owns the configured Markdown theme snapshot.
+- Owner: `packages/tui/src/chat/assistant-message.ts#AssistantMessageComponent.describe` selects colored rows.
 - Owner: MOMP adds `src/modes/settings.ts#cfgTuiTextColors` at the upstream settings owner.
 - Owner: upstream `src/modes/interactive-mode.ts` owns initial and live rendering configuration.
 - Owner: `src/system-prompt.ts` and `src/sdk.ts` own render inputs and session-scoped prompt rebuilds.
@@ -883,6 +884,7 @@ The upgrader validates these IDs against its executable and manual proof mapping
 - Reason: upstream v18.5.1 consumes line-start trimming per token, so zero-width foreground tags must pass it on.
 - Required action: retain the minimal setting, renderer, and conditional-template closure at existing owners.
 - Proof: span scope, wrap/reset, line-break trimming, and disabled rendering in `packages/tui/test/markdown.test.ts`.
+- Proof: native Assistant streaming and finalization in `packages/tui/test/native/transcript-native.test.ts`.
 - Proof: live Main UI and headless prompt cases in `test/system-prompt-templates.test.ts`.
 - Proof: render both deployed template branches and interact with the actual TUI.
 

@@ -774,7 +774,9 @@ export class AssistantMessageComponent extends Container {
 	 * head's `title`. With `hideThinkingBlock` only the live head shows (collapsed)
 	 * and a finished thought emits nothing.
 	 */
-	override describe(): NativeNode {
+	override describe(): NativeNode | null {
+		// Native Markdown does not interpret foreground spans; the row renderer owns their styling.
+		if (getMarkdownTheme().textColors) return null;
 		const tail = this.#displayedMessage ? this.#thinkingTailIndex(this.#displayedMessage) : undefined;
 		const rate =
 			tail !== undefined && this.#lastUpdateTransient && this.#thinkingRateLive
