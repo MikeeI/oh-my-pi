@@ -9,15 +9,7 @@ import * as os from "node:os";
 import * as path from "node:path";
 import { Transform } from "node:stream";
 import { pipeline } from "node:stream/promises";
-import {
-	$env,
-	$which,
-	APP_NAME,
-	compareVersions,
-	getProjectDir,
-	isCompiledBinary,
-	isEnoent,
-} from "@oh-my-pi/pi-utils";
+import { $env, $which, APP_NAME, compareVersions, getProjectDir, isCompiledBinary, isEnoent } from "@oh-my-pi/pi-utils";
 import chalk from "@oh-my-pi/pi-utils/chalk";
 import { withFileLock } from "@oh-my-pi/pi-utils/file-lock";
 import { $ } from "bun";

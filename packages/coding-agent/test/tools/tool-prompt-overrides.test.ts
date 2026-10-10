@@ -137,7 +137,7 @@ describe("profile-scoped tool prompts", () => {
 			const second = new WebSearchTool({ ...createSession(secondProfile.path()), modelRegistry });
 			expect(first.description).toBe("CUSTOM_WEB_SEARCH X");
 			expect(second.description).toBe("SECOND_PROFILE X");
-			authStorage.keys.setRuntime("xai", undefined);
+			authStorage.keys.removeRuntime("xai");
 			expect(first.description).toBe("CUSTOM_WEB_SEARCH X");
 			expect(new WebSearchTool(createSession(firstProfile.path())).description).toBe("CUSTOM_WEB_SEARCH web");
 			expect(new WebSearchTool(createSession()).description).toContain("Known URLs/programmatic data");
