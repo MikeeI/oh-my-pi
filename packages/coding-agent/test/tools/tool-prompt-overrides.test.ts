@@ -2,6 +2,7 @@ import { describe, expect, it } from "bun:test";
 import * as os from "node:os";
 import * as path from "node:path";
 import { Settings } from "@oh-my-pi/pi-coding-agent/config/settings";
+import { ModelRegistry } from "@oh-my-pi/pi-coding-agent/config/model-registry";
 import type { ToolSession } from "@oh-my-pi/pi-coding-agent/tools";
 import { ReadTool } from "@oh-my-pi/pi-coding-agent/tools/read";
 import { BashTool } from "@oh-my-pi/pi-coding-agent/tools/bash";
@@ -11,6 +12,7 @@ import { TaskTool } from "@oh-my-pi/pi-coding-agent/task";
 import { LspTool } from "@oh-my-pi/pi-coding-agent/lsp/tool";
 import { WebSearchTool } from "@oh-my-pi/pi-coding-agent/web/search";
 import { TempDir } from "@oh-my-pi/pi-utils";
+import { createInMemoryAuthStorage } from "../helpers/agent-session-setup";
 
 const MISSING_AGENT_DIR = path.join(os.tmpdir(), `omp-tool-prompt-missing-${process.pid}`);
 
@@ -116,11 +118,31 @@ describe("profile-scoped tool prompts", () => {
 		expect(new EvalTool(createSession()).description).toContain("One cell per call");
 	});
 
-	it("uses a profile-scoped web-search.md instead of the bundled guidance", async () => {
-		using tempDir = TempDir.createSync("@omp-web-search-prompt-");
-		await Bun.write(tempDir.join("prompts", "tools", "web-search.md"), "CUSTOM_WEB_SEARCH");
-
-		expect(new WebSearchTool(createSession(tempDir.path())).description).toBe("CUSTOM_WEB_SEARCH");
-		expect(new WebSearchTool(createSession()).description).toContain("Known URLs/programmatic data");
+	it("isolates selected Web Search sources while freezing each tool's auth-dependent guidance", async () => {
+		using firstProfile = TempDir.createSync("@omp-web-search-prompt-");
+		using secondProfile = TempDir.createSync("@omp-web-search-profile-");
+		await Bun.write(
+			firstProfile.join("prompts", "tools", "web-search.md"),
+			"CUSTOM_WEB_SEARCH {{#if xSearch}}X{{else}}web{{/if}}",
+		);
+		await Bun.write(
+			secondProfile.join("prompts", "tools", "web-search.md"),
+			"SECOND_PROFILE {{#if xSearch}}X{{else}}web{{/if}}",
+		);
+		const authStorage = createInMemoryAuthStorage();
+		try {
+			authStorage.keys.setRuntime("xai", "test-key");
+			const modelRegistry = new ModelRegistry(authStorage);
+			const first = new WebSearchTool({ ...createSession(firstProfile.path()), modelRegistry });
+			const second = new WebSearchTool({ ...createSession(secondProfile.path()), modelRegistry });
+			expect(first.description).toBe("CUSTOM_WEB_SEARCH X");
+			expect(second.description).toBe("SECOND_PROFILE X");
+			authStorage.keys.setRuntime("xai", undefined);
+			expect(first.description).toBe("CUSTOM_WEB_SEARCH X");
+			expect(new WebSearchTool(createSession(firstProfile.path())).description).toBe("CUSTOM_WEB_SEARCH web");
+			expect(new WebSearchTool(createSession()).description).toContain("Known URLs/programmatic data");
+		} finally {
+			authStorage.close();
+		}
 	});
 });

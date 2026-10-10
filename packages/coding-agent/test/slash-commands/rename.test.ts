@@ -161,7 +161,7 @@ for (const mode of ["TUI", "headless"] as const) {
 
 			await execute("/rename");
 
-			expect(session.sessionName).toBe("🧪 CACHE: Cache invalidation repair");
+			expect(session.sessionName).toBe("AUTO: 🧪 CACHE: Cache invalidation repair");
 			expect(generate).toHaveBeenCalledTimes(1);
 		});
 
@@ -171,11 +171,13 @@ for (const mode of ["TUI", "headless"] as const) {
 			const generate = vi
 				.spyOn(tinyTitleClient, "generate")
 				.mockImplementation(async (_model, _message, options) =>
-					options && "systemPrompt" in options ? "🗄 CACHE" : "Cache invalidation repair",
+					options && "systemPrompt" in options && options.systemPrompt !== TITLE_TRANSCRIPT_SYSTEM_PROMPT
+						? "🗄 CACHE"
+						: "Cache invalidation repair",
 				);
 
 			await execute("/rename");
-			expect(session.sessionName).toBe("🗄️ CACHE: Cache invalidation repair");
+			expect(session.sessionName).toBe("AUTO: 🗄️ CACHE: Cache invalidation repair");
 
 			await execute("/rename Cache ownership");
 			expect(session.sessionName).toBe("🗄️ CACHE: Cache ownership");
