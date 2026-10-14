@@ -7,8 +7,8 @@ import { getTaskSchema } from "@oh-my-pi/pi-coding-agent/task/types";
 import type { ToolSession } from "@oh-my-pi/pi-coding-agent/tools";
 
 // Contract: the single-spawn schema (`task.batch: false`; the exported
-// `taskSchema` instance) carries no batch fields while accepting a caller
-// `model`, `outputSchema`, and its validation mode. The batch shape (`tasks[]` + shared
+// `taskSchema` instance) carries no batch fields while accepting caller
+// `outputSchema` and its validation mode. The batch shape (`tasks[]` + shared
 // `context`) is gated by the `task.batch` setting (default on, covered by
 // test/task/task-batch.test.ts).
 
@@ -93,5 +93,45 @@ describe("task spawn validation", () => {
 	it("rejects a missing task", async () => {
 		const text = await executeText({ agent: "scout" });
 		expect(text).toContain("Missing `task`");
+	});
+});
+
+describe("task effort description", () => {
+	afterEach(() => {
+		vi.restoreAllMocks();
+	});
+
+	async function renderDescription(batch: boolean, effortEnabled: boolean): Promise<string> {
+		vi.spyOn(discoveryModule, "discoverAgents").mockResolvedValue({ agents: [], projectAgentsDir: null });
+		const session = {
+			cwd: "/tmp",
+			hasUI: false,
+			settings: Settings.isolated({
+				"task.batch": batch,
+				"task.enableEffort": effortEnabled,
+			}),
+			getSessionFile: () => null,
+			getSessionSpawns: () => "*",
+		} as unknown as ToolSession;
+		const tool = await TaskTool.create(session);
+		return tool.description;
+	}
+
+	it.each([true, false])("renders model-relative effort semantics when batch=%s", async batch => {
+		const description = await renderDescription(batch, true);
+
+		expect(description).toContain("Optional model-relative reasoning override.");
+		expect(description).toContain("Omit it to keep the selected agent's configured thinking level.");
+		expect(description).toContain(
+			'`"lo"`, `"med"`, and `"hi"` select the target model\'s lowest, middle, or highest supported thinking level.',
+		);
+		expect(description).toContain("Selection remains subject to `task.maxEffort`.");
+		expect(description.match(/Optional model-relative reasoning override/g)).toHaveLength(1);
+	});
+
+	it("omits effort guidance when effort is disabled", async () => {
+		const description = await renderDescription(true, false);
+
+		expect(description).not.toContain("model-relative reasoning override");
 	});
 });

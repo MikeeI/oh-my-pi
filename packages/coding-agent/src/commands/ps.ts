@@ -4,6 +4,7 @@
 
 import { Args, Command, Flags } from "@oh-my-pi/pi-utils/cli";
 import { psHelp as commandHelp } from "../cli/command-help";
+import { APP_DISPLAY_NAME } from "../app-version";
 import { type PsAction, type PsCommandArgs, runPsCommand } from "../cli/ps-cli";
 
 const ACTIONS: PsAction[] = ["list", "info", "logs", "stop", "kill", "restart"];
@@ -37,12 +38,12 @@ export default class Ps extends Command {
 	};
 
 	static examples = [
-		"omp ps",
-		"omp ps --all",
-		"omp ps logs web --follow",
-		"omp ps stop web",
-		"omp ps kill web",
-		"omp ps info relay --global browser-relay",
+		`${APP_DISPLAY_NAME} ps`,
+		`${APP_DISPLAY_NAME} ps --all`,
+		`${APP_DISPLAY_NAME} ps logs web --follow`,
+		`${APP_DISPLAY_NAME} ps stop web`,
+		`${APP_DISPLAY_NAME} ps kill web`,
+		`${APP_DISPLAY_NAME} ps info relay --global browser-relay`,
 	];
 
 	async run(): Promise<void> {

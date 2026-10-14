@@ -16,6 +16,7 @@ import {
 	openrouterModelManagerOptions,
 } from "@oh-my-pi/pi-catalog/provider-models/openai-compat";
 import type { Api, Model, ModelSpec } from "@oh-my-pi/pi-catalog/types";
+import { persistedModelCacheProviderId } from "./model-cache-fixture";
 
 function completionsSpec(overrides: Partial<ModelSpec<"openai-completions">> = {}): ModelSpec<"openai-completions"> {
 	return {
@@ -1397,7 +1398,7 @@ describe("model cache materialized round trip", () => {
 			const db = new Database(dbPath);
 			const row = db
 				.query<{ models: string }, [string]>("SELECT models FROM model_cache WHERE provider_id = ?")
-				.get("spec-cache-test");
+				.get(persistedModelCacheProviderId(db, "spec-cache-test"));
 			expect(row).toBeDefined();
 			const persisted = JSON.parse(row?.models ?? "[]") as Model<"openai-completions">[];
 			expect(persisted[0]?.compat.supportsDeveloperRole).toBe(true);
@@ -1409,7 +1410,7 @@ describe("model cache materialized round trip", () => {
 			persisted[0]!.compat.supportsDeveloperRole = false;
 			db.run("UPDATE model_cache SET models = ? WHERE provider_id = ?", [
 				JSON.stringify(persisted),
-				"spec-cache-test",
+				persistedModelCacheProviderId(db, "spec-cache-test"),
 			]);
 			db.close();
 			const offline = await resolveProviderModels<"openai-completions">(
@@ -1583,8 +1584,8 @@ describe("model cache materialized round trip", () => {
 			db.run("UPDATE model_cache SET materialization_policy = ?", ["stale-builder:stale-rules"]);
 			db.close();
 
-			// Another app version's rows read as absent but are not mass-deleted on
-			// open; each provider's next write replaces its own row lazily.
+			// Reject a mismatched policy without globally purging other providers.
+			// A rewrite repairs only the current provider's compatible namespace.
 			expect(readModelCache("stale-policy-cache-test", Infinity, Date.now, dbPath)).toBeNull();
 			const countRows = () => {
 				const verified = new Database(dbPath, { readonly: true });
@@ -1621,7 +1622,9 @@ describe("model cache materialized round trip", () => {
 		try {
 			writeModelCache("legacy-computer-cache-test", Date.now(), [model], true, "", dbPath);
 			const db = new Database(dbPath);
-			db.run("UPDATE model_cache SET version = 10 WHERE provider_id = ?", ["legacy-computer-cache-test"]);
+			db.run("UPDATE model_cache SET version = 10 WHERE provider_id = ?", [
+				persistedModelCacheProviderId(db, "legacy-computer-cache-test"),
+			]);
 			db.close();
 
 			expect(readModelCache("legacy-computer-cache-test", Infinity, Date.now, dbPath)).toBeNull();
@@ -1634,7 +1637,7 @@ describe("model cache materialized round trip", () => {
 		}
 	});
 
-	it("keeps header-free v11/v12 rows until their own provider is rewritten", async () => {
+	it("keeps header-free rejected rows until their own namespace is rewritten", async () => {
 		const tempDir = await fs.mkdtemp(path.join(os.tmpdir(), "pi-catalog-v12-cache-"));
 		const dbPath = path.join(tempDir, "models.db");
 		const model = buildModel(completionsSpec({ provider: "v12-cache-test" }));
@@ -1643,8 +1646,11 @@ describe("model cache materialized round trip", () => {
 			writeModelCache("v12-cache-test", Date.now(), [model], true, "", dbPath);
 			writeModelCache("current-cache-test", Date.now(), [model], true, "", dbPath);
 			const db = new Database(dbPath);
-			db.run("UPDATE model_cache SET version = 11 WHERE provider_id = ?", ["v11-cache-test"]);
-			db.run("UPDATE model_cache SET version = 12 WHERE provider_id = ?", ["v12-cache-test"]);
+			const v11Id = persistedModelCacheProviderId(db, "v11-cache-test");
+			const v12Id = persistedModelCacheProviderId(db, "v12-cache-test");
+			const currentId = persistedModelCacheProviderId(db, "current-cache-test");
+			db.run("UPDATE model_cache SET version = 11 WHERE provider_id = ?", [v11Id]);
+			db.run("UPDATE model_cache SET version = 12 WHERE provider_id = ?", [v12Id]);
 			db.close();
 			const versions = () => {
 				const verified = new Database(dbPath, { readonly: true });
@@ -1657,16 +1663,16 @@ describe("model cache materialized round trip", () => {
 				return Object.fromEntries(rows.map(row => [row.provider_id, row.version]));
 			};
 
-			const current = versions()["current-cache-test"];
+			const current = versions()[currentId];
 
 			// Opening the cache for an unrelated provider must not purge them.
 			expect(readModelCache("current-cache-test", Infinity, Date.now, dbPath)?.models).toHaveLength(1);
 			expect(readModelCache("v12-cache-test", Infinity, Date.now, dbPath)).toBeNull();
-			expect(versions()).toEqual({ "current-cache-test": current, "v11-cache-test": 11, "v12-cache-test": 12 });
+			expect(versions()).toEqual({ [currentId]: current, [v11Id]: 11, [v12Id]: 12 });
 
 			writeModelCache("v12-cache-test", Date.now(), [model], true, "", dbPath);
 			expect(readModelCache("v12-cache-test", Infinity, Date.now, dbPath)?.models).toHaveLength(1);
-			expect(versions()).toEqual({ "current-cache-test": current, "v11-cache-test": 11, "v12-cache-test": current });
+			expect(versions()).toEqual({ [currentId]: current, [v11Id]: 11, [v12Id]: current });
 		} finally {
 			await fs.rm(tempDir, { recursive: true, force: true });
 		}
@@ -1716,7 +1722,7 @@ describe("model cache materialized round trip", () => {
 			const db = new Database(dbPath, { readonly: true });
 			const row = db
 				.query<{ models: string }, [string]>("SELECT models FROM model_cache WHERE provider_id = ?")
-				.get("computer-use-cache-test");
+				.get(persistedModelCacheProviderId(db, "computer-use-cache-test"));
 			db.close();
 			const persisted = JSON.parse(row?.models ?? "[]") as Array<Record<string, unknown>>;
 			expect(persisted.find(model => model.id === direct.id)?.supportsComputerUseConfig).toBeNull();
@@ -1834,7 +1840,7 @@ describe("model cache materialized round trip", () => {
 			const db = new Database(dbPath, { readonly: true });
 			const row = db
 				.query<{ authoritative: number }, [string]>("SELECT authoritative FROM model_cache WHERE provider_id = ?")
-				.get(options.providerId);
+				.get(persistedModelCacheProviderId(db, options.providerId));
 			db.close();
 			expect(row?.authoritative).toBe(0);
 
@@ -1970,7 +1976,7 @@ describe("model cache materialized round trip", () => {
 			const db = new Database(dbPath, { readonly: true });
 			const row = db
 				.query<{ authoritative: number }, [string]>("SELECT authoritative FROM model_cache WHERE provider_id = ?")
-				.get(options.providerId);
+				.get(persistedModelCacheProviderId(db, options.providerId));
 			db.close();
 			expect(row?.authoritative).toBe(0);
 		} finally {
@@ -2150,7 +2156,9 @@ describe("model cache materialized round trip", () => {
 			// flagged unrestorable even though its base carries the headers.
 			writeModelCache("variant-cache-test", Date.now(), [variant], true, "", dbPath);
 			const db = new Database(dbPath);
-			db.run("UPDATE model_cache SET header_restore_version = 0 WHERE provider_id = ?", ["variant-cache-test"]);
+			db.run("UPDATE model_cache SET header_restore_version = 0 WHERE provider_id = ?", [
+				persistedModelCacheProviderId(db, "variant-cache-test"),
+			]);
 			db.close();
 
 			const offline = await resolveProviderModels<"openai-completions">(

@@ -83,6 +83,10 @@
 ### Removed
 
 - Removed Codex Code Mode and its `providers.openai-codex.codeMode` / `providers.openai-codex.codeModeDirectTools` settings; Codex models always use the full direct tool surface.
+### Fixed
+
+- Fixed Child prompt wrappers and configured previews following the selected structured or plain-text result mode.
+- Fixed missing-session recovery commands losing the profile selected for the failing launch.
 
 ## [18.10.3] - 2026-10-12
 
@@ -106,6 +110,9 @@
 - Fixed anonymized session exports losing whether bash timing was shown ([#15468](https://github.com/can1357/oh-my-pi/pull/15468) by [@iliaal](https://github.com/iliaal))
 - Added `omp --restore <session>`: resumes a session like `--resume`, then goes on with what its last process left unfinished when it crashed or was killed, both the interrupted turn and the subagents it was running (their results reach the parent as usual); Tern's session daemon now restarts omp with it after a crash
 - Kept private prompt-cache routing keys out of shared sessions and HTML exports ([#15467](https://github.com/can1357/oh-my-pi/pull/15467) by [@iliaal](https://github.com/iliaal))
+### Fixed
+
+- Fixed Child prompt wrappers and configured previews following the selected structured or plain-text result mode.
 
 ## [18.10.2] - 2026-10-12
 
@@ -141,6 +148,9 @@
 ### Fixed
 
 - Fixed `grep` on a single file showing in Tern as separate boxed snippets with no file row or syntax colors; it now looks the same as a `grep` over a directory
+### Fixed
+
+- Fixed MOMP help, resume commands, usage errors, and recovery hints incorrectly naming the upstream `omp` executable.
 
 ## [18.10.0] - 2026-10-12
 
@@ -526,6 +536,35 @@
 - Fixed slowdowns when processing long evaluation output, large Python kernel results, compiler/linter output, and ephemeral side-channel replies.
 - Fixed documents served as `application/octet-stream` being downloaded twice.
 - Fixed collaboration guests rebuilding the transcript excessively during streaming.
+### Changed
+
+- Subagent LSP now follows the upstream disabled default; set `task.enableLsp: true` to enable it, as synchronized MOMP profiles already do.
+- Runtime audits now record source, effective settings, and the exact compiled artifact identity.
+- Updated default URL-fetch browser identities to Chrome 155.
+
+### Fixed
+
+- Fixed dynamic prompt inspection omitting SVG and table-chart guidance.
+- Fixed conversation search missing exact whitespace phrases and returning inconsistent leading hits across result limits.
+- Fixed automatic remote compaction cancelling its running background request at the context limit instead of awaiting a usable result.
+- Removed unused chart and long-range detail queries from `stats --summary`.
+- Fixed conversation-search excerpts missing matches after Unicode lowercase expansions.
+- Fixed routine reloads losing commands or terminating RPC when candidate discovery fails.
+- Fixed folder rankings and omitted counts in `stats --summary` for more than 2,000 folders.
+- Fixed published CLI bundles loading unpatched Puppeteer instead of the workspace's patched version.
+- Fixed Codex cache probes using WebSockets when their SSE transport is overridden by the environment.
+- Fixed empty explicit AGENTS files, blank inline templates, and dangling mandatory templates silently losing guidance.
+- Fixed tagged-model and Vibe agents loading overrides from the wrong session profile.
+- Fixed RPC plugin reloads advertising stale profile agent descriptions.
+- Fixed prompt inspection omitting in-band tool blocks, their attribution, and final SDK request options.
+- Fixed blank `/rename` requests to use transcript-specific guidance that excludes unanswered Assistant follow-up questions.
+- Fixed conversation search and its benchmark reporting complete coverage after session discovery failures.
+- Fixed routine completion after terminal step failures or cancellation.
+- Fixed agent usage summaries showing zero-dollar costs for entirely unpriced usage.
+
+### Removed
+
+- Removed the unused `generateSessionTitleFromRecentTranscript` helper and its alternate title-selection options.
 
 ## [18.7.0] - 2026-10-06
 

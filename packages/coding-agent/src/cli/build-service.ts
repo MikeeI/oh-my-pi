@@ -29,6 +29,7 @@
 import * as fs from "node:fs";
 import { $env, APP_NAME, isRecord, VERSION } from "@oh-my-pi/pi-utils";
 import { $ } from "bun";
+import { APP_DISPLAY_NAME } from "../app-version";
 import {
 	isTimeoutError,
 	isUnsupportedProxyError,
@@ -289,7 +290,7 @@ export async function fetchBuild(selector: BuildSelector, options: FetchBuildOpt
 
 	if (response.status === 404 && isRecord(body) && body.error === "no_build") {
 		const hint =
-			"channel" in selector && selector.channel === "canary" ? ` Try \`${APP_NAME} update --stable\`.` : "";
+			"channel" in selector && selector.channel === "canary" ? ` Try \`${APP_DISPLAY_NAME} update --stable\`.` : "";
 		throw new Error(`No ${what} is published on ${origin} yet.${hint}`);
 	}
 	if (!response.ok) {

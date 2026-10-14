@@ -7,6 +7,7 @@ import { formatGroupedPaths, hasFsCode, isEnoent, prompt, untilAborted } from "@
 import { InternalUrlRouter, sessionResolveContext } from "../internal-urls";
 import { InternalUrlFilesystem, type UrlFileStat } from "../internal-urls/url-filesystem";
 import globDescription from "../prompts/tools/glob.md" with { type: "text" };
+import { resolveUserToolPromptSource } from "../prompts/tool-prompt-source";
 import { truncateHead } from "@oh-my-pi/pi-tui/tools/streaming-output";
 import { sessionDelegationBias } from "../task/prompt-policy";
 import { isScoutSpawnable } from "../task/spawn-policy";
@@ -120,17 +121,24 @@ export class GlobTool implements AgentTool<typeof findSchema, GlobToolDetails> {
 	readonly loadMode = "essential";
 	readonly label = "Glob";
 	get description(): string {
+		// Selected overrides remain mandatory even when the rendered description is memoized.
+		const descriptionSource = resolveUserToolPromptSource({
+			agentDir: this.session.settings.getAgentDir(),
+			toolName: this.name,
+			bundledSource: globDescription,
+		});
 		const hasFind = this.session.isToolActive?.("find") ?? isFindEnabled(this.session);
 		const eagerDelegation = sessionDelegationBias(this.session) === "eager";
 		const scoutAvailable = isScoutSpawnable(
 			cfgTaskDisabledAgents.get(this.session.settings),
 			this.session.getSessionSpawns?.() ?? "*",
 		);
-		// Every render input is a boolean; pack them so repeat reads skip the template render.
+		// Pack boolean render inputs, but also invalidate when the profile source changes.
 		const key = (hasFind ? 1 : 0) | (eagerDelegation ? 2 : 0) | (scoutAvailable ? 4 : 0);
-		if (key !== this.#descriptionKey) {
-			this.#description = prompt.render(globDescription, { hasFind, eagerDelegation, scoutAvailable });
+		if (key !== this.#descriptionKey || descriptionSource !== this.#descriptionSource) {
+			this.#description = prompt.render(descriptionSource, { hasFind, eagerDelegation, scoutAvailable });
 			this.#descriptionKey = key;
+			this.#descriptionSource = descriptionSource;
 		}
 		return this.#description;
 	}
@@ -145,6 +153,7 @@ export class GlobTool implements AgentTool<typeof findSchema, GlobToolDetails> {
 	readonly #timeoutMs: number;
 	#descriptionKey = -1;
 	#description = "";
+	#descriptionSource?: string;
 
 	constructor(
 		private readonly session: ToolSession,

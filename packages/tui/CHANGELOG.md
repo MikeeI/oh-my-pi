@@ -39,6 +39,9 @@
 ### Removed
 
 - Removed `tools/eval-format/code-mode-declarations` (`generateCodeModeDeclarations`), which only served Codex Code Mode.
+### Fixed
+
+- Fixed tmux history repeating finalized output or losing new answer tails when pane resizing precedes SIGWINCH.
 
 ## [18.10.3] - 2026-10-12
 
@@ -90,6 +93,10 @@
 - `CountdownTimer`'s native `elapsed` no longer sends `stopped: 0`, which froze every native countdown (extension input, selector and editor prompts) at zero from the start
 - The native backend's focus now reaches a field inside an `overlay`/`picker` sheet hoisted into the layer from a dock component (the MCP add wizard, login), so that field shows the live caret and focus ring
 - `MCPAddWizard` keeps a refused name or URL in its field, clears a stale refusal on Back, ignores a connection test that settles after the user stepped back, and Edit OAuth settings after a failed sign-in opens the settings again instead of doing nothing
+### Fixed
+
+- Fixed partial transcript replay losing accepted paragraph separators or changing rows after a late reaction.
+- Fixed transcript rows being lost or repeated during tmux resizing by retiring finalized blocks whole in preserve mode.
 
 ## [18.10.0] - 2026-10-12
 
@@ -234,6 +241,13 @@
 - Reduced memory retained by discarded TSP images and previews ([#14336](https://github.com/can1357/oh-my-pi/pull/14336) by [@iliaal](https://github.com/iliaal)).
 - Fixed startup capability probes printing as text in the prompt (e.g. `25a1;stsp;q;{…}pppppp`) on terminals that cannot parse them, such as macOS Terminal.app.
 - Fixed the `/resume` picker flashing while a search runs over a large session history: background fuzzy matches now land in one update instead of reordering the list dozens of times per keystroke.
+### Changed
+
+- Cache-miss markers now use lemon yellow, with a dedicated optional `cacheMiss` theme color.
+
+### Fixed
+
+- Enabled response foreground colors now remain visible in native Assistant rendering.
 
 ## [18.8.6] - 2026-10-08
 
@@ -300,6 +314,13 @@
 - Fixed slow Markdown processing for certain LaTeX environments and incomplete delimiters.
 - Fixed excessive slowdown when formatting long semicolon-free JavaScript evaluations.
 - Fixed prompt-editor lag in large drafts containing magic keywords.
+### Fixed
+
+- Fixed finalized response tails disappearing under viewport pressure while SVG figures finish rendering.
+- Fixed missing Read-token totals in settings and process Read cards.
+- Fixed duplicated accepted transcript prefixes and stale history after presentation resets.
+- Fixed leading whitespace after hard line breaks when foreground-color spans are enabled.
+- Fixed duplicate tool previews and editor rows when fullscreen return races a delayed tmux resize.
 
 ## [18.7.0] - 2026-10-06
 

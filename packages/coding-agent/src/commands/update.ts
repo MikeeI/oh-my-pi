@@ -4,6 +4,7 @@
 
 import { Command, Flags } from "@oh-my-pi/pi-utils/cli";
 import { updateHelp as commandHelp } from "../cli/command-help";
+import { APP_DISPLAY_NAME } from "../app-version";
 import * as pluginCli from "../cli/plugin-cli";
 import * as updateCli from "../cli/update-cli";
 import { CliUsageError } from "../cli/usage-error";
@@ -19,7 +20,11 @@ export default class Update extends Command {
 		stable: Flags.boolean({ description: "Switch back to the stable channel", default: false }),
 	};
 
-	static examples = ["omp update", "omp update --check", "omp update --canary"];
+	static examples = [
+		`${APP_DISPLAY_NAME} update`,
+		`${APP_DISPLAY_NAME} update --check`,
+		`${APP_DISPLAY_NAME} update --canary`,
+	];
 
 	async run(): Promise<void> {
 		const { flags } = await this.parse(Update);

@@ -20,4 +20,32 @@ describe("resumeCommand", () => {
 		setProfile("personal");
 		expect(resumeCommand("abc123")).toBe(`${APP_NAME} --profile personal --resume abc123`);
 	});
+
+	it("emits the published MOMP executable while preserving the active profile", async () => {
+		const child = Bun.spawn(
+			[
+				"bun",
+				"--eval",
+				`import { resumeCommand } from ${JSON.stringify(`${import.meta.dir}/../../src/utils/resume-command.ts`)}; console.log(resumeCommand("01a1183f-2b7c-75a0-b077-b23e6d269051"));`,
+			],
+			{
+				env: {
+					...process.env,
+					PI_BUNDLED: "true",
+					PI_BUNDLED_PACKAGE_NAME: "@mikeei/momp",
+					PI_BUNDLED_BINARY_NAME: "momp",
+					OMP_PROFILE: "personal",
+				},
+				stdout: "pipe",
+				stderr: "pipe",
+			},
+		);
+		const [stdout, stderr, exitCode] = await Promise.all([
+			new Response(child.stdout).text(),
+			new Response(child.stderr).text(),
+			child.exited,
+		]);
+		expect({ exitCode, stderr }).toEqual({ exitCode: 0, stderr: "" });
+		expect(stdout.trim()).toBe("momp --profile personal --resume 01a1183f-2b7c-75a0-b077-b23e6d269051");
+	});
 });

@@ -13,6 +13,7 @@ import {
 	normalizePathForComparison,
 } from "@oh-my-pi/pi-utils";
 import { JSONC } from "bun";
+import { APP_DISPLAY_NAME } from "../../app-version";
 import { resolveActiveProjectRegistryPath } from "../../discovery/helpers";
 import { loadExtensions } from "../extensions/loader";
 import { runBunCli } from "./bun-cli";
@@ -1120,7 +1121,7 @@ export class PluginManager {
 					status: fixed ? "ok" : "error",
 					message: fixed
 						? `Reconciled version drift: node_modules now matches lock v${recordedVersion}`
-						: `Version drift: lock records v${recordedVersion} but node_modules has v${pluginPkg.version} (run \`omp plugin install ${name} --force\`)`,
+						: `Version drift: lock records v${recordedVersion} but node_modules has v${pluginPkg.version} (run \`${APP_DISPLAY_NAME} plugin install ${name} --force\`)`,
 					fixed,
 				});
 				if (fixed) {

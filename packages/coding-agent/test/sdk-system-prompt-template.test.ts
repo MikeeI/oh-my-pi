@@ -13,14 +13,14 @@ type SystemPromptOption = string | string[] | ((defaultPrompt: string[]) => stri
 type ExplicitSystemPromptOptions = Pick<CreateAgentSessionOptions, "systemPromptTemplate" | "customSystemPrompt">;
 
 async function withSession<T>(
-	nativeTemplate: string,
+	legacyTemplate: string,
 	systemPrompt: SystemPromptOption,
 	fn: (session: AgentSession) => Promise<T>,
 	explicitSystemPromptOptions: ExplicitSystemPromptOptions = {},
 ): Promise<T> {
 	using tempDir = TempDir.createSync("@omp-sdk-system-prompt-template-");
 	const cwd = tempDir.join("project");
-	await Bun.write(path.join(cwd, CONFIG_DIR_NAME, "SYSTEM_TEMPLATE.md"), nativeTemplate);
+	await Bun.write(path.join(cwd, CONFIG_DIR_NAME, "SYSTEM_TEMPLATE.md"), legacyTemplate);
 
 	const authStorage = await AuthStorage.create(":memory:");
 	const modelRegistry = new ModelRegistry(authStorage, path.join(tempDir.path(), "models.yml"));
@@ -57,14 +57,14 @@ async function withSession<T>(
 }
 
 describe("SDK systemPrompt replacements", () => {
-	it("uses a fixed string without loading a malformed native template", async () => {
+	it("uses a fixed string without loading the legacy template filename", async () => {
 		const fixedPrompt = "sdk fixed prompt";
 		await withSession("{{#if eagerTasks}}", fixedPrompt, async session => {
 			expect(session.systemPrompt).toEqual([fixedPrompt]);
 		});
 	});
 
-	it("uses fixed prompt blocks without loading an empty native template", async () => {
+	it("uses fixed prompt blocks without loading the legacy template filename", async () => {
 		const fixedPrompt = ["sdk fixed block one", "sdk fixed block two"];
 		await withSession(" \n\t", fixedPrompt, async session => {
 			expect(session.systemPrompt).toEqual(fixedPrompt);
@@ -89,7 +89,7 @@ describe("SDK systemPrompt replacements", () => {
 		).rejects.toThrow("systemPromptTemplate cannot be combined with a literal custom system prompt");
 	});
 
-	it("falls back to the bundled prompt for callbacks when the native template is malformed", async () => {
+	it("uses the bundled prompt for callbacks when only the legacy template filename exists", async () => {
 		await withSession(
 			"{{#if eagerTasks}}",
 			defaultPrompt => {

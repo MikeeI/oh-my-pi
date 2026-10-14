@@ -4,7 +4,8 @@
  * Handles `omp q`/`omp web-search` subcommands for testing web search models.
  */
 
-import { APP_NAME, getProjectDir } from "@oh-my-pi/pi-utils";
+import { getProjectDir } from "@oh-my-pi/pi-utils";
+import { APP_DISPLAY_NAME as APP_NAME } from "../app-version";
 import chalk from "@oh-my-pi/pi-utils/chalk";
 import { Settings } from "../config/settings";
 import { initTheme, theme } from "@oh-my-pi/pi-tui/theme";

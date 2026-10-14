@@ -10,6 +10,7 @@ import type {
 import { isEnoent, isFsError, logger, prompt, untilAborted } from "@oh-my-pi/pi-utils";
 import { type Theme, theme } from "@oh-my-pi/pi-tui/theme";
 import lspDescription from "../prompts/tools/lsp.md" with { type: "text" };
+import { resolveUserToolPromptSource } from "../prompts/tool-prompt-source";
 import type { ToolSession } from "../tools";
 import { truncateForPrompt } from "../tools/approval";
 import { formatPathRelativeToCwd, resolveToCwd } from "../tools/path-utils";
@@ -89,6 +90,8 @@ import {
 	dedupeWorkspaceSymbols,
 	extractHoverText,
 	fileToUri,
+	filterDocumentSymbolInformation,
+	filterDocumentSymbols,
 	filterWorkspaceSymbols,
 	formatCodeAction,
 	formatDiagnostic,
@@ -191,7 +194,13 @@ export class LspTool implements AgentTool<typeof lspSchema, LspToolDetails, Them
 	readonly strict = true;
 
 	constructor(private readonly session: ToolSession) {
-		this.description = prompt.render(lspDescription);
+		this.description = prompt.render(
+			resolveUserToolPromptSource({
+				agentDir: session.settings.getAgentDir(),
+				toolName: this.name,
+				bundledSource: lspDescription,
+			}),
+		);
 	}
 
 	static createIf(session: ToolSession): LspTool | null {
@@ -1476,16 +1485,37 @@ export class LspTool implements AgentTool<typeof lspSchema, LspToolDetails, Them
 						useless = true;
 					} else {
 						const relPath = formatPathRelativeToCwd(targetFile, this.session.cwd);
+						const normalizedQuery = query?.trim();
 						if ("selectionRange" in result[0]) {
-							const lines = (result as DocumentSymbol[]).flatMap(s => formatDocumentSymbol(s));
-							output = `Symbols in ${relPath}:\n${lines.join("\n")}`;
+							const symbols = normalizedQuery
+								? filterDocumentSymbols(result as DocumentSymbol[], normalizedQuery)
+								: (result as DocumentSymbol[]);
+							if (symbols.length === 0) {
+								output = `No symbols matching "${normalizedQuery}" in ${relPath}`;
+								useless = true;
+							} else {
+								const lines = symbols.flatMap(s => formatDocumentSymbol(s));
+								output = normalizedQuery
+									? `Symbols in ${relPath}:\nMatching query: "${normalizedQuery}"\n${lines.join("\n")}`
+									: `Symbols in ${relPath}:\n${lines.join("\n")}`;
+							}
 						} else {
-							const lines = (result as SymbolInformation[]).map(s => {
-								const line = s.location.range.start.line + 1;
-								const icon = symbolKindToIcon(s.kind);
-								return `${icon} ${s.name} @ line ${line}`;
-							});
-							output = `Symbols in ${relPath}:\n${lines.join("\n")}`;
+							const symbols = normalizedQuery
+								? filterDocumentSymbolInformation(result as SymbolInformation[], normalizedQuery)
+								: (result as SymbolInformation[]);
+							if (symbols.length === 0) {
+								output = `No symbols matching "${normalizedQuery}" in ${relPath}`;
+								useless = true;
+							} else {
+								const lines = symbols.map(s => {
+									const line = s.location.range.start.line + 1;
+									const icon = symbolKindToIcon(s.kind);
+									return `${icon} ${s.name} @ line ${line}`;
+								});
+								output = normalizedQuery
+									? `Symbols in ${relPath}:\nMatching query: "${normalizedQuery}"\n${lines.join("\n")}`
+									: `Symbols in ${relPath}:\n${lines.join("\n")}`;
+							}
 						}
 					}
 					break;

@@ -18,11 +18,11 @@ import {
 	getProjectDir,
 	isCompiledBinary,
 	isEnoent,
-	VERSION,
 } from "@oh-my-pi/pi-utils";
 import chalk from "@oh-my-pi/pi-utils/chalk";
 import { withFileLock } from "@oh-my-pi/pi-utils/file-lock";
 import { $ } from "bun";
+import { APP_DISPLAY_NAME, APP_PACKAGE_NAME, isMompPackageName, APP_VERSION as VERSION } from "../app-version";
 import { Settings, settings } from "../config/settings";
 import { theme } from "@oh-my-pi/pi-tui/theme";
 import {
@@ -46,6 +46,7 @@ const PACKAGE = "@oh-my-pi/pi-coding-agent";
 const HOMEBREW_FORMULA = "can1357/tap/omp";
 const MISE_TOOL = "github:can1357/oh-my-pi";
 const NIX_STORE_DIR = "/nix/store";
+const MOMP_INSTALL_COMMAND = "bun install -g @mikeei/momp@latest --force --minimum-release-age 0";
 const RELEASE_METADATA_TIMEOUT_MS = 30_000;
 const BINARY_DOWNLOAD_TIMEOUT_MS = 15 * 60_000;
 
@@ -723,7 +724,7 @@ async function fetchLatestManifest(
 		}
 	};
 	const noCanary = () =>
-		new Error(`No canary release has been published for ${pkg} yet. Try \`${APP_NAME} update --stable\`.`);
+		new Error(`No canary release has been published for ${pkg} yet. Try \`${APP_DISPLAY_NAME} update --stable\`.`);
 
 	const fromPackument = (packument: unknown): Record<string, unknown> => {
 		const distTags = isRecord(packument) ? packument["dist-tags"] : undefined;
@@ -1903,7 +1904,16 @@ export async function updateViaBinaryAt(
 		return result;
 	});
 	printVerifiedVersion(build.version, verification.path ?? targetPath);
-	console.log(chalk.dim(`Restart ${APP_NAME} to use the new version`));
+	console.log(chalk.dim(`Restart ${APP_DISPLAY_NAME} to use the new version`));
+}
+
+/** Return true when runtime package metadata identifies the personal fork. */
+export function isMompPackage(packageName: string): boolean {
+	return isMompPackageName(packageName);
+}
+
+export function buildMompUpdateInstruction(): string {
+	return MOMP_INSTALL_COMMAND;
 }
 
 /**
@@ -2232,6 +2242,16 @@ export async function runUpdateCommand(opts: {
 	check: boolean;
 	channel?: UpdateChannel;
 }): Promise<void> {
+	if (isMompPackage(APP_PACKAGE_NAME)) {
+		console.log(`Current version: ${VERSION}`);
+		console.log("momp updates are installed manually:");
+		console.log(`  ${buildMompUpdateInstruction()}`);
+		if (!opts.check) {
+			console.error(chalk.red("momp update is disabled for the personal fork."));
+			process.exitCode = 1;
+		}
+		return;
+	}
 	const ompPath = resolveOmpPath();
 	const manager = ompPath ? await managedInstallName(ompPath) : undefined;
 	if (manager) {
@@ -2274,10 +2294,10 @@ export async function runUpdateCommand(opts: {
  * Print update command help.
  */
 export function printUpdateHelp(): void {
-	console.log(`${chalk.bold(`${APP_NAME} update`)} - Check for and install updates
+	console.log(`${chalk.bold(`${APP_DISPLAY_NAME} update`)} - Check for and install updates
 
 ${chalk.bold("Usage:")}
-  ${APP_NAME} update [options]
+  ${APP_DISPLAY_NAME} update [options]
 
 ${chalk.bold("Options:")}
   -c, --check     Check for updates without installing
@@ -2287,10 +2307,10 @@ ${chalk.bold("Options:")}
   --stable        Switch back to the stable channel
 
 ${chalk.bold("Examples:")}
-  ${APP_NAME} update              Update to latest version
-  ${APP_NAME} update --check      Check if updates are available
-  ${APP_NAME} update --force      Force reinstall
-  ${APP_NAME} update -l           Update installed plugins
-  ${APP_NAME} update --canary    Switch to the canary channel and update
+  ${APP_DISPLAY_NAME} update              Update to latest version
+  ${APP_DISPLAY_NAME} update --check      Check if updates are available
+  ${APP_DISPLAY_NAME} update --force      Force reinstall
+  ${APP_DISPLAY_NAME} update -l           Update installed plugins
+  ${APP_DISPLAY_NAME} update --canary     Switch to the canary channel and update
 `);
 }

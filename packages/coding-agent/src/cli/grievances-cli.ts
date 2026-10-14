@@ -4,6 +4,7 @@
 import chalk from "@oh-my-pi/pi-utils/chalk";
 import { Settings } from "../config/settings";
 import { flushGrievances, openAutoQaDb } from "../tools/report-tool-issue";
+import { APP_DISPLAY_NAME } from "../app-version";
 
 interface GrievanceRow {
 	id: number;
@@ -255,7 +256,7 @@ export async function pushGrievances(options: PushGrievancesOptions): Promise<vo
 		if (rejected > 0) {
 			console.log(
 				chalk.yellow(
-					`${rejected} grievance${rejected === 1 ? " was" : "s were"} refused by the server and marked rejected (see \`omp grievances list\`).`,
+					`${rejected} grievance${rejected === 1 ? " was" : "s were"} refused by the server and marked rejected (see \`${APP_DISPLAY_NAME} grievances list\`).`,
 				),
 			);
 		}

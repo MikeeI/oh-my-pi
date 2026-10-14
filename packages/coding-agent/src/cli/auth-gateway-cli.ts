@@ -49,6 +49,7 @@ import {
 } from "../session/auth-broker-config";
 import { runAuthGatewayStdio } from "./auth-gateway-stdio";
 import { generateToken, readTokenFile, writeTokenFile } from "./token-file";
+import { APP_DISPLAY_NAME } from "../app-version";
 
 export type AuthGatewayAction = "serve" | "stdio" | "token" | "status" | "check";
 
@@ -263,7 +264,7 @@ async function runServe(flags: AuthGatewayCommandArgs["flags"]): Promise<void> {
 	const brokerConfig = await resolveAuthBrokerConfig();
 	if (!brokerConfig) {
 		throw new Error(
-			"`omp auth-gateway serve` requires OMP_AUTH_BROKER_URL (or `auth.broker.url`/`auth.broker.token` in config.yml). The gateway is itself a broker client.",
+			`\`${APP_DISPLAY_NAME} auth-gateway serve\` requires OMP_AUTH_BROKER_URL (or \`auth.broker.url\`/\`auth.broker.token\` in config.yml). The gateway is itself a broker client.`,
 		);
 	}
 	const bind = flags.bind ?? DEFAULT_AUTH_GATEWAY_BIND;
@@ -484,7 +485,7 @@ async function runStatus(flags: AuthGatewayCommandArgs["flags"]): Promise<void> 
 			);
 			if (!tokenPresent) {
 				process.stdout.write(
-					"Run `omp auth-gateway token` or `omp auth-gateway serve` to create a bearer token.\n",
+					`Run \`${APP_DISPLAY_NAME} auth-gateway token\` or \`${APP_DISPLAY_NAME} auth-gateway serve\` to create a bearer token.\n`,
 				);
 			}
 		}
@@ -738,7 +739,7 @@ async function runCheck(flags: AuthGatewayCommandArgs["flags"]): Promise<void> {
 	const brokerConfig = await resolveAuthBrokerConfig();
 	if (!brokerConfig) {
 		throw new Error(
-			"`omp auth-gateway check` requires OMP_AUTH_BROKER_URL (or `auth.broker.url`/`auth.broker.token` in config.yml). It probes the same credentials the gateway would serve.",
+			`\`${APP_DISPLAY_NAME} auth-gateway check\` requires OMP_AUTH_BROKER_URL (or \`auth.broker.url\`/\`auth.broker.token\` in config.yml). It probes the same credentials the gateway would serve.`,
 		);
 	}
 
