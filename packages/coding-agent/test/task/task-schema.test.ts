@@ -190,7 +190,7 @@ Custom prompt.`,
 		const ordinarySchema = JSON.stringify(ordinary.parameters.toJsonSchema());
 		expect(ordinarySchema).toContain('"sourceSession"');
 		expect(ordinarySchema).toContain('"model"');
-		expect(ordinary.description).toContain("`seance`");
+		expect(ordinary.description).toContain("sourceSession");
 		expect(ordinary.description).toContain("Historical consults");
 	});
 	afterEach(() => vi.restoreAllMocks());
