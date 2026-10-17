@@ -332,6 +332,7 @@ The upgrader validates these IDs against its executable and manual proof mapping
 - Required action: remove stale per-call model guidance from the active Task override without adding a substitute API.
 - Coverage: upstream v18.11.3 permits `sourceSession` and per-call `model` only for the bundled seance agent.
 - Required action: preserve that upstream exception without exposing model overrides for ordinary agents.
+- Required action: pass conditional seance guidance through the active Task override only while the capability is advertised.
 - Required action: keep the bundled Task prompt byte-identical to upstream.
 - Required action: retain MOMP-specific policy and effort guidance in the active Settings templates.
 - Coverage: upstream v18.10.2 defaults `task.structured` off; Eval agent and workpool remain structured.
@@ -343,7 +344,7 @@ The upgrader validates these IDs against its executable and manual proof mapping
 - Proof: managed and effective `task.structured: true` with global provenance through Source `Settings.loadReadOnly`.
 - Proof: candidate prompt rendering through `momp system-prompt inspect`.
 - Proof: `test/system-prompt-templates.test.ts`.
-- Proof: effort-description cases in `test/task/task-schema.test.ts`.
+- Proof: effort guidance, seance capability visibility, and ordinary override rejection in `test/task/task-schema.test.ts`.
 
 #### `MOMP-EVAL-OUTPUT` — Large owner-result preservation
 
