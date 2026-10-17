@@ -87,6 +87,7 @@ function makeCtx(isStreaming = false, messages: AgentMessage[] = []) {
 		compactionQueuedMessages: [],
 		skillCommands: new Map(),
 		fileSlashCommands: new Set<string>(),
+		routineSlashCommands: new Set<string>(),
 		withLocalSubmission: async (_text: string, fn: () => Promise<unknown>) => fn(),
 		updatePendingMessagesDisplay: vi.fn(),
 		showWarning: vi.fn(),
@@ -366,6 +367,23 @@ describe("input controller — bare slash commands opt-in", () => {
 		await editor.onSubmit?.("id");
 
 		expect(prompt).toHaveBeenCalledWith("/id", { images: undefined });
+		expect(onInputCallback).not.toHaveBeenCalled();
+	});
+	it("confirms a discovered bare routine before dispatching it in an existing session", async () => {
+		await enable();
+		const history: AgentMessage[] = [{ role: "user", content: "hi", timestamp: 0 }];
+		const { ctx, editor, onInputCallback, showStatus } = makeCtx(false, history);
+		const runRoutineInvocation = vi.fn(async () => true);
+		ctx.routineSlashCommands.add("review-all");
+		Object.assign(ctx.session, { runRoutineInvocation });
+		controllerFor(ctx);
+
+		await editor.onSubmit?.("review-all");
+		expect(runRoutineInvocation).not.toHaveBeenCalled();
+		expect(showStatus).toHaveBeenCalledWith(expect.stringContaining("Enter again to run /review-all"));
+
+		await editor.onSubmit?.("review-all");
+		expect(runRoutineInvocation).toHaveBeenCalledWith("/review-all", { onProgress: expect.any(Function) });
 		expect(onInputCallback).not.toHaveBeenCalled();
 	});
 

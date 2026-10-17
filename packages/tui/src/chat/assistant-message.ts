@@ -260,7 +260,6 @@ export class AssistantMessageComponent extends Container {
 	#cacheMarker?: CacheInvalidationMarkerComponent;
 	#servedModelMarker?: ServedModelMarkerComponent;
 	#lastMessage?: AssistantMessage;
-	#emergencyText?: ProseBlock;
 	#toolImagesByCallId = new Map<string, ImageContent[]>();
 	/** File each grouped read showed that Tern's media viewer shows, for native `media` nodes. */
 	#toolMediaPathByCallId = new Map<string, string>();
@@ -617,12 +616,12 @@ export class AssistantMessageComponent extends Container {
 	override releaseRenderCaches(): void {
 		super.releaseRenderCaches();
 		this.#dropStableRenders();
-		this.#emergencyText?.releaseRenderCaches();
 	}
 
 	setHideThinkingBlock(hide: boolean): void {
+		if (this.#hideThinkingBlock === hide) return;
 		this.#hideThinkingBlock = hide;
-		this.#thinkingCollapsed.clear();
+		if (this.#lastMessage) this.updateContent(this.#lastMessage, { transient: this.#lastUpdateTransient });
 	}
 
 	/**
@@ -638,7 +637,9 @@ export class AssistantMessageComponent extends Container {
 	}
 
 	setProseOnlyThinking(proseOnly: boolean): void {
+		if (this.#proseOnlyThinking === proseOnly) return;
 		this.#proseOnlyThinking = proseOnly;
+		if (this.#lastMessage) this.updateContent(this.#lastMessage, { transient: this.#lastUpdateTransient });
 	}
 
 	/**
@@ -812,7 +813,9 @@ export class AssistantMessageComponent extends Container {
 	 * head's `title`. With `hideThinkingBlock` only the live head shows (collapsed)
 	 * and a finished thought emits nothing.
 	 */
-	override describe(cx?: DescribeContext): NativeNode {
+	override describe(cx?: DescribeContext): NativeNode | null {
+		// Native Markdown does not interpret foreground spans; the row renderer owns their styling.
+		if (getMarkdownTheme().textColors) return null;
 		const media = cx?.supports("media") === true;
 		const tail = this.#displayedMessage ? this.#thinkingTailIndex(this.#displayedMessage) : undefined;
 		const rate =
@@ -1474,10 +1477,12 @@ export class AssistantMessageComponent extends Container {
 		this.#stableReplayRenderer = undefined;
 	}
 
-	/** Render completed prose rather than an earlier thinking row under emergency viewport pressure. */
-	renderTranscriptBlockEmergencyRow(width: number): string | undefined {
-		if (!this.#transcriptBlockFinalized) return undefined;
-		return this.#emergencyText?.render(width)[0];
+	/** Keep the newest finalized rows reachable under emergency viewport pressure. */
+	renderTranscriptBlockEmergencyRows(width: number, maxRows: number): readonly string[] {
+		const count = Math.max(0, Math.trunc(maxRows));
+		if (!this.#transcriptBlockFinalized || count === 0) return EMPTY_STABLE_RENDER;
+		const rows = this.render(width);
+		return rows.slice(-count);
 	}
 
 	getTranscriptBlockVersion(): number {
@@ -1853,7 +1858,6 @@ export class AssistantMessageComponent extends Container {
 		this.#kittyPreviouslyDisplayed = this.#kittyDisplayed;
 		this.#kittyDisplayed = new Map();
 		this.#thinkingExtensions.clear();
-		this.#emergencyText = undefined;
 		this.#thinkingDots = undefined;
 		this.#hasTruncatableError = false;
 
@@ -1882,7 +1886,6 @@ export class AssistantMessageComponent extends Container {
 				const trimmed = content.text.trim();
 				const md = this.#proseBlock(i, trimmed, previousFigures);
 				this.#contentContainer.addChild(md);
-				this.#emergencyText = md;
 				captureItems?.push({ md, contentIndex: i, blockType: "text", lastText: trimmed });
 				hasRenderedContent = true;
 			} else if (content.type === "thinking") {

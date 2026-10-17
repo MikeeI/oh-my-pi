@@ -27,6 +27,7 @@ import evalPreludeNoticePrompt from "../prompts/system/eval-prelude-notice.md" w
 import sessionAgentNoticePrompt from "../prompts/system/session-agent-notice.md" with { type: "text" };
 import toolRosterNoticePrompt from "../prompts/system/tool-roster-notice.md" with { type: "text" };
 import xdevMountNoticePrompt from "../prompts/system/xdev-mount-notice.md" with { type: "text" };
+import type { BuildSystemPromptResult, DynamicPromptPart } from "../system-prompt";
 import { isMCPToolName, normalizeToolNames } from "../tools/builtin-names";
 import { denyError, resolveApproval, resolveApprovalFromContext } from "../tools/approval";
 import { wrapToolWithMetaNotice } from "../tools/output-meta";
@@ -128,7 +129,12 @@ interface SessionToolsOptions {
 	rebuildSystemPrompt?: (
 		toolNames: string[],
 		tools: Map<string, AgentTool>,
-	) => Promise<{ systemPrompt: string[]; xdevCatalogNames?: readonly string[] }>;
+	) => Promise<{
+		systemPrompt: string[];
+		xdevCatalogNames?: readonly string[];
+		dynamicParts?: DynamicPromptPart[];
+	}>;
+	initialSystemPromptResult?: BuildSystemPromptResult;
 	getMcpServerInstructions?: () => Map<string, string> | undefined;
 	xdev?: XdevState;
 	setActiveToolNames?: (names: Iterable<string>) => void;
@@ -363,6 +369,7 @@ export class SessionTools {
 	#turnSystemPromptOverride: string[] | undefined;
 	/** The latest per-turn override and the base its hook was given; kept after the turn ends. */
 	#lastTurnSystemPromptOverride: { prompt: string[]; base: string[] } | undefined;
+	#systemPromptResult: BuildSystemPromptResult;
 	#lastAppliedToolSignature: string | undefined;
 	/** Full enabled set, including tools demoted from the model-visible surface. */
 	#enabledToolNames = new Set<string>();
@@ -473,6 +480,10 @@ export class SessionTools {
 			restoredReply && restoredPromptDigest
 				? { reply: restoredReply, promptDigest: restoredPromptDigest }
 				: undefined;
+		const initialSystemPromptResult = options.initialSystemPromptResult;
+		this.#systemPromptResult = initialSystemPromptResult
+			? { ...initialSystemPromptResult, dynamicParts: initialSystemPromptResult.dynamicParts ?? [] }
+			: { systemPrompt: options.baseSystemPrompt, dynamicParts: [] };
 		this.#skills = options.skills ?? [];
 		this.#skillWarnings = options.skillWarnings ?? [];
 		this.#skillsSettings = options.skillsSettings;
@@ -497,6 +508,11 @@ export class SessionTools {
 	/** Current stable base system prompt. */
 	get baseSystemPrompt(): string[] {
 		return this.#baseSystemPrompt;
+	}
+
+	/** Latest accepted structured system prompt build. */
+	get systemPromptResult(): BuildSystemPromptResult {
+		return this.#systemPromptResult;
 	}
 
 	/** Replaces the controller-owned base prompt without applying it to the agent. */
@@ -1128,12 +1144,11 @@ export class SessionTools {
 		this.#setMountedNames(mountNames);
 		this.#setActiveToolNames?.(validToolNames);
 
-		let rebuiltSystemPrompt: string[] | undefined;
+		let rebuiltResult: BuildSystemPromptResult | undefined;
 		let rebuiltSignature: string | undefined;
 		let frozenSignature: string | undefined;
 		// Trigger of an implicit (non-forced) rebuild, rechecked at commit.
 		let implicitRebuildSignature: string | undefined;
-		let rebuiltXdevCatalogNames: readonly string[] | undefined;
 		let candidateSurface: PromptSurface | undefined;
 		try {
 			if (restrictDeviceOnlyWrite) this.#setDeviceOnlyWrite?.(true);
@@ -1178,10 +1193,9 @@ export class SessionTools {
 							rebuildSystemPrompt(validToolNames, this.#toolRegistry),
 						),
 					);
-					rebuiltSystemPrompt = built.systemPrompt;
+					rebuiltResult = { ...built, dynamicParts: built.dynamicParts ?? [] };
 					if (!forcePromptRefresh) implicitRebuildSignature = triggerSignature;
 					rebuiltSignature = signature;
-					rebuiltXdevCatalogNames = built.xdevCatalogNames;
 					candidateSurface = candidate;
 				}
 			}
@@ -1216,27 +1230,28 @@ export class SessionTools {
 			// transcript binds the prompt it was sent with: only a rebuild that
 			// reproduces it commits.
 			let restoresTranscriptPrompt = false;
-			if (rebuiltSystemPrompt && implicitRebuildSignature !== undefined) {
+			if (rebuiltResult && implicitRebuildSignature !== undefined) {
 				const binding = this.#implicitRebuildBinding();
 				restoresTranscriptPrompt =
-					typeof binding === "object" && systemPromptDigest(rebuiltSystemPrompt) === binding.promptDigest;
+					typeof binding === "object" && systemPromptDigest(rebuiltResult.systemPrompt) === binding.promptDigest;
 				if (binding !== "free" && !restoresTranscriptPrompt) {
-					rebuiltSystemPrompt = undefined;
+					rebuiltResult = undefined;
 					frozenSignature = implicitRebuildSignature;
 				}
 			}
-			if (rebuiltSystemPrompt && rebuiltSignature) {
+			if (rebuiltResult && rebuiltSignature) {
 				// The restored transcript was sent with this prompt under the inherited cache key.
 				if (this.#lastAppliedToolSignature !== undefined && !restoresTranscriptPrompt) {
 					this.#host.clearInheritedProviderPromptCacheKey();
 				}
-				this.#baseSystemPrompt = rebuiltSystemPrompt;
+				this.#baseSystemPrompt = rebuiltResult.systemPrompt;
+				this.#systemPromptResult = rebuiltResult;
 				this.#host.clearMemoryPromotionSnapshot();
 				this.#applyAgentSystemPrompt(this.#baseSystemPrompt);
 				invalidateToolSchemaMetadata(this.#host.agent.state.tools);
 				this.#lastAppliedToolSignature = rebuiltSignature;
 				this.#promptModelKey = this.#currentPromptModelKey();
-				this.#setBasePromptXdevNames(rebuiltXdevCatalogNames);
+				this.#setBasePromptXdevNames(rebuiltResult.xdevCatalogNames);
 				// The rebuilt prompt is a fresh roster snapshot. Keep the complete
 				// pending delta for a turn override that hides it, while separately
 				// tracking any later frozen changes that must follow a delivered base.
@@ -2025,6 +2040,8 @@ export class SessionTools {
 		const built = await this.#promptSurfaceScope.run(candidate, () =>
 			rebuildSystemPrompt(activeToolNames, this.#toolRegistry),
 		);
+		if (this.#host.isDisposed() || isCurrent?.() === false) return;
+		const result: BuildSystemPromptResult = { ...built, dynamicParts: built.dynamicParts ?? [] };
 		const promptTools = activeToolNames
 			.map(name => this.#toolRegistry.get(name))
 			.filter((tool): tool is AgentTool => tool != null);
@@ -2036,7 +2053,7 @@ export class SessionTools {
 			this.#computeAppliedToolSignature(activeToolNames, promptTools, mountedSignatureTools),
 		);
 		return {
-			systemPrompt: built.systemPrompt,
+			systemPrompt: result.systemPrompt,
 			commit: () => {
 				// Publish only to a live, current session whose base this
 				// preparation still owns.
@@ -2045,9 +2062,10 @@ export class SessionTools {
 				// awaiting its final commit: its own lifecycle published its own
 				// snapshot, so only carry the prompt forward.
 				if (this.#baseSystemPrompt !== previousBaseSystemPrompt) return true;
-				this.#baseSystemPrompt = built.systemPrompt;
+				this.#baseSystemPrompt = result.systemPrompt;
+				this.#systemPromptResult = result;
 				this.#promptSurface = candidate;
-				this.#setBasePromptXdevNames(built.xdevCatalogNames);
+				this.#setBasePromptXdevNames(result.xdevCatalogNames);
 				this.#host.clearMemoryPromotionSnapshot();
 				if (
 					previousBaseSystemPrompt.length !== this.#baseSystemPrompt.length ||

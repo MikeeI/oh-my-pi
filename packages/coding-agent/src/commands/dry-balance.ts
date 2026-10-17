@@ -1,5 +1,6 @@
 import { Args, Command, Flags } from "@oh-my-pi/pi-utils/cli";
 import { dryBalanceHelp as commandHelp } from "../cli/command-help";
+import { APP_DISPLAY_NAME } from "../app-version";
 import { runDryBalanceCommand } from "../cli/dry-balance-cli";
 
 export default class DryBalance extends Command {
@@ -24,11 +25,11 @@ export default class DryBalance extends Command {
 	};
 
 	static examples = [
-		"# Dry-run the configured default model with 100 random session ids\n  omp dry-balance",
-		"# Dry-run a specific model\n  omp dry-balance anthropic/claude-sonnet-4-5",
-		"# Larger run with bounded concurrency\n  omp dry-balance --model openai-codex/gpt-5-codex --count 1000 --concurrency 64",
-		"# Benchmark every OAuth account in parallel\n  omp dry-balance --bench",
-		"# Machine-readable output\n  omp dry-balance --json",
+		`# Dry-run the configured default model with 100 random session ids\n  ${APP_DISPLAY_NAME} dry-balance`,
+		`# Dry-run a specific model\n  ${APP_DISPLAY_NAME} dry-balance anthropic/claude-sonnet-4-5`,
+		`# Larger run with bounded concurrency\n  ${APP_DISPLAY_NAME} dry-balance --model openai-codex/gpt-5-codex --count 1000 --concurrency 64`,
+		`# Benchmark every OAuth account in parallel\n  ${APP_DISPLAY_NAME} dry-balance --bench`,
+		`# Machine-readable output\n  ${APP_DISPLAY_NAME} dry-balance --json`,
 	];
 
 	async run(): Promise<void> {

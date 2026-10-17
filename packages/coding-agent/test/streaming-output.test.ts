@@ -637,6 +637,7 @@ describe("OutputSink", () => {
 			artifactPath: path.join(dir, "sampled.log"),
 			artifactId: "art-sampled",
 			spillThreshold: 16,
+			headBytes: 8,
 			maxColumns: 8,
 			artifactMaxBytes: 32,
 			artifactHeadBytes: 16,
@@ -659,6 +660,7 @@ describe("OutputSink", () => {
 			),
 		).toHaveLength(2);
 		expect(notice).not.toContain("for full output");
+		expect(notice).not.toContain("to recover omitted artifact lines");
 	});
 	test("createInput decodes streamed UTF-8 chunks correctly", async () => {
 		const sink = new OutputSink();

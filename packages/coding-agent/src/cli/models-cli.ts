@@ -27,6 +27,7 @@ import { SessionManager } from "../session/session-manager";
 import { EventBus } from "../utils/event-bus";
 
 import { cfgDisabledExtensions, cfgExtensions } from "../extensibility/settings";
+import { APP_DISPLAY_NAME } from "../app-version";
 
 export type ModelsAction = "ls" | "find" | "refresh";
 
@@ -388,7 +389,9 @@ export async function runModelsCommand(command: ModelsCommandArgs): Promise<void
 	const kind = command.flags.kind ?? "chat";
 
 	if (action === "find" && (!pattern || pattern.trim().length === 0)) {
-		process.stderr.write("`omp models find` requires a search substring, e.g. `omp models find minimax`\n");
+		process.stderr.write(
+			`\`${APP_DISPLAY_NAME} models find\` requires a search substring, e.g. \`${APP_DISPLAY_NAME} models find minimax\`\n`,
+		);
 		process.exitCode = 1;
 		return;
 	}

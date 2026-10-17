@@ -2,20 +2,22 @@ import * as path from "node:path";
 import { ThinkingLevel } from "@oh-my-pi/pi-agent-core";
 import type { ImageContent } from "@oh-my-pi/pi-ai";
 import {
-	type AutocompleteProvider,
 	type Component,
 	emergencyTerminalRestore,
+	type AutocompleteProvider,
+	hasTerminalMultiplexerSession,
 	matchesKey,
 	parseSgrMouse,
 	type PasteOptions,
 	type SlashCommand,
 } from "@oh-my-pi/pi-tui";
-import { isEnoent, logger, postmortem, sanitizeText } from "@oh-my-pi/pi-utils";
+import { $which, isEnoent, logger, postmortem, sanitizeText } from "@oh-my-pi/pi-utils";
 import { formatDoubleTap } from "@oh-my-pi/pi-tui/app-keybindings";
 import { appKey, editorKey } from "@oh-my-pi/pi-tui/chrome/keybinding-hints";
 import { formatModelRoleAlias, roleCandidatePool } from "../../config/model-roles";
 import { resolveModelRoleValue } from "../../config/model-resolver";
 import { isSettingsInitialized, settings } from "../../config/settings";
+import { formatRoutineProgress } from "../../extensibility/routines";
 import { InternalUrlRouter, resolveLocalRoot } from "../../internal-urls";
 import { ApprovalDialogComponent } from "@oh-my-pi/pi-tui/overlays/approval-dialog";
 import { AskDialogComponent } from "@oh-my-pi/pi-tui/overlays/ask-dialog";
@@ -245,6 +247,29 @@ function safeAbort(label: string, fn: () => void): void {
 // deliberate human double-tap is always tens of milliseconds apart.
 const LEFT_DOUBLE_TAP_MIN_GAP_MS = 40;
 const LEFT_DOUBLE_TAP_MAX_GAP_MS = 500;
+function openTmuxScrollback(): boolean {
+	const pane = Bun.env.TMUX_PANE;
+	if (!hasTerminalMultiplexerSession("tmux") || !pane) return false;
+	const tmux = $which("tmux");
+	if (!tmux) return false;
+	try {
+		const result = Bun.spawnSync([tmux, "copy-mode", "-u", "-t", pane], {
+			stdin: "ignore",
+			stdout: "ignore",
+			stderr: "pipe",
+		});
+		if (result.exitCode === 0) return true;
+		logger.debug("Failed to enter tmux copy mode", {
+			exitCode: result.exitCode,
+			stderr: result.stderr.toString().trim(),
+		});
+	} catch (error) {
+		logger.debug("Failed to enter tmux copy mode", {
+			error: error instanceof Error ? error.message : String(error),
+		});
+	}
+	return false;
+}
 
 export class InputController {
 	constructor(
@@ -259,6 +284,7 @@ export class InputController {
 			readText: readTextFromClipboard,
 			readMacFileUrls: readMacFileUrlsFromClipboard,
 		},
+		private openNativeScrollback: () => boolean = openTmuxScrollback,
 	) {}
 
 	/** Resolve the current tiny role at use time so project/session reloads cannot leave a stale model. */
@@ -289,12 +315,12 @@ export class InputController {
 
 	/** Click-candidate id the hover band currently tracks; repaint only on change. */
 	#lastHoverClickId: string | undefined;
+	#tmuxScrollbackListenerInstalled = false;
 
 	/** Return the last full editor snapshot delivered by its change contract. */
 	getDraftText(): string {
 		return this.#draftText ?? this.ctx.editor.getText();
 	}
-
 	// Tap counter for the double-← gesture; reset whenever a quiet gap
 	// (>= LEFT_DOUBLE_TAP_MAX_GAP_MS) starts a fresh sequence. See
 	// #detectLeftDoubleTap.
@@ -464,6 +490,15 @@ export class InputController {
 			// Defers to fullscreen overlays, which own mouse handling on the
 			// alternate screen.
 			this.ctx.ui.addInputListener(data => this.#handleInlineMouse(data));
+		}
+		if (!this.#tmuxScrollbackListenerInstalled) {
+			this.#tmuxScrollbackListenerInstalled = true;
+			this.ctx.ui.addInputListener(data => {
+				if (!matchesKey(data, "pageUp")) return undefined;
+				if (this.ctx.ui.hasOverlay() || this.ctx.ui.getFocused() !== this.ctx.editor) return undefined;
+				if (this.ctx.editor.getText() || this.ctx.editor.pendingImages.length > 0) return undefined;
+				return this.openNativeScrollback() ? { consume: true } : undefined;
+			});
 		}
 		this.ctx.editor.onEscape = () => {
 			// `/mcp test` advertises Esc until each owner's post-settlement grace expires.
@@ -1225,6 +1260,10 @@ export class InputController {
 				return;
 			}
 
+			if (text && (await this.#invokeRoutineCommand(text))) {
+				return;
+			}
+
 			// If streaming, use prompt() with steer behavior
 			// This handles extension commands (execute immediately), prompt template expansion, and queueing
 			if (this.ctx.session.isStreaming) {
@@ -1404,6 +1443,7 @@ export class InputController {
 		const session = this.ctx.session;
 		return (
 			this.ctx.skillCommands.has(token) ||
+			this.ctx.routineSlashCommands.has(token) ||
 			this.ctx.fileSlashCommands.has(token) ||
 			session.extensionRunner?.getCommand(token) !== undefined ||
 			session.customCommands.some(loaded => loaded.command.name === token) ||
@@ -1647,6 +1687,28 @@ export class InputController {
 		const last = compaction[compaction.length - 1];
 		this.ctx.compactionQueuedMessages = compaction.slice(0, -1);
 		return { text: last.text, images: last.images };
+	}
+
+	async #invokeRoutineCommand(text: string): Promise<boolean> {
+		if (!text.startsWith("/")) return false;
+		const runRoutineInvocation = this.ctx.session.runRoutineInvocation;
+		if (typeof runRoutineInvocation !== "function") return false;
+		try {
+			const handled = await runRoutineInvocation.call(this.ctx.session, text, {
+				onProgress: progress => this.ctx.showStatus(formatRoutineProgress(progress)),
+			});
+			if (!handled) return false;
+			this.ctx.editor.clearDraft(text);
+			this.ctx.updatePendingMessagesDisplay();
+			this.ctx.ui.requestRender();
+			return true;
+		} catch (error) {
+			this.ctx.editor.clearDraft(text);
+			this.ctx.showError(error instanceof Error ? error.message : String(error));
+			this.ctx.updatePendingMessagesDisplay();
+			this.ctx.ui.requestRender();
+			return true;
+		}
 	}
 
 	/**
@@ -1925,6 +1987,10 @@ export class InputController {
 				this.ctx.showError(error instanceof Error ? error.message : String(error));
 				return;
 			}
+		}
+
+		if (text && (await this.#invokeRoutineCommand(text))) {
+			return;
 		}
 
 		// Skill commands invoke through the custom-message path regardless of
@@ -2596,7 +2662,14 @@ export class InputController {
 		if (!text.startsWith("/")) return;
 		const token = text.slice(1).split(/\s+/, 1)[0] ?? "";
 		if (!token) return;
-		if (this.#isKnownNonBuiltinSlashCommandToken(token)) {
+		const session = this.ctx.session;
+		const knownToken =
+			this.ctx.skillCommands.has(token) ||
+			this.ctx.fileSlashCommands.has(token) ||
+			session.extensionRunner?.getCommand(token) !== undefined ||
+			session.customCommands.some(loaded => loaded.command.name === token) ||
+			session.promptTemplates?.some(template => template.name === token) === true;
+		if (knownToken) {
 			commandUsage.record(token);
 			return;
 		}

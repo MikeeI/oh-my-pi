@@ -32,6 +32,7 @@ import type { TaskEffort } from "@oh-my-pi/pi-tui/thinking";
 import type { ToolSession } from "../tools";
 import { isIrcEnabled } from "../irc/messaging";
 import { buildOutputValidator } from "../tools/output-schema-validator";
+import { isAgentsContextFile } from "../utils/context-files";
 import { trackLateCleanup } from "../utils/late-cleanup";
 import { type DiscoveryResult, discoverAgents, getAgent } from "./discovery";
 import { type ExecutorOptions, runSubprocess } from "./executor";
@@ -308,8 +309,8 @@ function assertDepthAndSpawnAllowed(request: StructuredSubagentRequest, agentNam
 }
 
 /**
- * In-flight agent discovery, keyed by resolved cwd, the effective extension
- * roots and the provider/source toggles `discoverAgents` consults. Concurrent
+ * In-flight agent discovery, keyed by resolved cwd, the active profile, the
+ * effective extension roots and the provider/source toggles `discoverAgents` consults. Concurrent
  * preflights (task batch items, eval `agent()` fan-out) share one disk scan;
  * the entry is dropped when the scan settles, so any later call rescans and
  * policy resolution stays as fresh as before. A toggle flipped mid-scan changes
@@ -319,7 +320,11 @@ function assertDepthAndSpawnAllowed(request: StructuredSubagentRequest, agentNam
  */
 const inflightDiscovery = new Map<string, { fn: typeof discoverAgents; promise: Promise<DiscoveryResult> }>();
 
-function discoverAgentsShared(cwd: string, extensionRoots?: EffectiveExtensionRoots): Promise<DiscoveryResult> {
+function discoverAgentsShared(
+	cwd: string,
+	agentDir: string,
+	extensionRoots?: EffectiveExtensionRoots,
+): Promise<DiscoveryResult> {
 	const fn = discoverAgents;
 	const policy = [
 		isProviderEnabled("omp-plugins"),
@@ -327,10 +332,11 @@ function discoverAgentsShared(cwd: string, extensionRoots?: EffectiveExtensionRo
 		isUserSourceEnabled("claude-plugins"),
 		isUserSourceEnabled("claude"),
 	].join(",");
-	const key = `${path.resolve(cwd)}\0${policy}\0${JSON.stringify(extensionRoots ?? null)}`;
+	const resolvedAgentDir = path.resolve(agentDir);
+	const key = `${path.resolve(cwd)}\0${resolvedAgentDir}\0${policy}\0${JSON.stringify(extensionRoots ?? null)}`;
 	const existing = inflightDiscovery.get(key);
 	if (existing && existing.fn === fn) return existing.promise;
-	const promise = fn(cwd, undefined, extensionRoots);
+	const promise = fn(cwd, undefined, extensionRoots, resolvedAgentDir);
 	const entry = { fn, promise };
 	inflightDiscovery.set(key, entry);
 	const clear = () => {
@@ -355,7 +361,11 @@ export async function resolveEffectiveSubagentPolicy(
 	if (agentName !== SEANCE_AGENT_NAME) assertPlanControlsAllowed(request, planMode);
 	assertDepthAndSpawnAllowed(request, agentName);
 
-	const discovery = await discoverAgentsShared(request.session.cwd, request.session.effectiveExtensionRoots?.());
+	const discovery = await discoverAgentsShared(
+		request.session.cwd,
+		request.session.settings.getAgentDir(),
+		request.session.effectiveExtensionRoots?.(),
+	);
 	const agents = [...discovery.agents, ...(request.session.getSessionAgents?.() ?? [])];
 	const agent = getAgent(agents, agentName);
 	if (!agent) {
@@ -648,7 +658,7 @@ function buildExecutorOptions(
 		enableMCP,
 		customTools: request.customTools,
 		workPoolYieldItems: request.workPoolYieldItems,
-		contextFiles: session.contextFiles?.filter(file => path.basename(file.path).toLowerCase() !== "agents.md"),
+		contextFiles: session.contextFiles?.filter(file => !isAgentsContextFile(file)),
 		skills,
 		// Autoload runs after session start, outside the seance isolation options.
 		autoloadSkills: preparedSession ? undefined : autoloadSkills,

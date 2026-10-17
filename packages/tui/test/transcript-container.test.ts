@@ -37,6 +37,31 @@ class Block implements Component {
 		return this.#rows;
 	}
 }
+class VersionedBlock implements Component {
+	#rows: string[];
+	#version = 0;
+
+	constructor(rows: string[]) {
+		this.#rows = rows;
+	}
+
+	isTranscriptBlockFinalized(): boolean {
+		return true;
+	}
+
+	getTranscriptBlockVersion(): number {
+		return this.#version;
+	}
+
+	setRows(rows: string[]): void {
+		this.#rows = rows;
+		this.#version++;
+	}
+
+	render(): readonly string[] {
+		return this.#rows;
+	}
+}
 
 /** A live block the container recognizes as dynamic tool-activity. */
 class ToolBlock extends Block {
@@ -149,7 +174,7 @@ const finalAnswer: AssistantMessage = {
 	role: "assistant",
 	content: [
 		{ type: "thinking", thinking: "Reasoning first" },
-		{ type: "text", text: "## Implemented" },
+		{ type: "text", text: "Q1\nQ2\nQ3\nQ4" },
 	],
 	api: "openai-codex-responses",
 	provider: "openai-codex",
@@ -285,9 +310,50 @@ describe("TranscriptContainer row split", () => {
 		expect(rest).toContain("---");
 		expect(rest.filter(row => row === "AAA" || row === "BBB")).toEqual(["AAA", "BBB"]);
 	});
+
+	it("preserves accepted split rows after drift while reflowing an unchanged neighbor", () => {
+		const transcript = new TranscriptContainer();
+		transcript.addChild({ render: width => wrapWords(["abcd", "efgh"], width) });
+		const neighbor = transcript.peekFlushBatch(4)!;
+		transcript.acknowledgeFinalizedBatch(neighbor.id);
+
+		const changed = new VersionedBlock(["old1", "", "old2", "old3", "old4"]);
+		transcript.addChild(changed);
+		transcript.addChild(new Block(["tail"], true));
+		const split = transcript.peekFinalizedBatch(4, 4)!;
+		expect(split.rows).toEqual(["old1", "", "old2"]);
+		// A discarded frame recomposes the same physical offer before acceptance.
+		const recomposed = transcript.rerenderOfferedBatch(4)!;
+		transcript.acknowledgeFinalizedBatch(recomposed.id);
+
+		transcript.beginReplay();
+		const unchanged = transcript.peekReplayBatch(9)!;
+		expect(unchanged.rows).toEqual(["abcd efgh", "", "old1", "", "old2"]);
+		transcript.acknowledgeFinalizedBatch(unchanged.id);
+		changed.setRows(["new1", "", "new2", "new3", "new4"]);
+
+		transcript.beginReplay();
+		const replay = transcript.peekReplayBatch(9)!;
+		expect(replay.rows).toEqual(["abcd efgh", "", "old1", "", "old2"]);
+		transcript.acknowledgeFinalizedBatch(replay.id);
+		transcript.beginReplay();
+		expect(transcript.peekReplayBatch(9)?.rows).toEqual(["abcd efgh", "", "old1", "", "old2"]);
+	});
 });
 
 describe("TranscriptContainer", () => {
+	it("keeps accepted user rows immutable when a reaction arrives before replay", () => {
+		const transcript = new TranscriptContainer();
+		const message = new UserMessageComponent("accepted prompt");
+		transcript.addChild(message);
+		const accepted = transcript.peekFlushBatch(40)!;
+		transcript.acknowledgeFinalizedBatch(accepted.id);
+		message.setReaction("✅");
+
+		transcript.beginReplay();
+		expect(transcript.peekReplayBatch(40)?.rows).toEqual(accepted.rows);
+	});
+
 	it("preserves retirement while externally reordered and replaced live children settle", () => {
 		const transcript = new TranscriptContainer();
 		const archived = new Block(["archived"], true);
@@ -486,6 +552,10 @@ describe("TranscriptContainer", () => {
 
 	it("drops emitted stable rows on reset so a replay honors a hidden presentation (#10177)", () => {
 		const transcript = new TranscriptContainer();
+		const committed = new VersionedBlock(["OLD"]);
+		transcript.addChild(committed);
+		const initial = transcript.peekFlushBatch(80)!;
+		transcript.acknowledgeFinalizedBatch(initial.id);
 		// A thinking block whose reasoning prefix streams into scrollback ahead of
 		// its answer while the whole block is still the live frontier head.
 		const block = new AppendBlock(["reasoning one", "reasoning two", "answer"], ["reasoning one", "reasoning two"]);
@@ -495,19 +565,30 @@ describe("TranscriptContainer", () => {
 		const first = transcript.peekFinalizedBatch(80, 1)!;
 		expect(first.rows).toEqual(["reasoning one", "reasoning two"]);
 		transcript.acknowledgeFinalizedBatch(first.id);
-		expect(transcript.emittedStableRows()).toEqual([2]);
+		expect(transcript.emittedStableRows()).toEqual([0, 2]);
 
 		// Ctrl+T hides thinking: the block now renders only its answer and drops
 		// its published reasoning snapshots. resetStableEmission forgets the
 		// emitted prefix so the paired destructive replay does not resurrect the
 		// captured reasoning that visibly streamed into scrollback.
 		block.revise(["answer"]);
+		committed.setRows(["NEW"]);
 		transcript.resetStableEmission();
-		expect(transcript.emittedStableRows()).toEqual([0]);
+		expect(transcript.emittedStableRows()).toEqual([0, 0]);
+		expect(transcript.renderTail(80, 10)).toEqual(["NEW", "", "answer"]);
 
 		transcript.beginReplay();
-		expect(transcript.peekReplayBatch(80)).toBeUndefined();
+		const replay = transcript.peekReplayBatch(80)!;
+		expect(replay.rows).toEqual(["NEW", ""]);
+		transcript.acknowledgeFinalizedBatch(replay.id);
 		expect(transcript.renderViewport(80, 5, frame)).toEqual(["answer"]);
+		const answer = transcript.peekFlushBatch(80)!;
+		expect(answer.rows).toEqual(["answer", ""]);
+		transcript.acknowledgeFinalizedBatch(answer.id);
+		committed.setRows(["LATEST"]);
+		expect(transcript.renderTail(80, 10)).toEqual(["NEW", "", "answer"]);
+		transcript.beginReplay();
+		expect(transcript.peekReplayBatch(80)?.rows).toEqual(["NEW", "", "answer", ""]);
 	});
 
 	beforeAll(async () => {
@@ -652,18 +733,31 @@ describe("TranscriptContainer", () => {
 		expect(blocks[39]!.renders).toBeGreaterThan(0);
 	});
 
-	it("keeps an emergency row from a block behind the bounded viewport walk", () => {
+	it("keeps finalized-pending emergency rows reachable without retiring placeholders", () => {
 		class HintBlock extends Block {
-			renderTranscriptBlockEmergencyRow(): string {
-				return "hint";
+			pending = true;
+			isTranscriptBlockPending(): boolean {
+				return this.pending;
+			}
+			renderTranscriptBlockEmergencyRows(_width: number, _maxRows: number): readonly string[] {
+				return ["hint"];
 			}
 		}
 		const transcript = new TranscriptContainer();
-		transcript.addChild(new Block(["running"], false));
-		transcript.addChild(new HintBlock(["hint body"], true));
+		const running = new Block(["running"], false);
+		const hint = new HintBlock(["hint body"], true);
+		transcript.addChild(running);
+		transcript.addChild(hint);
 		for (let index = 0; index < 5; index++) transcript.addChild(new Block([`settled ${index}`], true));
 
 		expect(transcript.renderViewport(80, 2, frame)).toEqual(["hint", "settled 4"]);
+		running.finalize(["running"]);
+		const accepted = transcript.peekFinalizedBatch(80, 0)!;
+		expect(accepted.rows).toEqual(["running", ""]);
+		transcript.acknowledgeFinalizedBatch(accepted.id);
+		expect(transcript.peekFinalizedBatch(80, 0)).toBeUndefined();
+		hint.pending = false;
+		expect(transcript.peekFinalizedBatch(80, 0)?.rows).toContain("hint body");
 	});
 
 	it("does not count empty active blocks behind the viewport as hidden work", () => {
@@ -771,11 +865,20 @@ describe("TranscriptContainer", () => {
 		transcript.addChild(new Block(["continued turn"], false));
 		transcript.addChild(new Block(["task running"], false));
 
-		expect(transcript.peekFinalizedBatch(80, 3)).toBeUndefined();
-		const rows = transcript.renderViewport(80, 3, frame);
-		expect(rows[0]).toBe("2 more transcript blocks active");
-		expect(Bun.stripANSI(rows[1] ?? "").trim()).toBe("Implemented");
-		expect(rows[2]).toBe("task running");
+		expect(transcript.peekFinalizedBatch(80, 6)).toBeUndefined();
+		expect(transcript.renderViewport(80, 6, frame).map(row => Bun.stripANSI(row).trim())).toEqual([
+			"2 more transcript blocks active",
+			"Q1",
+			"Q2",
+			"Q3",
+			"Q4",
+			"task running",
+		]);
+		expect(transcript.renderViewport(80, 3, frame).map(row => Bun.stripANSI(row).trim())).toEqual([
+			"2 more transcript blocks active",
+			"Q4",
+			"task running",
+		]);
 	});
 
 	it("gives surplus rows to assistant text before a growing tool card (issue 9718)", () => {
@@ -914,6 +1017,57 @@ describe("TranscriptContainer", () => {
 		transcript.beginReplay();
 		expect(transcript.peekFinalizedBatch(80, 10)?.rows).toEqual(["committed", ""]);
 		expect(transcript.renderViewport(80, 10, frame)).toEqual(["active"]);
+	});
+
+	it("replays accepted bytes after pre-ack or post-ack component drift without duplicating replay", () => {
+		for (const mutationTiming of ["before-ack", "after-ack"] as const) {
+			const transcript = new TranscriptContainer();
+			const block = new VersionedBlock(["FINAL-TRAILING-Q4"]);
+			transcript.addChild(block);
+			const committed = transcript.peekFinalizedBatch(80, 0)!;
+			if (mutationTiming === "before-ack") block.setRows(["shortened"]);
+			transcript.acknowledgeFinalizedBatch(committed.id);
+			if (mutationTiming === "after-ack") block.setRows(["shortened"]);
+
+			expect(transcript.render(80)).toEqual(["shortened"]);
+			expect(transcript.renderTail(80, 5)).toEqual(["FINAL-TRAILING-Q4"]);
+			transcript.beginReplay();
+			const replay = transcript.peekReplayBatch(80)!;
+			expect(replay.rows).toEqual(["FINAL-TRAILING-Q4", ""]);
+			transcript.acknowledgeFinalizedBatch(replay.id);
+
+			transcript.beginReplay();
+			expect(transcript.peekReplayBatch(80)?.rows).toEqual(["FINAL-TRAILING-Q4", ""]);
+		}
+	});
+
+	it("reflows an unchanged neighbor while preserving drifted rows from the same accepted batch", () => {
+		const transcript = new TranscriptContainer();
+		const changed = new VersionedBlock(["OLD"]);
+		const unchanged = {
+			isTranscriptBlockFinalized: () => true,
+			getTranscriptBlockVersion: () => 0,
+			render: (width: number) => (width === 4 ? ["abcd", "efgh"] : ["abcdefgh"]),
+		};
+		transcript.addChild(changed);
+		transcript.addChild(unchanged);
+		const accepted = transcript.peekFlushBatch(4)!;
+		expect(accepted.rows).toEqual(["OLD", "", "abcd", "efgh", ""]);
+		transcript.acknowledgeFinalizedBatch(accepted.id);
+		transcript.addChild(new AppendBlock(["head", "tail"], ["head"]));
+		const head = transcript.peekFinalizedBatch(4, 1)!;
+		expect(head.rows).toEqual(["head"]);
+		transcript.acknowledgeFinalizedBatch(head.id);
+
+		changed.setRows(["NEW"]);
+		expect(transcript.renderTail(8, 10)).toEqual(["OLD", "", "abcdefgh", "", "head", "", "tail"]);
+		transcript.beginReplay();
+		const replay = transcript.peekReplayBatch(8)!;
+		expect(replay.rows).toEqual(["OLD", "", "abcdefgh", "", "head"]);
+		transcript.acknowledgeFinalizedBatch(replay.id);
+		transcript.beginReplay();
+		expect(transcript.peekReplayBatch(8)?.rows).toEqual(["OLD", "", "abcdefgh", "", "head"]);
+		expect(transcript.renderViewport(8, 1, frame)).toEqual(["tail"]);
 	});
 	it("renders exactly the trailing semantic rows without walking the full ledger", () => {
 		const transcript = new TranscriptContainer();

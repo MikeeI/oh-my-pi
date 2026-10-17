@@ -47,6 +47,13 @@ function materializationPolicy(): string {
 	return cachedMaterializationPolicy;
 }
 
+function physicalCacheProviderId(providerId: string): string {
+	// Keep the existing tables usable by older live binaries, but isolate both
+	// payload and freshness from their bare keys and from incompatible policies.
+	// Tuple encoding avoids ambiguous concatenations of provider and policy ids.
+	return JSON.stringify([CACHE_SCHEMA_VERSION, materializationPolicy(), providerId]);
+}
+
 interface CacheRowMeta {
 	provider_id: string;
 	version: number;
@@ -77,9 +84,9 @@ interface CacheRow extends CacheRowMeta {
  * Payload rows are multi-MB and SQLite rewrites a whole record (including its
  * overflow pages) on any column update. Freshness that advances without a
  * payload change therefore lives in `model_cache_refresh`, a small side row
- * keyed by provider. It applies only while `payload_updated_at` still matches
- * the payload row's `updated_at`, so a payload rewritten by another binary
- * silently invalidates it.
+ * keyed by the same physical policy/provider namespace. It applies only while
+ * `payload_updated_at` still matches the payload row's `updated_at`, so another
+ * compatible writer's payload replacement silently invalidates it.
  */
 const CACHE_ROW_FROM = `
 	FROM model_cache m
@@ -201,9 +208,9 @@ function withFreshness<TApi extends Api>(
 	const fresh = Number.isFinite(ageMs) && ageMs >= 0 && ageMs <= ttlMs;
 	return fresh === entry.fresh ? entry : { ...entry, fresh };
 }
-function invalidateReadRow(providerId: string, dbPath?: string): void {
+function invalidateReadRow(physicalProviderId: string, dbPath?: string): void {
 	try {
-		readRowCache.delete(readCacheKey(resolveCacheDb(dbPath).resolvedPath, providerId));
+		readRowCache.delete(readCacheKey(resolveCacheDb(dbPath).resolvedPath, physicalProviderId));
 	} catch {
 		// Best-effort only; a missed invalidation just costs one extra parse.
 	}
@@ -364,13 +371,12 @@ function migrateCacheSchema(db: Database): void {
 	}
 	// Rows predating v11 may carry credential-bearing request headers (v10 could
 	// still persist derived computer-use headers), so purge them and scrub the
-	// freed cells (#5780). Every other non-current row (v11/v12, a newer schema,
-	// or another materialization policy from a different app version sharing
-	// this file) never persisted headers: readers gate on the exact version and
-	// policy, treat it as absent, and the next write for that provider replaces
-	// it lazily, so switching versions does not wipe and re-download every
-	// provider. Never promote old rows in place: the legacy `UPDATE ... WHERE
-	// version = 2` migration did, defeating every later invalidation (#4146).
+	// freed cells (#5780). Headerless incompatible rows remain untouched:
+	// physical keys separate schema/app/builder/rules policies, including older
+	// binaries' bare provider keys. Readers still gate on the exact version and
+	// policy within their namespace; never evict another live version's rows.
+	// Never promote old rows in place: the legacy `UPDATE ... WHERE version = 2`
+	// migration did, defeating every later invalidation (#4146).
 	const legacyStmt = db.prepare("SELECT 1 AS found FROM model_cache WHERE version < ? LIMIT 1");
 	let hasLegacyRows: boolean;
 	try {
@@ -472,6 +478,7 @@ export function readModelCache<TApi extends Api>(
 	dbPath?: string,
 ): CacheEntry<TApi> | null {
 	try {
+		const physicalProviderId = physicalCacheProviderId(providerId);
 		// Monotonic change signal: same-shaped WAL overwrites after checkpoint
 		// can leave every size:mtime pair identical, so file metadata alone
 		// cannot invalidate. PRAGMA data_version increments on each committed
@@ -479,7 +486,7 @@ export function readModelCache<TApi extends Api>(
 		// across calls on the same connection, so it gates the no-query fast
 		// path for the shared handle only.
 		const { resolvedPath, shared } = resolveCacheDb(dbPath);
-		const key = readCacheKey(resolvedPath, providerId);
+		const key = readCacheKey(resolvedPath, physicalProviderId);
 		return runModelCacheDb(resolvedPath, shared, db => {
 			const dataVersion = shared ? dbDataVersion(db) : null;
 			const cached = readRowCache.get(key);
@@ -494,7 +501,7 @@ export function readModelCache<TApi extends Api>(
 			let entry: CacheEntry<TApi> | null = null;
 			let meta: CacheRowMeta | null = null;
 			if (cached?.entry && cached.meta) {
-				meta = queryRow<CacheRowMeta>(db, SELECT_CACHE_ROW_META, providerId);
+				meta = queryRow<CacheRowMeta>(db, SELECT_CACHE_ROW_META, physicalProviderId);
 				if (meta && meta.materialization_policy === materializationPolicy() && cacheRowsEqual(cached.meta, meta)) {
 					// Payload unchanged; only side-table freshness may have moved.
 					entry = withFreshness(withRowState(cached.entry as CacheEntry<TApi>, meta), ttlMs, now);
@@ -504,8 +511,8 @@ export function readModelCache<TApi extends Api>(
 			}
 			if (entry === null) {
 				// One statement reads payload and scalars from the same snapshot.
-				const row = queryRow<CacheRow>(db, SELECT_CACHE_ROW, providerId);
-				entry = parseCacheRow<TApi>(db, providerId, row, ttlMs, now);
+				const row = queryRow<CacheRow>(db, SELECT_CACHE_ROW, physicalProviderId);
+				entry = parseCacheRow<TApi>(db, physicalProviderId, row, ttlMs, now);
 				if (entry !== null && row !== null) {
 					// Drop the payload so the memo never pins the multi-MB `models` string.
 					const { models: _models, ...rowScalars } = row;
@@ -570,7 +577,7 @@ function withRowState<TApi extends Api>(entry: CacheEntry<TApi>, row: StoredRowS
 
 function parseCacheRow<TApi extends Api>(
 	db: Database,
-	providerId: string,
+	physicalProviderId: string,
 	row: CacheRow | null,
 	ttlMs: number,
 	now: () => number,
@@ -586,7 +593,7 @@ function parseCacheRow<TApi extends Api>(
 		// markers as empty could return a model with required credentials
 		// silently absent. Current-schema rows never persist headers, so the
 		// rejected payload needs no secure scrub.
-		db.run("DELETE FROM model_cache WHERE provider_id = ?", [providerId]);
+		db.run("DELETE FROM model_cache WHERE provider_id = ?", [physicalProviderId]);
 		return null;
 	}
 	const { updatedAt, authoritative } = rowState(row);
@@ -662,7 +669,8 @@ export function writeModelCache<TApi extends Api>(
 	restorableHeaderFallback?: Record<string, string>,
 ): void {
 	try {
-		invalidateReadRow(providerId, dbPath);
+		const physicalProviderId = physicalCacheProviderId(providerId);
+		invalidateReadRow(physicalProviderId, dbPath);
 		withModelCacheDb(dbPath, db => {
 			const headerOmittedModelIds: string[] = [];
 			const unrestorableHeaderModelIds: string[] = [];
@@ -732,7 +740,7 @@ export function writeModelCache<TApi extends Api>(
 					let stored: StoredRowState | null;
 					try {
 						stored = matchStmt.get(
-							providerId,
+							physicalProviderId,
 							CACHE_SCHEMA_VERSION,
 							policy,
 							staticFingerprint,
@@ -754,7 +762,7 @@ export function writeModelCache<TApi extends Api>(
 								payload_updated_at = excluded.payload_updated_at,
 								updated_at = excluded.updated_at,
 								authoritative = excluded.authoritative`,
-							[providerId, stored.updated_at, updatedAt, authoritativeFlag],
+							[physicalProviderId, stored.updated_at, updatedAt, authoritativeFlag],
 						);
 						return "refreshed";
 					}
@@ -765,7 +773,7 @@ export function writeModelCache<TApi extends Api>(
 							header_restore_version, models_hash, models
 						) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
 						[
-							providerId,
+							physicalProviderId,
 							CACHE_SCHEMA_VERSION,
 							policy,
 							updatedAt,
@@ -778,7 +786,7 @@ export function writeModelCache<TApi extends Api>(
 							serializedModels,
 						],
 					);
-					db.run("DELETE FROM model_cache_refresh WHERE provider_id = ?", [providerId]);
+					db.run("DELETE FROM model_cache_refresh WHERE provider_id = ?", [physicalProviderId]);
 					return "written";
 				})
 				.immediate();

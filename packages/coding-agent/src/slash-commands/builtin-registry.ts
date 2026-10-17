@@ -65,6 +65,7 @@ export const BUILTIN_SLASH_COMMAND_DEFS: ReadonlyArray<BuiltinSlashCommand> = BU
 		name: command.name,
 		aliases: command.aliases,
 		allowArgs: command.allowArgs === true,
+		argumentCompletionMode: command.argumentCompletionMode,
 		// Getter: some descriptions name keys, formatted at read time (theme/preset may change).
 		get description() {
 			return command.description;

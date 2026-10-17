@@ -1,7 +1,7 @@
 import * as fs from "node:fs";
 import * as os from "node:os";
 import * as path from "node:path";
-import { CONFIG_DIR_NAME, getConfigAgentDirName, getProjectDir } from "@oh-my-pi/pi-utils";
+import { CONFIG_DIR_NAME, getConfigAgentDirName, getProjectDir, isEnoent } from "@oh-my-pi/pi-utils";
 import { isUserSourceEnabled } from "./capability";
 import { resolveClaudePaths } from "./config/claude-paths";
 import { expandTilde } from "./tools/path-utils";
@@ -170,21 +170,17 @@ export interface ConfigFileResult<T> {
 	content: T;
 }
 
+export interface FindConfigFileOptions extends GetConfigDirsOptions {
+	/** Keep broken mandatory-template symlinks selected so their loader rejects them rather than falling back. */
+	includeDanglingSymlinks?: boolean;
+}
+
 /**
  * Find the first existing config file (for non-JSON files like SYSTEM.md).
  * Returns just the path, or undefined if not found.
  */
-export function findConfigFile(subpath: string, options: GetConfigDirsOptions = {}): string | undefined {
-	const dirs = getConfigDirs("", { ...options, existingOnly: false });
-
-	for (const { path: base } of dirs) {
-		const filePath = path.join(base, subpath);
-		if (fs.existsSync(filePath)) {
-			return filePath;
-		}
-	}
-
-	return undefined;
+export function findConfigFile(subpath: string, options: FindConfigFileOptions = {}): string | undefined {
+	return findConfigFileWithMeta(subpath, options)?.path;
 }
 
 /**
@@ -192,7 +188,7 @@ export function findConfigFile(subpath: string, options: GetConfigDirsOptions = 
  */
 export function findConfigFileWithMeta(
 	subpath: string,
-	options: GetConfigDirsOptions = {},
+	options: FindConfigFileOptions = {},
 ): Omit<ConfigFileResult<never>, "content"> | undefined {
 	const dirs = getConfigDirs("", { ...options, existingOnly: false });
 
@@ -200,6 +196,13 @@ export function findConfigFileWithMeta(
 		const filePath = path.join(base, subpath);
 		if (fs.existsSync(filePath)) {
 			return { path: filePath, source, level };
+		}
+		if (options.includeDanglingSymlinks) {
+			try {
+				if (fs.lstatSync(filePath).isSymbolicLink()) return { path: filePath, source, level };
+			} catch (error) {
+				if (!isEnoent(error)) throw error;
+			}
 		}
 	}
 

@@ -1,6 +1,7 @@
 import { $which } from "@oh-my-pi/pi-utils";
 import { isBunTestRuntime } from "@oh-my-pi/pi-utils/env";
 import { tmuxMultiplexer, wrapTmuxPassthrough } from "./multiplexers/tmux";
+import type { ViewportSize } from "./tui";
 
 export { wrapTmuxPassthrough } from "./multiplexers/tmux";
 
@@ -57,6 +58,7 @@ function queryTmuxClientTerminalNames(env: NodeJS.ProcessEnv): readonly string[]
 }
 
 const TMUX_COMMAND_TIMEOUT_MS = 500;
+const TMUX_PANE_SIZE_FORMAT = "#{pane_width} #{pane_height}";
 
 /** Run a tmux command against the current server; its stdout, or null on failure. */
 function runTmux(args: string[], env: NodeJS.ProcessEnv): string | null {
@@ -74,6 +76,21 @@ function runTmux(args: string[], env: NodeJS.ProcessEnv): string | null {
 	} catch {
 		return null;
 	}
+}
+
+/** Read the server-owned grid, which can precede both PTY geometry and SIGWINCH. */
+export function getTmuxPaneSize(env: NodeJS.ProcessEnv): ViewportSize {
+	const pane = env.TMUX_PANE;
+	if (!pane) throw new Error("TMUX_PANE is required to verify pane geometry");
+	const output = runTmux(["display-message", "-p", "-t", pane, TMUX_PANE_SIZE_FORMAT], env);
+	const match = output?.trim().match(/^(\d+) (\d+)$/);
+	if (!match) throw new Error(`Could not read tmux pane geometry for ${pane}`);
+	const columns = Number(match[1]);
+	const rows = Number(match[2]);
+	if (!Number.isSafeInteger(columns) || !Number.isSafeInteger(rows) || columns < 1 || rows < 1) {
+		throw new Error(`Invalid tmux pane geometry for ${pane}: ${output?.trim()}`);
+	}
+	return { columns, rows };
 }
 
 /**

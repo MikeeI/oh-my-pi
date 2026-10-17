@@ -1,0 +1,36 @@
+{
+  "name": "raw-scroll-resize",
+  "stage": "scroll",
+  "live": "ACCEPTED-1-13\nACCEPTED-1-14\nACCEPTED-1-15\nACCEPTED-1-16\nACCEPTED-1-17\nACCEPTED-1-18\nACCEPTED-1-19\nACCEPTED-1-20\nACCEPTED-1-21\nACCEPTED-1-22\nACCEPTED-1-23\nACCEPTED-1-24\nACCEPTED-1-25\nACCEPTED-1-26\nACCEPTED-1-27\nACCEPTED-1-28\nACCEPTED-1-29\nNEW-LIVE-0\nNEW-LIVE-1\n",
+  "full": "ACCEPTED-1-0\nACCEPTED-1-1\nACCEPTED-1-2\nACCEPTED-1-3\nACCEPTED-1-4\nACCEPTED-1-5\nACCEPTED-1-6\nACCEPTED-1-7\nACCEPTED-1-8\nACCEPTED-1-9\nACCEPTED-1-10\nACCEPTED-1-11\nACCEPTED-1-12\nACCEPTED-1-13\nACCEPTED-1-14\nACCEPTED-1-15\nACCEPTED-1-16\nACCEPTED-1-17\nACCEPTED-1-18\nACCEPTED-1-19\nACCEPTED-1-20\nACCEPTED-1-21\nACCEPTED-1-22\nACCEPTED-1-23\nACCEPTED-1-24\nACCEPTED-1-25\nACCEPTED-1-26\nACCEPTED-1-27\nACCEPTED-1-28\nACCEPTED-1-29\nNEW-LIVE-0\nNEW-LIVE-1\n",
+  "historySize": 13,
+  "history": "ACCEPTED-1-0\nACCEPTED-1-1\nACCEPTED-1-2\nACCEPTED-1-3\nACCEPTED-1-4\nACCEPTED-1-5\nACCEPTED-1-6\nACCEPTED-1-7\nACCEPTED-1-8\nACCEPTED-1-9\nACCEPTED-1-10\nACCEPTED-1-11\nACCEPTED-1-12",
+  "paint": {
+    "t": 1790723814102,
+    "kind": "paint",
+    "stage": "scroll",
+    "paint": 6,
+    "history": [],
+    "viewport": [
+      "NEW-LIVE-0",
+      "NEW-LIVE-1"
+    ],
+    "reset": false,
+    "alt": false,
+    "columns": 79,
+    "rows": 19,
+    "debug": {
+      "lines": [
+        "NEW-LIVE-0",
+        "NEW-LIVE-1"
+      ],
+      "windowTop": 0,
+      "altScreen": false,
+      "cursor": {
+        "x": 10,
+        "y": 18,
+        "visible": true
+      }
+    }
+  }
+}
