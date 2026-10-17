@@ -864,6 +864,7 @@ The upgrader validates these IDs against its executable and manual proof mapping
 - Required action: keep patched Puppeteer and ArkType dependencies embedded in the npm bundle.
 - Required action: use `APP_DISPLAY_NAME` at self-invocation consumers instead of Utils `APP_NAME` or hard-coded `omp`.
 - Proof: `test/update-cli.test.ts`.
+- Proof constraint: npm dry-run fixtures create the global package root before checking release-age policy.
 - Proof: `test/extension-loader-self-import.test.ts`.
 - Proof: late-profile recovery commands in `test/main-session-resolution-error.test.ts` and actual packed missing-session invocations.
 - Proof: published-identity and profile behavior in `test/utils/resume-command.test.ts`.

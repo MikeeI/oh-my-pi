@@ -700,7 +700,8 @@ describe("update-cli package manager commands", () => {
 				// the before/min-release-age exclusivity abort on npm 11.10-11.14.
 				const home = path.join(root, "home");
 				await fs.mkdir(home, { recursive: true });
-				await fs.mkdir(path.join(root, "prefix"), { recursive: true });
+				// npm 12 validates the global package root even during a dry run.
+				await fs.mkdir(path.join(root, "prefix", "lib", "node_modules"), { recursive: true });
 				await Bun.write(path.join(home, ".npmrc"), "min-release-age=365\n");
 				// Bogus proxies keep a corporate proxy from intercepting the loopback
 				// registry; NO_PROXY exempts 127.0.0.1 so the fake registry stays reachable.
