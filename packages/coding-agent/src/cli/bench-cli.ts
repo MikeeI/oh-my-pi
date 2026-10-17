@@ -70,6 +70,9 @@ const CACHE_PREFIX_CHUNK = cachePrefixChunk;
 const CACHE_PREFIX_PLACEHOLDER = "__OMP_CACHE_BENCH_RAW_PREFIX__";
 const CACHE_PREFIX_CHUNK_BYTES = UTF8_ENCODER.encode(CACHE_PREFIX_CHUNK).byteLength;
 const RESPONSE_CACHE_STATUS_HEADERS = ["cf-aig-cache-status"] as const;
+const CODEX_CACHE_OPTIONS_REJECTION = /\bunsupported parameter:\s*['"]?prompt_cache_options\b/i;
+const CODEX_CACHE_OPTIONS_REJECTION_MESSAGE = "Endpoint rejected unsupported prompt_cache_options.";
+const CODEX_PROBE_FAILURE_MESSAGE = "Codex cache breakpoint probe failed; provider error text omitted.";
 
 /**
  * One built-in workload a bench run exercises:
@@ -474,7 +477,19 @@ function cacheRunReport(
 	phase: BenchCacheRunReport["phase"],
 	result: BenchRunResult,
 	capture: CacheRequestCapture,
+	codexBreakpointProbe: boolean,
 ): BenchCacheRunReport {
+	// Provider errors can echo even a truncated request, so replacing complete
+	// payload values is insufficient. Only the known rejection classification
+	// crosses this probe's no-payload output boundary.
+	if (codexBreakpointProbe && !result.ok) {
+		result = {
+			...result,
+			error: CODEX_CACHE_OPTIONS_REJECTION.test(result.error)
+				? CODEX_CACHE_OPTIONS_REJECTION_MESSAGE
+				: CODEX_PROBE_FAILURE_MESSAGE,
+		};
+	}
 	return {
 		phase,
 		result,
@@ -1248,7 +1263,7 @@ export async function runBenchCommand(command: BenchCommandArgs, deps: BenchDepe
 			if (!preflightKey) {
 				const failure: BenchRunFailure = {
 					ok: false,
-					error: `No credentials for provider "${model.provider}". Run \`omp\` and use /login, or set the provider API key.`,
+					error: `No credentials for provider "${model.provider}". Run \`${APP_DISPLAY_NAME}\` and use /login, or set the provider API key.`,
 				};
 				results.push(failure);
 				if (!json) print(formatRunLine(failure, 0, runs, { tagKind }));
@@ -1344,8 +1359,8 @@ export async function runBenchCommand(command: BenchCommandArgs, deps: BenchDepe
 						if (!warmResult.ok) progress.failed++;
 						board?.repaint();
 						return {
-							cold: cacheRunReport("cold", coldResult, coldCapture),
-							warm: cacheRunReport("warm", warmResult, warmCapture),
+							cold: cacheRunReport("cold", coldResult, coldCapture, codexBreakpointProbe),
+							warm: cacheRunReport("warm", warmResult, warmCapture, codexBreakpointProbe),
 							coldAlreadyWarm: (coldCapture.usage?.cacheReadTokens ?? 0) > 0 || coldCapture.responseCacheHit,
 							stablePrefix: true,
 							suffixChanged: true,

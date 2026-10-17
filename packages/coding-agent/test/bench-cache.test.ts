@@ -13,7 +13,7 @@ import type {
 	SimpleStreamOptions,
 } from "@oh-my-pi/pi-ai";
 import * as codexTransport from "@oh-my-pi/pi-ai/providers/openai-codex-transport";
-import { runBenchCommand } from "@oh-my-pi/pi-coding-agent/cli/bench-cli";
+import { type BenchSummary, runBenchCommand } from "@oh-my-pi/pi-coding-agent/cli/bench-cli";
 import type { BenchModelRegistry } from "@oh-my-pi/pi-coding-agent/cli/bench-runtime";
 
 const model = {
@@ -202,6 +202,56 @@ describe("bench cache mode", () => {
 		expect(pair?.endpointAccepted).toBe(true);
 		expect(pair?.explicitBreakpointRequested).toBe(true);
 		expect(pair?.explicitBreakpointWireFields).toBe(true);
+	});
+
+	it("omits raw and JSON-escaped request echoes from Codex probe failure output", async () => {
+		let stdout = "";
+		let id = 0;
+		let phase = 0;
+		const privateFragments: string[] = [];
+		await runBenchCommand(
+			{ models: ["openai-codex/gpt-5.6-luna"], flags: { codexCacheBreakpointProbe: true, json: true } },
+			{
+				createRuntime: async () => ({
+					modelRegistry: { ...registry, getAll: () => [codexModel] },
+					close: () => {},
+				}),
+				randomSessionId: () => `session-${++id}`,
+				writeStdout: text => {
+					stdout += text;
+				},
+				writeStderr: () => {},
+				setExitCode: () => {},
+				streamSimple: (_model, context, options) => {
+					const prefix = context.messages[0]?.content;
+					const suffix = context.messages[1]?.content;
+					if (typeof prefix !== "string" || typeof suffix !== "string" || !options?.promptCacheKey) {
+						throw new Error("Missing synthetic probe request fixture");
+					}
+					// Providers may echo a truncated prefix, not only the complete request.
+					privateFragments.push(prefix.slice(0, 80), suffix, options.promptCacheKey);
+					const echo =
+						phase++ === 0
+							? `${prefix.slice(0, 80)}\n${suffix}\n${options.promptCacheKey}`
+							: JSON.stringify({ input: context.messages, prompt_cache_key: options.promptCacheKey });
+					throw new Error(`Unsupported parameter: 'prompt_cache_options'; request: ${echo}`);
+				},
+				stdoutIsTTY: false,
+			},
+		);
+
+		const report: BenchSummary = JSON.parse(stdout);
+		const pair = report.models[0]?.cachePairs?.[0];
+		if (!pair) throw new Error("Missing failed probe pair");
+		expect(pair.endpointAccepted).toBe(false);
+		for (const { result } of [pair.cold, pair.warm]) {
+			if (result.ok) throw new Error("Echoing provider unexpectedly succeeded");
+			expect(result.error).toContain("prompt_cache_options");
+			const leaked = privateFragments.some(
+				fragment => result.error.includes(fragment) || result.error.includes(JSON.stringify(fragment).slice(1, -1)),
+			);
+			expect(leaked).toBe(false);
+		}
 	});
 
 	it("keeps pi-native credential affinity while marking gateway-hidden payload diagnostics unavailable", async () => {

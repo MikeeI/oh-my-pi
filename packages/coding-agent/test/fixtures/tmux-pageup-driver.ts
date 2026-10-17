@@ -25,7 +25,11 @@ async function main(): Promise<void> {
 	const context = {
 		editor,
 		ui: tui,
-		session: { extensionRunner: undefined },
+		session: {
+			extensionRunner: undefined,
+			// This PageUp fixture has no model or provider connection to warm.
+			prewarmModelConnection: () => undefined,
+		},
 		updateEditorBorderColor: () => {},
 		keybindings: {
 			getKeys: () => [],

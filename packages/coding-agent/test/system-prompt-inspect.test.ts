@@ -496,18 +496,36 @@ describe("system-prompt command", () => {
 		const tempDir = TempDir.createSync("@omp-system-prompt-first-message-");
 		const projectDir = path.join(tempDir.path(), "project");
 		const agentDir = path.join(tempDir.path(), "agent");
+		const networkAttempts = path.join(tempDir.path(), "network-attempts.log");
+		const networkGuard = path.join(tempDir.path(), "reject-network.mjs");
 		try {
 			await Bun.write(path.join(projectDir, ".keep"), "");
 			await Bun.write(
-				path.join(agentDir, "settings.json"),
+				path.join(agentDir, "config.yml"),
 				JSON.stringify({
 					modelRoles: { default: "anthropic/claude-sonnet-4-5" },
 					todo: { enabled: true, eager: "preferred", reminders: false },
 				}),
 			);
+			// The scoped proxy routes prewarming through fetch; reject it before
+			// either the proxy or the provider can be contacted.
+			await Bun.write(
+				networkGuard,
+				[
+					'import * as fs from "node:fs";',
+					`fs.writeFileSync(${JSON.stringify(networkAttempts)}, "");`,
+					"const rejectNetwork = () => {",
+					`  fs.appendFileSync(${JSON.stringify(networkAttempts)}, "network attempt\\n");`,
+					'  throw new Error("Offline inspection attempted network I/O");',
+					"};",
+					"globalThis.fetch = rejectNetwork;",
+				].join("\n"),
+			);
 			const proc = Bun.spawn(
 				[
 					process.execPath,
+					"--preload",
+					networkGuard,
 					CLI_ENTRY,
 					"system-prompt",
 					"inspect",
@@ -524,6 +542,8 @@ describe("system-prompt command", () => {
 					env: {
 						...process.env,
 						ANTHROPIC_API_KEY: "test-key",
+						ANTHROPIC_BASE_URL: "https://api.anthropic.com",
+						PI_PROXY: "http://127.0.0.1:9",
 						NO_COLOR: "1",
 						PI_CODING_AGENT_DIR: agentDir,
 					},
@@ -535,12 +555,15 @@ describe("system-prompt command", () => {
 				new Response(proc.stderr).text(),
 			]);
 			expect({ exitCode, error }).toEqual({ exitCode: 0, error: "" });
+			expect(await Bun.file(networkAttempts).text()).toBe("");
 			const parsed = JSON.parse(output) as {
+				model: { provider: string; id: string };
 				firstMessage: string;
 				categories: { requestMessages: { tokens: number } };
 				requestMessages: Array<{ role: string; tokens: number; message: { content: Array<{ text?: string }> } }>;
 			};
 
+			expect(parsed.model).toEqual({ provider: "anthropic", id: "claude-sonnet-4-5" });
 			expect(parsed.firstMessage).toBe("Implement the requested change");
 
 			expect(parsed.categories.requestMessages.tokens).toBeGreaterThan(0);

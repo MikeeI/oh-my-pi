@@ -791,11 +791,7 @@ async function dedupeRealPaths(files: readonly string[]): Promise<string[]> {
  * bucket does follow symlinks, which is what #15878 asks for: a transcript
  * staged in as a symlink is a transcript.
  */
-async function scanBucketFiles(
-	root: string,
-	pattern: string,
-	onFailure?: SessionDiscoveryReporter,
-): Promise<string[]> {
+async function scanBucketFiles(root: string, pattern: string, onFailure?: SessionDiscoveryReporter): Promise<string[]> {
 	let entries: fs.Dirent[];
 	try {
 		entries = await fs.promises.readdir(root, { withFileTypes: true });

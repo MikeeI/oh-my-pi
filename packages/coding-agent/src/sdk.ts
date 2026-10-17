@@ -2112,6 +2112,8 @@ async function createAgentSessionScoped(options: CreateAgentSessionOptions): Pro
 			matchPreferences: modelMatchPreferences,
 		}),
 	);
+	// Offline capture must not send even credential-less provider prewarm HEADs.
+	const prewarmConnection = options.captureProviderContext ? undefined : prewarmModelConnection;
 	let model = options.model;
 	let modelFallbackMessage: string | undefined;
 	let initialRetryFallback: InitialRetryFallbackState | undefined;
@@ -2212,7 +2214,7 @@ async function createAgentSessionScoped(options: CreateAgentSessionOptions): Pro
 		// build). Effective for endpoints known before any request (official
 		// Anthropic); others warm once a request has revealed their real origin.
 		// Every mode benefits (interactive, print, rpc, acp).
-		void prewarmModelConnection(model);
+		void prewarmConnection?.(model);
 	}
 
 	// Re-derives the thinking level whenever startup settles on a different
@@ -2958,7 +2960,7 @@ async function createAgentSessionScoped(options: CreateAgentSessionOptions): Pro
 						// model: any value derived from the earlier fallback model's
 						// `thinking.defaultLevel` must not become sticky.
 						adoptThinkingForModel(restoredModel);
-						void prewarmModelConnection(restoredModel);
+						void prewarmConnection?.(restoredModel);
 						return true;
 					}
 				}
@@ -3293,7 +3295,7 @@ async function createAgentSessionScoped(options: CreateAgentSessionOptions): Pro
 					);
 					modelFallbackMessage = `Fallback: ${usageFallbackReason.from} -> ${target}\n${usageFallbackReason.reason}`;
 				}
-				void prewarmModelConnection(selectedModel);
+				void prewarmConnection?.(selectedModel);
 				break;
 			}
 			if (!model) {
@@ -3338,7 +3340,7 @@ async function createAgentSessionScoped(options: CreateAgentSessionOptions): Pro
 				// `pickInitialThinkingLevel` closes over `defaultRoleSpec`,
 				// so the role's explicit selector (e.g. `:max`) now applies.
 				adoptThinkingForModel(resolvedDefaultModel);
-				void prewarmModelConnection(resolvedDefaultModel);
+				void prewarmConnection?.(resolvedDefaultModel);
 				return true;
 			};
 
@@ -3412,7 +3414,7 @@ async function createAgentSessionScoped(options: CreateAgentSessionOptions): Pro
 						restoredSessionThinkingLevel = retryFallback.originalThinkingLevel;
 					}
 					adoptThinkingForModel(resolved.model);
-					void prewarmModelConnection(resolved.model);
+					void prewarmConnection?.(resolved.model);
 					return true;
 				}
 				return false;

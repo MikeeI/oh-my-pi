@@ -237,6 +237,11 @@
 ### Fixed
 
 - Fixed context-file `@` imports failing to load paths containing backslash-escaped spaces ([#16090](https://github.com/can1357/oh-my-pi/issues/16090))
+### Fixed
+
+- Fixed offline prompt inspection sending provider connection warm-up requests.
+- Fixed Codex cache breakpoint probe failures exposing synthetic request payloads through provider errors.
+- Fixed published benchmark credential hints naming `omp` instead of `momp`.
 
 ## [18.12.0] - 2026-10-17
 

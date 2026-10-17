@@ -298,9 +298,11 @@ The upgrader validates these IDs against its executable and manual proof mapping
 - Owner: `packages/agent/src/agent-loop.ts#prepareProviderCall` owns shared provider-context preparation.
 - Owner: `packages/agent/src/agent.ts#prepareModelCall` exposes non-dispatching configured preview preparation.
 - Owner: `src/sdk.ts` applies Main and Settings stream-option decoration before offline capture and real dispatch.
+- Owner: `src/sdk.ts#createAgentSessionScoped` suppresses provider connection prewarming for offline capture.
 - Reason: current upstream has no provider-prompt inspection command or equivalent offline measurement workflow.
 - Required action: retain one MOMP inspection command using runtime prompt-composition owners.
 - Proof: `test/system-prompt-inspect.test.ts`.
+- Proof: the official-Anthropic first-message case rejects outbound prewarm attempts in the isolated source CLI.
 - Proof: `test/system-prompt-templates.test.ts`.
 - Proof: captured options serialize through the real Codex body owner in `test/sdk-tool-activation.test.ts`.
 - Proof: live/preview dialect parity in `packages/agent/test/agent-side-request-context.test.ts`.
@@ -631,11 +633,13 @@ The upgrader validates these IDs against its executable and manual proof mapping
 - Owner: `packages/ai/src/providers/openai-codex-responses.ts` owns Codex request construction.
 - Owner: `packages/ai/src/stream.ts#mapOptionsForApi` preserves explicit cache options on the Codex surface.
 - Owner: `packages/coding-agent/src/cli/bench-cli.ts` owns probe execution and measurements.
+- Owner: `packages/coding-agent/src/cli/bench-cli.ts#cacheRunReport` translates probe errors without echoing payloads.
 - Owner: `packages/coding-agent/src/commands/bench.ts` owns CLI exposure and usage.
 - Reason: current upstream has no explicit synthetic Codex cache-breakpoint capability probe.
 - Required action: retain one MOMP probe at the current provider request and bench-command seams.
 - Proof: `packages/ai/test/openai-codex-responses-lite.test.ts`.
 - Proof: `packages/coding-agent/test/bench-cache.test.ts`.
+- Proof: raw, truncated, and JSON-escaped provider-error echoes remain absent from probe JSON failure output.
 - Usage: `omp bench openai-codex/gpt-5.6-luna --codex-cache-breakpoint-probe --json`.
 - Observation: the Codex endpoint has rejected `prompt_cache_options` since at least the 18.8.7 upgrade; on 2026-10-16 all seven available Codex models rejected it.
 - Verification gap: endpoint acceptance of explicit breakpoints is unproven; `momp-upgrade prove` reports this rejection as `warn`, not as a probe defect.

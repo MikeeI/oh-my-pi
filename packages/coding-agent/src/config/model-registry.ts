@@ -3191,7 +3191,10 @@ export class ModelRegistry {
 		if (this.#initialRefreshSettled || this.#isProviderDisabled(provider)) return false;
 		const status = this.#providerDiscoveryStates.get(provider)?.status;
 		if (status !== undefined) {
-			return status === "idle" || ((status === "cached" || status === "unavailable") && this.#backgroundRefresh !== undefined);
+			return (
+				status === "idle" ||
+				((status === "cached" || status === "unavailable") && this.#backgroundRefresh !== undefined)
+			);
 		}
 		if (this.getDiscoveryProviderId(provider) !== undefined) return true;
 		return (
