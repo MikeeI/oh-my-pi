@@ -4,6 +4,7 @@ import * as path from "node:path";
 import type { Message } from "@oh-my-pi/pi-ai";
 import { textContent } from "@oh-my-pi/pi-tui/chat/transcript-entry";
 import { getSessionsDir } from "@oh-my-pi/pi-utils/dirs";
+import { isEnoent } from "@oh-my-pi/pi-utils/fs-error";
 import * as logger from "@oh-my-pi/pi-utils/logger";
 import { LRUCache } from "@oh-my-pi/pi-utils/lru";
 import { parseJsonlLenient } from "@oh-my-pi/pi-utils/stream";
@@ -51,6 +52,14 @@ export interface SessionInfo {
 	 */
 	status?: SessionStatus;
 }
+
+export interface SessionDiscoveryFailure {
+	path: string;
+	stage: "enumeration" | "stat" | "read" | "header";
+	error: unknown;
+}
+
+type SessionDiscoveryReporter = (failure: SessionDiscoveryFailure) => void;
 
 export interface ResolvedSessionMatch {
 	session: SessionInfo;
@@ -403,11 +412,13 @@ async function scanSessionFile(
 	storage: SessionStorage,
 	withStatus: boolean,
 	knownStat?: SessionStorageStat,
+	onFailure?: SessionDiscoveryReporter,
 ): Promise<SessionInfo | undefined> {
 	let stat: SessionStorageStat;
 	try {
 		stat = knownStat ?? storage.statSync(file);
-	} catch {
+	} catch (error) {
+		onFailure?.({ path: file, stage: "stat", error });
 		// Missing/unstatable file: no stat identity to cache under.
 		return undefined;
 	}
@@ -417,6 +428,9 @@ async function scanSessionFile(
 	const cacheKey = withStatus ? `s\0${file}` : `h\0${file}`;
 	const cached = cache.get(cacheKey);
 	if (cached && cached.mtimeMs === stat.mtimeMs && cached.size === stat.size) {
+		if (!cached.info) {
+			onFailure?.({ path: file, stage: "header", error: new Error("Invalid session header") });
+		}
 		return cached.info ? { ...cached.info } : undefined;
 	}
 	try {
@@ -432,6 +446,7 @@ async function scanSessionFile(
 			// Cache the negative result too: an unparseable file stays unparseable
 			// until its stat identity changes.
 			cache.set(cacheKey, { mtimeMs: stat.mtimeMs, size: stat.size, info: undefined });
+			onFailure?.({ path: file, stage: "header", error: new Error("Invalid session header") });
 			return undefined;
 		}
 
@@ -499,7 +514,8 @@ async function scanSessionFile(
 		// callers can never mutate the shared cached object.
 		cache.set(cacheKey, { mtimeMs: stat.mtimeMs, size: stat.size, info: { ...info } });
 		return info;
-	} catch {
+	} catch (error) {
+		onFailure?.({ path: file, stage: "read", error });
 		return undefined;
 	}
 }
@@ -510,11 +526,12 @@ async function collectSessionsFromFileStride(
 	startIndex: number,
 	stride: number,
 	withStatus: boolean,
+	onFailure?: SessionDiscoveryReporter,
 ): Promise<SessionInfo[]> {
 	const sessions: SessionInfo[] = [];
 
 	for (let i = startIndex; i < files.length; i += stride) {
-		const session = await scanSessionFile(files[i], storage, withStatus);
+		const session = await scanSessionFile(files[i], storage, withStatus, undefined, onFailure);
 		if (session) sessions.push(session);
 	}
 
@@ -525,15 +542,16 @@ async function collectSessionsFromFiles(
 	files: string[],
 	storage: SessionStorage,
 	withStatus: boolean,
+	onFailure?: SessionDiscoveryReporter,
 ): Promise<SessionInfo[]> {
 	const workerCount = getSessionListWorkerCount(files.length);
 	const sessions =
 		workerCount === 1
-			? await collectSessionsFromFileStride(files, storage, 0, 1, withStatus)
+			? await collectSessionsFromFileStride(files, storage, 0, 1, withStatus, onFailure)
 			: (
 					await Promise.all(
 						Array.from({ length: workerCount }, (_, workerIndex) =>
-							collectSessionsFromFileStride(files, storage, workerIndex, workerCount, withStatus),
+							collectSessionsFromFileStride(files, storage, workerIndex, workerCount, withStatus, onFailure),
 						),
 					)
 				).flat();
@@ -626,13 +644,16 @@ async function scanSessionDirReadOnly(
 	sessionDir: string,
 	storage: SessionStorage,
 	withStatus: boolean,
+	onFailure?: SessionDiscoveryReporter,
 ): Promise<SessionInfo[]> {
+	let files: string[];
 	try {
-		const files = storage.listFilesSync(sessionDir, "*.jsonl");
-		return await collectSessionsFromFiles(files, storage, withStatus);
-	} catch {
+		files = storage.listFilesSync(sessionDir, "*.jsonl");
+	} catch (error) {
+		if (!isEnoent(error)) onFailure?.({ path: sessionDir, stage: "enumeration", error });
 		return [];
 	}
+	return collectSessionsFromFiles(files, storage, withStatus, onFailure);
 }
 
 /**
@@ -652,19 +673,25 @@ export function listSessions(
 /**
  * List sessions without repairing orphaned backups or mutating the directory.
  */
-export function listSessionsReadOnly(sessionDir: string, storage: SessionStorage): Promise<SessionInfo[]> {
-	return scanSessionDirReadOnly(sessionDir, storage, true);
+export function listSessionsReadOnly(
+	sessionDir: string,
+	storage: SessionStorage,
+	onFailure?: SessionDiscoveryReporter,
+): Promise<SessionInfo[]> {
+	return scanSessionDirReadOnly(sessionDir, storage, true, onFailure);
 }
 
 /** List all sessions across all project directories (newest first). */
 export async function listAllSessions(
 	storage: SessionStorage = new FileSessionStorage(),
 	sessionsRoot: string = getSessionsDir(),
+	onFailure?: SessionDiscoveryReporter,
 ): Promise<SessionInfo[]> {
 	try {
-		const files = await dedupeRealPaths(await scanBucketFiles(sessionsRoot, "*.jsonl"));
-		return await collectSessionsFromFiles(files, storage, true);
-	} catch {
+		const files = await dedupeRealPaths(await scanBucketFiles(sessionsRoot, "*.jsonl", onFailure));
+		return await collectSessionsFromFiles(files, storage, true, onFailure);
+	} catch (error) {
+		if (!isEnoent(error)) onFailure?.({ path: sessionsRoot, stage: "enumeration", error });
 		return [];
 	}
 }
@@ -764,19 +791,30 @@ async function dedupeRealPaths(files: readonly string[]): Promise<string[]> {
  * bucket does follow symlinks, which is what #15878 asks for: a transcript
  * staged in as a symlink is a transcript.
  */
-async function scanBucketFiles(root: string, pattern: string): Promise<string[]> {
+async function scanBucketFiles(
+	root: string,
+	pattern: string,
+	onFailure?: SessionDiscoveryReporter,
+): Promise<string[]> {
 	let entries: fs.Dirent[];
 	try {
 		entries = await fs.promises.readdir(root, { withFileTypes: true });
-	} catch {
+	} catch (error) {
+		if (!isEnoent(error)) onFailure?.({ path: root, stage: "enumeration", error });
 		return [];
 	}
 	const out: string[] = [];
 	for (const entry of entries) {
 		if (entry.isSymbolicLink() || !entry.isDirectory()) continue;
 		const dir = path.join(root, entry.name);
-		for await (const name of new Bun.Glob(pattern).scan({ cwd: dir, followSymlinks: true })) {
-			out.push(path.join(dir, name));
+		try {
+			for await (const name of new Bun.Glob(pattern).scan({ cwd: dir, followSymlinks: true })) {
+				out.push(path.join(dir, name));
+			}
+		} catch (error) {
+			if (!onFailure) throw error;
+			// Coverage-aware searches keep yielded files and continue other buckets.
+			if (!isEnoent(error)) onFailure({ path: dir, stage: "enumeration", error });
 		}
 	}
 	return out;

@@ -15,13 +15,20 @@ export type ColorValue = string | number;
 export const OPTIONAL_THEME_COLOR_RECORD = {
 	assistantMessageText: true,
 } satisfies Partial<Record<ThemeColor, true>>;
+export const DEFAULT_CACHE_MISS_COLOR = "#FFFF00";
 
 export interface ThemeJson {
 	$schema?: string;
 	name: string;
 	vars?: Record<string, ColorValue>;
-	colors: Omit<Record<ThemeColor | ThemeBg, ColorValue>, "thinkingMax" | keyof typeof OPTIONAL_THEME_COLOR_RECORD> &
-		Partial<Record<keyof typeof OPTIONAL_THEME_COLOR_RECORD, ColorValue>> & { thinkingMax?: ColorValue };
+	colors: Omit<
+		Record<ThemeColor | ThemeBg, ColorValue>,
+		"thinkingMax" | "cacheMiss" | keyof typeof OPTIONAL_THEME_COLOR_RECORD
+	> &
+		Partial<Record<keyof typeof OPTIONAL_THEME_COLOR_RECORD, ColorValue>> & {
+			thinkingMax?: ColorValue;
+			cacheMiss?: ColorValue;
+		};
 	export?: {
 		pageBg?: ColorValue;
 		cardBg?: ColorValue;
@@ -60,6 +67,7 @@ export type ThemeColor =
 	| "success"
 	| "error"
 	| "warning"
+	| "cacheMiss"
 	| "muted"
 	| "dim"
 	| "text"
@@ -124,6 +132,7 @@ const THEME_COLOR_RECORD = {
 	success: true,
 	error: true,
 	warning: true,
+	cacheMiss: true,
 	muted: true,
 	dim: true,
 	text: true,

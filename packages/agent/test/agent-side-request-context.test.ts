@@ -1,6 +1,6 @@
 import { describe, expect, it, mock } from "bun:test";
 import { type } from "@oh-my-pi/omptype";
-import type { AssistantMessage, Context } from "@oh-my-pi/pi-ai";
+import type { AssistantMessage, Context, UserMessage } from "@oh-my-pi/pi-ai";
 import { createMockModel } from "@oh-my-pi/pi-ai/providers/mock";
 import { AssistantMessageEventStream } from "@oh-my-pi/pi-ai/utils/event-stream";
 import { buildModel } from "@oh-my-pi/pi-catalog/build";
@@ -156,6 +156,44 @@ describe("Agent — buildSideRequestContext", () => {
 
 		expect(context.tools).toEqual([]);
 		expect(context.systemPrompt).toEqual(["system"]);
+	});
+
+	it("previews the actual owned-dialect request after invocation and provider transforms", async () => {
+		const input: UserMessage = { role: "user", content: [{ type: "text", text: "Q?" }], timestamp: 1 };
+		const injected: UserMessage = {
+			role: "user",
+			content: [{ type: "text", text: "Invocation-only marker" }],
+			timestamp: 2,
+		};
+		let dispatched: Context | undefined;
+		const agent = new Agent({
+			initialState: { model, systemPrompt: ["system"], tools: [tool] },
+			dialectResolver: () => "glm",
+			transformContext: async messages => [...messages, injected],
+			transformProviderContext: context => ({
+				...context,
+				systemPrompt: [...(context.systemPrompt ?? []), "Provider transform marker"],
+				tools: context.tools?.map(entry => ({ ...entry, description: "Provider-visible tool marker" })),
+			}),
+			streamFn: (_model, context) => {
+				dispatched = context;
+				const stream = new AssistantMessageEventStream();
+				queueMicrotask(() => {
+					stream.push({ type: "done", reason: "stop", message: testAssistantMessage("ok") });
+				});
+				return stream;
+			},
+		});
+		const { context: preview } = await agent.prepareModelCall([input], ["system"]);
+		const { context: secondPreview } = await agent.prepareModelCall([input], ["system"]);
+		await agent.prompt(input);
+		if (!dispatched) throw new Error("Agent did not dispatch a provider context");
+		expect(preview).toEqual(dispatched);
+		expect(secondPreview).toEqual(preview);
+		expect(preview.tools ?? []).toEqual([]);
+		expect(preview.systemPrompt?.slice(0, 2)).toEqual(["system", "Provider transform marker"]);
+		expect(preview.systemPrompt?.at(-1)).toContain("Provider-visible tool marker");
+		expect(preview.messages).toContainEqual(injected);
 	});
 
 	it("invokes transformProviderContext filter if present", async () => {

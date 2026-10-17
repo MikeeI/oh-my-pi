@@ -2051,6 +2051,7 @@ const (
 	SlashCommandSourceCustom    SlashCommandSource = "custom"
 	SlashCommandSourceMcpPrompt SlashCommandSource = "mcp_prompt"
 	SlashCommandSourceFile      SlashCommandSource = "file"
+	SlashCommandSourceRoutine   SlashCommandSource = "routine"
 )
 
 func (v *SlashCommandSource) UnmarshalJSON(data []byte) error {
@@ -2059,7 +2060,7 @@ func (v *SlashCommandSource) UnmarshalJSON(data []byte) error {
 		return err
 	}
 	switch value := SlashCommandSource(s); value {
-	case SlashCommandSourceBuiltin, SlashCommandSourceSkill, SlashCommandSourceExtension, SlashCommandSourceCustom, SlashCommandSourceMcpPrompt, SlashCommandSourceFile:
+	case SlashCommandSourceBuiltin, SlashCommandSourceSkill, SlashCommandSourceExtension, SlashCommandSourceCustom, SlashCommandSourceMcpPrompt, SlashCommandSourceFile, SlashCommandSourceRoutine:
 		*v = value
 		return nil
 	}

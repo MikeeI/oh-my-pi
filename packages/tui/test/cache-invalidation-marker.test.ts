@@ -4,7 +4,8 @@ import {
 	CacheInvalidationMarkerComponent,
 	detectCacheInvalidation,
 } from "@oh-my-pi/pi-tui/chat/cache-invalidation-marker";
-import { initTheme } from "@oh-my-pi/pi-tui/theme";
+import { styledSpans } from "../src/native/spans";
+import { getNativeThemePalette, getResolvedThemeColors, initTheme, theme } from "@oh-my-pi/pi-tui/theme";
 
 function usage(parts: { input?: number; cacheRead?: number; cacheWrite?: number; output?: number }): Usage {
 	const input = parts.input ?? 0;
@@ -90,5 +91,25 @@ describe("CacheInvalidationMarkerComponent", () => {
 		const dividerWidth = Bun.stringWidth(lines[1]);
 		expect(dividerWidth).toBeGreaterThan(0);
 		expect(dividerWidth).toBeLessThan(80);
+	});
+
+	it("keeps terminal and native cache-miss foregrounds resolvable for themes without the optional token", async () => {
+		const marker = new CacheInvalidationMarkerComponent({ reprocessedTokens: 117_000 });
+		const divider = marker.render(80)[1]!;
+		// Both the rule and label must be colored, without recoloring unrelated muted text.
+		const lemonAnsi = Bun.color("#FFFF00", "ansi-16m")!;
+		const lemon256Ansi = Bun.color("#FFFF00", "ansi-256")!;
+		const color = divider.includes(lemonAnsi) ? lemonAnsi : lemon256Ansi;
+		expect(divider.split(color)).toHaveLength(3);
+		expect(
+			styledSpans(divider)
+				.filter(part => part.t.trim())
+				.every(part => part.s === "cacheMiss"),
+		).toBe(true);
+		expect(JSON.stringify(marker.describe())).toContain('"s":"cacheMiss"');
+		const palette = getNativeThemePalette();
+		expect((palette.dark ?? palette.light)?.cacheMiss).toBe("#FFFF00");
+		expect((await getResolvedThemeColors()).cacheMiss).toBe("#FFFF00");
+		expect(theme.getColorHex("muted")).not.toBe("#FFFF00");
 	});
 });

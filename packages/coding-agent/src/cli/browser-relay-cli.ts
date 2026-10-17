@@ -14,6 +14,7 @@ import optionsJs from "../tools/browser/relay/extension-assets/options.js.txt" w
 import thirdPartyNotices from "../tools/browser/relay/extension-assets/THIRD-PARTY-NOTICES.txt" with { type: "text" };
 import { DEFAULT_RELAY_URL } from "../tools/browser/relay/kind";
 import { type RelayServer, startRelayServer } from "../tools/browser/relay/server";
+import { APP_DISPLAY_NAME } from "../app-version";
 
 export const BROWSER_RELAY_ACTIONS = ["serve", "install"] as const;
 export type BrowserRelayAction = (typeof BROWSER_RELAY_ACTIONS)[number];
@@ -59,10 +60,10 @@ async function runInstall(dirOverride: string | undefined): Promise<void> {
 	console.log("Finish setup in Chrome:");
 	console.log("  1. Open chrome://extensions and enable Developer mode.");
 	console.log(`  2. Click "Load unpacked" and select: ${dir}`);
-	console.log("  3. Enable the mode:  omp config set browser.relay true");
+	console.log(`  3. Enable the mode:  ${APP_DISPLAY_NAME} config set browser.relay true`);
 	console.log("");
 	console.log("omp starts the relay automatically when the browser prelude needs it;");
-	console.log("run `omp browser-relay` yourself only for --token or --no-group.");
+	console.log(`run \`${APP_DISPLAY_NAME} browser-relay\` yourself only for --token or --no-group.`);
 	console.log("The extension badge shows 'on' once it reaches a relay.");
 	console.log(
 		"Old connection-refused entries in chrome://extensions > Errors may persist after reconnect; use Clear all.",
@@ -95,13 +96,13 @@ async function runServe(args: BrowserRelayCommandArgs): Promise<void> {
 	console.log(`omp browser relay listening on http://127.0.0.1:${args.port}`);
 	console.log(`  extension endpoint  ws://127.0.0.1:${args.port}/ext${args.token ? "?token=***" : ""}`);
 	if (args.port === DEFAULT_RELAY_PORT) {
-		console.log("  enable with         omp config set browser.relay true");
+		console.log(`  enable with         ${APP_DISPLAY_NAME} config set browser.relay true`);
 	} else {
 		console.log(
-			`  enable with         omp config set browser.relay true && omp config set browser.relayUrl http://127.0.0.1:${args.port}`,
+			`  enable with         ${APP_DISPLAY_NAME} config set browser.relay true && ${APP_DISPLAY_NAME} config set browser.relayUrl http://127.0.0.1:${args.port}`,
 		);
 	}
-	console.log("Waiting for the OMP Browser Relay extension to connect (omp browser-relay install)...");
+	console.log(`Waiting for the OMP Browser Relay extension to connect (${APP_DISPLAY_NAME} browser-relay install)...`);
 
 	let announced = false;
 	const readiness = setInterval(() => {

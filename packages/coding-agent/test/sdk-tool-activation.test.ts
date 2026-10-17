@@ -4,8 +4,9 @@ import * as os from "node:os";
 import * as path from "node:path";
 import { type } from "@oh-my-pi/omptype";
 import type { AgentTool, StreamFn } from "@oh-my-pi/pi-agent-core";
-import type { Model, ToolResultMessage } from "@oh-my-pi/pi-ai";
+import type { Context, Model, SimpleStreamOptions, ToolResultMessage } from "@oh-my-pi/pi-ai";
 import { createMockModel } from "@oh-my-pi/pi-ai/providers/mock";
+import { buildTransformedCodexRequestBody } from "@oh-my-pi/pi-ai/providers/openai-codex-responses";
 import { getBundledModel } from "@oh-my-pi/pi-catalog/models";
 import { ModelRegistry } from "@oh-my-pi/pi-coding-agent/config/model-registry";
 import { Settings } from "@oh-my-pi/pi-coding-agent/config/settings";
@@ -135,6 +136,36 @@ describe("createAgentSession defaultInactive tool activation", () => {
 		// The discovered auth DB lives in registryAuthDir; Windows cannot delete it while open.
 		modelRegistry.authStorage.close();
 		removeSyncWithRetries(registryAuthDir);
+	});
+
+	it("serializes SDK external-thinking capture into an offline Codex body", async () => {
+		const tempDir = makeTempDir();
+		vi.spyOn(modelRegistry, "getApiKey").mockResolvedValue("test-key");
+		const model = getBundledModel("openai-codex", "gpt-5.6-luna");
+		if (!model || model.api !== "openai-codex-responses") throw new Error("Missing Codex capture fixture model");
+		const captured: Array<{ context: Context; options: SimpleStreamOptions | undefined }> = [];
+		const { session } = await createAgentSession({
+			...baseOptions(tempDir),
+			model,
+			settings: Settings.isolated({ externalThinking: true, textVerbosity: "low" }),
+			captureProviderContext: (context, _model, options) => captured.push({ context, options }),
+		});
+		try {
+			await session.prompt("Inspect this request without executing tools.");
+			expect(captured).toHaveLength(1);
+			expect(captured[0]?.context.tools?.some(tool => tool.name === "think")).toBe(true);
+			const request = captured[0];
+			if (!request) throw new Error("Missing captured provider request");
+			const body = await buildTransformedCodexRequestBody(
+				model as Model<"openai-codex-responses">,
+				request.context,
+				{ forceReasoningOff: request.options?.forceReasoningOff, textVerbosity: request.options?.textVerbosity },
+			);
+			expect(body.reasoning).toEqual({ effort: "none" });
+			expect(body.text).toEqual({ verbosity: "low" });
+		} finally {
+			await session.dispose();
+		}
 	});
 
 	it("excludes defaultInactive extension tools from the initial active set unless explicitly requested", async () => {

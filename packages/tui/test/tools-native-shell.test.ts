@@ -15,6 +15,7 @@ import type { TUI } from "../src/tui";
 const done: RenderResultOptions = { expanded: false, isPartial: false };
 // 1×1 transparent PNG.
 const PNG = "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNkYAAAAAYAAjCB0C8AAAAASUVORK5CYII=";
+const NATIVE_ASSISTANT_REQUIRED_ERROR = "Expected a native assistant message";
 
 function isNode(child: NativeChild): child is NativeNode {
 	return "k" in child;
@@ -336,12 +337,14 @@ describe("read image results", () => {
 
 			it("show the model and the texture as media nodes, nothing for the sidecar", () => {
 				const message = assistant().describe(withMedia);
+				if (message === null) throw new Error(NATIVE_ASSISTANT_REQUIRED_ERROR);
 				expect(collect(message.c, "media").map(n => props(n).path)).toEqual(["/repo/house.obj", "/repo/brick.png"]);
 				expect(collect(message.c, "image")).toHaveLength(0);
 			});
 
 			it("upload only the texture's blob without media support", () => {
 				const message = assistant().describe(withoutMedia);
+				if (message === null) throw new Error(NATIVE_ASSISTANT_REQUIRED_ERROR);
 				expect(collect(message.c, "media")).toHaveLength(0);
 				expect(collect(message.c, "image")).toHaveLength(1);
 			});
@@ -379,6 +382,7 @@ describe("read image results", () => {
 
 			it("show the file once and plain rows for both reads", () => {
 				const message = assistant().describe(withMedia);
+				if (message === null) throw new Error(NATIVE_ASSISTANT_REQUIRED_ERROR);
 				const media = collect(message.c, "media");
 				expect(media).toHaveLength(1);
 				expect(props(media[0]).path).toBe(svg);
@@ -391,6 +395,7 @@ describe("read image results", () => {
 
 			it("upload one blob image without media support", () => {
 				const message = assistant().describe(withoutMedia);
+				if (message === null) throw new Error(NATIVE_ASSISTANT_REQUIRED_ERROR);
 				expect(collect(message.c, "media")).toHaveLength(0);
 				expect(collect(message.c, "image")).toHaveLength(1);
 				expect(collect(group().describe(withoutMedia).c, "image")).toHaveLength(0);

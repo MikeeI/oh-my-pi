@@ -29,6 +29,7 @@ import type {
 	EvalViewEntry,
 } from "@oh-my-pi/pi-tui/tools/eval";
 import evalDescription from "../prompts/tools/eval.md" with { type: "text" };
+import { resolveUserToolPromptSource } from "../prompts/tool-prompt-source";
 import evalAgentsTopic from "../prompts/tools/eval-agents.md" with { type: "text" };
 import evalJudgeTopic from "../prompts/tools/eval-judge.md" with { type: "text" };
 import evalHelpersTopic from "../prompts/tools/eval-helpers.md" with { type: "text" };
@@ -149,6 +150,8 @@ const MAX_VIEWS_PER_CELL = 16;
 const LIVE_UPDATE_INTERVAL_MS = 50;
 
 export interface EvalToolDescriptionOptions {
+	/** Active profile directory; omit to render the bundled prompt for standalone callers. */
+	agentDir?: string;
 	py?: boolean;
 	js?: boolean;
 	/**
@@ -217,11 +220,20 @@ export function getEvalToolDescription(options: EvalToolDescriptionOptions = {})
 		const summary = evalPreludeSummary(prelude);
 		if (summary) preludes.push({ name: prelude.name, summary });
 	}
-	return prompt.render(evalDescription, {
-		...evalTemplateContext(options),
-		preludes,
-		inlineTopics: options.inlineTopics ? Object.values(getEvalDocTopics(options)).join("\n\n") : undefined,
-	});
+	return prompt.render(
+		options.agentDir
+			? resolveUserToolPromptSource({
+					agentDir: options.agentDir,
+					toolName: "eval",
+					bundledSource: evalDescription,
+				})
+			: evalDescription,
+		{
+			...evalTemplateContext(options),
+			preludes,
+			inlineTopics: options.inlineTopics ? Object.values(getEvalDocTopics(options)).join("\n\n") : undefined,
+		},
+	);
 }
 
 export interface EvalToolOptions {
@@ -339,6 +351,7 @@ export class EvalTool implements AgentTool<typeof evalSchema> {
 			session.taskDepth ?? 0,
 		);
 		return {
+			agentDir: session.settings.getAgentDir(),
 			py: backends.python,
 			js: backends.js,
 			spawns: depthAllowsSpawning ? (session.getSessionSpawns?.() ?? "*") : false,

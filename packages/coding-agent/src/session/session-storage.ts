@@ -1037,7 +1037,8 @@ export class FileSessionStorage implements SessionStorage {
 			return Array.from(new Bun.Glob(pattern).scanSync({ cwd: dir, followSymlinks: true })).map(name =>
 				path.join(dir, name),
 			);
-		} catch {
+		} catch (error) {
+			if (!isEnoent(error)) throw error;
 			return [];
 		}
 	}

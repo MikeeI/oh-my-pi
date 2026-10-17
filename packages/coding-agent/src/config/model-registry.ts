@@ -3174,7 +3174,7 @@ export class ModelRegistry {
 
 	/**
 	 * Whether an unresolved selector on `provider` may still be supplied by
-	 * discovery this process has not finished. Two states qualify:
+	 * discovery this process has not finished.
 	 * - `idle`: a config-declared provider with a cold cache has no catalog yet
 	 *   (e.g. after `omp update` bumps the cache namespace, #10048).
 	 * - `cached`/`unavailable` while the initial background refresh is in
@@ -3183,12 +3183,25 @@ export class ModelRegistry {
 	 *   upgrade, or a cache row keyed to another credential). With no refresh
 	 *   running (an embedder that manages discovery itself) these states are
 	 *   final, so unresolved selectors warn immediately.
+	 * Built-in cache hydration can leave no state before initial discovery.
+	 * The initial-refresh barrier ends suppression even if discovery fails;
+	 * non-cache terminal results also end it for hosts using refreshProvider.
 	 */
 	isProviderDiscoveryPending(provider: string): boolean {
+		if (this.#initialRefreshSettled || this.#isProviderDisabled(provider)) return false;
 		const status = this.#providerDiscoveryStates.get(provider)?.status;
-		if (status === "idle") return true;
-		if (status !== "cached" && status !== "unavailable") return false;
-		return this.#backgroundRefresh !== undefined && !this.#initialRefreshSettled;
+		if (status !== undefined) {
+			return status === "idle" || ((status === "cached" || status === "unavailable") && this.#backgroundRefresh !== undefined);
+		}
+		if (this.getDiscoveryProviderId(provider) !== undefined) return true;
+		return (
+			MODELS_DEV_CATALOG_PROVIDER_ID_LOOKUP[provider] === true ||
+			(BUILT_IN_MODEL_MANAGER_PROVIDER_IDS[provider] === true &&
+				(this.#createProviderAvailabilityCheck()(provider) ||
+					PROVIDER_DESCRIPTORS.some(
+						descriptor => descriptor.providerId === provider && descriptor.allowUnauthenticated,
+					)))
+		);
 	}
 
 	/**

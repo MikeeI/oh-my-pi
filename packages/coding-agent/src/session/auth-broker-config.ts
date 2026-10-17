@@ -19,6 +19,7 @@
  * policy is loaded from effective Settings by the SDK discovery wrapper.
  */
 
+import { APP_DISPLAY_NAME } from "../app-version";
 import * as path from "node:path";
 import {
 	type AuthAccountPolicyConfig,
@@ -252,9 +253,9 @@ export async function describeAuthBrokerStartupError(error: unknown): Promise<st
 	const target = url ? ` at ${url}` : "";
 	return (
 		`Auth broker${target} is unreachable (${error.message}). ` +
-		"omp is configured to use this broker for credentials and will not fall back to local credentials automatically.\n" +
-		"Start the broker with `omp auth-broker serve`, or disable it with " +
-		"`omp config reset auth.broker.url` and `omp config reset auth.broker.token` " +
+		`${APP_DISPLAY_NAME} is configured to use this broker for credentials and will not fall back to local credentials automatically.\n` +
+		`Start the broker with \`${APP_DISPLAY_NAME} auth-broker serve\`, or disable it with ` +
+		`\`${APP_DISPLAY_NAME} config reset auth.broker.url\` and \`${APP_DISPLAY_NAME} config reset auth.broker.token\` ` +
 		"(or unset OMP_AUTH_BROKER_URL / OMP_AUTH_BROKER_TOKEN)."
 	);
 }

@@ -42,7 +42,7 @@ import {
 import type { AgentDefinition } from "@oh-my-pi/pi-coding-agent/task/types";
 import type { SingleResult, TaskParams } from "@oh-my-pi/pi-tui/tools/task";
 import type { ToolSession } from "@oh-my-pi/pi-coding-agent/tools";
-import { __resetDirsFromEnvForTests, removeWithRetries, setAgentDir } from "@oh-my-pi/pi-utils";
+import { __resetDirsFromEnvForTests, getAgentDir, removeWithRetries, setAgentDir, TempDir } from "@oh-my-pi/pi-utils";
 import { createInMemoryAuthStorage } from "../helpers/agent-session-setup";
 
 import { cfgRetryModelFallback } from "@oh-my-pi/pi-coding-agent/session/settings";
@@ -161,6 +161,44 @@ describe("structured subagent primitive", () => {
 		expect(policy.modelOverride).toEqual(["b/y"]);
 	});
 
+	it("keeps concurrent Child discovery isolated between profiles in the same workspace", async () => {
+		using workspace = TempDir.createSync("@omp-discovery-workspace-");
+		using firstProfile = TempDir.createSync("@omp-discovery-first-");
+		using secondProfile = TempDir.createSync("@omp-discovery-second-");
+		const scoutFrontmatter = "---\nname: scout\ndescription: Profile scout\ntools: read\n---\n";
+		await Bun.write(firstProfile.join("prompts", "agents", "scout.md"), `${scoutFrontmatter}FIRST_PROFILE\n`);
+		await Bun.write(secondProfile.join("prompts", "agents", "scout.md"), `${scoutFrontmatter}SECOND_PROFILE\n`);
+		const firstSettings = Settings.isolated();
+		const secondSettings = Settings.isolated();
+		vi.spyOn(firstSettings, "getAgentDir").mockReturnValue(firstProfile.path());
+		vi.spyOn(secondSettings, "getAgentDir").mockReturnValue(secondProfile.path());
+		vi.spyOn(firstSettings, "reloadFromDisk").mockResolvedValue();
+		vi.spyOn(secondSettings, "reloadFromDisk").mockResolvedValue();
+		const discover = discoveryModule.discoverAgents;
+		const entered = Promise.withResolvers<void>();
+		const release = Promise.withResolvers<void>();
+		vi.spyOn(discoveryModule, "discoverAgents").mockImplementation(async (...args) => {
+			const discovered = await discover(...args);
+			if (args[3] === firstProfile.path()) {
+				entered.resolve();
+				await release.promise;
+			}
+			return discovered;
+		});
+		const first = resolveEffectiveSubagentPolicy(
+			request({ agent: "scout", session: session({ cwd: workspace.path(), settings: firstSettings }) }),
+		);
+		await entered.promise;
+		const second = resolveEffectiveSubagentPolicy(
+			request({ agent: "scout", session: session({ cwd: workspace.path(), settings: secondSettings }) }),
+		);
+		// Let the second preflight cross its reload boundary while the first scan remains in flight.
+		await Promise.resolve();
+		release.resolve();
+		const policies = await Promise.all([first, second]);
+		expect(policies.map(policy => policy.agent.systemPrompt)).toEqual(["FIRST_PROFILE", "SECOND_PROFILE"]);
+	});
+
 	it("rescans agents when a plugin provider is disabled while an earlier discovery is in flight", async () => {
 		const previouslyDisabled = getDisabledProviders();
 		enableProvider("omp-plugins");
@@ -218,7 +256,7 @@ describe("structured subagent primitive", () => {
 	});
 
 	it("uses saved seance models in active-role/default order and honors an explicit available override", async () => {
-		const seanceAgent = getBundledAgent("seance");
+		const seanceAgent = getBundledAgent("seance", getAgentDir());
 		if (!seanceAgent) throw new Error("Expected the bundled seance agent");
 		mockDiscovery(seanceAgent);
 		const tempDir = await fs.mkdtemp(path.join(os.tmpdir(), "omp-seance-policy-"));
@@ -279,7 +317,7 @@ describe("structured subagent primitive", () => {
 	});
 
 	it("fails closed when the source has no saved model or an explicit model is unavailable", async () => {
-		const seanceAgent = getBundledAgent("seance");
+		const seanceAgent = getBundledAgent("seance", getAgentDir());
 		if (!seanceAgent) throw new Error("Expected the bundled seance agent");
 		mockDiscovery(seanceAgent);
 		const tempDir = await fs.mkdtemp(path.join(os.tmpdir(), "omp-seance-model-fail-"));
@@ -736,6 +774,25 @@ describe("structured subagent primitive", () => {
 		expect(evalPolicy.enableIrc).toBe(taskPolicy.enableIrc);
 	});
 
+	it("filters canonical and explicitly marked AGENTS context before child execution", async () => {
+		mockDiscovery();
+		const childSession = session();
+		childSession.contextFiles = [
+			{ path: "/project/AGENTS.md", content: "canonical" },
+			{ path: "/tmp/strict.md", content: "override", kind: "agents-md" },
+			{ path: "/project/context.md", content: "project" },
+		];
+		let forwardedContextFiles: executorModule.ExecutorOptions["contextFiles"];
+		vi.spyOn(executorModule, "runSubprocess").mockImplementation(async options => {
+			forwardedContextFiles = options.contextFiles;
+			return result();
+		});
+
+		await runStructuredSubagent(request({ session: childSession }));
+
+		expect(forwardedContextFiles).toEqual([{ path: "/project/context.md", content: "project" }]);
+	});
+
 	it("rejects an invalid caller schema before executor dispatch in both modes", async () => {
 		mockDiscovery();
 		const dispatch = vi.spyOn(executorModule, "runSubprocess");
@@ -836,8 +893,8 @@ describe("structured subagent primitive", () => {
 			const find = modelRegistry.find.bind(modelRegistry);
 			modelRegistry.find = (provider, id) => (provider === "mock" && id === model.id ? model : find(provider, id));
 			modelRegistry.getAvailable = () => [model];
-			const seanceAgent = getBundledAgent("seance");
-			const scoutAgent = getBundledAgent("scout");
+			const seanceAgent = getBundledAgent("seance", getAgentDir());
+			const scoutAgent = getBundledAgent("scout", getAgentDir());
 			if (!seanceAgent || !scoutAgent) throw new Error("Expected bundled seance and scout agents");
 			vi.spyOn(discoveryModule, "discoverAgents").mockResolvedValue({
 				agents: [

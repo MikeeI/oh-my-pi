@@ -111,6 +111,17 @@ function coordinatorWithMockSession(responses: MockResponseSource) {
 }
 
 describe("native security coordinator", () => {
+	test("rejects a plan after its profile security-reviewer policy changes", async () => {
+		vi.spyOn(settings, "getAgentDir").mockReturnValue(temporaryRoot);
+		const { coordinator, mock } = coordinatorWithMockSession([]);
+		const plan = await coordinator.preflight({ credentialId, model: mock.model });
+		await Bun.write(
+			path.join(temporaryRoot, "prompts", "agents", "security-reviewer.md"),
+			"---\nname: security-reviewer\ndescription: Changed review policy\n---\nChanged review scope.\n",
+		);
+		await expect(coordinator.start({ planId: plan.id })).rejects.toThrow("Security scan plan is stale");
+	});
+
 	test("preflight accepts provider-owned Bedrock auth without an OAuth row", async () => {
 		const bedrockModel = getBundledModel("amazon-bedrock", "us.anthropic.claude-opus-4-8");
 		if (!bedrockModel) throw new Error("Expected bundled Bedrock model");

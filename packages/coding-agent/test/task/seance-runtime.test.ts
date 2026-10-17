@@ -211,9 +211,11 @@ describe("seance startup contracts", () => {
 		await fs.mkdir(cwd, { recursive: true });
 		const sourceFile = path.join(tempDir.path(), "source.jsonl");
 		const sourceText = await writeSourceSession(sourceFile, cwd);
+		const wrapper = "Selected seance wrapper: {{agent}}";
+		await Bun.write(path.join(cwd, ".omp", "SUBAGENT-SYSTEM.template.md"), wrapper);
 		const artifactsDir = path.join(tempDir.path(), "artifacts");
 		await fs.mkdir(artifactsDir, { recursive: true });
-		const agent = getBundledAgent("seance");
+		const agent = getBundledAgent("seance", getAgentDir());
 		if (!agent) throw new Error("Expected the bundled seance agent");
 		const authStorage = await AuthStorage.create(":memory:");
 		authStorage.keys.setRuntime("anthropic", "test-key");
@@ -226,6 +228,7 @@ describe("seance startup contracts", () => {
 		let reachedStartedBoundary = false;
 		let extensionLoaded = false;
 		let extensionRootsRead = false;
+		let startupPrompt: string[] = [];
 
 		try {
 			eventBus.on(TASK_SUBAGENT_LIFECYCLE_CHANNEL, payload => {
@@ -240,6 +243,7 @@ describe("seance startup contracts", () => {
 					return;
 				}
 				reachedStartedBoundary = true;
+				startupPrompt = [...(AgentRegistry.global().get(id)?.session?.systemPrompt ?? [])];
 				controller.abort();
 			});
 			const extension = hostilePreparedExtension(() => {
@@ -278,6 +282,10 @@ describe("seance startup contracts", () => {
 			expect(extensionLoaded).toBe(false);
 			expect(extensionRootsRead).toBe(false);
 			expect(await fs.readFile(sourceFile, "utf8")).toBe(sourceText);
+			expect(startupPrompt.slice(-2)).toEqual([
+				prompt.render(wrapper, { agent: agent.systemPrompt }),
+				preparedSourceSession(sourceFile, "source-session").promptSuffix("anthropic/claude-sonnet-4-5"),
+			]);
 		} finally {
 			authStorage.close();
 			setAgentDir(previousAgentDir);
@@ -317,7 +325,7 @@ describe("seance startup contracts", () => {
 		let revived: AgentSession | undefined;
 		let forkManagerClosed = false;
 		try {
-			const seanceAgent = getBundledAgent("seance");
+			const seanceAgent = getBundledAgent("seance", getAgentDir());
 			if (!seanceAgent) throw new Error("Expected the bundled seance agent");
 			const model = getBundledModel("anthropic", "claude-sonnet-4-5");
 			if (!model) throw new Error("Expected anthropic/claude-sonnet-4-5");

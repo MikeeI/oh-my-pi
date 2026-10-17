@@ -6,6 +6,7 @@ import * as os from "node:os";
 import * as path from "node:path";
 import * as url from "node:url";
 
+import type { AgentMessage } from "@oh-my-pi/pi-agent-core";
 import {
 	type Api,
 	type AssistantMessage,
@@ -28,7 +29,8 @@ import { collectOnlineTinyCandidates, expandOnlineTinyModelFallbacks } from "../
 import type { Settings } from "../config/settings";
 import titleMarkerInstruction from "../prompts/system/title-marker-instruction.md" with { type: "text" };
 import titleSystemPrompt from "../prompts/system/title-system.md" with { type: "text" };
-import { formatTitleUserMessage } from "../tiny/message-preproc";
+import titleTranscriptSystemPrompt from "../prompts/system/title-transcript-system.md" with { type: "text" };
+import { formatTitleUserMessage, stripCodeBlocks } from "../tiny/message-preproc";
 import { isLowSignalTitleInput, normalizeGeneratedTitle } from "../tiny/text";
 import { tinyTitleClient } from "../tiny/title-client";
 
@@ -36,6 +38,7 @@ import { cfgRetryModelFallback } from "../session/settings";
 
 const TITLE_SYSTEM_PROMPT = prompt.render(titleSystemPrompt);
 const TITLE_MARKER_INSTRUCTION = prompt.render(titleMarkerInstruction);
+export const TITLE_TRANSCRIPT_SYSTEM_PROMPT = prompt.render(titleTranscriptSystemPrompt);
 
 // Plain π, not the nerd-font `icon.omp` glyph: window/tab titles render in the
 // OS UI font, which has no nerd-font PUA coverage.
@@ -106,6 +109,10 @@ function disposeWindowsConsoleTitleApi(): void {
 // ceiling costs nothing when thinking is genuinely suppressed and keeps the
 // `<title>` marker output reachable when it isn't (issue #4355).
 const TITLE_MAX_TOKENS = 1024;
+const TITLE_TRANSCRIPT_MAX_USER_MESSAGES = 5;
+const TITLE_TRANSCRIPT_MAX_ASSISTANT_MESSAGES = 5;
+const TITLE_TRANSCRIPT_MAX_MESSAGE_CHARS = 10_000;
+const TITLE_TRANSCRIPT_MAX_TOTAL_CHARS = 40_000;
 
 /** Matches the title the model wraps in `<title>...</title>`. */
 const TITLE_MARKER_GLOBAL_RE = /<title>([\s\S]*?)<\/title>|<title\s*\/>|<title>\s*$/gi;
@@ -121,9 +128,8 @@ function getTitleModels(registry: ModelRegistry, settings: Settings, currentMode
 	const availableModels = roleCandidatePool("tiny", settings, registry);
 	if (availableModels.length === 0) return [];
 
-	const models = collectOnlineTinyCandidates(["tiny", "commit", "smol"], settings, availableModels).map(
-		candidate => candidate.model,
-	);
+	const roleOrder = ["tiny", "commit", "smol"];
+	const models = collectOnlineTinyCandidates(roleOrder, settings, availableModels).map(candidate => candidate.model);
 	if (
 		currentModel &&
 		(models.length === 0 || cfgRetryModelFallback.get(settings) !== false) &&
@@ -140,6 +146,79 @@ function getTitleModels(registry: ModelRegistry, settings: Settings, currentMode
 		}
 	}
 	return models;
+}
+
+interface TextBlock {
+	type: "text";
+	text: string;
+}
+
+interface RecentTitleMessage {
+	role: "user" | "assistant";
+	text: string;
+	index: number;
+}
+
+function isTextBlock(value: unknown): value is TextBlock {
+	if (typeof value !== "object" || value === null) return false;
+	const block = value as { type?: unknown; text?: unknown };
+	return block.type === "text" && typeof block.text === "string";
+}
+
+function extractTextOnly(message: AgentMessage): string {
+	const content = "content" in message ? message.content : undefined;
+	if (typeof content === "string") return content;
+	if (!Array.isArray(content)) return "";
+	return content
+		.filter(isTextBlock)
+		.map(block => block.text)
+		.join("\n");
+}
+
+function capTranscriptMessage(text: string): string {
+	const cleaned = stripCodeBlocks(text).trim();
+	return cleaned.length > TITLE_TRANSCRIPT_MAX_MESSAGE_CHARS
+		? `${cleaned.slice(0, TITLE_TRANSCRIPT_MAX_MESSAGE_CHARS)}…`
+		: cleaned;
+}
+
+function selectRecentTitleMessages(messages: readonly AgentMessage[]): RecentTitleMessage[] {
+	const selected: RecentTitleMessage[] = [];
+	let userCount = 0;
+	let assistantCount = 0;
+
+	for (let index = messages.length - 1; index >= 0; index--) {
+		const message = messages[index];
+		if (!message || (message.role !== "user" && message.role !== "assistant")) continue;
+		if (message.role === "user" && userCount >= TITLE_TRANSCRIPT_MAX_USER_MESSAGES) continue;
+		if (message.role === "assistant" && assistantCount >= TITLE_TRANSCRIPT_MAX_ASSISTANT_MESSAGES) continue;
+
+		const text = capTranscriptMessage(extractTextOnly(message));
+		if (!text) continue;
+
+		selected.push({ role: message.role, text, index });
+		if (message.role === "user") userCount++;
+		else assistantCount++;
+
+		if (
+			userCount >= TITLE_TRANSCRIPT_MAX_USER_MESSAGES &&
+			assistantCount >= TITLE_TRANSCRIPT_MAX_ASSISTANT_MESSAGES
+		) {
+			break;
+		}
+	}
+
+	return selected.sort((a, b) => a.index - b.index);
+}
+
+export function formatRecentTitleTranscript(messages: readonly AgentMessage[]): string | null {
+	const rendered = selectRecentTitleMessages(messages).map(item => `<${item.role}>\n${item.text}\n</${item.role}>`);
+	if (rendered.length === 0) return null;
+
+	const transcript = `<chat>\n${rendered.join("\n\n")}\n</chat>`;
+	return transcript.length > TITLE_TRANSCRIPT_MAX_TOTAL_CHARS
+		? `<chat>\n…${transcript.slice(-TITLE_TRANSCRIPT_MAX_TOTAL_CHARS + 8)}`
+		: transcript;
 }
 
 /**

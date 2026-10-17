@@ -1,4 +1,11 @@
-import { APP_NAME, getActiveProfile } from "@oh-my-pi/pi-utils";
+import { getActiveProfile } from "@oh-my-pi/pi-utils";
+import { APP_DISPLAY_NAME } from "../app-version";
+
+/** Current executable and profile for a copyable session-start command. */
+export function sessionCommand(): string {
+	const profile = getActiveProfile();
+	return `${APP_DISPLAY_NAME}${profile ? ` --profile ${profile}` : ""}`;
+}
 
 /**
  * Build the shell command that resumes a session by id.
@@ -11,8 +18,6 @@ import { APP_NAME, getActiveProfile } from "@oh-my-pi/pi-utils";
  * (issue #9018). Profile names are validated against a strict charset
  * (`normalizeProfileName`), so no shell quoting is required.
  */
-export function resumeCommand(sessionId: string): string {
-	const profile = getActiveProfile();
-	const profileFlag = profile ? `--profile ${profile} ` : "";
-	return `${APP_NAME} ${profileFlag}--resume ${sessionId}`;
+export function resumeCommand(sessionId?: string): string {
+	return `${sessionCommand()} --resume${sessionId === undefined ? "" : ` ${sessionId}`}`;
 }

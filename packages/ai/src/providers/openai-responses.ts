@@ -79,13 +79,13 @@ import type {
 	ReasoningEffort,
 	ResponseCreateParamsStreaming,
 	ResponseInput,
-	ResponseInputContent,
 	ResponseStreamEvent,
 } from "./openai-responses-wire";
 import {
 	applyCommonResponsesSamplingParams,
 	applyOpenAIExtraBody,
 	applyOpenAIGatewayRouting,
+	applyOpenAIResponsesPromptCachePolicy,
 	applyResponsesCompatPolicy,
 	applyVercelResponsesCacheControls,
 	applyWireModelIdTransform,
@@ -1587,7 +1587,6 @@ function applyOpenAIResponsesPromptCachePolicy(
 	if (promptCache?.mode === "explicit" && promptCache.breakpoint !== "none")
 		markLatestStableResponsesCacheBreakpoint(params.input, statefulCacheBaseline);
 }
-
 export function buildParams(
 	model: Model<"openai-responses">,
 	context: Context,

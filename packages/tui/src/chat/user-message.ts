@@ -144,6 +144,7 @@ export class UserMessageComponent extends Container implements ReactionTarget, T
 	/** Matches the composer tokens in {@link #text} (chips, skills, this message's mentions). */
 	readonly #tokens: RegExp;
 	#reaction: string | undefined;
+	#transcriptVersion = 0;
 	#native: NativeNode | undefined;
 	/** The terminal's clock and the image link policy {@link #native} was described with. */
 	#nativeHour12: boolean | undefined;
@@ -189,8 +190,15 @@ export class UserMessageComponent extends Container implements ReactionTarget, T
 	setReaction(emoji: string): void {
 		if (this.#reaction === emoji) return;
 		this.#reaction = emoji;
+		this.#transcriptVersion++;
 		this.#zoneLines = undefined;
 		this.#native = undefined;
+	}
+
+	// Native cards may update reactions in place, but accepted terminal rows
+	// must retain the presentation the transcript previously committed.
+	getTranscriptBlockVersion(): number {
+		return this.#transcriptVersion;
 	}
 
 	/**

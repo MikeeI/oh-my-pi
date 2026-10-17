@@ -10,10 +10,11 @@ import { Settings } from "@oh-my-pi/pi-coding-agent/config/settings";
 import { getBundledAgent } from "@oh-my-pi/pi-coding-agent/task/agents";
 import { buildOutputValidator } from "@oh-my-pi/pi-coding-agent/tools/output-schema-validator";
 import { AUTO_THINKING } from "@oh-my-pi/pi-tui/thinking";
+import { getAgentDir } from "@oh-my-pi/pi-utils";
 
 describe("bundled agent parsing", () => {
 	it("defaults the task agent to the auto thinking selector", () => {
-		const task = getBundledAgent("task");
+		const task = getBundledAgent("task", getAgentDir());
 
 		expect(task).toBeDefined();
 		expect(task?.model).toEqual(["@task"]);
@@ -21,7 +22,7 @@ describe("bundled agent parsing", () => {
 	});
 
 	it("accepts security-reviewer findings with optional remediation metadata", () => {
-		const securityReviewer = getBundledAgent("security-reviewer");
+		const securityReviewer = getBundledAgent("security-reviewer", getAgentDir());
 		const findingValidator = buildOutputValidator(securityReviewer?.output).validator?.validateSection.get(
 			"findings",
 		);
@@ -68,7 +69,7 @@ describe("bundled agent parsing", () => {
 		});
 		const registry = { getAvailable: () => [gpt55] } as Parameters<typeof resolveModelOverride>[1];
 
-		const agent = getBundledAgent("reviewer");
+		const agent = getBundledAgent("reviewer", getAgentDir());
 		expect(agent?.thinkingLevel).toBeUndefined();
 		const patterns = resolveAgentModelPatterns({ agentModel: agent?.model, settings });
 		const resolved = resolveModelOverride(patterns, registry, settings);
@@ -98,7 +99,7 @@ describe("bundled agent parsing", () => {
 			["scout", "smol", "fast/hy3"],
 			["reviewer", "slow", "codex/sol"],
 		] as const) {
-			const agent = getBundledAgent(name);
+			const agent = getBundledAgent(name, getAgentDir());
 			expect(resolveAgentModelSelection({ agentModel: agent?.model, settings })).toEqual({
 				patterns: [model],
 				role,
