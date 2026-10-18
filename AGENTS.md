@@ -352,7 +352,7 @@ The upgrader validates these IDs against its executable and manual proof mapping
 
 - Disposition: `UPSTREAM-INTEGRIERT`.
 - Contract: Eval keeps large raw tool results separate or passes handles instead of re-emitting them.
-- Coverage: upstream Eval aggregation, tool orchestration, shell, and subprocess capabilities remain unchanged.
+- Coverage: upstream v18.12.1 owns print-based text, structured views, and image or figure attachments.
 - Owner: the project-settings `eval.md` override owns model-visible result-handling guidance; the bundled Eval prompt stays byte-identical to upstream.
 - Required action: retain the profile override and model-visible result-handling guidance in Settings.
 - Required action: do not add a separate Eval runtime restriction for this guidance.
@@ -373,6 +373,7 @@ The upgrader validates these IDs against its executable and manual proof mapping
 - Owner: upstream `src/session/agent-session.ts` owns per-Child kernel identity; Eval backends key retained state by session.
 - Required action: retain routing guidance aligned with the current upstream Eval runtime split in Settings.
 - Required action: reuse upstream kernel isolation without a parallel fork implementation.
+- Required action: align the selected Eval override with upstream helpers without a removed `display()` compatibility alias.
 - Proof: profile override and fallback cases in `test/tools/tool-prompt-overrides.test.ts`.
 - Proof: runtime semantics in Eval workflow, bridge-policy, Python-prelude, and JavaScript-executor tests.
 - Proof: render the active Eval tool description and inspect its concurrent-name guidance.

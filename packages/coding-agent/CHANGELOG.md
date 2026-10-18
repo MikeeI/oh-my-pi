@@ -217,6 +217,12 @@
 - Fixed `omp --restore` and `/retry` reporting nothing to retry for a turn cut off by a process exit in a session that had used `eval`; the interrupted turn now continues ([#16195](https://github.com/can1357/oh-my-pi/issues/16195))
 - Fixed session loading on Windows treating a session path with a regular-file component as a missing session (an empty session) instead of rejecting it with `ENOTDIR` like POSIX does ([#16145](https://github.com/can1357/oh-my-pi/pull/16145) by [@jchanghong023](https://github.com/jchanghong023))
 - Fixed models from extension providers listed in `enabledModels` or `--models` missing from `/model`, the Ctrl+P cycle and the startup model scope notice until the background catalog refresh finished ([#16096](https://github.com/can1357/oh-my-pi/pull/16096) by [@skipper019](https://github.com/skipper019))
+### Fixed
+
+- Fixed offline prompt inspection sending provider connection warm-up requests.
+- Fixed Codex cache breakpoint probe failures exposing synthetic request payloads through provider errors.
+- Fixed published benchmark credential hints naming `omp` instead of `momp`.
+- Fixed profile Eval guidance advertising the removed `display()` helper.
 
 ## [18.12.1] - 2026-10-17
 
@@ -237,11 +243,6 @@
 ### Fixed
 
 - Fixed context-file `@` imports failing to load paths containing backslash-escaped spaces ([#16090](https://github.com/can1357/oh-my-pi/issues/16090))
-### Fixed
-
-- Fixed offline prompt inspection sending provider connection warm-up requests.
-- Fixed Codex cache breakpoint probe failures exposing synthetic request payloads through provider errors.
-- Fixed published benchmark credential hints naming `omp` instead of `momp`.
 
 ## [18.12.0] - 2026-10-17
 
