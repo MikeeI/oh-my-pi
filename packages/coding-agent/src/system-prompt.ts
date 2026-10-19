@@ -33,6 +33,7 @@ import defaultSystemPromptTemplate from "./prompts/system/system-prompt.md" with
 import userAppendPromptTemplate from "./prompts/system/user-append.md" with { type: "text" };
 import { normalizeConcurrencyLimit } from "./task/parallel";
 import type { ActiveRepoContext } from "@oh-my-pi/pi-tui/status-line/host";
+import { shortenPath } from "@oh-my-pi/pi-tui/render/render-utils";
 import { XD_URL_PREFIX } from "@oh-my-pi/pi-tui/tools/xd-url";
 import type { ContextFileEntry } from "./tools";
 import { expandTilde } from "./tools/path-utils";
@@ -1275,15 +1276,30 @@ export async function buildSystemPrompt(options: BuildSystemPromptOptions = {}):
 				? "custom-system-prompt.md"
 				: "system-prompt.md"
 			: "SYSTEM.template.md";
-	const systemBlock = renderInspectablePromptBlock(
-		systemTemplate,
-		renderData,
-		systemSource,
-		0,
-		false,
-		captureDynamicParts,
-		usesCustomPrompt ? CUSTOM_PROMPT_PART_PROBES : SYSTEM_PROMPT_PART_PROBES,
-	);
+	let systemBlock: RenderedPromptBlock;
+	try {
+		systemBlock = renderInspectablePromptBlock(
+			systemTemplate,
+			renderData,
+			systemSource,
+			0,
+			false,
+			captureDynamicParts,
+			usesCustomPrompt ? CUSTOM_PROMPT_PART_PROBES : SYSTEM_PROMPT_PART_PROBES,
+		);
+	} catch (error) {
+		if (resolvedSystemPromptTemplate === undefined) throw error;
+		// Selected templates are mandatory, so a stale helper must fail; naming the source keeps that failure actionable.
+		// Resolution returns file content for paths and the input itself for inline SDK templates.
+		const templateSource =
+			systemPromptTemplate !== undefined && systemPromptTemplate !== resolvedSystemPromptTemplate
+				? shortenPath(systemPromptTemplate)
+				: "inline template";
+		throw new Error(
+			`Could not render system prompt template ${templateSource}: ${error instanceof Error ? error.message : String(error)}`,
+			{ cause: error },
+		);
+	}
 	const systemPrompt = [systemBlock.text];
 	const dynamicParts: DynamicPromptPart[] = [...systemBlock.dynamicParts];
 	for (const prelude of evalPreludes) {

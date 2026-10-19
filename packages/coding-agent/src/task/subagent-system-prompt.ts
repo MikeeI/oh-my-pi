@@ -64,6 +64,19 @@ export async function resolveSubagentSystemPrompt(cwd: string): Promise<Resolved
 	return { systemPromptTemplate, wrapperTemplatePath, wrapperTemplate };
 }
 
+function renderSubagentWrapper(resolved: ResolvedSubagentSystemPrompt, data: prompt.TemplateContext): string {
+	try {
+		return prompt.render(resolved.wrapperTemplate, data);
+	} catch (error) {
+		if (!resolved.wrapperTemplatePath) throw error;
+		// A selected wrapper is mandatory; name it so stale helpers in profile or project templates are actionable.
+		throw new Error(
+			`Could not render subagent system prompt template ${shortenPath(resolved.wrapperTemplatePath)}: ${error instanceof Error ? error.message : String(error)}`,
+			{ cause: error },
+		);
+	}
+}
+
 export function createSubagentSystemPromptTransform(
 	resolved: ResolvedSubagentSystemPrompt,
 	input: SubagentSystemPromptInput,
@@ -73,7 +86,7 @@ export function createSubagentSystemPromptTransform(
 
 	return result => {
 		const ircRoster = input.ircRoster?.();
-		const wrapper = prompt.render(resolved.wrapperTemplate, {
+		const wrapper = renderSubagentWrapper(resolved, {
 			agent: input.agent,
 			structured: input.structured,
 			context: input.context?.trim() ?? "",

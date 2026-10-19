@@ -784,15 +784,17 @@ describe("system Handlebars prompt templates", () => {
 		});
 	});
 
-	test("invalid discovered system prompt template hard fails", async () => {
+	test("discovered system prompt template with a removed helper hard fails with its path", async () => {
 		await withTempDir(async dir => {
 			const templatePath = path.join(dir, ".omp", "SYSTEM.template.md");
 			await fs.mkdir(path.dirname(templatePath), { recursive: true });
-			await fs.writeFile(templatePath, "{{#if}}");
+			await fs.writeFile(templatePath, '{{SECTION_SEPARATOR "Workspace"}}');
 
 			const { options } = await captureRootCommandOptions(dir);
 
-			await expect(buildCapturedTemplatePrompt(dir, options)).rejects.toThrow();
+			await expect(buildCapturedTemplatePrompt(dir, options)).rejects.toThrow(
+				`Could not render system prompt template ${templatePath}: Missing helper: "SECTION_SEPARATOR"`,
+			);
 		});
 	});
 

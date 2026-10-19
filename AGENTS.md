@@ -98,6 +98,7 @@ The upgrader validates these IDs against its executable and manual proof mapping
 - Contract: raw and template siblings select raw and surface the suppression warning.
 - Contract: an absent template permits the built-in base; every discovered or explicit template is mandatory.
 - Contract: mandatory templates MUST be readable, non-empty, and valid; failure terminates prompt construction.
+- Contract: a selected template render failure names its source path, or `inline template` for SDK content.
 - Contract: inline SDK templates reject whitespace-only content before rendering.
 - Contract: dangling discovered template symlinks remain mandatory selections instead of permitting fallback.
 - Contract: `SYSTEM_TEMPLATE.md` is not an accepted alias for the canonical MOMP filename.
@@ -139,6 +140,7 @@ The upgrader validates these IDs against its executable and manual proof mapping
 - Contract: the selected Child wrapper preserves item-indexed workpool `yield` and ordinary `data`/`error` semantics.
 - Contract: wrappers follow the actual execution mode; plain-result Children never receive yield-only completion guidance.
 - Contract: dangling Child base and wrapper template symlinks fail instead of selecting lower-priority sources.
+- Contract: a selected wrapper render failure names its source path.
 - Owner: `src/system-prompt.ts` owns base and wrapper discovery.
 - Owner: `src/task/subagent-system-prompt.ts#resolveSubagentSystemPrompt` loads the selected wrapper snapshot.
 - Owner: `src/task/subagent-system-prompt.ts#createSubagentSystemPromptTransform` renders and inserts its provider block.
@@ -173,6 +175,7 @@ The upgrader validates these IDs against its executable and manual proof mapping
 - Proof: `test/context-file-inheritance.test.ts`.
 - Proof: `test/task/workpool.test.ts` and rendering structured, plain-result, and workpool wrapper branches.
 - Proof: dangling Child base and wrapper cases in `test/system-prompt-templates.test.ts`.
+- Proof: removed-helper wrapper failure in `test/task/subagent-system-template.test.ts`.
 - Proof: owning-session IRC delivery in `test/sdk-async-result-routing.test.ts`.
 - Proof: structured-prefix and plain-result regression cases in `test/task/executor-subagent-reminders.test.ts`.
 - Proof: saved-source isolation, selected-wrapper ordering, and revival in `test/task/seance-runtime.test.ts`.

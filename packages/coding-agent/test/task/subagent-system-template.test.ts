@@ -228,6 +228,21 @@ describe("subagent system prompt templates", () => {
 		});
 	});
 
+	test.serial("names the selected wrapper when it references a removed helper", async () => {
+		await withTemplateEnvironment(async ({ projectDir, projectTemplate }) => {
+			await fs.mkdir(path.dirname(projectTemplate), { recursive: true });
+			await fs.writeFile(projectTemplate, '{{SECTION_SEPARATOR "Role"}} {{agent}}');
+			const transform = createSubagentSystemPromptTransform(await resolveSubagentSystemPrompt(projectDir), {
+				agent: "Rendered scout role",
+				structured: true,
+			});
+
+			expect(() => transform({ systemPrompt: ["base-block"], dynamicParts: [], xdevCatalogNames: [] })).toThrow(
+				`Could not render subagent system prompt template ${projectTemplate}: Missing helper: "SECTION_SEPARATOR"`,
+			);
+		});
+	});
+
 	test.serial("renders a user template", async () => {
 		await withTemplateEnvironment(async ({ projectDir, userTemplate, userBaseTemplate }) => {
 			await fs.mkdir(path.dirname(userTemplate), { recursive: true });
