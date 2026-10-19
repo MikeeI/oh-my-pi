@@ -6,6 +6,7 @@ import { listConversationSessions } from "../session/conversation-corpus";
 import {
 	DEFAULT_CONVERSATION_SEARCH_DAYS,
 	DEFAULT_CONVERSATION_SEARCH_LIMIT,
+	MAX_CONVERSATION_SEARCH_LIMIT,
 	searchConversationSessions,
 } from "../session/conversation-search";
 import type { ToolSession } from ".";
@@ -19,7 +20,9 @@ const conversationSearchSchema = type({
 	"role?": type("'user' | 'assistant' | 'both'").describe("message roles to search; default both"),
 	"match?": type("'all' | 'phrase'").describe("all terms anywhere or exact phrase; default all"),
 	"format?": type("'text' | 'json'").describe("output format; default text"),
-	"limit?": type("1 <= number.integer <= 50").describe("maximum returned matches; default 12"),
+	"limit?": type(`1 <= number.integer <= ${MAX_CONVERSATION_SEARCH_LIMIT}`).describe(
+		"maximum returned matches; default 12",
+	),
 });
 
 export type ConversationSearchParams = typeof conversationSearchSchema.infer;
@@ -96,7 +99,7 @@ export class ConversationSearchTool implements AgentTool<typeof conversationSear
 				malformedRecords: report.malformedRecords,
 			};
 			return {
-				content: [{ type: "text", text: formatConversationSearchReport(report, format) }],
+				content: [{ type: "text", text: formatConversationSearchReport(report, format, limit) }],
 				details,
 				...(report.complete && report.totalMatches === 0 ? { useless: true } : {}),
 			};

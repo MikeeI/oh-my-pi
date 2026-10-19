@@ -11,6 +11,7 @@ import type { SessionInfo } from "./session-listing";
 
 export const DEFAULT_CONVERSATION_SEARCH_DAYS = 10;
 export const DEFAULT_CONVERSATION_SEARCH_LIMIT = 12;
+export const MAX_CONVERSATION_SEARCH_LIMIT = 50;
 
 const DAY_MS = 24 * 60 * 60 * 1000;
 export const CONVERSATION_SEARCH_CONCURRENCY = 4;

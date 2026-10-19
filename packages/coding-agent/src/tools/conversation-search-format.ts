@@ -1,4 +1,8 @@
-import type { ConversationSearchHit, ConversationSearchReport } from "../session/conversation-search";
+import {
+	type ConversationSearchHit,
+	type ConversationSearchReport,
+	MAX_CONVERSATION_SEARCH_LIMIT,
+} from "../session/conversation-search";
 import { replaceTabs, shortenPath } from "@oh-my-pi/pi-tui/render/render-utils";
 
 export type ConversationSearchFormat = "text" | "json";
@@ -9,12 +13,13 @@ const JSON_EXCERPT_CHARS = 1_600;
 export function formatConversationSearchReport(
 	report: ConversationSearchReport,
 	format: ConversationSearchFormat,
+	limit: number,
 ): string {
-	if (format === "json") return formatJson(report);
-	return formatText(report);
+	if (format === "json") return formatJson(report, limit);
+	return formatText(report, limit);
 }
 
-function formatText(report: ConversationSearchReport): string {
+function formatText(report: ConversationSearchReport, limit: number): string {
 	const lines = [
 		`matches=${report.hits.length}/${report.totalMatches} matched_sessions=${report.matchedSessions} searched_sessions=${report.searchedSessions}/${report.candidateSessions} scope=${report.scope} since=${report.since} complete=${report.complete}`,
 	];
@@ -31,9 +36,8 @@ function formatText(report: ConversationSearchReport): string {
 		if (report.scope === "all" && hit.cwd) metadata.push(`cwd=${JSON.stringify(shortenPath(hit.cwd))}`);
 		lines.push(metadata.join(" "), `  ${singleLine(excerpt(hit, TEXT_EXCERPT_CHARS))}`);
 	}
-	if (report.totalMatches > report.hits.length) {
-		lines.push(`Omitted ${report.totalMatches - report.hits.length} older match(es); increase limit to return more.`);
-	}
+	const omitted = report.totalMatches - report.hits.length;
+	if (omitted > 0) lines.push(omittedMatchesHint(omitted, report.totalMatches, limit));
 	if (!report.complete) {
 		lines.push(
 			`Coverage incomplete: discovery_failures=${report.discoveryFailures} failed_sessions=${report.failedSessions} malformed_records=${report.malformedRecords}.`,
@@ -42,7 +46,15 @@ function formatText(report: ConversationSearchReport): string {
 	return lines.join("\n");
 }
 
-function formatJson(report: ConversationSearchReport): string {
+// At the schema maximum, raising `limit` is impossible; point at the filters that shrink the match set instead.
+function omittedMatchesHint(omitted: number, totalMatches: number, limit: number): string {
+	if (limit < MAX_CONVERSATION_SEARCH_LIMIT) {
+		return `Omitted ${omitted} older match(es); retry with limit=${Math.min(MAX_CONVERSATION_SEARCH_LIMIT, totalMatches)}.`;
+	}
+	return `Omitted ${omitted} older match(es); limit is at its maximum ${MAX_CONVERSATION_SEARCH_LIMIT}; narrow with fewer days, match=phrase, role, or more query terms.`;
+}
+
+function formatJson(report: ConversationSearchReport, limit: number): string {
 	return JSON.stringify(
 		{
 			query: report.query,
@@ -57,6 +69,8 @@ function formatJson(report: ConversationSearchReport): string {
 			matched_sessions: report.matchedSessions,
 			visible_messages: report.visibleMessages,
 			total_matches: report.totalMatches,
+			limit,
+			omitted_matches: report.totalMatches - report.hits.length,
 			failed_sessions: report.failedSessions,
 			discovery_failures: report.discoveryFailures,
 			malformed_records: report.malformedRecords,
