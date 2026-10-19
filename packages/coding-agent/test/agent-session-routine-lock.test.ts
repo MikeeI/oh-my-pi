@@ -185,4 +185,25 @@ describe("AgentSession routine lock", () => {
 		expect(progress.some(update => update.status === "complete")).toBe(false);
 		expect(mock.calls).toHaveLength(outcome === "error" ? 1 : 2);
 	});
+
+	it("rejects a routine that would shadow a file command on sessions without command advertisement", async () => {
+		tempDir = TempDir.createSync("@pi-routine-catalog-");
+		authStorage = await AuthStorage.create(path.join(tempDir.path(), "testauth.db"));
+		const model = getBundledModel("anthropic", "claude-sonnet-4-5");
+		if (!model) throw new Error("Expected built-in anthropic model to exist");
+		const agent = new Agent({ initialState: { model, systemPrompt: ["Test"], tools: [], messages: [] } });
+		const modelRegistry = new ModelRegistry(authStorage);
+
+		expect(
+			() =>
+				new AgentSession({
+					agent,
+					sessionManager: SessionManager.inMemory(),
+					settings: Settings.isolated(),
+					modelRegistry,
+					slashCommands: [{ name: "review-all", description: "File command", content: "body", source: "test" }],
+					routines: [routine],
+				}),
+		).toThrow("Routine /review-all conflicts with existing slash command /review-all");
+	});
 });

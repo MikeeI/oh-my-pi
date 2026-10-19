@@ -171,6 +171,7 @@ import {
 	type Routine,
 	type RoutineExecutionPlan,
 	type RoutineProgress,
+	validateRoutineCommandNames,
 } from "../extensibility/routines";
 import { SkillDescriptionCatalog } from "../extensibility/skill-descriptions";
 import type { Skill, SkillWarning } from "../extensibility/skills";
@@ -1988,6 +1989,10 @@ export class AgentSession implements SettingsScope {
 		this.#getEvalPreludes = config.getEvalPreludes;
 		this.#reconcileBrowserMcpFilter = config.reconcileBrowserMcpFilter;
 		this.#customCommands = config.customCommands ?? [];
+		// SDK and print sessions never run the transport advertisement checks, and routines
+		// dispatch before file-command expansion, so an unchecked collision would silently
+		// shadow the file command.
+		this.#assertRoutineCatalog(this.#slashCommands, this.#routines);
 		const recoveryHost: TurnRecoveryHost = {
 			agent: this.agent,
 			sessionManager: this.sessionManager,
@@ -6845,10 +6850,13 @@ export class AgentSession implements SettingsScope {
 			.catch(() => {})
 			.then(async () => {
 				resetCapabilities();
-				this.#slashCommands = await loadSlashCommands({
+				const slashCommands = await loadSlashCommands({
 					cwd: this.sessionManager.getCwd(),
 					extensionRoots: this.effectiveExtensionRoots,
 				});
+				// Reject before committing so a reloaded file command never hides behind a routine.
+				this.#assertRoutineCatalog(slashCommands, this.#routines);
+				this.#slashCommands = slashCommands;
 				// Resets the capability cache again, rediscovers skills, rebuilds the prompt,
 				// and fires the command-metadata notification after both lists are current.
 				await this.#tools.refreshSkills();
@@ -7499,7 +7507,20 @@ export class AgentSession implements SettingsScope {
 	}
 
 	setRoutines(routines: Routine[]): void {
+		this.#assertRoutineCatalog(this.#slashCommands, routines);
 		this.#routines = [...routines];
+	}
+
+	/**
+	 * Rejects duplicate routine names and names owned by session commands.
+	 * Transports add their own builtin and alias names before calling the session;
+	 * this check covers every path, including sessions that never advertise commands.
+	 */
+	#assertRoutineCatalog(slashCommands: readonly FileSlashCommand[], routines: readonly Routine[]): void {
+		const reservedNames = new Set<string>();
+		for (const command of slashCommands) reservedNames.add(command.name);
+		for (const command of this.customCommands) reservedNames.add(command.command.name);
+		validateRoutineCommandNames(routines, reservedNames);
 	}
 
 	/** Custom commands (TypeScript slash commands and MCP prompts) */
