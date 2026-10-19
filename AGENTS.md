@@ -339,6 +339,8 @@ The upgrader validates these IDs against its executable and manual proof mapping
 - Required action: retain MOMP-specific policy and effort guidance in the active Settings templates.
 - Coverage: upstream v18.10.2 defaults `task.structured` off; Eval agent and workpool remain structured.
 - Coverage: upstream v18.10.3 owns named-agent soft request budgets; retain its exact-name precedence and reset semantics.
+- Coverage: upstream v18.12.2 counts Cursor's server-side tool results toward soft request budgets.
+- Owner: upstream `src/task/executor.ts#createSubagentRunMonitor` owns that accounting.
 - Contract: managed MOMP profiles explicitly enable `task.structured` to retain Task schemas and yield-result behavior.
 - Owner: upstream `src/task/settings.ts#cfgTaskStructured` owns the setting and its disabled default.
 - Owner: project-settings `data/sync/agent/config.yml` owns managed activation.
@@ -347,6 +349,7 @@ The upgrader validates these IDs against its executable and manual proof mapping
 - Proof: candidate prompt rendering through `momp system-prompt inspect`.
 - Proof: `test/system-prompt-templates.test.ts`.
 - Proof: effort guidance, seance capability visibility, and ordinary override rejection in `test/task/task-schema.test.ts`.
+- Proof: server-side request-budget cases in `test/task/task-guards.test.ts`.
 
 #### `MOMP-EVAL-OUTPUT` — Large owner-result preservation
 
@@ -371,6 +374,8 @@ The upgrader validates these IDs against its executable and manual proof mapping
 - Contract: use unique names or recompute state in-cell when concurrent Eval cells share a live session.
 - Owner: the project-settings `eval.md` override owns model-visible Eval routing and failure guidance.
 - Owner: upstream `src/session/agent-session.ts` owns per-Child kernel identity; Eval backends key retained state by session.
+- Coverage: upstream v18.12.2 pauses Eval cell deadlines during delegated tool waits without dropping cancellation.
+- Owner: upstream `src/eval/js/tool-bridge.ts#callSessionTool` owns delegated wait routing.
 - Required action: retain routing guidance aligned with the current upstream Eval runtime split in Settings.
 - Required action: reuse upstream kernel isolation without a parallel fork implementation.
 - Required action: align the selected Eval override with upstream helpers without a removed `display()` compatibility alias.
@@ -378,6 +383,7 @@ The upgrader validates these IDs against its executable and manual proof mapping
 - Proof: runtime semantics in Eval workflow, bridge-policy, Python-prelude, and JavaScript-executor tests.
 - Proof: render the active Eval tool description and inspect its concurrent-name guidance.
 - Proof: isolation-policy cases in `test/eval/agent-bridge-policy.test.ts`.
+- Proof: delegated-wait deadlines and cancellation in `test/eval/session-tool-timeout.test.ts`.
 
 #### `MOMP-READ-SKILL-COMPACT` — Compact skill-read display
 
@@ -801,6 +807,9 @@ The upgrader validates these IDs against its executable and manual proof mapping
 - Coverage: upstream v18.9.1 separates live image placements from immutable history; resize seed rows use its current rewrite API.
 - Coverage: upstream v18.10.0 partially retires settled blocks through `RowSplit` and bills all below-transcript chrome at its floor.
 - Coverage: upstream v18.11.3 owns transient chrome floors, run-state settlement, and stable streaming-list publication.
+- Coverage: upstream v18.12.2 adds opt-in `tui.completeScrollback` for rows displaced by growing chrome.
+- Owner: upstream `packages/tui/src/prompt/composer.ts#renderFrame` owns its retirement-budget selection.
+- Required action: retain that upstream policy alongside MOMP's accepted-row replay and tmux resize safeguards.
 - Required action: retain those lifecycle owners alongside whole-block tmux retirement and accepted-row replay.
 - Required action: capture partial row boundaries in accepted tape, discarded offers, and semantic replay at that upstream owner.
 - Owner: `packages/tui/src/chrome/transcript-container.ts#peekWholeFinalizedBatch` owns budget-bounded whole-block acceptance.
