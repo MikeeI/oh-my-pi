@@ -623,8 +623,8 @@ describe("system Handlebars prompt templates", () => {
 			const configDirName = `.omp-test-${path.basename(dir)}`;
 			process.env.PI_CONFIG_DIR = configDirName;
 			try {
-				expect(discoverSubagentSystemPromptTemplate(dir)).toBeUndefined();
-				expect(discoverSubagentBaseSystemPromptTemplate(dir)).toBeUndefined();
+				expect(await discoverSubagentSystemPromptTemplate(dir)).toBeUndefined();
+				expect(await discoverSubagentBaseSystemPromptTemplate(dir)).toBeUndefined();
 			} finally {
 				if (originalConfigDir === undefined) {
 					delete process.env.PI_CONFIG_DIR;
@@ -647,8 +647,8 @@ describe("system Handlebars prompt templates", () => {
 				await fs.mkdir(userConfigDir, { recursive: true });
 				await fs.writeFile(wrapperTemplatePath, "User child wrapper");
 				await fs.writeFile(baseTemplatePath, "User child base");
-				expect(discoverSubagentSystemPromptTemplate(dir)).toBe(wrapperTemplatePath);
-				expect(discoverSubagentBaseSystemPromptTemplate(dir)).toBe(baseTemplatePath);
+				expect(await discoverSubagentSystemPromptTemplate(dir)).toBe(wrapperTemplatePath);
+				expect(await discoverSubagentBaseSystemPromptTemplate(dir)).toBe(baseTemplatePath);
 			} finally {
 				await fs.rm(path.join(os.homedir(), configDirName), { recursive: true, force: true });
 				if (originalConfigDir === undefined) {
@@ -660,7 +660,7 @@ describe("system Handlebars prompt templates", () => {
 		});
 	});
 
-	test("subagent template discovery prefers the project source", async () => {
+	test("subagent template discovery prefers the nearest ancestor project source", async () => {
 		await withTempDir(async dir => {
 			const originalConfigDir = process.env.PI_CONFIG_DIR;
 			const configDirName = `.omp-test-${path.basename(dir)}`;
@@ -675,8 +675,10 @@ describe("system Handlebars prompt templates", () => {
 				await fs.writeFile(path.join(userConfigDir, "SYSTEM.template.md"), "User child base");
 				await fs.writeFile(projectWrapperTemplatePath, "Project child wrapper");
 				await fs.writeFile(projectBaseTemplatePath, "Project child base");
-				expect(discoverSubagentSystemPromptTemplate(dir)).toBe(projectWrapperTemplatePath);
-				expect(discoverSubagentBaseSystemPromptTemplate(dir)).toBe(projectBaseTemplatePath);
+				const nestedCwd = path.join(dir, "data", "cves");
+				await fs.mkdir(nestedCwd, { recursive: true });
+				expect(await discoverSubagentSystemPromptTemplate(nestedCwd)).toBe(projectWrapperTemplatePath);
+				expect(await discoverSubagentBaseSystemPromptTemplate(nestedCwd)).toBe(projectBaseTemplatePath);
 			} finally {
 				await fs.rm(path.join(os.homedir(), configDirName), { recursive: true, force: true });
 				if (originalConfigDir === undefined) {
@@ -723,6 +725,20 @@ describe("system Handlebars prompt templates", () => {
 			} finally {
 				await fs.rm(path.join(os.homedir(), configDirName), { recursive: true, force: true });
 			}
+		});
+	});
+
+	test("a nested cwd selects the nearest ancestor project SYSTEM.template.md", async () => {
+		await withTempDir(async dir => {
+			const templatePath = path.join(dir, ".omp", "SYSTEM.template.md");
+			const nestedCwd = path.join(dir, "data", "cves");
+			await fs.mkdir(path.dirname(templatePath), { recursive: true });
+			await fs.mkdir(nestedCwd, { recursive: true });
+			await fs.writeFile(templatePath, "Project template {{cwd}}");
+
+			const { options } = await captureRootCommandOptions(nestedCwd);
+
+			expect(options.systemPromptTemplate).toBe(templatePath);
 		});
 	});
 

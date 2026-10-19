@@ -96,6 +96,8 @@ The upgrader validates these IDs against its executable and manual proof mapping
 - Contract: raw `--system-prompt`, `SYSTEM.md`, `APPEND_SYSTEM.md`, and `--append-system-prompt` remain literal.
 - Contract: precedence is explicit raw prompt, project raw, project template, user raw, user template, built-in base.
 - Contract: raw and template siblings select raw and surface the suppression warning.
+- Contract: project `SYSTEM.md` and `SYSTEM.template.md` resolve from the nearest non-empty ancestor `.omp`, matching native `SYSTEM.md` discovery.
+- Contract: `APPEND_SYSTEM.md` keeps upstream's cwd-only config-base lookup.
 - Contract: an absent template permits the built-in base; every discovered or explicit template is mandatory.
 - Contract: mandatory templates MUST be readable, non-empty, and valid; failure terminates prompt construction.
 - Contract: a selected template render failure names its source path, or `inline template` for SDK content.
@@ -107,6 +109,7 @@ The upgrader validates these IDs against its executable and manual proof mapping
 - Contract: runtime tool-registry rebuilds preserve the selected sources while refreshing dynamic tool state.
 - Owner: `src/system-prompt.ts` owns source discovery, precedence, loading, and rendering.
 - Owner: `src/config.ts#findConfigFileWithMeta` preserves dangling entries for mandatory prompt discovery.
+- Owner: upstream `src/discovery/builtin.ts#findNearestProjectConfigDir` owns the nearest project `.omp` walk-up.
 - Owner: `src/main.ts` maps discovered sources into Main-session construction.
 - Owner: `src/capability/system-prompt.ts#systemPromptCapability` owns raw `SYSTEM.md` capability metadata.
 - Reason: upstream v18.2.7 added an analogous `SYSTEM_TEMPLATE.md` interface with fallback semantics.
@@ -141,6 +144,7 @@ The upgrader validates these IDs against its executable and manual proof mapping
 - Contract: wrappers follow the actual execution mode; plain-result Children never receive yield-only completion guidance.
 - Contract: dangling Child base and wrapper template symlinks fail instead of selecting lower-priority sources.
 - Contract: a selected wrapper render failure names its source path.
+- Contract: project Child base and wrapper templates resolve from the nearest non-empty ancestor `.omp`.
 - Owner: `src/system-prompt.ts` owns base and wrapper discovery.
 - Owner: `src/task/subagent-system-prompt.ts#resolveSubagentSystemPrompt` loads the selected wrapper snapshot.
 - Owner: `src/task/subagent-system-prompt.ts#createSubagentSystemPromptTransform` renders and inserts its provider block.

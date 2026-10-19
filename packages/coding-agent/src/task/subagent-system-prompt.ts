@@ -44,8 +44,10 @@ export interface ResolvedSubagentSystemPrompt {
 }
 
 export async function resolveSubagentSystemPrompt(cwd: string): Promise<ResolvedSubagentSystemPrompt> {
-	const systemPromptTemplate = discoverSubagentBaseSystemPromptTemplate(cwd);
-	const wrapperTemplatePath = discoverSubagentSystemPromptTemplate(cwd);
+	const [systemPromptTemplate, wrapperTemplatePath] = await Promise.all([
+		discoverSubagentBaseSystemPromptTemplate(cwd),
+		discoverSubagentSystemPromptTemplate(cwd),
+	]);
 	let wrapperTemplate = subagentSystemPromptTemplate;
 	if (wrapperTemplatePath) {
 		try {

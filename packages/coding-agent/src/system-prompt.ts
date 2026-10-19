@@ -13,7 +13,9 @@ import { diffLines } from "@oh-my-pi/pi-natives";
 import { $env, getAgentDir, getProjectDir, hasFsCode, isEnoent, logger, prompt } from "@oh-my-pi/pi-utils";
 import { contextFileCapability } from "./capability/context-file";
 import { systemPromptCapability } from "./capability/system-prompt";
+import { findRepoRoot } from "./capability/fs";
 import { findConfigFile, findConfigFileWithMeta } from "./config";
+import { findNearestProjectConfigDir } from "./discovery/builtin";
 import type { SkillsSettings } from "./extensibility/settings";
 import type { Personality } from "./session/settings";
 import { type ContextFile, loadCapability, type SystemPrompt as SystemPromptFile } from "./discovery";
@@ -250,14 +252,25 @@ export interface SystemPromptSourceDiscovery {
 	appendPath?: string;
 }
 
+/**
+ * Directory whose project config bases own prompt sources: the parent of the nearest non-empty `.omp`, else `cwd`.
+ * Reusing the native SYSTEM.md capability walk-up keeps a nested cwd from silently selecting user-level sources.
+ */
+async function resolveProjectPromptRoot(cwd: string): Promise<string> {
+	const nearest = await findNearestProjectConfigDir({ cwd, home: os.homedir(), repoRoot: await findRepoRoot(cwd) });
+	return nearest ? path.dirname(nearest.dir) : cwd;
+}
+
 /** Select effective raw, template, and append prompt sources using project-before-user precedence. */
-export function discoverSystemPromptSources(cwd: string): SystemPromptSourceDiscovery {
-	const projectRaw = findConfigFileWithMeta("SYSTEM.md", { user: false, cwd });
+export async function discoverSystemPromptSources(cwd: string): Promise<SystemPromptSourceDiscovery> {
+	const projectRoot = await resolveProjectPromptRoot(cwd);
+	const projectRaw = findConfigFileWithMeta("SYSTEM.md", { user: false, cwd: projectRoot });
 	const projectTemplate = findConfigFileWithMeta("SYSTEM.template.md", {
 		user: false,
-		cwd,
+		cwd: projectRoot,
 		includeDanglingSymlinks: true,
 	});
+	// APPEND_SYSTEM.md keeps upstream's cwd-only config-base lookup.
 	const appendPath =
 		findConfigFile("APPEND_SYSTEM.md", { user: false, cwd }) ??
 		findConfigFile("APPEND_SYSTEM.md", { project: false, cwd });
@@ -289,18 +302,23 @@ export function discoverSystemPromptSources(cwd: string): SystemPromptSourceDisc
 }
 
 /** Select the child base template using project-before-user precedence. */
-export function discoverSubagentBaseSystemPromptTemplate(cwd: string): string | undefined {
+export async function discoverSubagentBaseSystemPromptTemplate(cwd: string): Promise<string | undefined> {
+	const projectRoot = await resolveProjectPromptRoot(cwd);
 	return (
-		findConfigFile("SYSTEM.template.md", { user: false, cwd, includeDanglingSymlinks: true }) ??
+		findConfigFile("SYSTEM.template.md", { user: false, cwd: projectRoot, includeDanglingSymlinks: true }) ??
 		findConfigFile("SYSTEM.template.md", { project: false, cwd, includeDanglingSymlinks: true })
 	);
 }
 
 /** Select the child wrapper template using project-before-user precedence. */
-export function discoverSubagentSystemPromptTemplate(cwd: string): string | undefined {
+export async function discoverSubagentSystemPromptTemplate(cwd: string): Promise<string | undefined> {
+	const projectRoot = await resolveProjectPromptRoot(cwd);
 	return (
-		findConfigFile("SUBAGENT-SYSTEM.template.md", { user: false, cwd, includeDanglingSymlinks: true }) ??
-		findConfigFile("SUBAGENT-SYSTEM.template.md", { project: false, cwd, includeDanglingSymlinks: true })
+		findConfigFile("SUBAGENT-SYSTEM.template.md", {
+			user: false,
+			cwd: projectRoot,
+			includeDanglingSymlinks: true,
+		}) ?? findConfigFile("SUBAGENT-SYSTEM.template.md", { project: false, cwd, includeDanglingSymlinks: true })
 	);
 }
 

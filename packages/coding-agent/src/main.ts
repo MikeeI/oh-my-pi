@@ -1398,7 +1398,7 @@ export async function buildDiscoveredSystemPromptOptions({
 	systemPromptTemplateSource?: string;
 	appendSystemPromptSource?: string;
 }): Promise<Pick<CreateAgentSessionOptions, "systemPrompt" | "systemPromptTemplate">> {
-	const discoveredSystemPrompt = discoverSystemPromptSources(cwd);
+	const discoveredSystemPrompt = await discoverSystemPromptSources(cwd);
 	if (
 		systemPromptSource === undefined &&
 		systemPromptTemplateSource === undefined &&
