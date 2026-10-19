@@ -169,6 +169,7 @@
 
 - Fixed system and subagent prompt template render errors (such as a removed helper) not naming the template file that failed
 - Fixed starting in a subdirectory ignoring the project's `.omp/SYSTEM.md`, `SYSTEM.template.md`, and `SUBAGENT-SYSTEM.template.md` and silently using the user-level prompt; they now resolve from the nearest project `.omp` like other project config
+- Fixed published `momp update --help` advertising self-installation and channel switching that the personal fork disables
 
 ## [18.12.2] - 2026-10-18
 

@@ -1,5 +1,5 @@
 import type { CommandMetadata } from "@oh-my-pi/pi-utils/cli";
-import { APP_DISPLAY_NAME } from "../app-version";
+import { APP_DISPLAY_NAME, APP_PACKAGE_NAME, isMompPackageName } from "../app-version";
 
 export const acpHelp = {
 	description: `Run ${APP_DISPLAY_NAME} as an ACP (Agent Client Protocol) server over stdio`,
@@ -174,7 +174,11 @@ export const ttsrHelp = {
 	description: "Inspect and test Time-Traveling Stream Rules (TTSR)",
 } satisfies CommandMetadata;
 
-export const updateHelp = { description: "Check for and install updates" } satisfies CommandMetadata;
+export const updateHelp = {
+	description: isMompPackageName(APP_PACKAGE_NAME)
+		? "Show the manual momp install command or update installed plugins"
+		: "Check for and install updates",
+} satisfies CommandMetadata;
 
 export const usageHelp = {
 	description: "Show provider usage limits for every authenticated account",

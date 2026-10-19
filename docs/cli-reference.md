@@ -284,7 +284,7 @@ Run `omp <command> --help` for each command's own flags and examples.
 | `stats` | View usage statistics. | |
 | `system-prompt` | Inspect Main or configured Child provider prompts, dynamic parts, token breakdown, or Codex wire hashes. | |
 | `stream` | Broadcast local OMP session screens and chat to a public live channel. | |
-| `update` | Check for and install updates; `--canary`/`--stable` switch release channels. | |
+| `update` | Check for and install updates; `--canary`/`--stable` switch release channels. Published `momp` never self-installs: it prints the manual install command, exits 0 for `--check`, and exits 1 otherwise; `-l` still updates plugins. | |
 | `usage` | Show provider usage limits for every authenticated account, flagging saved resets close to expiry; `usage clients` breaks token burn down per client (with `--days`), `usage invalidate` drops cached reports, `usage accounts` lists each OAuth account's provider and identity key (the key `task.agentAccountPools` and broker account pools take; no tokens, `--json` supported), and `usage reset` lists each Codex and Claude account's saved rate-limit resets by `<provider>/<credential id>` (`--json`, `--redact`) and `usage reset <provider>/<credential id>` spends one, also from an auth-broker client. | [Task agent discovery](./task-agent-discovery.md#model-and-structured-output-precedence), [saved resets](./settings.md#saved-reset-auto-consumption) |
 | `tiny-models` | Download tiny local models for session titles, memory, and word completion. | [local models](./local-models.md) |
 | `token` | Get the API key or OAuth token for a provider. | [secrets](./secrets.md) |

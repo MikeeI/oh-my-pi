@@ -878,6 +878,7 @@ The upgrader validates these IDs against its executable and manual proof mapping
 - Contract: published `momp update` refuses self-installation.
 - Contract: the refusal prints `bun install -g @mikeei/momp@latest --force --minimum-release-age 0`.
 - Contract: `momp update --check` never installs or treats the upstream package as the fork package.
+- Contract: published `momp update` help describes its manual-install behavior and never advertises self-installation or channel switching.
 - Contract: startup may check upstream availability but compares against the fork's base version.
 - Contract: legacy extension self-imports resolve against the installed package identity.
 - Contract: copyable CLI self-invocations, help examples, and recovery hints use the active binary identity.
@@ -888,6 +889,7 @@ The upgrader validates these IDs against its executable and manual proof mapping
 - Owner: `src/utils/resume-command.ts` owns profile-aware start and resume commands; `src/main.ts` renders recovery hints after profile selection.
 - Owner: `scripts/bundle-dist.ts` embeds validated package identity overrides into the bundled CLI.
 - Owner: `src/cli/update-cli.ts` owns fork-safe update behavior.
+- Owner: `src/commands/update.ts` and `src/cli/command-help.ts#updateHelp` render identity-specific update help.
 - Owner: `src/extensibility/plugins/legacy-pi-compat.ts` owns installed-package self-import compatibility.
 - Owner: `MOMP_VERSION` owns the source release version.
 - Reason: canonical upstream cannot own the `@mikeei/momp` package identity or its fork-safe update policy.
