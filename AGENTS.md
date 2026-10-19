@@ -9,7 +9,6 @@ Align fork changes with upstream ownership boundaries to minimize rebase conflic
 Prefer upstream behavior when it already satisfies the fork contract; NEVER duplicate functionality already owned upstream.
 `main` mirrors `upstream/main` and MUST remain free of MOMP-only changes.
 `personal` is the MOMP development and release branch; it carries the minimal fork patchstack.
-When upstream implements a MOMP contract, remove the redundant fork patch instead of preserving its historical shape.
 
 ### Mobile Terminal Environment
 
@@ -112,6 +111,7 @@ The upgrader validates these IDs against its executable and manual proof mapping
 - Owner: upstream `src/discovery/builtin.ts#findNearestProjectConfigDir` owns the nearest project `.omp` walk-up.
 - Owner: `src/main.ts` maps discovered sources into Main-session construction.
 - Owner: `src/capability/system-prompt.ts#systemPromptCapability` owns raw `SYSTEM.md` capability metadata.
+- Owner: `docs/system-prompt-customization.md`, `docs/config-usage.md`, and `docs/session-operations-export-share-fork-resume.md` document the MOMP filename, flag, discovery, and mandatory failure.
 - Reason: upstream v18.2.7 added an analogous `SYSTEM_TEMPLATE.md` interface with fallback semantics.
 - Reason: its filename and discovered-template fallback do not satisfy the mandatory MOMP contract.
 - Required action: retain the MOMP filename, discovery, precedence, loading, and mandatory failure behavior.
@@ -488,6 +488,7 @@ The upgrader validates these IDs against its executable and manual proof mapping
 - Contract: RPC clients surface reload rejection instead of silently accepting invalid candidate state.
 - Contract: failed directory scans reject routine reloads; only an absent routine directory is optional.
 - Contract: duplicate or conflicting routines fail before command advertisement.
+- Contract: SDK and print sessions reject routine names owned by session file or custom commands at construction, reload, and replacement.
 - Contract: autocomplete shows the declared description without synthetic routine suffixes.
 - Contract: execution serializes active routine work and reports progress.
 - Contract: a terminal step failure stops the routine, reports failed, and prevents subsequent steps.
@@ -502,6 +503,7 @@ The upgrader validates these IDs against its executable and manual proof mapping
 - Owner: `src/extensibility/routines.ts` owns parsing, validation, planning, and progress formatting.
 - Owner: `src/task/command-templates.ts` owns the embedded command-template source that keeps routine discovery acyclic.
 - Owner: `src/session/agent-session.ts` owns execution and lifecycle serialization.
+- Owner: `src/session/agent-session.ts` `#assertRoutineCatalog` enforces session-owned routine name conflicts on every commit path.
 - Owner: `src/modes/rpc/rpc-mode.ts` serializes command refreshes and retains the last validated advertisement.
 - Owner: upstream `src/session/agent-session.ts#isBusyForSnapshot` owns the shared snapshot busy decision.
 - Owner: upstream `src/modes/rpc/wire/state.ts#stateDefs` owns the command-source enum for every generated RPC SDK.
@@ -564,6 +566,7 @@ The upgrader validates these IDs against its executable and manual proof mapping
 - Contract: local selection and global ranking share one ordering with stable identity tie-breakers.
 - Contract: smaller limits return prefixes of larger results for an unchanged corpus and fixed search time.
 - Contract: bounded text and JSON output returns newest matches with explicit partial-coverage diagnostics.
+- Contract: truncated text output names an actionable next step; at the `limit` maximum it names narrowing filters instead.
 - Contract: enumeration, stat, and session-read failures contribute to partial-coverage diagnostics.
 - Contract: an empty discovered corpus never conceals a discovery failure as a complete search.
 - Contract: Children never receive the tool.
@@ -869,6 +872,7 @@ The upgrader validates these IDs against its executable and manual proof mapping
 - Contract: published bundles retain required patched dependencies without install-time patching.
 - Contract: publish-time bundle identity is injected without changing source package metadata.
 - Contract: source `package.json` stays upstream-near; publish metadata is never hard-coded into source.
+- Contract: fork names, registry metadata, binaries, and publish versions exist only in temporary publish staging.
 - Contract: published `momp update` refuses self-installation.
 - Contract: the refusal prints `bun install -g @mikeei/momp@latest --force --minimum-release-age 0`.
 - Contract: `momp update --check` never installs or treats the upstream package as the fork package.
@@ -992,7 +996,6 @@ The upgrader validates these IDs against its executable and manual proof mapping
 #### Experiments and non-contract artifacts
 
 Changelogs, formatting-only commits, test migrations, proposals, and experiments do not justify runtime retention.
-Operational probes, benchmarks, experiments, migration scaffolding, and diagnostic scripts MUST have a current repeatable consumer.
 Classify retained candidates during every full upgrade as `NICHT-CONTRACT-AKTIV` or `NICHT-CONTRACT-ENTFERNEN`.
 `NICHT-CONTRACT-AKTIV` requires an operator workflow, release gate, performance decision, or regression investigation.
 `NICHT-CONTRACT-ENTFERNEN` requires complete removal during the same full upgrade or authorized cleanup.
@@ -1044,8 +1047,8 @@ Prompt files are upstream-owned by default.
 A MOMP prompt delta MUST defend a current observable model, tool-routing, or operator contract.
 Prompt wording history, personal preference, and token count alone do not justify a permanent delta.
 NEVER propose new progressive disclosure or progressive exposure for prompts, tools, schemas, or capabilities.
-The existing `xd://` catalog mode is the sole settled exception.
-`tools.xdevDocs="catalog"` is the settled MOMP baseline for this repository's use case.
+The existing on-demand `xd://` device catalog is the sole settled exception.
+`tools.xdevDocs="builtins"` is the settled MOMP baseline; managed `config.yml` owns the value.
 NEVER propose, require, or repeat `builtins`-versus-`catalog` comparison or A/B measurement unless the user explicitly reopens this decision.
 Keep prompt behavior in static `.md` owners and keep coupled runtime wiring and behavioral tests in the same closure.
 When removing a prompt delta, inspect imports, renderers, tool capability gates, consumers, and contract tests.
@@ -1064,9 +1067,6 @@ Render and inspect every behavior-bearing prompt change before completion.
 - Routing: NEVER duplicate the upgrader procedure here; route upgrade, publish, install, and deploy through its contract.
 - Versioning: source behavior changes and release-version bumps MUST remain separate changes.
 - Versioning: complete and verify source behavior before changing `MOMP_VERSION`.
-- Packaging: keep `packages/coding-agent/package.json` close to upstream source metadata.
-- Packaging: fork names, registry metadata, binaries, and publish versions belong to temporary publish staging.
-- Packaging: NEVER hard-code publish-stage identity into source metadata merely to identify a release artifact as MOMP.
 
 Request semantics:
 
