@@ -17,7 +17,11 @@ const MOMP_DISABLED_FLAG = "Disabled for momp; prints the manual install command
 export default class Update extends Command {
 	static description = commandHelp.description;
 	static flags = {
-		force: Flags.boolean({ char: "f", description: MOMP_PACKAGE ? MOMP_DISABLED_FLAG : "Force update", default: false }),
+		force: Flags.boolean({
+			char: "f",
+			description: MOMP_PACKAGE ? MOMP_DISABLED_FLAG : "Force update",
+			default: false,
+		}),
 		check: Flags.boolean({
 			char: "c",
 			description: MOMP_PACKAGE
