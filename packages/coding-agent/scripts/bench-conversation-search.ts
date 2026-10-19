@@ -7,6 +7,7 @@ import { parseArgs } from "node:util";
 import { type ConversationSessionCorpus, listConversationSessions } from "../src/session/conversation-corpus";
 import {
 	CONVERSATION_SEARCH_CONCURRENCY,
+	conversationSearchWindowStart,
 	DEFAULT_CONVERSATION_SEARCH_DAYS,
 	DEFAULT_CONVERSATION_SEARCH_LIMIT,
 	searchConversationSessions,
@@ -149,27 +150,28 @@ export async function runConversationSearchBenchmark(
 	if (options.sessionDir) await assertDirectory("--session-dir", options.sessionDir);
 	const measuredAt = new Date();
 	const nowMs = measuredAt.getTime();
-	const sinceMs = nowMs - options.days * 86_400_000;
+	const sinceMs = conversationSearchWindowStart(options.days, nowMs);
 	const discoveryStarted = performance.now();
 	const corpus = await listConversationSessions({
 		cwd: options.cwd,
 		scope: "project",
+		modifiedSinceMs: sinceMs,
 		sessionDir: options.sessionDir ?? SessionManager.getDefaultSessionDir(options.cwd),
 		currentSessionFile: options.excludeSessionFile,
 	});
 	const discoveryMs = performance.now() - discoveryStarted;
 	if (corpus.discoveryFailures > 0) throw new Error("Benchmark invalid: session discovery was incomplete.");
 	const { sessions } = corpus;
-	if (sessions.length === 0) throw new Error("No persisted sessions were found for the selected workspace.");
+	if (sessions.length === 0) {
+		throw new Error(`No persisted sessions fall within the ${options.days}-day lookback window for the workspace.`);
+	}
 	const excludedPath = options.excludeSessionFile ? path.resolve(options.excludeSessionFile) : undefined;
 	if (excludedPath && !sessions.some(session => path.resolve(session.path) === excludedPath)) {
-		throw new Error(`--exclude-session is not present in the selected session corpus: ${excludedPath}`);
+		throw new Error(`--exclude-session is not present in the selected lookback-window corpus: ${excludedPath}`);
 	}
-	const eligible = sessions.filter(session => {
-		if (excludedPath && path.resolve(session.path) === excludedPath) return false;
-		return session.modified.getTime() >= sinceMs;
-	});
-	if (eligible.length === 0) throw new Error(`No sessions fall within the ${options.days}-day lookback window.`);
+	// Discovery already applied the window; only the excluded session remains to drop.
+	const eligible = excludedPath ? sessions.filter(session => path.resolve(session.path) !== excludedPath) : sessions;
+	if (eligible.length === 0) throw new Error("No sessions remain after excluding --exclude-session.");
 	const datasetFiles = await Promise.all(
 		eligible.map(async session => {
 			const filePath = path.resolve(session.path);

@@ -567,12 +567,16 @@ The upgrader validates these IDs against its executable and manual proof mapping
 - Contract: smaller limits return prefixes of larger results for an unchanged corpus and fixed search time.
 - Contract: bounded text and JSON output returns newest matches with explicit partial-coverage diagnostics.
 - Contract: truncated text output names an actionable next step; at the `limit` maximum it names narrowing filters instead.
-- Contract: enumeration, stat, and session-read failures contribute to partial-coverage diagnostics.
+- Contract: enumeration and stat failures contribute to partial-coverage diagnostics.
+- Contract: read and header failures of session files modified within the window also contribute.
+- Contract: discovery content-scans only session files modified within the window; older files are only stat'ed.
 - Contract: an empty discovered corpus never conceals a discovery failure as a complete search.
 - Contract: Children never receive the tool.
 - Owner: `src/session/conversation-corpus.ts` owns visible transcript projection and journal discovery.
 - Owner: upstream `src/session/session-listing.ts` owns session enumeration, scanning, and discovery-error reporting.
-- Owner: upstream `src/session/session-storage.ts#FileSessionStorage.listFilesSync` preserves filesystem enumeration errors.
+- Owner: `src/session/session-listing.ts#listSessionsModifiedSince` selects windowed files before content scans.
+- Reason: scanning every stored session thrashed the shared 4096-entry scan cache and cost ~0.7 s per `all` search.
+- Required action: reuse upstream `newestSessionFiles` with its optional failure reporter, not a parallel enumerator.
 - Owner: `src/session/conversation-search.ts` owns lexical matching, windowing, ranking, and coverage accounting.
 - Owner: `src/tools/conversation-search.ts` owns the tool boundary and Main-only exposure.
 - Owner: `src/tools/conversation-search-format.ts` owns output variants.
@@ -581,7 +585,7 @@ The upgrader validates these IDs against its executable and manual proof mapping
 - Coverage: upstream v18.12.0 follows transcript symlinks, skips symlinked buckets, and deduplicates physical files.
 - Owner: upstream `src/session/session-listing.ts#scanBucketFiles` owns cross-bucket enumeration.
 - Required action: preserve that owner and deduplication with partial enumeration and discovery-failure accounting.
-- Proof: `test/conversation-search.test.ts`.
+- Proof: `test/conversation-search.test.ts`, including the stale-journal window case.
 
 ##### Benchmark behavior
 

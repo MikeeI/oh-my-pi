@@ -266,6 +266,17 @@ describe("conversation_search", () => {
 		expect(empty.details).toMatchObject({ complete: true, candidateSessions: 0 });
 	});
 
+	it("does not inspect or count journals last modified before the lookback window", async () => {
+		using tempDir = TempDir.createSync("@omp-conversation-search-window-");
+		const staleFile = tempDir.join("sessions/stale-broken.jsonl");
+		await Bun.write(staleFile, '{"type":"message"}\n');
+		const staleSeconds = (Date.now() - 30 * 86_400_000) / 1000;
+		await fs.utimes(staleFile, staleSeconds, staleSeconds);
+		const tool = new ConversationSearchTool(makeToolSession(tempDir.path(), tempDir.join("sessions/active.jsonl")));
+		const result = await tool.execute("window", { query: "needle", days: 10 });
+		expect(result.details).toMatchObject({ complete: true, discoveryFailures: 0, candidateSessions: 0 });
+	});
+
 	it("is available to Main but absent from child tool registries", async () => {
 		using tempDir = TempDir.createSync("@omp-conversation-search-gate-");
 		const activeFile = tempDir.join("active.jsonl");

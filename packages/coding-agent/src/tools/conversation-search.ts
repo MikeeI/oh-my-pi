@@ -4,6 +4,7 @@ import { untilAborted } from "@oh-my-pi/pi-utils";
 import conversationSearchDescription from "../prompts/tools/conversation-search.md" with { type: "text" };
 import { listConversationSessions } from "../session/conversation-corpus";
 import {
+	conversationSearchWindowStart,
 	DEFAULT_CONVERSATION_SEARCH_DAYS,
 	DEFAULT_CONVERSATION_SEARCH_LIMIT,
 	MAX_CONVERSATION_SEARCH_LIMIT,
@@ -74,11 +75,18 @@ export class ConversationSearchTool implements AgentTool<typeof conversationSear
 			const match = params.match ?? "all";
 			const format = params.format ?? "text";
 			const limit = params.limit ?? DEFAULT_CONVERSATION_SEARCH_LIMIT;
-			const corpus = await listConversationSessions({ cwd: this.session.cwd, scope, currentSessionFile });
+			const nowMs = Date.now();
+			const corpus = await listConversationSessions({
+				cwd: this.session.cwd,
+				scope,
+				modifiedSinceMs: conversationSearchWindowStart(days, nowMs),
+				currentSessionFile,
+			});
 			const report = await searchConversationSessions(
 				corpus,
 				{ query, days, scope, role, match, limit, currentSessionFile },
 				signal,
+				nowMs,
 			);
 			const details: ConversationSearchDetails = {
 				query: report.query,

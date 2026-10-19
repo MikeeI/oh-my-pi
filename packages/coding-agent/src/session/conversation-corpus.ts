@@ -1,11 +1,6 @@
 import * as path from "node:path";
 import { isRecord, logger } from "@oh-my-pi/pi-utils";
-import {
-	listAllSessions,
-	listSessionsReadOnly,
-	type SessionDiscoveryFailure,
-	type SessionInfo,
-} from "./session-listing";
+import { listSessionsModifiedSince, type SessionDiscoveryFailure, type SessionInfo } from "./session-listing";
 import { visitEntriesFromFileStream } from "./session-loader";
 import { SessionManager } from "./session-manager";
 import { FileSessionStorage } from "./session-storage";
@@ -33,10 +28,11 @@ export interface ConversationSessionCorpus {
 export async function listConversationSessions(options: {
 	cwd: string;
 	scope: ConversationSearchScope;
+	/** Window start; older files are never content-scanned, so their read failures cannot affect coverage. */
+	modifiedSinceMs: number;
 	currentSessionFile?: string | null;
 	sessionDir?: string;
 }): Promise<ConversationSessionCorpus> {
-	const storage = new FileSessionStorage();
 	const currentPath = options.currentSessionFile ? path.resolve(options.currentSessionFile) : undefined;
 	let discoveryFailures = 0;
 	const onFailure = (failure: SessionDiscoveryFailure) => {
@@ -48,12 +44,16 @@ export async function listConversationSessions(options: {
 		});
 	};
 	const sessionDir =
-		options.sessionDir ??
-		(currentPath ? path.dirname(currentPath) : SessionManager.getDefaultSessionDir(options.cwd, undefined, storage));
-	const sessions =
 		options.scope === "all"
-			? await listAllSessions(storage, undefined, onFailure)
-			: await listSessionsReadOnly(sessionDir, storage, onFailure);
+			? undefined
+			: (options.sessionDir ??
+				(currentPath
+					? path.dirname(currentPath)
+					: SessionManager.getDefaultSessionDir(options.cwd, undefined, new FileSessionStorage())));
+	const sessions = await listSessionsModifiedSince(
+		{ modifiedSinceMs: options.modifiedSinceMs, sessionDir },
+		onFailure,
+	);
 	return { sessions, discoveryFailures };
 }
 

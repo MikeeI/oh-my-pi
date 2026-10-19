@@ -644,16 +644,13 @@ async function scanSessionDirReadOnly(
 	sessionDir: string,
 	storage: SessionStorage,
 	withStatus: boolean,
-	onFailure?: SessionDiscoveryReporter,
 ): Promise<SessionInfo[]> {
-	let files: string[];
 	try {
-		files = storage.listFilesSync(sessionDir, "*.jsonl");
-	} catch (error) {
-		if (!isEnoent(error)) onFailure?.({ path: sessionDir, stage: "enumeration", error });
+		const files = storage.listFilesSync(sessionDir, "*.jsonl");
+		return await collectSessionsFromFiles(files, storage, withStatus);
+	} catch {
 		return [];
 	}
-	return collectSessionsFromFiles(files, storage, withStatus, onFailure);
 }
 
 /**
@@ -673,25 +670,19 @@ export function listSessions(
 /**
  * List sessions without repairing orphaned backups or mutating the directory.
  */
-export function listSessionsReadOnly(
-	sessionDir: string,
-	storage: SessionStorage,
-	onFailure?: SessionDiscoveryReporter,
-): Promise<SessionInfo[]> {
-	return scanSessionDirReadOnly(sessionDir, storage, true, onFailure);
+export function listSessionsReadOnly(sessionDir: string, storage: SessionStorage): Promise<SessionInfo[]> {
+	return scanSessionDirReadOnly(sessionDir, storage, true);
 }
 
 /** List all sessions across all project directories (newest first). */
 export async function listAllSessions(
 	storage: SessionStorage = new FileSessionStorage(),
 	sessionsRoot: string = getSessionsDir(),
-	onFailure?: SessionDiscoveryReporter,
 ): Promise<SessionInfo[]> {
 	try {
-		const files = await dedupeRealPaths(await scanBucketFiles(sessionsRoot, "*.jsonl", onFailure));
-		return await collectSessionsFromFiles(files, storage, true, onFailure);
-	} catch (error) {
-		if (!isEnoent(error)) onFailure?.({ path: sessionsRoot, stage: "enumeration", error });
+		const files = await dedupeRealPaths(await scanBucketFiles(sessionsRoot, "*.jsonl"));
+		return await collectSessionsFromFiles(files, storage, true);
+	} catch {
 		return [];
 	}
 }
@@ -825,12 +816,14 @@ interface StatedSessionFile {
 /**
  * Files matching `pattern` under `root`, newest mtime first. Stat-only: costs
  * one glob plus one stat per file, never a content read. Files that vanish
- * between discovery and stat are dropped.
+ * between discovery and stat are dropped; `onFailure` makes enumeration and
+ * stat failures visible to coverage-aware callers instead of silently omitting them.
  */
 async function newestSessionFiles(
 	root: string,
 	pattern: string,
 	storage: SessionStorage,
+	onFailure?: SessionDiscoveryReporter,
 ): Promise<StatedSessionFile[]> {
 	let files: string[];
 	try {
@@ -841,14 +834,15 @@ async function newestSessionFiles(
 			const slash = pattern.lastIndexOf("/");
 			files =
 				slash >= 0
-					? await dedupeRealPaths(await scanBucketFiles(root, pattern.slice(slash + 1)))
+					? await dedupeRealPaths(await scanBucketFiles(root, pattern.slice(slash + 1), onFailure))
 					: await Array.fromAsync(new Bun.Glob(pattern).scan({ cwd: root, followSymlinks: true }), name =>
 							path.join(root, name),
 						);
 		} else {
 			files = storage.listFilesSync(root, pattern);
 		}
-	} catch {
+	} catch (error) {
+		if (!isEnoent(error)) onFailure?.({ path: root, stage: "enumeration", error });
 		return [];
 	}
 	const stated: StatedSessionFile[] = [];
@@ -857,7 +851,8 @@ async function newestSessionFiles(
 			files.map(async file => {
 				try {
 					return { file, stat: await fs.promises.stat(file) };
-				} catch {
+				} catch (error) {
+					onFailure?.({ path: file, stage: "stat", error });
 					return undefined;
 				}
 			}),
@@ -869,10 +864,43 @@ async function newestSessionFiles(
 		for (const file of files) {
 			try {
 				stated.push({ file, stat: storage.statSync(file) });
-			} catch {}
+			} catch (error) {
+				onFailure?.({ path: file, stage: "stat", error });
+			}
 		}
 	}
 	return stated.sort((a, b) => b.stat.mtimeMs - a.stat.mtimeMs);
+}
+
+/** Selects the session files {@link listSessionsModifiedSince} content-scans. */
+export interface SessionsModifiedSinceQuery {
+	/** Inclusive lower bound on file mtime, in epoch milliseconds. */
+	modifiedSinceMs: number;
+	/** One project's session directory; omitted spans every project under `sessionsRoot`. */
+	sessionDir?: string;
+	/** Root holding one directory per project. Default: {@link getSessionsDir}. */
+	sessionsRoot?: string;
+}
+
+/**
+ * Sessions whose files changed at or after `modifiedSinceMs`, ordered like {@link listAllSessions}.
+ * Older files are only stat'ed: a time-windowed consumer cannot use them, and content-scanning
+ * every file of a large store costs far more than the window and thrashes the shared scan cache.
+ */
+export async function listSessionsModifiedSince(
+	query: SessionsModifiedSinceQuery,
+	onFailure?: SessionDiscoveryReporter,
+): Promise<SessionInfo[]> {
+	const storage = new FileSessionStorage();
+	const stated = query.sessionDir
+		? await newestSessionFiles(query.sessionDir, "*.jsonl", storage, onFailure)
+		: await newestSessionFiles(query.sessionsRoot ?? getSessionsDir(), "*/*.jsonl", storage, onFailure);
+	const files: string[] = [];
+	for (const { file, stat } of stated) {
+		if (stat.mtimeMs < query.modifiedSinceMs) break;
+		files.push(file);
+	}
+	return collectSessionsFromFiles(files, storage, true, onFailure);
 }
 
 /** Header-level {@link SessionInfo} with status for one session file; undefined when unreadable or not a session. */

@@ -14,6 +14,12 @@ export const DEFAULT_CONVERSATION_SEARCH_LIMIT = 12;
 export const MAX_CONVERSATION_SEARCH_LIMIT = 50;
 
 const DAY_MS = 24 * 60 * 60 * 1000;
+
+/** Inclusive start of a lookback window; discovery and search must use the same instant. */
+export function conversationSearchWindowStart(days: number, nowMs: number): number {
+	return nowMs - days * DAY_MS;
+}
+
 export const CONVERSATION_SEARCH_CONCURRENCY = 4;
 const MAX_CAPTURE_CHARS = 4_096;
 
@@ -73,12 +79,12 @@ interface SessionSearchResult {
 export async function searchConversationSessions(
 	corpus: ConversationSessionCorpus,
 	request: ConversationSearchRequest,
-	signal?: AbortSignal,
-	nowMs = Date.now(),
+	signal: AbortSignal | undefined,
+	nowMs: number,
 ): Promise<ConversationSearchReport> {
 	const query = request.query.trim();
 	if (!query) throw new Error("Conversation search query must not be empty.");
-	const sinceMs = nowMs - request.days * DAY_MS;
+	const sinceMs = conversationSearchWindowStart(request.days, nowMs);
 	const currentSessionPath = request.currentSessionFile ? path.resolve(request.currentSessionFile) : undefined;
 	const candidates = corpus.sessions.filter(session => {
 		if (currentSessionPath && path.resolve(session.path) === currentSessionPath) return false;
