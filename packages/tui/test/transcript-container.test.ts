@@ -1227,6 +1227,23 @@ describe("TranscriptContainer", () => {
 		expect(transcript.peekReplayBatch(8)?.rows).toEqual(["OLD", "", "abcdefgh", "", "head"]);
 		expect(transcript.renderViewport(8, 1, frame)).toEqual(["tail"]);
 	});
+
+	it("renders only the accepted chunks a drifted resize tail needs", () => {
+		const transcript = new TranscriptContainer();
+		const changed = new VersionedBlock(["OLD"]);
+		const early = new CountingBlock(["early"]);
+		const blocks = [changed, early, new CountingBlock(["late0"]), new CountingBlock(["late1"])];
+		for (const block of blocks) {
+			transcript.addChild(block);
+			transcript.acknowledgeFinalizedBatch(transcript.peekFlushBatch(80)!.id);
+		}
+
+		changed.setRows(["NEW"]);
+		expect(transcript.renderTail(80, 100)).toEqual(["OLD", "", "early", "", "late0", "", "late1"]);
+		const earlyRenders = early.renders;
+		expect(transcript.renderTail(80, 2)).toEqual(["", "late1"]);
+		expect(early.renders).toBe(earlyRenders);
+	});
 	it("renders exactly the trailing semantic rows without walking the full ledger", () => {
 		const transcript = new TranscriptContainer();
 		transcript.addChild(new Block(["a1", "a2"], true));

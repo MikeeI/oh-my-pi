@@ -805,6 +805,7 @@ The upgrader validates these IDs against its executable and manual proof mapping
 - Implementation constraint: geometry epochs currently distinguish stale CPR replies from the active resize transaction.
 - Contract: fullscreen exits recover the normal-buffer anchor after size changes, including net-zero bursts.
 - Contract: resize recovery retains its normal-buffer snapshot until the first recovered frame is painted.
+- Contract: after accepted-row drift, the resize tail renders only the accepted chunks its viewport needs.
 - Owner: upstream `packages/tui/src/chrome/transcript-container.ts#TranscriptContainer` owns retirement and replay.
 - Owner: `packages/tui/src/prompt/composer.ts#rerenderOfferedHistory` discards invalidated transcript wrappers.
 - Owner: upstream `packages/tui/src/tui.ts#TUI.emitPlanFrame` owns the sole physical history write.
@@ -843,6 +844,7 @@ The upgrader validates these IDs against its executable and manual proof mapping
 - Proof: mixed accepted-batch drift, semantic neighbor reflow, and retirement in `packages/tui/test/transcript-container.test.ts`.
 - Proof: split-prefix acceptance, discarded-frame recomposition, drift, and unchanged-neighbor reflow in that test file.
 - Proof: finalized-pending emergency visibility and retirement ordering in `packages/tui/test/transcript-container.test.ts`.
+- Proof: drifted-tail chunk bounds in `packages/tui/test/transcript-container.test.ts`.
 - Proof: reentrant paint reset and frame-plan cases in `packages/tui/test/history-frame-plan.test.ts`.
 - Proof: CPR offsets and a full-height width-reflow start row in `packages/tui/test/resize-multiplexer-anchor.test.ts`.
 - Proof: bounded erasure and stale fullscreen CPR rejection in `packages/tui/test/resize-multiplexer-anchor.test.ts`.

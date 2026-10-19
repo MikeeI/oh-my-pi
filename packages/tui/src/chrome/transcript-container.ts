@@ -1095,8 +1095,7 @@ export class TranscriptContainer extends Container {
 			return rows.length > cap ? rows.slice(rows.length - cap) : rows;
 		}
 
-		const rows = this.#renderAcceptedTape(width);
-		if (rows.length > 0 && isPlainBlank(rows.at(-1)!)) rows.pop();
+		const frontierRows: string[] = [];
 		for (let index = this.#frontier; index < this.#entries.length; index++) {
 			const entry = this.#entries[index]!;
 			this.#setAllocation(entry.component, Number.MAX_SAFE_INTEGER, this.#lastFrame);
@@ -1104,9 +1103,18 @@ export class TranscriptContainer extends Container {
 			const emittedRows = index === this.#frontier ? this.#emittedRowCount(entry, width) : 0;
 			const block = rendered.slice(emittedRows);
 			if (block.length === 0) continue;
-			if (rows.length > 0) rows.push("");
-			rows.push(...block);
+			if (frontierRows.length > 0) frontierRows.push("");
+			frontierRows.push(...block);
 		}
+		// Collect accepted chunks bottom-up only until the viewport is covered; one extra row survives the
+		// trailing-blank trim below, and any non-empty tape suffix implies the same separator as the full tape.
+		const rows: string[] = [];
+		for (let index = this.#acceptedTapeChunks.length - 1; index >= 0 && rows.length <= cap; index--) {
+			rows.unshift(...this.#renderAcceptedChunk(this.#acceptedTapeChunks[index]!, width));
+		}
+		if (rows.length > 0 && isPlainBlank(rows.at(-1)!)) rows.pop();
+		if (rows.length > 0 && frontierRows.length > 0) rows.push("");
+		rows.push(...frontierRows);
 		return rows.length > cap ? rows.slice(rows.length - cap) : rows;
 	}
 
@@ -1557,21 +1565,24 @@ export class TranscriptContainer extends Container {
 	}
 
 	#renderAcceptedTape(width: number): string[] {
+		return this.#acceptedTapeChunks.flatMap(chunk => this.#renderAcceptedChunk(chunk, width));
+	}
+
+	// Reflow is segment-local within a chunk, so rendering a suffix of chunks yields the same rows as the full tape's suffix.
+	#renderAcceptedChunk(chunk: AcceptedTapeChunk, width: number): string[] {
 		const rows: string[] = [];
-		for (const chunk of this.#acceptedTapeChunks) {
-			let offset = 0;
-			for (const part of chunk.parts) {
-				const component = part.entry.component as Component & FinalizableBlock;
-				rows.push(...this.#acceptedRows(chunk, width, offset, part.start));
-				rows.push(
-					...(part.version !== undefined && component.getTranscriptBlockVersion?.() !== part.version
-						? this.#acceptedRows(chunk, width, part.start, part.end)
-						: this.#renderAcceptedPart(part, width)),
-				);
-				offset = part.end;
-			}
-			rows.push(...this.#acceptedRows(chunk, width, offset, chunk.rows.length));
+		let offset = 0;
+		for (const part of chunk.parts) {
+			const component = part.entry.component as Component & FinalizableBlock;
+			rows.push(...this.#acceptedRows(chunk, width, offset, part.start));
+			rows.push(
+				...(part.version !== undefined && component.getTranscriptBlockVersion?.() !== part.version
+					? this.#acceptedRows(chunk, width, part.start, part.end)
+					: this.#renderAcceptedPart(part, width)),
+			);
+			offset = part.end;
 		}
+		rows.push(...this.#acceptedRows(chunk, width, offset, chunk.rows.length));
 		return rows;
 	}
 
