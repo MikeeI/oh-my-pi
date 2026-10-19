@@ -8,7 +8,7 @@ This file owns `Next-Finding-ID` and projects current issue-file state.
 When a row disagrees with its issue file, correct the row from the issue file in the same task.
 ISSUE-020, ISSUE-023, and ISSUE-024 are paused at the user's request; their lifecycle states do not authorize investigation.
 
-Next finding ID: ISSUE-025
+Next finding ID: ISSUE-026
 
 ## Open-Findings
 
@@ -29,6 +29,7 @@ Next finding ID: ISSUE-025
 | [ISSUE-022](issues/ISSUE-022.md) | tmux height burst erases finalized transcript tail on Stop | Investigating | Not-Selected | Not-Selected | High | Verify upstream height recurrence | Not published. |
 | [ISSUE-023](issues/ISSUE-023.md) | tmux: preserve resize leaves duplicate editor and status rows | Investigating | Not-Selected | Not-Selected | High | Await explicit investigation resumption | Not published. |
 | [ISSUE-024](issues/ISSUE-024.md) | tmux: stale paints detach the resize cursor anchor and overwrite accepted rows | Investigating | Not-Selected | Not-Selected | High | Await explicit investigation resumption | Not published. |
+| [ISSUE-025](issues/ISSUE-025.md) | Task lifecycle: finished subagents stay fully live with only a time bound | Investigating | Not-Selected | Not-Selected | High | Measure representative live Child cost | Not published. |
 
 ## Archived-Findings
 
