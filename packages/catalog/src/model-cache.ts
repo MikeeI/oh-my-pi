@@ -261,6 +261,7 @@ function initializeDb(db: Database): void {
 		)
 	`);
 	migrateCacheSchema(db);
+	pruneIdleForeignPolicies(db);
 	// `models_hash` is the only payload-change detector for the read memo and the
 	// unchanged-write skip. Writers here replace whole rows; this keeps an
 	// in-place edit of `models` by any other tool or binary from reusing a stale hash.
@@ -397,6 +398,68 @@ function migrateCacheSchema(db: Database): void {
 		db.run("DELETE FROM model_cache WHERE version < ?", [FIRST_HEADERLESS_SCHEMA_VERSION]);
 	} finally {
 		db.run("PRAGMA secure_delete = FAST");
+	}
+}
+
+/**
+ * A foreign schema/policy group whose newest payload or freshness write is
+ * older than this is treated as abandoned. Every release adds a new policy,
+ * so without this bound each upgrade leaves its multi-MB rows behind forever.
+ * A live binary refreshes its rows far more often; losing an idle group only
+ * costs that binary one rediscovery.
+ */
+const FOREIGN_POLICY_RETENTION_MS = 14 * 24 * 60 * 60 * 1000;
+
+/**
+ * Delete whole schema/policy groups other than the current one once their
+ * newest activity is past {@link FOREIGN_POLICY_RETENTION_MS}. Groups are
+ * removed whole, never per provider, so a live binary keeps a consistent set.
+ * Freed pages are reused by later writes; the file itself shrinks only on a
+ * manual `VACUUM`, which needs an exclusive lock that live sessions would block.
+ */
+function pruneIdleForeignPolicies(db: Database): void {
+	const cutoff = Date.now() - FOREIGN_POLICY_RETENTION_MS;
+	try {
+		const idle = db
+			.query<{ version: number; materialization_policy: string }, [number, string, number]>(
+				`SELECT m.version, m.materialization_policy
+				FROM model_cache m
+				LEFT JOIN model_cache_refresh r ON r.provider_id = m.provider_id
+				WHERE NOT (m.version = ? AND m.materialization_policy = ?)
+				GROUP BY m.version, m.materialization_policy
+				HAVING MAX(MAX(m.updated_at, COALESCE(r.updated_at, 0))) < ?`,
+			)
+			.all(CACHE_SCHEMA_VERSION, materializationPolicy(), cutoff);
+		const orphanRefresh = db
+			.query<{ found: number }, [number]>(
+				`SELECT 1 AS found FROM model_cache_refresh r
+				WHERE r.updated_at < ? AND NOT EXISTS (SELECT 1 FROM model_cache m WHERE m.provider_id = r.provider_id)
+				LIMIT 1`,
+			)
+			.get(cutoff);
+		if (idle.length === 0 && !orphanRefresh) return;
+		db.transaction(() => {
+			for (const group of idle) {
+				const params = [group.version, group.materialization_policy];
+				db.run(
+					`DELETE FROM model_cache_refresh WHERE provider_id IN
+						(SELECT provider_id FROM model_cache WHERE version = ? AND materialization_policy = ?)`,
+					params,
+				);
+				db.run("DELETE FROM model_cache WHERE version = ? AND materialization_policy = ?", params);
+			}
+			db.run(
+				`DELETE FROM model_cache_refresh WHERE updated_at < ?
+					AND NOT EXISTS (SELECT 1 FROM model_cache m WHERE m.provider_id = model_cache_refresh.provider_id)`,
+				[cutoff],
+			);
+		})();
+		if (idle.length > 0) logger.debug("Pruned idle foreign model-cache policies", { groups: idle.length });
+	} catch (error) {
+		// The opener owns corruption recovery; anything else is housekeeping that
+		// a busy or read-only database must never turn into a cache failure.
+		if (isSqliteCorruptionError(error)) throw error;
+		logger.debug("Skipped model-cache pruning", { error: String(error) });
 	}
 }
 

@@ -742,15 +742,19 @@ The upgrader validates these IDs against its executable and manual proof mapping
 - Contract: incompatible materialization policies and older bare-key writers cannot overwrite each other's rows.
 - Contract: same-policy writers retain shared snapshots, freshness-only updates, and payload-change invalidation.
 - Contract: public cache APIs and diagnostics retain logical provider IDs.
-- Contract: headerless foreign namespaces remain untouched and are never used as compatibility fallbacks.
+- Contract: headerless foreign namespaces are never used as compatibility fallbacks.
+- Contract: a foreign schema/policy group is deleted whole once its newest payload or freshness write is 14 days old.
+- Contract: live foreign groups, the current policy, and other providers of a live group are never pruned.
 - Contract: the existing pre-v11 credential scrub and exact schema/policy validation remain effective.
 - Owner: upstream `packages/catalog/src/model-cache.ts` owns physical keys, persistence, and compatibility validation.
 - Coverage: upstream v18.8.0 validates memoized payloads using scalar metadata and `models_hash`.
 - Reason: upstream rejects incompatible payloads but lets other app versions replace the same provider-keyed row.
 - Required action: retain policy-scoped physical keys for reads, writes, memo invalidation, and freshness operations.
 - Required action: use the physical namespace in both metadata and payload queries while retaining upstream hash memoization.
-- Required action: retain headerless foreign rows without automatic pruning that could evict a live version.
+- Required action: prune only whole idle foreign groups on open; pruning failures never block cache access.
+- Trade-off: freed pages are reused by later writes; shrinking the file requires a manual `VACUUM`.
 - Proof: old and incompatible writer isolation in `packages/catalog/test/model-cache-rewrites.test.ts`.
+- Proof: idle, live, refreshed, and orphan-freshness pruning cases in that test file.
 - Proof: header omission and corrupt-provenance cleanup in `packages/ai/test/model-cache.test.ts`.
 - Proof: materialized round trips and schema rejection in `packages/catalog/test/build.test.ts`.
 
