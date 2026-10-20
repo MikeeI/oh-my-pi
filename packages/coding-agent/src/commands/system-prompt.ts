@@ -8,7 +8,7 @@ import type { Context, FetchImpl, Message, Model, SimpleStreamOptions, Tool } fr
 import { streamSimple } from "@oh-my-pi/pi-ai";
 import { countTokens, Encoding } from "@oh-my-pi/pi-natives";
 import { postmortem, setProjectDir } from "@oh-my-pi/pi-utils";
-import { Args, Command, Flags, renderCommandHelp } from "@oh-my-pi/pi-utils/cli";
+import { Args, CliUsageError, Command, Flags, renderCommandHelp } from "@oh-my-pi/pi-utils/cli";
 import { APP_DISPLAY_NAME } from "../app-version";
 import { systemPromptHelp as commandHelp } from "../cli/command-help";
 import { ModelRegistry } from "../config/model-registry";
@@ -608,11 +608,11 @@ async function writeStdout(text: string): Promise<void> {
 
 async function resolveCwd(cwdFlag: string | undefined): Promise<string> {
 	const cwd = path.resolve(cwdFlag ?? process.cwd());
-	const stat = await fs.stat(cwd).catch((error: unknown) => {
-		throw new Error(`Invalid --cwd: ${cwd} does not exist`, { cause: error });
+	const stat = await fs.stat(cwd).catch(() => {
+		throw new CliUsageError(`Invalid --cwd: ${cwd} does not exist`);
 	});
 	if (!stat.isDirectory()) {
-		throw new Error(`Invalid --cwd: ${cwd} is not a directory`);
+		throw new CliUsageError(`Invalid --cwd: ${cwd} is not a directory`);
 	}
 	return cwd;
 }
@@ -694,7 +694,7 @@ export async function inspectSystemPrompt(
 
 export async function inspectSubagentSystemPrompt(cwd: string, rawName: string): Promise<SystemPromptInspection> {
 	const name = rawName.trim();
-	if (!name) throw new Error("--subagent requires a non-empty agent name");
+	if (!name) throw new CliUsageError("--subagent requires a non-empty agent name");
 
 	setProjectDir(cwd);
 	const settings = await Settings.loadReadOnly({ cwd });
@@ -702,14 +702,14 @@ export async function inspectSubagentSystemPrompt(cwd: string, rawName: string):
 	const agent = getAgent(discovery.agents, name);
 	if (!agent) {
 		const available = discovery.agents.map(candidate => candidate.name).join(", ") || "none";
-		throw new Error(`Unknown agent "${name}". Available: ${available}`);
+		throw new CliUsageError(`Unknown agent "${name}". Available: ${available}`);
 	}
 	const disabledAgents = cfgTaskDisabledAgents.get(settings);
 	if (disabledAgents.includes(name)) {
 		const enabled = discovery.agents
 			.filter(candidate => !disabledAgents.includes(candidate.name))
 			.map(candidate => candidate.name);
-		throw new Error(
+		throw new CliUsageError(
 			`Agent "${name}" is disabled in settings. Enable it via /agents, or use a different agent type.${enabled.length > 0 ? ` Available: ${enabled.join(", ")}` : ""}`,
 		);
 	}
@@ -837,10 +837,10 @@ export default class SystemPrompt extends Command {
 	};
 
 	static examples = [
-		`# Inspect provider-facing blocks\n  ${APP_DISPLAY_NAME} system-prompt inspect --cwd /root/projects/project-paperless-go-classifier`,
-		`# Inspect dynamic prompt parts\n  ${APP_DISPLAY_NAME} system-prompt inspect --cwd /root/projects/project-paperless-go-classifier --dynamic-parts`,
-		`# Inspect dynamic prompt parts as JSON\n  ${APP_DISPLAY_NAME} system-prompt inspect --cwd /root/projects/project-paperless-go-classifier --dynamic-parts --json`,
-		`# Inspect token shares by prompt source and provider tool\n  ${APP_DISPLAY_NAME} system-prompt inspect --cwd /root/projects/project-paperless-go-classifier --breakdown --json`,
+		`# Inspect provider-facing blocks\n  ${APP_DISPLAY_NAME} system-prompt inspect`,
+		`# Inspect dynamic prompt parts\n  ${APP_DISPLAY_NAME} system-prompt inspect --dynamic-parts`,
+		`# Inspect dynamic prompt parts as JSON\n  ${APP_DISPLAY_NAME} system-prompt inspect --dynamic-parts --json`,
+		`# Inspect token shares by prompt source and provider tool\n  ${APP_DISPLAY_NAME} system-prompt inspect --breakdown --json`,
 		`# Inspect an actual first request, including hidden runtime-injected messages
   ${APP_DISPLAY_NAME} system-prompt inspect --first-message "Implement the requested change" --breakdown --json`,
 		`# Hash the actual first Codex wire request without a provider network call
@@ -863,13 +863,13 @@ export default class SystemPrompt extends Command {
 			return;
 		}
 		if (action !== "inspect") {
-			throw new Error(`Unsupported system-prompt action: ${action}`);
+			throw new CliUsageError(`Unsupported system-prompt action: ${action}`);
 		}
 		const selectedModes = [flags.provider, flags["dynamic-parts"], flags.breakdown, flags["codex-wire-hash"]].filter(
 			Boolean,
 		).length;
 		if (selectedModes > 1) {
-			throw new Error("Use only one of --provider, --dynamic-parts, --breakdown, or --codex-wire-hash");
+			throw new CliUsageError("Use only one of --provider, --dynamic-parts, --breakdown, or --codex-wire-hash");
 		}
 		if (
 			flags.subagent !== undefined &&
@@ -878,18 +878,18 @@ export default class SystemPrompt extends Command {
 				flags.model !== undefined ||
 				flags["codex-wire-hash"])
 		) {
-			throw new Error(
+			throw new CliUsageError(
 				"--system-template, --agents-file, --model, and --codex-wire-hash apply only to main inspection",
 			);
 		}
 		if (flags.subagent !== undefined && flags["first-message"] !== undefined) {
-			throw new Error("--first-message applies only to main prompt inspection");
+			throw new CliUsageError("--first-message applies only to main prompt inspection");
 		}
 		if (flags["first-message"] !== undefined && !flags.breakdown && !flags["codex-wire-hash"]) {
-			throw new Error("--first-message requires --breakdown or --codex-wire-hash");
+			throw new CliUsageError("--first-message requires --breakdown or --codex-wire-hash");
 		}
 		if (flags["codex-wire-hash"] && flags["first-message"] === undefined) {
-			throw new Error("--codex-wire-hash requires --first-message");
+			throw new CliUsageError("--codex-wire-hash requires --first-message");
 		}
 
 		const cwd = await resolveCwd(flags.cwd);

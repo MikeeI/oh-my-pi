@@ -656,10 +656,26 @@ describe("system-prompt command", () => {
 		});
 	}
 
-	test("rejects combined output modes", async () => {
-		const command = new SystemPromptCommand(["inspect", "--provider", "--dynamic-parts"], TEST_CONFIG);
-		await expect(command.run()).rejects.toThrow(
-			"Use only one of --provider, --dynamic-parts, --breakdown, or --codex-wire-hash",
+	test("reports invalid flag combinations as usage errors without a code frame", async () => {
+		const proc = Bun.spawn(
+			[process.execPath, CLI_ENTRY, "system-prompt", "inspect", "--provider", "--dynamic-parts"],
+			{
+				stdout: "pipe",
+				stderr: "pipe",
+				env: { ...process.env, NO_COLOR: "1" },
+			},
 		);
+		const [exitCode, output, error] = await Promise.all([
+			proc.exited,
+			new Response(proc.stdout).text(),
+			new Response(proc.stderr).text(),
+		]);
+
+		expect({ exitCode, output }).toEqual({ exitCode: 1, output: "" });
+		expect(error.split("\n")[0]).toBe(
+			"error: Use only one of --provider, --dynamic-parts, --breakdown, or --codex-wire-hash",
+		);
+		expect(error).toContain("USAGE");
+		expect(error).not.toMatch(/^\s*\d+ \|/m);
 	});
 });

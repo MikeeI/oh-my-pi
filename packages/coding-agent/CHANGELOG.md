@@ -119,6 +119,8 @@
 - Fixed system and subagent prompt template render errors (such as a removed helper) not naming the template file that failed
 - Fixed starting in a subdirectory ignoring the project's `.omp/SYSTEM.md`, `SYSTEM.template.md`, and `SUBAGENT-SYSTEM.template.md` and silently using the user-level prompt; they now resolve from the nearest project `.omp` like other project config
 - Fixed published `momp update --help` advertising self-installation and channel switching that `momp` does not support
+- Fixed `system-prompt inspect` printing a code frame instead of a one-line error and usage for invalid flags, `--cwd`, or `--subagent`
+- Fixed `system-prompt inspect --help` examples pointing at a nonexistent project directory
 
 ## [18.12.3] - 2026-10-19
 

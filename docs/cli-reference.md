@@ -315,3 +315,5 @@ Invocation-only state remains outside this configured preview.
 
 `omp system-prompt inspect --provider --json` also emits `tools`, the rendered provider tool names and descriptions.
 Operators use it to verify that profile-selected tool prompt overrides reach the provider request.
+
+Invalid flag combinations, a missing `--cwd`, and unknown or disabled `--subagent` names print `error: <message>` and the usage line to stderr and exit 1.

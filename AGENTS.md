@@ -295,6 +295,7 @@ The upgrader validates these IDs against its executable and manual proof mapping
 - Usage: `momp system-prompt inspect --cwd <workspace> --first-message "<text>" --breakdown --json`.
 - Usage: `momp system-prompt inspect --model <codex-model> --first-message "<text>" --codex-wire-hash --json`.
 - Contract: large text and JSON outputs finish writing and remain complete before process exit.
+- Contract: invalid flags, `--cwd`, and `--subagent` selections fail as usage errors with the usage line, never a code frame.
 - Contract: Main inspection is not accepted as proof of Child loading.
 - Owner: `src/commands/system-prompt.ts` owns command grammar, measurement, and output.
 - Owner: `src/system-prompt.ts` owns opt-in counterfactual dynamic-fragment capture.
