@@ -1,6 +1,6 @@
 # ISSUE-011 — Read: compact directory metadata spacing
 
-State: Submitted
+State: Archived
 Authorized-Work: Pull-Request-Implementation
 Publication-Target: New-pull-request
 External-Reference: https://github.com/can1357/oh-my-pi/pull/9062
@@ -8,7 +8,7 @@ Contribution-Priority: Medium
 Root-Cause-Confidence: High
 Finding-Category: Performance
 Created: 2026-08-21
-Updated: 2026-08-23
+Updated: 2026-10-20
 Source: `upstream/main@160ed439ac0df594347e7d7018b813a7ffdb5e81`
 
 ## Root-Cause
@@ -26,6 +26,7 @@ Impact: The preview repeats padding on every entry; token reduction beyond the f
 - [S] `packages/coding-agent/src/workspace-tree.ts` → Read listings select compact metadata while prompt trees retain aligned metadata.
 - [S] [PR #9062](https://github.com/can1357/oh-my-pi/pull/9062) → head `df1d6cb7a68b` contains implementation `400669749a96` and changelog follow-up `df1d6cb7a68b`.
 - [O] GitHub reports PR #9062 open, mergeable, and clean against `upstream/main@160ed439ac0d`; checked 2026-08-23.
+- [O] GitHub reports PR #9062 `MERGED` on 2026-10-11; merge commit `3a5ee56e12d5` first ships in v18.9.2; checked 2026-10-20.
 
 ## Prior-Art
 
@@ -89,9 +90,9 @@ None.
 
 ## Next-Action
 
-Summary: Await Read current-head review
-Action: Monitor pull request #9062 for review of clean head `df1d6cb7a68b` and the maintainer decision.
-Done-When: A current-head review, requested follow-up, or terminal outcome is recorded.
+Summary: —
+Action: None.
+Done-When: None.
 
 ## Publication-Draft
 
@@ -117,3 +118,10 @@ The directory preview keeps the same information in a denser representation.
 
 Verification: `bun test packages/coding-agent/test/workspace-tree.test.ts` — 9 pass, 0 fail.
 ```
+
+## Archive
+
+Archive-Reason: Merged
+Detail: None.
+Evidence: https://github.com/can1357/oh-my-pi/pull/9062 — PR state `MERGED`; upstream merge commit `3a5ee56e12d543d66b6064a34c3f0abf6ec0c29a` is present in v18.9.2.
+Checked: 2026-10-20

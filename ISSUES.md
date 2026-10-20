@@ -17,7 +17,6 @@ Next finding ID: ISSUE-027
 | [ISSUE-002](issues/ISSUE-002.md) | Eval registry: disabling the last live backend re-advertises every language | Investigating | Not-Selected | Not-Selected | High | Verify Eval commit boundary | Not published. |
 | [ISSUE-007](issues/ISSUE-007.md) | Hub capability: disabled process supervision remains fully advertised | Implementing | Pull-Request-Implementation | New-pull-request | High | Approve reviewed Hub PR | Not published. |
 | [ISSUE-010](issues/ISSUE-010.md) | LSP prompt: raw requests omit multi-server routing guidance | Implementing | Pull-Request-Implementation | New-pull-request | Medium | Review local LSP prompt PR | Not published. |
-| [ISSUE-011](issues/ISSUE-011.md) | Read: compact directory metadata spacing | Submitted | Pull-Request-Implementation | New-pull-request | Medium | Await Read current-head review | https://github.com/can1357/oh-my-pi/pull/9062 |
 | [ISSUE-012](issues/ISSUE-012.md) | Prompt: metadata-free workspace tree | Submitted | Pull-Request-Implementation | New-pull-request | Medium | Await tree current-head review | https://github.com/can1357/oh-my-pi/pull/9152 |
 | [ISSUE-013](issues/ISSUE-013.md) | LSP symbols: file query is ignored | Submitted | Pull-Request-Implementation | New-pull-request | Medium | Rebase LSP symbol PR | https://github.com/can1357/oh-my-pi/pull/8400 |
 | [ISSUE-014](issues/ISSUE-014.md) | LSP rename: previews omit edit details | Submitted | Pull-Request-Implementation | New-pull-request | Medium | Rebase LSP preview PR | https://github.com/can1357/oh-my-pi/pull/8401 |
@@ -43,5 +42,6 @@ Next finding ID: ISSUE-027
 | [ISSUE-006](issues/archive/ISSUE-006.md) | Task prompt: same-file edits are not guaranteed to auto-resolve | Pull-Request-Implementation | New-pull-request | High | Merged | https://github.com/can1357/oh-my-pi/pull/9047 |
 | [ISSUE-008](issues/archive/ISSUE-008.md) | Read prompt: raw is not a universal converter or byte bypass | Not-Selected | Not-Selected | Medium | Fixed-Elsewhere | Not published. |
 | [ISSUE-009](issues/archive/ISSUE-009.md) | Read SSH guidance: retired search and ssh tool names remain model-visible | Pull-Request-Implementation | New-pull-request | Medium | Merged | https://github.com/can1357/oh-my-pi/pull/9045 |
+| [ISSUE-011](issues/archive/ISSUE-011.md) | Read: compact directory metadata spacing | Pull-Request-Implementation | New-pull-request | Medium | Merged | https://github.com/can1357/oh-my-pi/pull/9062 |
 | [ISSUE-018](issues/archive/ISSUE-018.md) | Read guidance: known targets consume repeated model turns | Pull-Request-Implementation | New-pull-request | High | Withdrawn | https://github.com/can1357/oh-my-pi/pull/10465 |
 | [ISSUE-019](issues/archive/ISSUE-019.md) | GitHub errors omit structured and request context | Pull-Request-Implementation | New-pull-request | Medium | Merged | https://github.com/can1357/oh-my-pi/pull/10581 |

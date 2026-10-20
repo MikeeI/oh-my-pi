@@ -121,6 +121,7 @@
 - Fixed published `momp update --help` advertising self-installation and channel switching that `momp` does not support
 - Fixed `system-prompt inspect` printing a code frame instead of a one-line error and usage for invalid flags, `--cwd`, or `--subagent`
 - Fixed `system-prompt inspect --help` examples pointing at a nonexistent project directory
+- Fixed a blank `/rename` title losing its card (`AUTO: 🧪 CACHE: …`), so the next rename asked for a new card; the marker now follows the card (`🧪 CACHE: AUTO: …`)
 
 ### Removed
 

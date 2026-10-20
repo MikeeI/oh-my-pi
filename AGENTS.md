@@ -532,6 +532,7 @@ The upgrader validates these IDs against its executable and manual proof mapping
 - Contract: generated title input omits tools, thinking, and code fences.
 - Contract: title generation ignores Assistant follow-up questions unless a later user reply selects or answers them.
 - Contract: blank manual `/rename` generation carries `AUTO:` while remaining replaceable; automatic first-input and replan titles remain replaceable without that marker.
+- Contract: a card-form title carries `AUTO:` after its card, so the card still parses and carries over.
 - Contract: `/rename` arguments keep `@` and `#` literal.
 - Coverage: upstream command-specific completion wins when it has a result.
 - Contract: absent command-specific completion falls through unless the command declares exclusive completion.
@@ -923,7 +924,7 @@ The upgrader validates these IDs against its executable and manual proof mapping
 
 - Disposition: `UPSTREAM-GEDECKT`.
 - Contract: bundled agent prompt definitions follow upstream; Scout retains the upstream read-only tool set.
-- Contract: `task.enableLsp` applies only to agent definitions that declare LSP.
+- Contract: `task.enableLsp` grants LSP to agents that declare it or declare no tool list.
 - Contract: parent capability and plan-mode restrictions still attenuate Child LSP.
 - Owner: upstream `src/task/structured-subagent.ts#resolveEffectiveSubagentPolicy` owns effective Child LSP policy.
 - Owner: upstream `src/task/settings.ts#cfgTaskEnableLsp` owns the setting and its disabled default.
@@ -931,21 +932,11 @@ The upgrader validates these IDs against its executable and manual proof mapping
 - Reason: upstream satisfies the capability contract; synchronized configuration supplies the MOMP preference.
 - Required action: keep the source setting upstream-identical and retain explicit activation in managed Settings.
 - Required action: require `task.enableLsp: true` in managed configuration and the candidate's effective release settings.
-- Required action: configure LSP explicitly in capability tests instead of relying on a fork default.
+- Required action: keep the proof tests byte-identical to upstream; this contract has no source or test delta.
 - Coverage: installations without the managed config use the upstream disabled default.
 - Proof: `test/task/subagent-lsp.test.ts`.
 - Proof: `test/tools/task-agent-capabilities.test.ts`.
 - Proof: load the managed profile through source `Settings.loadReadOnly` and verify enabled LSP with global provenance.
-
-#### `MOMP-AGENT-CONTEXT` — AGENTS-first generated-agent context
-
-- Disposition: `UPSTREAM-INTEGRIERT`.
-- Contract: generated-agent guidance consumes provided `AGENTS.md` and other supplied project context.
-- Contract: the architect never assumes `CLAUDE.md` is the sole project-instruction owner.
-- Owner: `src/prompts/system/agent-creation-architect.md`.
-- Reason: current upstream owns agent-creation guidance but assumes `CLAUDE.md` instead of supplied `AGENTS.md` context.
-- Required action: retain only AGENTS-first guidance at the current upstream agent-architect prompt owner.
-- Proof: render and inspect the agent-creation architect prompt.
 
 #### `MOMP-LSP` — LSP extensions at upstream owners
 

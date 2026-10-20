@@ -161,8 +161,15 @@ for (const mode of ["TUI", "headless"] as const) {
 
 			await execute("/rename");
 
-			expect(session.sessionName).toBe("AUTO: 🧪 CACHE: Cache invalidation repair");
+			expect(session.sessionName).toBe("🧪 CACHE: AUTO: Cache invalidation repair");
 			expect(generate).toHaveBeenCalledTimes(1);
+
+			// The marked title still parses as a card, so a second blank rename keeps it
+			// without a new card request and without stacking the marker.
+			generate.mockResolvedValue("Cache write ordering");
+			await execute("/rename");
+			expect(session.sessionName).toBe("🧪 CACHE: AUTO: Cache write ordering");
+			expect(generate).toHaveBeenCalledTimes(2);
 		});
 
 		it("heads a typed or generated title without a card with one the title model names", async () => {
@@ -177,7 +184,7 @@ for (const mode of ["TUI", "headless"] as const) {
 				);
 
 			await execute("/rename");
-			expect(session.sessionName).toBe("AUTO: 🗄️ CACHE: Cache invalidation repair");
+			expect(session.sessionName).toBe("🗄️ CACHE: AUTO: Cache invalidation repair");
 
 			await execute("/rename Cache ownership");
 			expect(session.sessionName).toBe("🗄️ CACHE: Cache ownership");
