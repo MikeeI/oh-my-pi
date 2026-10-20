@@ -1106,12 +1106,13 @@ export class TranscriptContainer extends Container {
 			if (frontierRows.length > 0) frontierRows.push("");
 			frontierRows.push(...block);
 		}
-		// Collect accepted chunks bottom-up only until the viewport is covered; one extra row survives the
+		// Compose accepted segments bottom-up only until the viewport is covered; one extra row survives the
 		// trailing-blank trim below, and any non-empty tape suffix implies the same separator as the full tape.
-		const rows: string[] = [];
-		for (let index = this.#acceptedTapeChunks.length - 1; index >= 0 && rows.length <= cap; index--) {
-			rows.unshift(...this.#renderAcceptedChunk(this.#acceptedTapeChunks[index]!, width));
-		}
+		// Chunk granularity is not enough: an accepted replay replaces the tape with one session-sized chunk.
+		const touched = new Set<TranscriptEntry>();
+		const rows = this.#renderAcceptedTapeSuffix(width, cap + 1, touched);
+		// Same lifecycle as the undrifted branch: a transient tail leaves committed blocks without caches.
+		for (const entry of touched) if (entry.state === "committed") this.#releaseRenderCaches(entry);
 		if (rows.length > 0 && isPlainBlank(rows.at(-1)!)) rows.pop();
 		if (rows.length > 0 && frontierRows.length > 0) rows.push("");
 		rows.push(...frontierRows);
@@ -1573,17 +1574,42 @@ export class TranscriptContainer extends Container {
 		const rows: string[] = [];
 		let offset = 0;
 		for (const part of chunk.parts) {
-			const component = part.entry.component as Component & FinalizableBlock;
 			rows.push(...this.#acceptedRows(chunk, width, offset, part.start));
-			rows.push(
-				...(part.version !== undefined && component.getTranscriptBlockVersion?.() !== part.version
-					? this.#acceptedRows(chunk, width, part.start, part.end)
-					: this.#renderAcceptedPart(part, width)),
-			);
+			rows.push(...this.#renderAcceptedSegment(chunk, part, width));
 			offset = part.end;
 		}
 		rows.push(...this.#acceptedRows(chunk, width, offset, chunk.rows.length));
 		return rows;
+	}
+
+	/** A drifted part replays its accepted physical rows; an unchanged part renders semantically. */
+	#renderAcceptedSegment(chunk: AcceptedTapeChunk, part: AcceptedTapePart, width: number): readonly string[] {
+		const component = part.entry.component as Component & FinalizableBlock;
+		return part.version !== undefined && component.getTranscriptBlockVersion?.() !== part.version
+			? this.#acceptedRows(chunk, width, part.start, part.end)
+			: this.#renderAcceptedPart(part, width);
+	}
+
+	// Reflow is segment-local, so composing segments bottom-up yields exactly the full tape's suffix.
+	#renderAcceptedTapeSuffix(width: number, minRows: number, touched: Set<TranscriptEntry>): string[] {
+		const segments: (readonly string[])[] = [];
+		let count = 0;
+		const take = (rows: readonly string[]): void => {
+			segments.push(rows);
+			count += rows.length;
+		};
+		for (let chunkIndex = this.#acceptedTapeChunks.length - 1; chunkIndex >= 0 && count < minRows; chunkIndex--) {
+			const chunk = this.#acceptedTapeChunks[chunkIndex]!;
+			const { parts } = chunk;
+			take(this.#acceptedRows(chunk, width, parts.at(-1)?.end ?? 0, chunk.rows.length));
+			for (let partIndex = parts.length - 1; partIndex >= 0 && count < minRows; partIndex--) {
+				const part = parts[partIndex]!;
+				touched.add(part.entry);
+				take(this.#renderAcceptedSegment(chunk, part, width));
+				take(this.#acceptedRows(chunk, width, partIndex > 0 ? parts[partIndex - 1]!.end : 0, part.start));
+			}
+		}
+		return segments.reverse().flat();
 	}
 
 	#completeFullyEmittedHeads(width: number): void {
