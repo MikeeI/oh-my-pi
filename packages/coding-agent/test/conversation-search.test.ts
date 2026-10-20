@@ -277,6 +277,46 @@ describe("conversation_search", () => {
 		expect(result.details).toMatchObject({ complete: true, discoveryFailures: 0, candidateSessions: 0 });
 	});
 
+	it("reuses parsed transcripts only while the journal prefix is unchanged", async () => {
+		using tempDir = TempDir.createSync("@omp-conversation-search-cache-");
+		const cwd = tempDir.path();
+		const file = tempDir.join("sessions/cached.jsonl");
+		const now = Date.now();
+		const record = (index: number, text: string) =>
+			JSON.stringify({
+				type: "message",
+				id: `appended-${index}`,
+				parentId: null,
+				timestamp: new Date(now - 60_000 + index).toISOString(),
+				message: { role: "user", content: `marker ${text}`, timestamp: now - 60_000 + index },
+			});
+		const marker = (text: string): FixtureMessage[] => [
+			{ role: "user", content: `marker ${text}`, timestamp: now - 120_000 },
+		];
+		await writeSession(file, "cached-session", cwd, "Cache", marker("alpha"), now);
+		const tool = new ConversationSearchTool(makeToolSession(cwd, tempDir.join("sessions/active.jsonl")));
+		const search = async () => {
+			const result = await tool.execute("cache", { query: "marker", format: "json" });
+			const report = JSON.parse(result.content.find(part => part.type === "text")?.text ?? "");
+			const texts: string[] = report.hits.map((hit: { text: string }) => hit.text);
+			return { complete: report.complete, texts: texts.sort() };
+		};
+
+		expect(await search()).toEqual({ complete: true, texts: ["marker alpha"] });
+		// A half-written line counts as malformed now, but must not enter the
+		// cached prefix, or completing it would leave a malformed remainder.
+		const bravo = record(1, "bravo");
+		await fs.appendFile(file, bravo.slice(0, 40));
+		expect(await search()).toEqual({ complete: false, texts: ["marker alpha"] });
+		await fs.appendFile(file, `${bravo.slice(40)}\n${record(2, "charlie")}\n`);
+		expect(await search()).toEqual({ complete: true, texts: ["marker alpha", "marker bravo", "marker charlie"] });
+		// Atomic replacement yields a new inode that shares nothing with the cached prefix.
+		const replacement = tempDir.join("sessions/replacement.tmp");
+		await writeSession(replacement, "cached-session", cwd, "Cache", marker("delta"), now);
+		await fs.rename(replacement, file);
+		expect(await search()).toEqual({ complete: true, texts: ["marker delta"] });
+	});
+
 	it("is available to Main but absent from child tool registries", async () => {
 		using tempDir = TempDir.createSync("@omp-conversation-search-gate-");
 		const activeFile = tempDir.join("active.jsonl");

@@ -572,6 +572,14 @@ The upgrader validates these IDs against its executable and manual proof mapping
 - Contract: discovery content-scans only session files modified within the window; older files are only stat'ed.
 - Contract: an empty discovered corpus never conceals a discovery failure as a complete search.
 - Contract: Children never receive the tool.
+- Contract: repeated searches in one process reuse per-journal visible-message projections and parse only appended complete lines.
+- Contract: a projection is reused only while inode, minimum size, header identity, and the digest before its end still match.
+- Contract: a trailing partial line is searched and counted as before but never enters a cached projection.
+- Contract: cached projections apply the lookback window at query time, so every `days` value shares them.
+- Contract: retained projections stay bounded by a character budget with least-recently-used eviction.
+- Owner: `src/session/conversation-corpus.ts#ConversationTranscriptCache` owns projection reuse and invalidation.
+- Owner: `src/tools/conversation-search.ts` owns the process-wide cache instance.
+- Reason: journals change only by append, append rollback, in-place title-slot rewrite, or atomic rename, so a matching prefix stays valid.
 - Owner: `src/session/conversation-corpus.ts` owns visible transcript projection and journal discovery.
 - Owner: upstream `src/session/session-listing.ts` owns session enumeration, scanning, and discovery-error reporting.
 - Owner: `src/session/session-listing.ts#listSessionsModifiedSince` selects windowed files before content scans.
@@ -585,18 +593,36 @@ The upgrader validates these IDs against its executable and manual proof mapping
 - Coverage: upstream v18.12.0 follows transcript symlinks, skips symlinked buckets, and deduplicates physical files.
 - Owner: upstream `src/session/session-listing.ts#scanBucketFiles` owns cross-bucket enumeration.
 - Required action: preserve that owner and deduplication with partial enumeration and discovery-failure accounting.
-- Proof: `test/conversation-search.test.ts`, including the stale-journal window case.
+- Proof: `test/conversation-search.test.ts`, including the stale-journal window and cached-prefix invalidation cases.
 
 ##### Benchmark behavior
 
 - Contract: the benchmark uses a fixed guaranteed-miss query and records effective warmup and measured-run counts.
+- Contract: `--scope` selects project or all-project corpora; project remains the default.
+- Contract: `--transcript-cache cold` gives every run a fresh cache; `warm` reuses projections filled by at least one warmup run.
+- Contract: cold remains the default so measurements stay comparable with earlier parse-path baselines.
 - Contract: its corpus fingerprint identifies selected session-file paths, sizes, and modification times.
 - Contract: incomplete discovery or scan coverage invalidates a benchmark run.
 - Contract: disappearing selected files, changed file metadata or visible-message counts, and unexpected matches invalidate a run.
 - Usage: `bun --cwd packages/coding-agent run bench:conversation-search -- --cwd <workspace>`.
+- Usage: `bun --cwd packages/coding-agent run bench:conversation-search -- --cwd <workspace> --scope all --transcript-cache warm`.
 - Owner: `scripts/bench-conversation-search.ts` owns the reproducible local evaluator and output.
 - Required action: preserve discovery failures through benchmark validation.
 - Proof: `test/conversation-search-benchmark.test.ts`.
+
+#### `MOMP-SESSION-STREAM-PARSE` — Decoded-text journal streaming
+
+- Disposition: `UPSTREAM-INTEGRIERT`.
+- Contract: streamed journal visits decode each newline-terminated batch once and parse it as text.
+- Contract: entries, malformed-record counts, title-slot peeling, record and byte limits, and invalid-UTF-8 replacement stay unchanged.
+- Contract: an unfinished value resumes at its exact byte offset, including after invalid UTF-8.
+- Contract: `startByte` resumes a visit at a line boundary without peeling a title slot.
+- Owner: upstream `src/session/session-loader.ts#visitEntriesFromFileStream` owns streamed journal parsing.
+- Reason: Bun 1.4.3 `Bun.JSONL.parseChunk` parses typed arrays about 2.4x slower than strings on session JSONL.
+- Reason: `MOMP-CONVERSATION-SEARCH` needs `startByte` to parse only appended journal bytes.
+- Required action: retain this delta until upstream or Bun removes the typed-array cost and offers an offset start.
+- Proof: `test/session-loader-stream.test.ts`, including the invalid-UTF-8 unfinished-value case.
+- Proof: `bench:conversation-search -- --scope all` before and after the delta.
 
 #### `MOMP-CACHE-MISS-COLOR` — Prominent cache-miss foreground
 

@@ -5,6 +5,7 @@ import {
 	type ConversationRole,
 	type ConversationSearchScope,
 	type ConversationSessionCorpus,
+	type ConversationTranscriptCache,
 	visitVisibleConversationMessages,
 } from "./conversation-corpus";
 import type { SessionInfo } from "./session-listing";
@@ -81,6 +82,7 @@ export async function searchConversationSessions(
 	request: ConversationSearchRequest,
 	signal: AbortSignal | undefined,
 	nowMs: number,
+	transcripts: ConversationTranscriptCache,
 ): Promise<ConversationSearchReport> {
 	const query = request.query.trim();
 	if (!query) throw new Error("Conversation search query must not be empty.");
@@ -94,7 +96,7 @@ export async function searchConversationSessions(
 	const settled = await mapWithConcurrencyLimitAllSettled(
 		candidates,
 		CONVERSATION_SEARCH_CONCURRENCY,
-		(session, _index, workerSignal) => searchSession(session, sinceMs, needles, request, workerSignal),
+		(session, _index, workerSignal) => searchSession(session, sinceMs, needles, request, transcripts, workerSignal),
 		signal,
 	);
 
@@ -153,6 +155,7 @@ async function searchSession(
 	sinceMs: number,
 	needles: string[],
 	request: ConversationSearchRequest,
+	transcripts: ConversationTranscriptCache,
 	signal: AbortSignal,
 ): Promise<SessionSearchResult> {
 	let matchCount = 0;
@@ -196,6 +199,7 @@ async function searchSession(
 				request.limit,
 			);
 		},
+		transcripts,
 		signal,
 	);
 	return { matchCount, visibleMessages: stats.visibleMessages, malformedRecords: stats.malformedRecords, hits };

@@ -94,6 +94,11 @@ export interface VisitEntriesFromFileStreamOptions {
 	maxRecords?: number;
 	/** Read at most this many bytes from the file's current prefix. */
 	maxBytes?: number;
+	/**
+	 * Start at this absolute byte offset, which must begin a line. A nonzero
+	 * start never peels the title slot, which only occupies the first line.
+	 */
+	startByte?: number;
 	/** Yield to the macrotask queue after this many bytes have been consumed. */
 	yieldEveryBytes?: number;
 	/** Yield to the macrotask queue after this many entries have been visited. */
@@ -196,6 +201,34 @@ export async function readSessionHeaderId(filePath: string): Promise<string | un
 	return id;
 }
 
+function isJsonWhitespace(code: number): boolean {
+	return code === 0x09 || code === 0x0a || code === 0x0d || code === 0x20;
+}
+
+/**
+ * Bytes of a newline-terminated `batch` consumed once `text` (its decoding) is
+ * parsed up to `offset`. Leading whitespace of the unparsed remainder is
+ * consumed too. The remainder's start maps to bytes through its line start:
+ * 0x0a never belongs to a multibyte or invalid UTF-8 sequence, so line
+ * boundaries align exactly even where U+FFFD replaced invalid bytes. Only a
+ * value sharing its line with earlier content needs the segment re-encoded,
+ * which is exact for valid UTF-8.
+ */
+function consumedBatchBytes(batch: Uint8Array, text: string, offset: number): number {
+	let remainder = offset;
+	while (remainder < text.length && isJsonWhitespace(text.charCodeAt(remainder))) remainder++;
+	if (remainder >= text.length) return batch.length;
+	const lineStart = text.lastIndexOf("\n", remainder - 1) + 1;
+	let linesAfter = 0;
+	for (let index = text.indexOf("\n", lineStart); index !== -1; index = text.indexOf("\n", index + 1)) linesAfter++;
+	let byteLineStart = batch.length;
+	for (let seen = 0; seen < linesAfter && byteLineStart > 0; seen++) {
+		// A negative fromIndex would wrap to the end, so position 1 resolves to 0 directly.
+		byteLineStart = byteLineStart >= 2 ? batch.lastIndexOf(0x0a, byteLineStart - 2) + 1 : 0;
+	}
+	return byteLineStart + Buffer.byteLength(text.slice(lineStart, remainder));
+}
+
 /** Parse session JSONL and visit each entry without retaining prior entries. */
 export async function visitEntriesFromFileStream(
 	filePath: string,
@@ -203,8 +236,9 @@ export async function visitEntriesFromFileStream(
 	options: VisitEntriesFromFileStreamOptions = {},
 ): Promise<SessionTitleUpdate | undefined> {
 	let titleSlot: SessionTitleUpdate | undefined;
-	let sawFirstLine = false;
-	let sawFirstEntry = false;
+	const startByte = Math.max(0, options.startByte ?? 0);
+	let sawFirstLine = startByte > 0;
+	let sawFirstEntry = startByte > 0;
 	let bytesSinceYield = 0;
 	let entriesSinceYield = 0;
 	let recordsSeen = 0;
@@ -214,10 +248,14 @@ export async function visitEntriesFromFileStream(
 	const yieldEveryBytes = Math.max(0, options.yieldEveryBytes ?? STREAM_YIELD_BYTES);
 	const yieldEveryEntries = Math.max(0, options.yieldEveryEntries ?? STREAM_YIELD_ENTRIES);
 	const maxBytes = Math.max(0, options.maxBytes ?? Number.POSITIVE_INFINITY);
-	// Bytes, not text: a multibyte UTF-8 sequence straddling a chunk boundary
-	// stays intact, and Bun.JSONL.parseChunk takes typed arrays directly. Only
-	// the unconsumed remainder is held (≤ one record + a chunk), so the ≥8MiB
-	// memory guard holds — the file is never fully loaded.
+	// Buffer bytes, parse text: only newline-terminated bytes are decoded, so a
+	// multibyte UTF-8 sequence straddling a chunk boundary stays intact.
+	// Bun.JSONL.parseChunk is ~2.4x slower on typed arrays than on strings
+	// (Bun 1.4.3, 640 MiB of session JSONL), so each drained batch is decoded
+	// once. The non-fatal decoder matches the byte parser, which also replaces
+	// invalid UTF-8 with U+FFFD; a fatal decoder would drop whole journals.
+	// Only the unconsumed remainder is held (≤ one record + a chunk, plus the
+	// batch's transient decoded copy), so the file is never fully loaded.
 	const sink = new ConcatSink();
 	const decoder = new TextDecoder();
 
@@ -233,10 +271,9 @@ export async function visitEntriesFromFileStream(
 		await Bun.sleep(0);
 	};
 
-	const hasPayload = (bytes: Uint8Array, start: number, end: number): boolean => {
+	const hasPayload = (text: string, start: number, end: number): boolean => {
 		for (let index = start; index < end; index++) {
-			const byte = bytes[index];
-			if (byte !== 0x09 && byte !== 0x0a && byte !== 0x0d && byte !== 0x20) return true;
+			if (!isJsonWhitespace(text.charCodeAt(index))) return true;
 		}
 		return false;
 	};
@@ -249,18 +286,16 @@ export async function visitEntriesFromFileStream(
 		// preceding newline, which would then be miscounted as a malformed record.
 		const lastNewline = view.lastIndexOf(0x0a);
 		if (lastNewline === -1) return;
-		let buffer: Uint8Array = view.subarray(0, lastNewline + 1);
-		let consumed = 0;
-		const advance = (count: number): void => {
-			consumed += count;
-			buffer = buffer.subarray(count);
-		};
-		while (buffer.length > 0 && !stopped) {
+		const batch = view.subarray(0, lastNewline + 1);
+		const text = decoder.decode(batch);
+		// parseChunk reports absolute UTF-16 positions within `text`.
+		let offset = 0;
+		while (offset < text.length && !stopped) {
 			if (recordsSeen >= maxRecords) {
 				stopped = true;
 				break;
 			}
-			const { values, error, read, done } = Bun.JSONL.parseChunk(buffer);
+			const { values, error, read, done } = Bun.JSONL.parseChunk(text, offset, text.length);
 			for (const value of values) {
 				if (recordsSeen >= maxRecords) {
 					stopped = true;
@@ -295,39 +330,42 @@ export async function visitEntriesFromFileStream(
 			if (stopped) break;
 			if (error) {
 				// Malformed record: skip past the next newline and continue.
-				const nextNewline = buffer.indexOf(0x0a, read);
+				const nextNewline = text.indexOf("\n", read);
 				if (nextNewline === -1) break; // rest of the bad line not yet received
-				if (hasPayload(buffer, read, nextNewline)) options.onMalformedRecord?.();
+				if (hasPayload(text, read, nextNewline)) options.onMalformedRecord?.();
 				recordsSeen++;
-				advance(nextNewline + 1);
+				offset = nextNewline + 1;
 				if (recordsSeen >= maxRecords) {
 					stopped = true;
 					break;
 				}
 				continue;
 			}
-			if (read === 0) {
+			if (read <= offset) {
 				// Incomplete value awaiting more bytes. Once the input has ended nothing more
 				// is coming, so it is a truncated record (parseJsonlLenient counts it too).
 				if (endOfInput) {
-					if (hasPayload(buffer, 0, buffer.length)) options.onMalformedRecord?.();
+					if (hasPayload(text, offset, text.length)) options.onMalformedRecord?.();
 					recordsSeen++;
-					advance(buffer.length);
+					offset = text.length;
 				}
 				break;
 			}
-			advance(read);
+			offset = read;
 			if (done) {
-				advance(buffer.length);
+				offset = text.length;
 				break;
 			}
 		}
-		sink.consume(consumed);
+		sink.consume(consumedBatchBytes(batch, text, offset));
 	};
 
 	try {
 		const file = Bun.file(filePath);
-		const source = Number.isFinite(maxBytes) ? file.slice(0, maxBytes) : file;
+		const source =
+			startByte > 0 || Number.isFinite(maxBytes)
+				? file.slice(startByte, Number.isFinite(maxBytes) ? maxBytes : undefined)
+				: file;
 		for await (const chunk of source.stream()) {
 			if (stopped) break;
 			bytesSinceYield += chunk.byteLength;

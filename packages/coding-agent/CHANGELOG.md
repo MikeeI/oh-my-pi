@@ -165,6 +165,10 @@
 - Fixed sessions whose first reply starts with a todo plan getting a title without its icon and code: the plan's title refresh no longer replaces the card title that is still being generated
 - Fixed generated titles that come out without an icon and code (a subagent's title, a title-model fallback, a malformed card reply) staying plain: they now get a card like `/rename` titles do
 - Fixed running the test suite adding fixture titles (`PLAN`, `renamed session`, …) to your real `~/.omp/agent/history.db`
+### Changed
+
+- Sped up `conversation_search` and loading of large sessions by parsing session journals as decoded text, and repeated searches in one process now re-read only messages appended since the previous search
+
 ### Fixed
 
 - Fixed system and subagent prompt template render errors (such as a removed helper) not naming the template file that failed

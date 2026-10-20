@@ -2,7 +2,7 @@ import { type } from "@oh-my-pi/omptype";
 import type { AgentTool, AgentToolResult } from "@oh-my-pi/pi-agent-core";
 import { untilAborted } from "@oh-my-pi/pi-utils";
 import conversationSearchDescription from "../prompts/tools/conversation-search.md" with { type: "text" };
-import { listConversationSessions } from "../session/conversation-corpus";
+import { ConversationTranscriptCache, listConversationSessions } from "../session/conversation-corpus";
 import {
 	conversationSearchWindowStart,
 	DEFAULT_CONVERSATION_SEARCH_DAYS,
@@ -13,6 +13,10 @@ import {
 import type { ToolSession } from ".";
 import { type ConversationSearchFormat, formatConversationSearchReport } from "./conversation-search-format";
 import { ToolError } from "@oh-my-pi/pi-tui/tools/tool-errors";
+
+// Shared across sessions and tool instances in this process so repeated searches
+// parse only journal bytes appended since an earlier search.
+const processTranscripts = new ConversationTranscriptCache();
 
 const conversationSearchSchema = type({
 	query: type("string > 0").describe("literal text or whitespace-separated terms"),
@@ -87,6 +91,7 @@ export class ConversationSearchTool implements AgentTool<typeof conversationSear
 				{ query, days, scope, role, match, limit, currentSessionFile },
 				signal,
 				nowMs,
+				processTranscripts,
 			);
 			const details: ConversationSearchDetails = {
 				query: report.query,

@@ -4,7 +4,12 @@ import * as fs from "node:fs/promises";
 import * as os from "node:os";
 import * as path from "node:path";
 import { parseArgs } from "node:util";
-import { type ConversationSessionCorpus, listConversationSessions } from "../src/session/conversation-corpus";
+import {
+	type ConversationSearchScope,
+	type ConversationSessionCorpus,
+	ConversationTranscriptCache,
+	listConversationSessions,
+} from "../src/session/conversation-corpus";
 import {
 	CONVERSATION_SEARCH_CONCURRENCY,
 	conversationSearchWindowStart,
@@ -22,21 +27,27 @@ const BENCHMARK_QUERY = "\0conversation-search-benchmark-guaranteed-miss\0";
 const USAGE = `Usage: bun scripts/bench-conversation-search.ts --cwd <workspace> [options]
 
 Options:
-  --cwd <path>             Workspace whose persisted sessions are benchmarked (required)
-  --session-dir <path>     Explicit session directory instead of workspace discovery
-  --exclude-session <path> Session JSONL to exclude like the active Main session
-  --days <n>               Lookback window (default: 10)
-  --runs <n>               Measured warm runs (default: 5)
-  --warmup <n>             Unmeasured warmup runs (default: 1)
-  --json                    Emit exactly one JSON result
-  --help                    Show this help
+  --cwd <path>                   Workspace whose persisted sessions are benchmarked (required)
+  --scope <project|all>          Search the workspace's sessions or every project (default: project)
+  --session-dir <path>           Explicit session directory instead of workspace discovery (project scope)
+  --exclude-session <path>       Session JSONL to exclude like the active Main session
+  --days <n>                     Lookback window (default: 10)
+  --transcript-cache <cold|warm> Parse every run from scratch, or reuse projections warmed before measuring (default: cold)
+  --runs <n>                     Measured runs (default: 5)
+  --warmup <n>                   Unmeasured warmup runs (default: 1)
+  --json                         Emit exactly one JSON result
+  --help                         Show this help
 `;
+
+type TranscriptCacheMode = "cold" | "warm";
 
 export interface ConversationSearchBenchmarkOptions {
 	cwd: string;
+	scope: ConversationSearchScope;
 	sessionDir?: string;
 	excludeSessionFile?: string;
 	days: number;
+	transcriptCache: TranscriptCacheMode;
 	runs: number;
 	warmupRuns: number;
 	json: boolean;
@@ -70,6 +81,7 @@ export interface ConversationSearchBenchmarkReport {
 	dataset: {
 		id: string;
 		cwd: string;
+		scope: ConversationSearchScope;
 		sessionDir?: string;
 		excludedSession?: string;
 		days: number;
@@ -86,6 +98,7 @@ export interface ConversationSearchBenchmarkReport {
 		role: "both";
 		limit: number;
 		concurrency: number;
+		transcriptCache: TranscriptCacheMode;
 		warmupRuns: number;
 		measuredRuns: number;
 	};
@@ -121,9 +134,11 @@ export function parseConversationSearchBenchmarkArgs(
 		strict: true,
 		options: {
 			cwd: { type: "string" },
+			scope: { type: "string", default: "project" },
 			"session-dir": { type: "string" },
 			"exclude-session": { type: "string" },
 			days: { type: "string", default: String(DEFAULT_CONVERSATION_SEARCH_DAYS) },
+			"transcript-cache": { type: "string", default: "cold" },
 			runs: { type: "string", default: String(DEFAULT_RUNS) },
 			warmup: { type: "string", default: String(DEFAULT_WARMUP_RUNS) },
 			json: { type: "boolean", default: false },
@@ -132,13 +147,26 @@ export function parseConversationSearchBenchmarkArgs(
 	});
 	if (values.help) return null;
 	if (!values.cwd) throw new Error("--cwd is required. Use --help for usage.");
+	const scope = values.scope;
+	if (scope !== "project" && scope !== "all") throw new Error("--scope must be project or all.");
+	if (scope === "all" && values["session-dir"]) throw new Error("--session-dir applies only to --scope project.");
+	const transcriptCache = values["transcript-cache"];
+	if (transcriptCache !== "cold" && transcriptCache !== "warm") {
+		throw new Error("--transcript-cache must be cold or warm.");
+	}
+	const warmupRuns = parseIntegerOption("--warmup", values.warmup, 0, MAX_WARMUP_RUNS);
+	if (transcriptCache === "warm" && warmupRuns === 0) {
+		throw new Error("--transcript-cache warm requires at least one --warmup run to fill the cache.");
+	}
 	return {
 		cwd: path.resolve(values.cwd),
+		scope,
 		sessionDir: values["session-dir"] ? path.resolve(values["session-dir"]) : undefined,
 		excludeSessionFile: values["exclude-session"] ? path.resolve(values["exclude-session"]) : undefined,
 		days: parseIntegerOption("--days", values.days, 1, 3_650),
+		transcriptCache,
 		runs: parseIntegerOption("--runs", values.runs, 1, MAX_RUNS),
-		warmupRuns: parseIntegerOption("--warmup", values.warmup, 0, MAX_WARMUP_RUNS),
+		warmupRuns,
 		json: values.json,
 	};
 }
@@ -154,16 +182,21 @@ export async function runConversationSearchBenchmark(
 	const discoveryStarted = performance.now();
 	const corpus = await listConversationSessions({
 		cwd: options.cwd,
-		scope: "project",
+		scope: options.scope,
 		modifiedSinceMs: sinceMs,
-		sessionDir: options.sessionDir ?? SessionManager.getDefaultSessionDir(options.cwd),
+		sessionDir:
+			options.scope === "project"
+				? (options.sessionDir ?? SessionManager.getDefaultSessionDir(options.cwd))
+				: undefined,
 		currentSessionFile: options.excludeSessionFile,
 	});
 	const discoveryMs = performance.now() - discoveryStarted;
 	if (corpus.discoveryFailures > 0) throw new Error("Benchmark invalid: session discovery was incomplete.");
 	const { sessions } = corpus;
 	if (sessions.length === 0) {
-		throw new Error(`No persisted sessions fall within the ${options.days}-day lookback window for the workspace.`);
+		throw new Error(
+			`No persisted sessions fall within the ${options.days}-day lookback window for scope ${options.scope}.`,
+		);
 	}
 	const excludedPath = options.excludeSessionFile ? path.resolve(options.excludeSessionFile) : undefined;
 	if (excludedPath && !sessions.some(session => path.resolve(session.path) === excludedPath)) {
@@ -207,8 +240,14 @@ export async function runConversationSearchBenchmark(
 		}
 	};
 
+	// Cold runs parse every journal from scratch; warm runs reuse projections the
+	// warmup filled, measuring the repeated-search path the tool takes in one process.
+	const warmTranscripts = new ConversationTranscriptCache();
+	const transcriptsForRun = () =>
+		options.transcriptCache === "warm" ? warmTranscripts : new ConversationTranscriptCache();
+
 	for (let run = 0; run < options.warmupRuns; run++) {
-		const report = await executeSearch(corpus, options, nowMs);
+		const report = await executeSearch(corpus, options, nowMs, transcriptsForRun());
 		verifyReport(report.visibleMessages, report.complete, report.totalMatches, report.searchedSessions);
 	}
 
@@ -224,7 +263,7 @@ export async function runConversationSearchBenchmark(
 		const cpuBefore = process.cpuUsage();
 		const started = performance.now();
 		try {
-			const report = await executeSearch(corpus, options, nowMs);
+			const report = await executeSearch(corpus, options, nowMs, transcriptsForRun());
 			const wallMs = performance.now() - started;
 			const cpu = process.cpuUsage(cpuBefore);
 			verifyReport(report.visibleMessages, report.complete, report.totalMatches, report.searchedSessions);
@@ -250,6 +289,7 @@ export async function runConversationSearchBenchmark(
 		dataset: {
 			id: datasetId,
 			cwd: options.cwd,
+			scope: options.scope,
 			sessionDir: options.sessionDir,
 			excludedSession: excludedPath,
 			days: options.days,
@@ -266,6 +306,7 @@ export async function runConversationSearchBenchmark(
 			role: "both",
 			limit: DEFAULT_CONVERSATION_SEARCH_LIMIT,
 			concurrency: CONVERSATION_SEARCH_CONCURRENCY,
+			transcriptCache: options.transcriptCache,
 			warmupRuns: options.warmupRuns,
 			measuredRuns: options.runs,
 		},
@@ -296,8 +337,8 @@ export async function runConversationSearchBenchmark(
 export function formatConversationSearchBenchmark(report: ConversationSearchBenchmarkReport): string {
 	return [
 		`benchmark: ${report.benchmark}`,
-		`dataset: id=${report.dataset.id} sessions=${report.dataset.sessions} mebibytes=${report.dataset.mebibytes} visible_messages=${report.dataset.visibleMessages} days=${report.dataset.days}`,
-		`evaluator: warmup=${report.evaluator.warmupRuns} runs=${report.evaluator.measuredRuns} concurrency=${report.evaluator.concurrency} query=${report.evaluator.query}`,
+		`dataset: id=${report.dataset.id} scope=${report.dataset.scope} sessions=${report.dataset.sessions} mebibytes=${report.dataset.mebibytes} visible_messages=${report.dataset.visibleMessages} days=${report.dataset.days}`,
+		`evaluator: warmup=${report.evaluator.warmupRuns} runs=${report.evaluator.measuredRuns} concurrency=${report.evaluator.concurrency} transcript_cache=${report.evaluator.transcriptCache} query=${report.evaluator.query}`,
 		`wall_ms: min=${report.result.wallMs.min} median=${report.result.wallMs.median} max=${report.result.wallMs.max}`,
 		`cpu_ms: min=${report.result.cpuMs.min} median=${report.result.cpuMs.median} max=${report.result.cpuMs.max}`,
 		`throughput_mib_s: min=${report.result.throughputMiBPerSecond.min} median=${report.result.throughputMiBPerSecond.median} max=${report.result.throughputMiBPerSecond.max}`,
@@ -310,13 +351,14 @@ async function executeSearch(
 	corpus: ConversationSessionCorpus,
 	options: ConversationSearchBenchmarkOptions,
 	nowMs: number,
+	transcripts: ConversationTranscriptCache,
 ) {
 	return searchConversationSessions(
 		corpus,
 		{
 			query: BENCHMARK_QUERY,
 			days: options.days,
-			scope: "project",
+			scope: options.scope,
 			role: "both",
 			match: "phrase",
 			limit: DEFAULT_CONVERSATION_SEARCH_LIMIT,
@@ -324,6 +366,7 @@ async function executeSearch(
 		},
 		undefined,
 		nowMs,
+		transcripts,
 	);
 }
 

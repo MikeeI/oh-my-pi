@@ -101,6 +101,13 @@ describe("conversation search benchmark", () => {
 	it("requires an explicit workspace while preserving benchmark defaults", () => {
 		expect(() => parseConversationSearchBenchmarkArgs([])).toThrow("--cwd is required");
 		const parsed = parseConversationSearchBenchmarkArgs(["--cwd", "."]);
-		expect(parsed).toMatchObject({ days: 10, runs: 5, warmupRuns: 1, json: false });
+		expect(parsed).toMatchObject({
+			scope: "project",
+			transcriptCache: "cold",
+			days: 10,
+			runs: 5,
+			warmupRuns: 1,
+			json: false,
+		});
 	});
 });
