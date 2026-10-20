@@ -423,9 +423,14 @@ The upgrader validates these IDs against its executable and manual proof mapping
 - Contract: middle-elided results expose the exact omitted range in complete artifacts without repeating preserved output.
 - Contract: capped artifacts advertise head/tail samples, never recovery selectors for bytes that were not saved.
 - Owner: `packages/tui/src/tools/output-meta.ts#formatTruncationMetaNotice` owns exact recovery references.
+- Owner: `packages/tui/src/tools/streaming-output.ts#OutputSink` reports exact shown line counts and elided artifact lines.
+- Owner: `src/tools/output-meta.ts#OutputMetaBuilder.truncationFromSummary` maps that report without guessed ranges.
+- Implementation constraint: substituted inline chunks withhold ranges because their lines no longer match the artifact.
 - Reason: upstream v18.4.9 caps output artifacts; original stream coordinates do not address their omitted middle.
-- Required action: retain only the runtime artifact-recovery deltas at the current output-metadata owner.
-- Proof: artifact spill recovery in `test/tools.test.ts`.
+- Reason: upstream splits sink head and tail lines evenly, so its ranges name the wrong artifact lines.
+- Coverage: upstream v18.12.3 stops middle-eliding Read file pages and continues them with an exact `:N` offset.
+- Required action: retain only the runtime artifact-recovery deltas at the current output-metadata and sink owners.
+- Proof: exact sink middle-elision recovery in `test/streaming-output.test.ts`.
 - Proof: capped middle-elision recovery in `test/streaming-output.test.ts`.
 
 #### `MOMP-READ-ARCHIVE-FRESHNESS` — Fresh archive indexes across Read calls
