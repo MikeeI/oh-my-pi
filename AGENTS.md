@@ -890,6 +890,9 @@ The upgrader validates these IDs against its executable and manual proof mapping
 - Proof: real tmux covers delayed SIGWINCH, width/height changes, and zero, partial, or full native history.
 - Proof: new finalized output during delayed resize, full paragraph contents, and continued interaction before Stop in that test.
 - Proof: explicit reset and rebuild ED3 ordering in `packages/tui/test/destructive-reset-clear-order.test.ts`.
+- Required action: seed retained live rows before a history scroll only when no reset or erase already cleared them.
+- Required action: route seeded rows through the synchronized-output renewal owner.
+- Proof: upstream `packages/tui/test/resize-tmux-sync.test.ts` and `packages/tui/test/image-clip.test.ts` pass unchanged.
 
 #### `MOMP-TMUX-PAGEUP` — Native tmux history access
 

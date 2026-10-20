@@ -3754,23 +3754,30 @@ export class TUI extends Container {
 			// region may include pulled-down accepted history, which must not be
 			// erased on the strength of stale viewport coordinates.
 			const pushed = Math.max(0, startTop + preparedHistory.lines.length + rows - height);
-			if (!this.#preservedResizeGridTail && pushed > this.#providerViewportTop && this.#providerWindow.length > 0) {
+			const eraseLiveRegion =
+				!this.#preservedResizeGridTail && pushed > this.#providerViewportTop && this.#providerWindow.length > 0;
+			if (eraseLiveRegion) {
 				buffer += relativeRows
 					? moveToRow(this.#providerViewportTop) + this.#eraseBelowCursorRow(width, height)
 					: this.#eraseBelowRow(this.#providerViewportTop, height);
 				cursorRow = this.#providerViewportTop;
 			}
-			if (preparedHistory.lines.length > 0 && pushed > 0) {
+			// Seeding overwrites retained live rows before the scroll can archive them. A cleared
+			// screen or erased live region has nothing to protect, and reseeding there would
+			// transmit the same image placements twice.
+			if (!destructiveReset && !eraseLiveRegion && preparedHistory.lines.length > 0 && pushed > 0) {
 				const replacementLines = [...preparedHistory.lines, ...prepared.lines];
 				const replacementRows = [...preparedHistory.rows, ...prepared.rows];
 				const seedCount = Math.min(pushed, replacementRows.length, height - startTop);
 				for (let index = 0; index < seedCount; index++) {
-					buffer += `${moveToRow(startTop + index)}${this.#lineRewriteSequence(
-						replacementRows[index]!,
-						width,
-						startTop + index,
-						this.#osc66SpacerGlyphWidth(replacementLines, index),
-					)}`;
+					append(
+						`${moveToRow(startTop + index)}${this.#lineRewriteSequence(
+							replacementRows[index]!,
+							width,
+							startTop + index,
+							this.#osc66SpacerGlyphWidth(replacementLines, index),
+						)}`,
+					);
 				}
 			}
 			buffer += moveToRow(startTop);
