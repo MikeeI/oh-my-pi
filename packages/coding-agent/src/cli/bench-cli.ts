@@ -7,14 +7,11 @@ import type {
 	Context,
 	Effort,
 	Model,
-	OpenAIPromptCacheOptions,
 	ProviderSessionState,
 	ServiceTier,
 	ServiceTierByFamily,
 } from "@oh-my-pi/pi-ai";
 import { resolveModelServiceTier, streamSimple } from "@oh-my-pi/pi-ai";
-import { isGpt56PlusResponsesModel } from "@oh-my-pi/pi-ai/providers/openai-shared";
-import { getOpenAICodexWebSocketEnvValue } from "@oh-my-pi/pi-ai/providers/openai-codex-transport";
 import {
 	renderTableRow,
 	replaceTabs,
@@ -70,9 +67,6 @@ const CACHE_PREFIX_CHUNK = cachePrefixChunk;
 const CACHE_PREFIX_PLACEHOLDER = "__OMP_CACHE_BENCH_RAW_PREFIX__";
 const CACHE_PREFIX_CHUNK_BYTES = UTF8_ENCODER.encode(CACHE_PREFIX_CHUNK).byteLength;
 const RESPONSE_CACHE_STATUS_HEADERS = ["cf-aig-cache-status"] as const;
-const CODEX_CACHE_OPTIONS_REJECTION = /\bunsupported parameter:\s*['"]?prompt_cache_options\b/i;
-const CODEX_CACHE_OPTIONS_REJECTION_MESSAGE = "Endpoint rejected unsupported prompt_cache_options.";
-const CODEX_PROBE_FAILURE_MESSAGE = "Codex cache breakpoint probe failed; provider error text omitted.";
 
 /**
  * One built-in workload a bench run exercises:
@@ -148,7 +142,6 @@ export interface BenchCommandArgs {
 		/** Run the single-user, parallel, and prefill phases instead of one `--profile` workload. */
 		detailed?: boolean;
 		cache?: boolean;
-		codexCacheBreakpointProbe?: boolean;
 		cachePrefixFile?: string;
 		cachePrefixBytes?: number;
 		cachePairs?: number;
@@ -226,18 +219,8 @@ export interface BenchCachePairReport {
 	/** Structural-only comparisons: prompt text and cache keys are never emitted. */
 	stablePrefix: true;
 	suffixChanged: true;
-	/** Provider-session IDs differ between cold and warm requests for an explicit Codex breakpoint probe. */
-	providerSessionIdsDistinct: boolean;
 	promptCacheKeyStable: true;
-	/** Both synthetic requests completed successfully at the provider endpoint. */
-	endpointAccepted: boolean;
 	statefulResponsesDisabled: true;
-	/** The request asked the provider to use an explicit latest-stable-message breakpoint. */
-	explicitBreakpointRequested: boolean;
-	/** Whether the locally observed wire payload carried both explicit-cache fields. */
-	explicitBreakpointWireFields: boolean | "unavailable";
-	promptCacheOptionsObserved: boolean | "unavailable";
-	explicitBreakpointCounts: { cold: number; warm: number } | "unavailable";
 	freshProviderSessionState: true;
 	/** "unavailable" when a transport does not expose the provider payload locally. */
 	payloadStructureStable: boolean | "unavailable";
@@ -320,7 +303,6 @@ export interface BenchSummary {
 	cache?: {
 		pairs: number;
 		concurrency: number;
-		probe?: "codex-explicit-breakpoint";
 	};
 }
 
@@ -394,8 +376,6 @@ function hasVisibleFinalContent(message: AssistantMessage): boolean {
 
 interface CacheRequestCapture {
 	payloadStructure?: string;
-	promptCacheOptionsObserved?: boolean;
-	explicitBreakpointCount?: number;
 	requestIdObserved: boolean;
 	responseCacheHit: boolean;
 	usage?: BenchCacheUsage;
@@ -412,24 +392,6 @@ function payloadStructure(payload: unknown): string {
 			.join(",")}}`;
 	}
 	return typeof payload;
-}
-function inspectExplicitBreakpointWireFields(payload: unknown): {
-	promptCacheOptionsObserved: boolean;
-	explicitBreakpointCount: number;
-} {
-	if (typeof payload !== "object" || payload === null || Array.isArray(payload)) {
-		return { promptCacheOptionsObserved: false, explicitBreakpointCount: 0 };
-	}
-	const record = payload as Record<string, unknown>;
-	const options = record.prompt_cache_options;
-	const promptCacheOptionsObserved =
-		typeof options === "object" &&
-		options !== null &&
-		!Array.isArray(options) &&
-		(options as Record<string, unknown>).mode === "explicit";
-	const input = JSON.stringify(record.input ?? "");
-	const explicitBreakpointCount = input.match(/"prompt_cache_breakpoint":\{"mode":"explicit"\}/g)?.length ?? 0;
-	return { promptCacheOptionsObserved, explicitBreakpointCount };
 }
 
 function asNonNegativeNumber(value: unknown): number {
@@ -477,19 +439,7 @@ function cacheRunReport(
 	phase: BenchCacheRunReport["phase"],
 	result: BenchRunResult,
 	capture: CacheRequestCapture,
-	codexBreakpointProbe: boolean,
 ): BenchCacheRunReport {
-	// Provider errors can echo even a truncated request, so replacing complete
-	// payload values is insufficient. Only the known rejection classification
-	// crosses this probe's no-payload output boundary.
-	if (codexBreakpointProbe && !result.ok) {
-		result = {
-			...result,
-			error: CODEX_CACHE_OPTIONS_REJECTION.test(result.error)
-				? CODEX_CACHE_OPTIONS_REJECTION_MESSAGE
-				: CODEX_PROBE_FAILURE_MESSAGE,
-		};
-	}
 	return {
 		phase,
 		result,
@@ -692,7 +642,7 @@ function formatCachePairLine(pair: BenchCachePairReport, index: number, total: n
 		const usage = run.usage;
 		return `${run.phase}${alreadyWarm ? " (already warm)" : ""} ${run.observations.join(", ")} ${chalk.dim("input")} ${usage?.inputTokens ?? 0} ${chalk.dim("cache-read")} ${usage?.cacheReadTokens ?? 0} ${chalk.dim("cache-write")} ${usage?.cacheWriteTokens ?? 0} ${chalk.dim("output")} ${usage?.outputTokens ?? run.result.outputTokens} ${chalk.dim("total")} ${usage?.totalTokens ?? 0} ${chalk.dim("cost")} ${formatCost(usage?.cost ?? 0)} ${chalk.dim("TTFT")} ${formatMs(run.result.ttftMs)} ${chalk.dim("duration")} ${formatMs(run.result.durationMs)} ${chalk.dim("throughput")} ${run.result.tokensPerSecond.toFixed(1)}/s`;
 	};
-	return `  ${chalk.dim(`pair ${index + 1}/${total}`)}${pair.explicitBreakpointRequested ? " explicit-breakpoint-probe" : ""} ${formatPhase(pair.cold, pair.coldAlreadyWarm)}; ${formatPhase(pair.warm)}`;
+	return `  ${chalk.dim(`pair ${index + 1}/${total}`)} ${formatPhase(pair.cold, pair.coldAlreadyWarm)}; ${formatPhase(pair.warm)}`;
 }
 
 interface BenchRequestOptions {
@@ -708,8 +658,6 @@ interface BenchRequestOptions {
 	/** Requested service tier passed to `streamSimple`; absent omits the option. The provider layer applies scope/support gating before it reaches the wire. */
 	serviceTier?: ServiceTier;
 	promptCacheKey?: string;
-	promptCache?: OpenAIPromptCacheOptions;
-	preferWebsockets?: boolean;
 	statefulResponses?: false;
 	cacheCapture?: CacheRequestCapture;
 }
@@ -740,15 +688,9 @@ async function runBenchRequest(
 			reasoning: options.reasoning,
 			promptCacheKey: options.promptCacheKey,
 			statefulResponses: options.statefulResponses,
-			promptCache: options.promptCache,
 			onPayload: options.cacheCapture
 				? payload => {
 						options.cacheCapture!.payloadStructure = payloadStructure(payload);
-						if (options.promptCache?.mode === "explicit") {
-							const wireFields = inspectExplicitBreakpointWireFields(payload);
-							options.cacheCapture!.promptCacheOptionsObserved = wireFields.promptCacheOptionsObserved;
-							options.cacheCapture!.explicitBreakpointCount = wireFields.explicitBreakpointCount;
-						}
 						return undefined;
 					}
 				: undefined,
@@ -763,7 +705,7 @@ async function runBenchRequest(
 			disableReasoning: options.disableReasoning,
 			serviceTier: options.serviceTier,
 			providerSessionState,
-			preferWebsockets: options.preferWebsockets ?? true,
+			preferWebsockets: true,
 			// pi-ai opts every OpenRouter request into response caching (1h TTL).
 			// Bench sends a byte-identical request each run, so within the TTL
 			// OpenRouter replays the cached generation with zeroed usage — the run
@@ -1075,15 +1017,7 @@ function formatBenchTable(rows: readonly BenchTableRow[], spec: BenchTableSpec, 
 	return table.map(cells => renderTableRow(cells, layout, undefined, { gap: "  " }).trimEnd());
 }
 
-function assertCacheModeSupported(targets: BenchTarget[], codexBreakpointProbe: boolean): void {
-	if (codexBreakpointProbe) {
-		for (const { model } of targets) {
-			if (model.api !== "openai-codex-responses" || !isGpt56PlusResponsesModel(model)) {
-				throw new Error("--codex-cache-breakpoint-probe requires an openai-codex-responses GPT-5.6+ model");
-			}
-		}
-		return;
-	}
+function assertCacheModeSupported(targets: BenchTarget[]): void {
 	if (targets.some(({ model }) => model.api === "openai-codex-responses")) {
 		throw new Error(
 			"--cache is not supported for openai-codex-responses because Codex WebSocket chaining cannot produce independent prompt-cache pairs",
@@ -1092,13 +1026,7 @@ function assertCacheModeSupported(targets: BenchTarget[], codexBreakpointProbe: 
 }
 
 export async function runBenchCommand(command: BenchCommandArgs, deps: BenchDependencies = {}): Promise<BenchSummary> {
-	const codexBreakpointProbe = command.flags.codexCacheBreakpointProbe === true;
-	const cacheMode = command.flags.cache === true || codexBreakpointProbe;
-	// The provider's process override wins over preferWebsockets:false.
-	// Reject it before loading credentials rather than silently changing probe transport.
-	if (codexBreakpointProbe && getOpenAICodexWebSocketEnvValue() === true) {
-		throw new Error("--codex-cache-breakpoint-probe requires SSE; unset PI_CODEX_WEBSOCKET or set it to 0");
-	}
+	const cacheMode = command.flags.cache === true;
 	const cacheFlagsUsed =
 		command.flags.cachePrefixFile !== undefined ||
 		command.flags.cachePrefixBytes !== undefined ||
@@ -1225,7 +1153,7 @@ export async function runBenchCommand(command: BenchCommandArgs, deps: BenchDepe
 	const runtime = await (deps.createRuntime ?? createDefaultBenchRuntime)();
 	try {
 		const targets = await resolveBenchTargets(command.models, runtime.modelRegistry, runtime.settings, writeStderr);
-		if (cacheMode) assertCacheModeSupported(targets, codexBreakpointProbe);
+		if (cacheMode) assertCacheModeSupported(targets);
 		// Explicit `--service-tier` (a single value broadcast across families) wins;
 		// otherwise fall back to the configured per-family `tier.*` settings. Each
 		// model resolves its own family's tier below before reaching the wire.
@@ -1286,9 +1214,6 @@ export async function runBenchCommand(command: BenchCommandArgs, deps: BenchDepe
 						const stablePrefix = renderCacheBenchmarkPrefix(cachePrefix!, cacheNamespace);
 						const coldSuffix = prompt.render(cacheSuffixTemplate, { variant: "A" }).trim();
 						const warmSuffix = prompt.render(cacheSuffixTemplate, { variant: "B" }).trim();
-						const credentialAffinitySessionId = pairIndex === 0 ? testSessionId : randomSessionId();
-						const coldSessionId = codexBreakpointProbe ? randomSessionId() : credentialAffinitySessionId;
-						const warmSessionId = codexBreakpointProbe ? randomSessionId() : credentialAffinitySessionId;
 						const coldCapture: CacheRequestCapture = {
 							requestIdObserved: false,
 							responseCacheHit: false,
@@ -1296,32 +1221,19 @@ export async function runBenchCommand(command: BenchCommandArgs, deps: BenchDepe
 						// Keep the gateway's credential selection stable for both phases.
 						// Provider-session state is still recreated by runBenchRequest and
 						// stateful Responses chaining is disabled below.
+						const credentialAffinitySessionId = pairIndex === 0 ? testSessionId : randomSessionId();
 						const credentialResolver = runtime.modelRegistry.resolver(model, credentialAffinitySessionId);
-						const requestModel = codexBreakpointProbe
-							? ({
-									...model,
-									compat: {
-										...model.compat,
-										supportsPromptCacheBreakpoints: true,
-										promptCacheBreakpointTtl: "30m",
-									},
-								} as Model<Api>)
-							: model;
 						const coldResult = await runBenchRequest(
-							requestModel,
+							model,
 							{
 								apiKey: credentialResolver,
-								sessionId: coldSessionId,
+								sessionId: credentialAffinitySessionId,
 								messages: cacheBenchmarkMessages(stablePrefix, coldSuffix),
 								maxTokens: cacheMaxTokens!,
 								reasoning: toReasoningEffort(thinking),
 								disableReasoning: shouldDisableReasoning(thinking) ? true : undefined,
 								serviceTier,
 								promptCacheKey,
-								promptCache: codexBreakpointProbe
-									? { mode: "explicit", ttl: "30m", breakpoint: "latest-stable-message" }
-									: undefined,
-								preferWebsockets: codexBreakpointProbe ? false : undefined,
 								statefulResponses: false,
 								cacheCapture: coldCapture,
 							},
@@ -1333,20 +1245,16 @@ export async function runBenchCommand(command: BenchCommandArgs, deps: BenchDepe
 							responseCacheHit: false,
 						};
 						const warmResult = await runBenchRequest(
-							requestModel,
+							model,
 							{
 								apiKey: credentialResolver,
-								sessionId: warmSessionId,
+								sessionId: credentialAffinitySessionId,
 								messages: cacheBenchmarkMessages(stablePrefix, warmSuffix),
 								maxTokens: cacheMaxTokens!,
 								reasoning: toReasoningEffort(thinking),
 								disableReasoning: shouldDisableReasoning(thinking) ? true : undefined,
 								serviceTier,
 								promptCacheKey,
-								promptCache: codexBreakpointProbe
-									? { mode: "explicit", ttl: "30m", breakpoint: "latest-stable-message" }
-									: undefined,
-								preferWebsockets: codexBreakpointProbe ? false : undefined,
 								statefulResponses: false,
 								cacheCapture: warmCapture,
 							},
@@ -1359,40 +1267,14 @@ export async function runBenchCommand(command: BenchCommandArgs, deps: BenchDepe
 						if (!warmResult.ok) progress.failed++;
 						board?.repaint();
 						return {
-							cold: cacheRunReport("cold", coldResult, coldCapture, codexBreakpointProbe),
-							warm: cacheRunReport("warm", warmResult, warmCapture, codexBreakpointProbe),
+							cold: cacheRunReport("cold", coldResult, coldCapture),
+							warm: cacheRunReport("warm", warmResult, warmCapture),
 							coldAlreadyWarm: (coldCapture.usage?.cacheReadTokens ?? 0) > 0 || coldCapture.responseCacheHit,
 							stablePrefix: true,
 							suffixChanged: true,
 							promptCacheKeyStable: true,
 							statefulResponsesDisabled: true,
 							freshProviderSessionState: true,
-							providerSessionIdsDistinct: coldSessionId !== warmSessionId,
-							explicitBreakpointRequested: codexBreakpointProbe,
-							endpointAccepted: coldResult.ok && warmResult.ok,
-							explicitBreakpointWireFields:
-								coldCapture.promptCacheOptionsObserved === undefined ||
-								warmCapture.promptCacheOptionsObserved === undefined ||
-								coldCapture.explicitBreakpointCount === undefined ||
-								warmCapture.explicitBreakpointCount === undefined
-									? "unavailable"
-									: coldCapture.promptCacheOptionsObserved &&
-										warmCapture.promptCacheOptionsObserved &&
-										coldCapture.explicitBreakpointCount > 0 &&
-										warmCapture.explicitBreakpointCount > 0,
-							promptCacheOptionsObserved:
-								coldCapture.promptCacheOptionsObserved === undefined ||
-								warmCapture.promptCacheOptionsObserved === undefined
-									? "unavailable"
-									: coldCapture.promptCacheOptionsObserved && warmCapture.promptCacheOptionsObserved,
-							explicitBreakpointCounts:
-								coldCapture.explicitBreakpointCount === undefined ||
-								warmCapture.explicitBreakpointCount === undefined
-									? "unavailable"
-									: {
-											cold: coldCapture.explicitBreakpointCount,
-											warm: warmCapture.explicitBreakpointCount,
-										},
 							payloadStructureStable:
 								coldCapture.payloadStructure === undefined || warmCapture.payloadStructure === undefined
 									? "unavailable"
@@ -1496,13 +1378,7 @@ export async function runBenchCommand(command: BenchCommandArgs, deps: BenchDepe
 			failures,
 			serviceTierByFamily,
 			...(cacheMode
-				? {
-						cache: {
-							pairs: cachePairs!,
-							concurrency: cacheConcurrency!,
-							...(codexBreakpointProbe ? { probe: "codex-explicit-breakpoint" as const } : {}),
-						},
-					}
+				? { cache: { pairs: cachePairs!, concurrency: cacheConcurrency! } }
 				: detailed
 					? { detailed: { runsPerPhase: runsPerStep, par } }
 					: { profile }),

@@ -299,13 +299,6 @@ Run `omp <command> --help` for each command's own flags and examples.
 
 `__complete` is an internal, hidden subcommand used by shell completion scripts.
 
-### Codex cache breakpoint probe
-
-`omp bench <model> --codex-cache-breakpoint-probe --json` reports synthetic explicit-breakpoint endpoint evidence.
-It does not establish Main-session prompt-cache reuse.
-Output omits the synthetic prefix, suffixes, and cache key, including provider-error request echoes.
-Known `prompt_cache_options` rejection is classified; other provider failures omit raw error text.
-
 ### Configured Child prompt inspection
 
 `omp system-prompt inspect --subagent <name> --json` previews a configured fresh top-level Child.

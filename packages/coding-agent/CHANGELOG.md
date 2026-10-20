@@ -122,6 +122,10 @@
 - Fixed `system-prompt inspect` printing a code frame instead of a one-line error and usage for invalid flags, `--cwd`, or `--subagent`
 - Fixed `system-prompt inspect --help` examples pointing at a nonexistent project directory
 
+### Removed
+
+- Removed `bench --codex-cache-breakpoint-probe`; the Codex endpoint rejects explicit `prompt_cache_options` on every available model
+
 ## [18.12.3] - 2026-10-19
 
 ### Added

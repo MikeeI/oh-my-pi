@@ -1,4 +1,4 @@
-import { describe, expect, it, spyOn } from "bun:test";
+import { describe, expect, it } from "bun:test";
 import * as fs from "node:fs/promises";
 import * as os from "node:os";
 import * as path from "node:path";
@@ -12,8 +12,7 @@ import type {
 	Model,
 	SimpleStreamOptions,
 } from "@oh-my-pi/pi-ai";
-import * as codexTransport from "@oh-my-pi/pi-ai/providers/openai-codex-transport";
-import { type BenchSummary, runBenchCommand } from "@oh-my-pi/pi-coding-agent/cli/bench-cli";
+import { runBenchCommand } from "@oh-my-pi/pi-coding-agent/cli/bench-cli";
 import type { BenchModelRegistry } from "@oh-my-pi/pi-coding-agent/cli/bench-runtime";
 
 const model = {
@@ -33,8 +32,8 @@ const piNativeModel = {
 const codexModel = {
 	...model,
 	provider: "openai-codex",
-	id: "gpt-5.6-luna",
-	name: "gpt-5.6-luna",
+	id: "gpt-cache-codex-test",
+	name: "gpt-cache-codex-test",
 	api: "openai-codex-responses",
 } as unknown as Model<Api>;
 
@@ -146,113 +145,6 @@ describe("bench cache mode", () => {
 		expect(stdout).not.toContain("bench-cache:");
 		expect(stdout).not.toContain("Cache benchmark suffix");
 	});
-	it("keeps the cache key stable while probing explicit breakpoints across Codex sessions", async () => {
-		const calls: Array<{ context: Context; options: SimpleStreamOptions }> = [];
-		let id = 0;
-		const summary = await runBenchCommand(
-			{ models: ["openai-codex/gpt-5.6-luna"], flags: { codexCacheBreakpointProbe: true, json: true } },
-			{
-				createRuntime: async () => ({
-					modelRegistry: { ...registry, getAll: () => [codexModel] },
-					close: () => {},
-				}),
-				randomSessionId: () => `session-${++id}`,
-				writeStdout: () => {},
-				writeStderr: () => {},
-				setExitCode: () => {},
-				streamSimple: (_model, context, options) => {
-					const phase = calls.length === 0 ? "cold" : "warm";
-					calls.push({ context, options: options! });
-					void options?.onPayload?.({
-						prompt_cache_options: { mode: "explicit", ttl: "30m" },
-						input: [
-							{
-								role: "user",
-								content: [
-									{
-										type: "input_text",
-										text: context.messages[0]?.content,
-										prompt_cache_breakpoint: { mode: "explicit" },
-									},
-								],
-							},
-						],
-					});
-					const message = successfulMessage(phase === "warm" ? 100 : 0, phase === "cold" ? 100 : 0);
-					return streamWithMessage(message);
-				},
-				stdoutIsTTY: false,
-			},
-		);
-
-		expect(summary.cache).toEqual({ pairs: 1, concurrency: 1, probe: "codex-explicit-breakpoint" });
-		expect(calls).toHaveLength(2);
-		expect(calls[0]?.options.promptCacheKey).toBe(calls[1]?.options.promptCacheKey);
-		expect(calls[0]?.options.sessionId).not.toBe(calls[1]?.options.sessionId);
-		expect(calls[0]?.options.promptCache).toEqual({
-			mode: "explicit",
-			ttl: "30m",
-			breakpoint: "latest-stable-message",
-		});
-		expect(calls[0]?.options.preferWebsockets).toBe(false);
-		expect(calls[1]?.options.preferWebsockets).toBe(false);
-		expect(calls[0]?.context.messages?.[0]?.content).toBe(calls[1]?.context.messages?.[0]?.content);
-		const pair = summary.models[0]?.cachePairs?.[0];
-		expect(pair?.providerSessionIdsDistinct).toBe(true);
-		expect(pair?.endpointAccepted).toBe(true);
-		expect(pair?.explicitBreakpointRequested).toBe(true);
-		expect(pair?.explicitBreakpointWireFields).toBe(true);
-	});
-
-	it("omits raw and JSON-escaped request echoes from Codex probe failure output", async () => {
-		let stdout = "";
-		let id = 0;
-		let phase = 0;
-		const privateFragments: string[] = [];
-		await runBenchCommand(
-			{ models: ["openai-codex/gpt-5.6-luna"], flags: { codexCacheBreakpointProbe: true, json: true } },
-			{
-				createRuntime: async () => ({
-					modelRegistry: { ...registry, getAll: () => [codexModel] },
-					close: () => {},
-				}),
-				randomSessionId: () => `session-${++id}`,
-				writeStdout: text => {
-					stdout += text;
-				},
-				writeStderr: () => {},
-				setExitCode: () => {},
-				streamSimple: (_model, context, options) => {
-					const prefix = context.messages[0]?.content;
-					const suffix = context.messages[1]?.content;
-					if (typeof prefix !== "string" || typeof suffix !== "string" || !options?.promptCacheKey) {
-						throw new Error("Missing synthetic probe request fixture");
-					}
-					// Providers may echo a truncated prefix, not only the complete request.
-					privateFragments.push(prefix.slice(0, 80), suffix, options.promptCacheKey);
-					const echo =
-						phase++ === 0
-							? `${prefix.slice(0, 80)}\n${suffix}\n${options.promptCacheKey}`
-							: JSON.stringify({ input: context.messages, prompt_cache_key: options.promptCacheKey });
-					throw new Error(`Unsupported parameter: 'prompt_cache_options'; request: ${echo}`);
-				},
-				stdoutIsTTY: false,
-			},
-		);
-
-		const report: BenchSummary = JSON.parse(stdout);
-		const pair = report.models[0]?.cachePairs?.[0];
-		if (!pair) throw new Error("Missing failed probe pair");
-		expect(pair.endpointAccepted).toBe(false);
-		for (const { result } of [pair.cold, pair.warm]) {
-			if (result.ok) throw new Error("Echoing provider unexpectedly succeeded");
-			expect(result.error).toContain("prompt_cache_options");
-			const leaked = privateFragments.some(
-				fragment => result.error.includes(fragment) || result.error.includes(JSON.stringify(fragment).slice(1, -1)),
-			);
-			expect(leaked).toBe(false);
-		}
-	});
 
 	it("keeps pi-native credential affinity while marking gateway-hidden payload diagnostics unavailable", async () => {
 		const calls: SimpleStreamOptions[] = [];
@@ -299,7 +191,7 @@ describe("bench cache mode", () => {
 		let credentialLookups = 0;
 		await expect(
 			runBenchCommand(
-				{ models: ["openai-codex/gpt-5.6-luna"], flags: { cache: true } },
+				{ models: ["openai-codex/gpt-cache-codex-test"], flags: { cache: true } },
 				{
 					createRuntime: async () => ({
 						modelRegistry: {
@@ -321,31 +213,6 @@ describe("bench cache mode", () => {
 			"--cache is not supported for openai-codex-responses because Codex WebSocket chaining cannot produce independent prompt-cache pairs",
 		);
 		expect(credentialLookups).toBe(0);
-		const websocketOverride = spyOn(codexTransport, "getOpenAICodexWebSocketEnvValue").mockReturnValue(true);
-		try {
-			await expect(
-				runBenchCommand(
-					{
-						models: ["openai-codex/gpt-5.6-luna"],
-						flags: { codexCacheBreakpointProbe: true, json: true },
-					},
-					{
-						createRuntime: async () => ({
-							modelRegistry: { ...registry, getAll: () => [codexModel] },
-							close: () => {},
-						}),
-						streamSimple: () => {
-							throw new Error("The SSE probe must reject a forced WebSocket before issuing a request");
-						},
-						writeStdout: () => {},
-						writeStderr: () => {},
-						setExitCode: () => {},
-					},
-				),
-			).rejects.toThrow("PI_CODEX_WEBSOCKET");
-		} finally {
-			websocketOverride.mockRestore();
-		}
 	});
 
 	it("gives every pair a private stable namespace and flags a prewarmed cold request", async () => {

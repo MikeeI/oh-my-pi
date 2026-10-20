@@ -44,10 +44,7 @@ export default class Bench extends Command {
 			description: "Execute runs with N parallel queries/requests (default: 4); --detailed's parallel phase width",
 		}),
 		cache: Flags.boolean({
-			description: "Run a synthetic provider prompt-cache probe (not a Main-session cache test)",
-		}),
-		"codex-cache-breakpoint-probe": Flags.boolean({
-			description: "Probe GPT-5.6 Codex breakpoints over SSE (rejects PI_CODEX_WEBSOCKET=true)",
+			description: "Run independent cold/warm prompt-cache pairs (not supported for openai-codex-responses)",
 		}),
 		"cache-prefix-file": Flags.string({ description: "Stable prompt prefix file for --cache" }),
 		"cache-prefix-bytes": Flags.integer({ description: "Stable prefix byte budget for --cache (default: 8192)" }),
@@ -67,7 +64,6 @@ export default class Bench extends Command {
 		`# Compare single-user vs 8 concurrent users, plus prefill speed\n  ${APP_DISPLAY_NAME} bench apple --detailed --par 8`,
 		`# Force priority serving tier\n  ${APP_DISPLAY_NAME} bench openai-codex/gpt-5.5:low --runs 10 --service-tier priority`,
 		`# Measure one cold/warm prompt-cache pair\n  ${APP_DISPLAY_NAME} bench openai/gpt-5.6 --cache --json`,
-		`# Probe the ChatGPT Codex endpoint's explicit-breakpoint support\n  ${APP_DISPLAY_NAME} bench openai-codex/gpt-5.6-luna --codex-cache-breakpoint-probe --json`,
 	];
 
 	async run(): Promise<void> {
@@ -85,7 +81,6 @@ export default class Bench extends Command {
 				json: flags.json,
 				par: flags.par,
 				cache: flags.cache,
-				codexCacheBreakpointProbe: flags["codex-cache-breakpoint-probe"],
 				cachePrefixFile: flags["cache-prefix-file"],
 				cachePrefixBytes: flags["cache-prefix-bytes"],
 				cachePairs: flags["cache-pairs"],
