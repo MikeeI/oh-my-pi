@@ -21,7 +21,6 @@ import { loadLegacyPiModule } from "../plugins/legacy-pi-compat";
 // Runtime self-reference: dereference this namespace only inside loader functions to keep the index.ts cycle safe.
 import * as PiCodingAgent from "../../index";
 import * as typebox from "../legacy-typebox";
-import { loadLegacyPiModule } from "../plugins/legacy-pi-compat";
 import { createNoOpUIContext, resolvePath, withHostGuard } from "../utils";
 import type { CustomToolAPI, CustomToolFactory, LoadedCustomTool, ToolLoadError } from "./types";
 

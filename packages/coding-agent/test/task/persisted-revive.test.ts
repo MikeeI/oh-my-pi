@@ -1463,11 +1463,18 @@ describe("cold revival replays the system prompt the last request sent", () => {
 		expect(warm.toolRequests.at(-1)).toBe(spawned.toolRequests.at(-1)!);
 	});
 
-	/** The executor's own subagent prompt over a default block listing the active tools. */
+	/** The executor's own subagent prompt over a default block listing the active tools, composed as the SDK does. */
 	function subagentPrompt(toolNames: string[], options?: CreateAgentSessionOptions): string[] {
+		const transform = options?.systemPromptTransform;
+		if (!transform) throw new Error("Expected a subagent system prompt transform");
+		const transformed = transform({
+			systemPrompt: [`default: ${toolNames.join(",")}`],
+			dynamicParts: [],
+		}).systemPrompt;
 		const build = options?.systemPrompt;
+		if (build === undefined) return transformed;
 		if (typeof build !== "function") throw new Error("Expected a system prompt builder");
-		return [build([`default: ${toolNames.join(",")}`])].flat();
+		return [build(transformed)].flat();
 	}
 
 	function registerPeer(): void {

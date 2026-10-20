@@ -183,6 +183,10 @@ The upgrader validates these IDs against its executable and manual proof mapping
 - Proof: owning-session IRC delivery in `test/sdk-async-result-routing.test.ts`.
 - Proof: structured-prefix and plain-result regression cases in `test/task/executor-subagent-reminders.test.ts`.
 - Proof: saved-source isolation, selected-wrapper ordering, and revival in `test/task/seance-runtime.test.ts`.
+- Coverage: upstream v18.12.4 re-renders a parked Child's held IRC roster on warm revive.
+- Owner: upstream `src/task/executor.ts#recordIrcRender` and `#trackSubagentIrcRoster` own that roster retention.
+- Required action: report each selected-wrapper render through `createSubagentSystemPromptTransform`'s `onIrcRender`.
+- Proof: warm-revive roster cases in `test/task/persisted-revive.test.ts`, composed through the selected transform.
 
 #### `MOMP-PROMPT-OVERRIDES` — Process-scoped Main overrides
 
@@ -838,6 +842,8 @@ The upgrader validates these IDs against its executable and manual proof mapping
 - Required action: retain that upstream policy alongside MOMP's accepted-row replay and tmux resize safeguards.
 - Required action: retain those lifecycle owners alongside whole-block tmux retirement and accepted-row replay.
 - Required action: capture partial row boundaries in accepted tape, discarded offers, and semantic replay at that upstream owner.
+- Coverage: upstream v18.12.4 relocates split seams through archived inline images via `RowSplit.images`.
+- Required action: keep recorded blank separators beside image seams; image-reserved rows never count as blanks.
 - Owner: `packages/tui/src/chrome/transcript-container.ts#peekWholeFinalizedBatch` owns budget-bounded whole-block acceptance.
 - Contract: preserve-mode tmux accepts settled blocks whole without waiting for pressure, before reflow archives an unowned copy.
 - Contract: active streaming heads retain capacity-based progressive publication and ordered retirement.
@@ -911,6 +917,7 @@ The upgrader validates these IDs against its executable and manual proof mapping
 - Owner: `src/cli/update-cli.ts` owns fork-safe update behavior.
 - Owner: `src/commands/update.ts` and `src/cli/command-help.ts#updateHelp` render identity-specific update help.
 - Owner: `src/extensibility/plugins/legacy-pi-compat.ts` owns installed-package self-import compatibility.
+- Coverage: upstream v18.12.4 loads custom tools through `loadLegacyPiModule`; the fork's loader delta is removed.
 - Owner: `MOMP_VERSION` owns the source release version.
 - Reason: canonical upstream cannot own the `@mikeei/momp` package identity or its fork-safe update policy.
 - Required action: retain one MOMP identity owner and publish-time staging boundary.
