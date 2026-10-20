@@ -110,6 +110,15 @@
 - Fixed supported Bedrock Claude models falling back to soft instead of remote compaction ([#16343](https://github.com/can1357/oh-my-pi/pull/16343) by [@anatoli-tsinovoy](https://github.com/anatoli-tsinovoy))
 - Fixed browser `tab.run(fn, [url])` and `browser.open("https://…")` failing with a bare "expects an options object"; the errors now say to pass `{ args: [...] }` and `browser.open({ url, name })` ([#16236](https://github.com/can1357/oh-my-pi/pull/16236) by [@will-bogusz](https://github.com/will-bogusz))
 - Fixed the built-in `ts-set-map`, `ts-import-type` and `ts-no-any` rules reminding you about code they allow: an empty or computed `Set`/`Map`, a runtime `await import()`, or the word "any" in a comment ([#16242](https://github.com/can1357/oh-my-pi/pull/16242) by [@will-bogusz](https://github.com/will-bogusz))
+### Changed
+
+- Sped up `conversation_search` and loading of large sessions by parsing session journals as decoded text, and repeated searches in one process now re-read only messages appended since the previous search
+
+### Fixed
+
+- Fixed system and subagent prompt template render errors (such as a removed helper) not naming the template file that failed
+- Fixed starting in a subdirectory ignoring the project's `.omp/SYSTEM.md`, `SYSTEM.template.md`, and `SUBAGENT-SYSTEM.template.md` and silently using the user-level prompt; they now resolve from the nearest project `.omp` like other project config
+- Fixed published `momp update --help` advertising self-installation and channel switching that `momp` does not support
 
 ## [18.12.3] - 2026-10-19
 
@@ -165,15 +174,6 @@
 - Fixed sessions whose first reply starts with a todo plan getting a title without its icon and code: the plan's title refresh no longer replaces the card title that is still being generated
 - Fixed generated titles that come out without an icon and code (a subagent's title, a title-model fallback, a malformed card reply) staying plain: they now get a card like `/rename` titles do
 - Fixed running the test suite adding fixture titles (`PLAN`, `renamed session`, …) to your real `~/.omp/agent/history.db`
-### Changed
-
-- Sped up `conversation_search` and loading of large sessions by parsing session journals as decoded text, and repeated searches in one process now re-read only messages appended since the previous search
-
-### Fixed
-
-- Fixed system and subagent prompt template render errors (such as a removed helper) not naming the template file that failed
-- Fixed starting in a subdirectory ignoring the project's `.omp/SYSTEM.md`, `SYSTEM.template.md`, and `SUBAGENT-SYSTEM.template.md` and silently using the user-level prompt; they now resolve from the nearest project `.omp` like other project config
-- Fixed published `momp update --help` advertising self-installation and channel switching that the personal fork disables
 
 ## [18.12.2] - 2026-10-18
 
