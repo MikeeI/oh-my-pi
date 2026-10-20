@@ -302,6 +302,40 @@ describe("TranscriptContainer row split", () => {
 		}
 	});
 
+	it("keeps a live blank row below an archived image when a blank separator precedes the image", () => {
+		const previous = TERMINAL.imageProtocol;
+		setTerminalImageProtocol(ImageProtocol.Iterm2);
+		try {
+			const transcript = new TranscriptContainer();
+			transcript.addChild(
+				new Block(
+					[
+						"above 1",
+						"",
+						"\x1b[0m",
+						"\x1b[0m",
+						"\x1b[0m",
+						"\x1b7\x1b[3A\x1b]1337;File=inline=1;width=10;height=4:AAAA\x07\x1b8",
+						"",
+						"below 1",
+						"below 2",
+					],
+					true,
+				),
+			);
+			transcript.addChild(new Block(["tail"], true));
+			// Room 8 cuts inside the image; iTerm2 moves the cut below it, archiving the separator and image whole.
+			const head = transcript.peekFinalizedBatch(40, 8)!;
+			expect(head.rows.length).toBe(6);
+			transcript.acknowledgeFinalizedBatch(head.id);
+			// Reserved image rows are not blank separators, so the live blank below the image survives the resize.
+			const rest = transcript.peekFlushBatch(50)!.rows;
+			expect(rest.slice(0, 2)).toEqual(["", "below 1"]);
+		} finally {
+			setTerminalImageProtocol(previous);
+		}
+	});
+
 	it("keeps a replacement image live when the archived one is swapped before a width change", () => {
 		const previous = TERMINAL.imageProtocol;
 		setTerminalImageProtocol(ImageProtocol.Iterm2);
