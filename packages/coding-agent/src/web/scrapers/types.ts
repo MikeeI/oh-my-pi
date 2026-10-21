@@ -40,9 +40,9 @@ export type SpecialHandler = (
 export const MAX_BYTES = 50 * 1024 * 1024;
 
 // Chrome Stable: https://googlechromelabs.github.io/chrome-for-testing/last-known-good-versions.json
-const CHROME_MAJOR_VERSION = "155";
+const CHROME_MAJOR_VERSION = "156";
 const GOOGLEBOT_CHROME_VERSION = "155.0.8059.39";
-const CURL_VERSION = "8.22.0";
+const CURL_VERSION = "8.23.0";
 
 const USER_AGENTS = [
 	`Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/${CHROME_MAJOR_VERSION}.0.0.0 Safari/537.36`,

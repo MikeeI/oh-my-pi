@@ -462,8 +462,8 @@ The upgrader validates these IDs against its executable and manual proof mapping
 - Required action: retain the minimal identity-order delta at the current upstream fetch owner.
 - Proof: `test/web-scraper-user-agent.test.ts`.
 - Source: https://developers.google.com/crawling/docs/crawlers-fetchers/google-common-crawlers
-- Source: Chrome Stable 155.0.8059.39, verified 2026-10-06: https://googlechromelabs.github.io/chrome-for-testing/last-known-good-versions.json
-- Source: curl 8.22.0, verified 2026-10-06: https://curl.se/download.html
+- Source: Chrome Stable 156.0.8078.47, verified 2026-10-21: https://googlechromelabs.github.io/chrome-for-testing/last-known-good-versions.json
+- Source: curl 8.23.0, verified 2026-10-21: https://curl.se/download.html
 
 #### `MOMP-WEB-SEARCH-PARALLEL` — Provider-roundtrip-efficient searches
 

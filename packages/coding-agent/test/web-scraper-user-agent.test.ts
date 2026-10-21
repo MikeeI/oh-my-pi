@@ -2,10 +2,10 @@ import { expect, it } from "bun:test";
 import { loadPage } from "../src/web/scrapers/types";
 
 const CHROME_USER_AGENT =
-	"Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/155.0.0.0 Safari/537.36";
+	"Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/156.0.0.0 Safari/537.36";
 const GOOGLEBOT_USER_AGENT =
 	"Mozilla/5.0 (Linux; Android 6.0.1; Nexus 5X Build/MMB29P) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/155.0.8059.39 Mobile Safari/537.36 (compatible; Googlebot/2.1; +http://www.google.com/bot.html)";
-const CURL_USER_AGENT = "curl/8.22.0";
+const CURL_USER_AGENT = "curl/8.23.0";
 
 it("retries recognized bot blocks with Chrome, Googlebot, then curl", async () => {
 	const userAgents: string[] = [];
