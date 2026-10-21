@@ -216,6 +216,10 @@ Terminal turn failures produce a nonzero exit status in both text and JSON modes
 Print mode ignores `plan.defaultOnStartup` because it has no plan-review UI.
 Use `--plan-yolo` for unattended planning and implementation.
 
+CLI-authored messages dispatch `/compact`, `/handoff`, `/retry`, and `/mcp reauth <name>` locally instead of prompting the model.
+For example, `omp -p '/compact'` runs compaction and exits 1 if the command fails.
+Slash text merged from stdin or `@file` remains prompt content; `/stats` is not locally dispatched in print mode.
+
 See [advisor / watchdog](./advisor-watchdog.md#headless-runs) for print-mode disposal with the advisor enabled.
 
 ### Output modes (`--mode`)
