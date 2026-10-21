@@ -330,6 +330,8 @@ The upgrader validates these IDs against its executable and manual proof mapping
 - Coverage: upstream requires task `solutionSpace` to describe design openness rather than work volume.
 - Coverage: upstream maps task `effort` values to the target model's lowest, middle, and highest levels.
 - Coverage: omitted task `effort` preserves configured thinking selection; `task.maxEffort` remains the ceiling.
+- Coverage: upstream v18.12.5 ignores caller `effort` in preflight and dispatch when `task.enableEffort` is disabled.
+- Owner: upstream `src/task/index.ts#TaskTool.#effortParams` owns that runtime gate.
 - Coverage: model switches select the target model's policy even when model identity is hidden.
 - Owner: upstream `src/task/prompt-policy.ts#sessionDelegationBias` resolves the active model's delegation bias.
 - Owner: upstream `packages/catalog/src/compat/delegation.ts` resolves delegation policy from catalog rules.
@@ -361,6 +363,7 @@ The upgrader validates these IDs against its executable and manual proof mapping
 - Proof: candidate prompt rendering through `momp system-prompt inspect`.
 - Proof: `test/system-prompt-templates.test.ts`.
 - Proof: effort guidance, seance capability visibility, and ordinary override rejection in `test/task/task-schema.test.ts`.
+- Proof: disabled-effort dispatch in upstream `test/task/task-batch.test.ts`.
 - Proof: server-side request-budget cases in `test/task/task-guards.test.ts`.
 
 #### `MOMP-EVAL-OUTPUT` — Large owner-result preservation
@@ -918,12 +921,14 @@ The upgrader validates these IDs against its executable and manual proof mapping
 - Owner: `src/commands/update.ts` and `src/cli/command-help.ts#updateHelp` render identity-specific update help.
 - Owner: `src/extensibility/plugins/legacy-pi-compat.ts` owns installed-package self-import compatibility.
 - Coverage: upstream v18.12.4 loads custom tools through `loadLegacyPiModule`; the fork's loader delta is removed.
+- Coverage: upstream v18.12.5 owns custom-registry manifest fallback for empty Artifactory `dist-tags`.
 - Owner: `MOMP_VERSION` owns the source release version.
 - Reason: canonical upstream cannot own the `@mikeei/momp` package identity or its fork-safe update policy.
 - Required action: retain one MOMP identity owner and publish-time staging boundary.
 - Required action: keep patched Puppeteer and ArkType dependencies embedded in the npm bundle.
 - Required action: use `APP_DISPLAY_NAME` at self-invocation consumers instead of Utils `APP_NAME` or hard-coded `omp`.
 - Proof: `test/update-cli.test.ts`.
+- Proof: custom-registry fallback in upstream `test/cli/update-cli.test.ts`.
 - Proof constraint: npm dry-run fixtures create the global package root before checking release-age policy.
 - Proof: `test/extension-loader-self-import.test.ts`.
 - Proof: late-profile recovery commands in `test/main-session-resolution-error.test.ts` and actual packed missing-session invocations.

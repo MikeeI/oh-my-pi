@@ -110,22 +110,6 @@
 - Fixed supported Bedrock Claude models falling back to soft instead of remote compaction ([#16343](https://github.com/can1357/oh-my-pi/pull/16343) by [@anatoli-tsinovoy](https://github.com/anatoli-tsinovoy))
 - Fixed browser `tab.run(fn, [url])` and `browser.open("https://…")` failing with a bare "expects an options object"; the errors now say to pass `{ args: [...] }` and `browser.open({ url, name })` ([#16236](https://github.com/can1357/oh-my-pi/pull/16236) by [@will-bogusz](https://github.com/will-bogusz))
 - Fixed the built-in `ts-set-map`, `ts-import-type` and `ts-no-any` rules reminding you about code they allow: an empty or computed `Set`/`Map`, a runtime `await import()`, or the word "any" in a comment ([#16242](https://github.com/can1357/oh-my-pi/pull/16242) by [@will-bogusz](https://github.com/will-bogusz))
-### Changed
-
-- Sped up `conversation_search` and loading of large sessions by parsing session journals as decoded text, and repeated searches in one process now re-read only messages appended since the previous search
-
-### Fixed
-
-- Fixed system and subagent prompt template render errors (such as a removed helper) not naming the template file that failed
-- Fixed starting in a subdirectory ignoring the project's `.omp/SYSTEM.md`, `SYSTEM.template.md`, and `SUBAGENT-SYSTEM.template.md` and silently using the user-level prompt; they now resolve from the nearest project `.omp` like other project config
-- Fixed published `momp update --help` advertising self-installation and channel switching that `momp` does not support
-- Fixed `system-prompt inspect` printing a code frame instead of a one-line error and usage for invalid flags, `--cwd`, or `--subagent`
-- Fixed `system-prompt inspect --help` examples pointing at a nonexistent project directory
-- Fixed a blank `/rename` title losing its card (`AUTO: 🧪 CACHE: …`), so the next rename asked for a new card; the marker now follows the card (`🧪 CACHE: AUTO: …`)
-
-### Removed
-
-- Removed `bench --codex-cache-breakpoint-probe`; the Codex endpoint rejects explicit `prompt_cache_options` on every available model
 
 ## [18.12.3] - 2026-10-19
 
@@ -233,12 +217,6 @@
 - Fixed `omp --restore` and `/retry` reporting nothing to retry for a turn cut off by a process exit in a session that had used `eval`; the interrupted turn now continues ([#16195](https://github.com/can1357/oh-my-pi/issues/16195))
 - Fixed session loading on Windows treating a session path with a regular-file component as a missing session (an empty session) instead of rejecting it with `ENOTDIR` like POSIX does ([#16145](https://github.com/can1357/oh-my-pi/pull/16145) by [@jchanghong023](https://github.com/jchanghong023))
 - Fixed models from extension providers listed in `enabledModels` or `--models` missing from `/model`, the Ctrl+P cycle and the startup model scope notice until the background catalog refresh finished ([#16096](https://github.com/can1357/oh-my-pi/pull/16096) by [@skipper019](https://github.com/skipper019))
-### Fixed
-
-- Fixed offline prompt inspection sending provider connection warm-up requests.
-- Fixed Codex cache breakpoint probe failures exposing synthetic request payloads through provider errors.
-- Fixed published benchmark credential hints naming `omp` instead of `momp`.
-- Fixed profile Eval guidance advertising the removed `display()` helper.
 
 ## [18.12.1] - 2026-10-17
 
@@ -563,10 +541,6 @@
 ### Removed
 
 - Removed Codex Code Mode and its `providers.openai-codex.codeMode` / `providers.openai-codex.codeModeDirectTools` settings; Codex models always use the full direct tool surface.
-### Fixed
-
-- Fixed Child prompt wrappers and configured previews following the selected structured or plain-text result mode.
-- Fixed missing-session recovery commands losing the profile selected for the failing launch.
 
 ## [18.10.3] - 2026-10-12
 
@@ -590,9 +564,6 @@
 - Fixed anonymized session exports losing whether bash timing was shown ([#15468](https://github.com/can1357/oh-my-pi/pull/15468) by [@iliaal](https://github.com/iliaal))
 - Added `omp --restore <session>`: resumes a session like `--resume`, then goes on with what its last process left unfinished when it crashed or was killed, both the interrupted turn and the subagents it was running (their results reach the parent as usual); Tern's session daemon now restarts omp with it after a crash
 - Kept private prompt-cache routing keys out of shared sessions and HTML exports ([#15467](https://github.com/can1357/oh-my-pi/pull/15467) by [@iliaal](https://github.com/iliaal))
-### Fixed
-
-- Fixed Child prompt wrappers and configured previews following the selected structured or plain-text result mode.
 
 ## [18.10.2] - 2026-10-12
 
@@ -628,9 +599,6 @@
 ### Fixed
 
 - Fixed `grep` on a single file showing in Tern as separate boxed snippets with no file row or syntax colors; it now looks the same as a `grep` over a directory
-### Fixed
-
-- Fixed MOMP help, resume commands, usage errors, and recovery hints incorrectly naming the upstream `omp` executable.
 
 ## [18.10.0] - 2026-10-12
 
@@ -1016,35 +984,6 @@
 - Fixed slowdowns when processing long evaluation output, large Python kernel results, compiler/linter output, and ephemeral side-channel replies.
 - Fixed documents served as `application/octet-stream` being downloaded twice.
 - Fixed collaboration guests rebuilding the transcript excessively during streaming.
-### Changed
-
-- Subagent LSP now follows the upstream disabled default; set `task.enableLsp: true` to enable it, as synchronized MOMP profiles already do.
-- Runtime audits now record source, effective settings, and the exact compiled artifact identity.
-- Updated default URL-fetch browser identities to Chrome 155.
-
-### Fixed
-
-- Fixed dynamic prompt inspection omitting SVG and table-chart guidance.
-- Fixed conversation search missing exact whitespace phrases and returning inconsistent leading hits across result limits.
-- Fixed automatic remote compaction cancelling its running background request at the context limit instead of awaiting a usable result.
-- Removed unused chart and long-range detail queries from `stats --summary`.
-- Fixed conversation-search excerpts missing matches after Unicode lowercase expansions.
-- Fixed routine reloads losing commands or terminating RPC when candidate discovery fails.
-- Fixed folder rankings and omitted counts in `stats --summary` for more than 2,000 folders.
-- Fixed published CLI bundles loading unpatched Puppeteer instead of the workspace's patched version.
-- Fixed Codex cache probes using WebSockets when their SSE transport is overridden by the environment.
-- Fixed empty explicit AGENTS files, blank inline templates, and dangling mandatory templates silently losing guidance.
-- Fixed tagged-model and Vibe agents loading overrides from the wrong session profile.
-- Fixed RPC plugin reloads advertising stale profile agent descriptions.
-- Fixed prompt inspection omitting in-band tool blocks, their attribution, and final SDK request options.
-- Fixed blank `/rename` requests to use transcript-specific guidance that excludes unanswered Assistant follow-up questions.
-- Fixed conversation search and its benchmark reporting complete coverage after session discovery failures.
-- Fixed routine completion after terminal step failures or cancellation.
-- Fixed agent usage summaries showing zero-dollar costs for entirely unpriced usage.
-
-### Removed
-
-- Removed the unused `generateSessionTitleFromRecentTranscript` helper and its alternate title-selection options.
 
 ## [18.7.0] - 2026-10-06
 
