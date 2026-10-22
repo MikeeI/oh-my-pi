@@ -214,19 +214,36 @@ The upgrader validates these IDs against its executable and manual proof mapping
 
 - Disposition: `MOMP-EIGEN`.
 - Contract: `prompts/tools/read.md`, `bash.md`, `task.md`, `lsp.md`, `eval.md`, `web-search.md`, and `glob.md` under the active user agent directory override their bundled tool descriptions.
+- Contract: `eval-agents.md` overrides Eval agent guidance in both inline and `xd://eval/agents` views.
+- Contract: `write-device-only.md` overrides only the restricted Write description, not full-access previews.
+- Contract: `replace.md` and `sloppy.md` override only their matching Edit descriptions, not schemas or grammars.
+- Contract: `security-scan.md` and `reflect.md` override their tools' descriptions.
+- Contract: `isolation-error.md` overrides isolated-run recovery messages under the owning session's profile.
+- Contract: isolation-error templates receive the active binary identity as `appDisplayName`.
 - Contract: an absent override uses the corresponding bundled tool prompt as the sole default.
-- Contract: a selected empty, unreadable, or non-regular override fails instead of silently falling back.
+- Contract: a selected empty, unreadable, non-regular, or dangling override fails instead of silently falling back.
 - Contract: each selected source renders through the same tool-owned variables as its bundled prompt.
 - Contract: prompt overrides never replace tool names, schemas, or runtime behavior.
 - Owner: `src/prompts/tool-prompt-source.ts` owns profile-scoped discovery, fallback, and file validation.
 - Owner: `src/tools/read.ts#ReadTool`, `src/tools/bash.ts#BashTool`, `src/task/index.ts#TaskTool`, `src/lsp/tool.ts#LspTool`, `src/tools/eval.ts#EvalTool`, and `src/web/search/index.ts#WebSearchTool` render their selected sources.
 - Owner: `src/tools/glob.ts#GlobTool` renders the selected Glob prompt.
+- Owner: `src/tools/eval.ts#getEvalDocTopics` selects and renders profile-scoped agent-topic guidance.
+- Owner: `src/tools/write.ts#WriteTool`, `src/tools/security-scan.ts#SecurityScanTool`, and `src/tools/memory-reflect.ts#MemoryReflectTool` own their additional description sources.
+- Owner: `src/edit/index.ts#resolveEditToolDescription` selects profile sources for Replace and Sloppy.
+- Owner: `src/task/isolation-runner.ts#renderIsolationError` loads and renders profile-owned recovery messages.
+- Owner: `src/task/structured-subagent.ts#runStructuredSubagent` passes Task and Eval's owning profile to isolation.
+- Implementation constraint: Eval selects agent-topic overrides only while spawning is allowed.
+- Implementation constraint: Edit overrides preserve Hashline density selection and all other Edit modes.
+- Implementation constraint: isolation receives its profile explicitly, without consulting process-global settings.
 - Implementation constraint: Glob validates its selected source before memo lookup and keys rendering by source and flags.
 - Implementation constraint: Web Search freezes auth-dependent guidance per tool instance to isolate profile prompt sources.
 - Reason: current upstream has no profile-scoped override for a built-in tool prompt.
-- Required action: retain strict overrides for Read, Bash, Task, LSP, Eval, Web Search, and Glob at their description owners.
+- Required action: retain strict profile overrides for every named source at its current description or message owner.
 - Required action: include every managed tool override in upstream prompt-drift review and release settings-drift checks.
 - Proof: override and fallback cases in `test/tools/tool-prompt-overrides.test.ts`.
+- Proof: profile-owned recovery messages and retained-work preservation in `test/task/isolation-release.test.ts`.
+- Proof: unchanged native and compact fallback behavior in `test/edit-prompt-variant.test.ts`.
+- Proof: release-only runtime description and topic rendering through `scripts/inspect-tool-prompt-overrides.ts`.
 
 #### `MOMP-AST-GREP-PAGING` — Actionable AST search pagination
 
@@ -915,6 +932,8 @@ The upgrader validates these IDs against its executable and manual proof mapping
 - Contract: missing-session picker and new-session recovery commands retain the profile selected for the failing launch.
 - Contract: upstream/source identity retains `omp`; shared `.omp` paths and protocol namespaces remain unchanged.
 - Owner: `src/app-version.ts` owns runtime identity and upstream-version comparison.
+- Owner: `src/task/isolation-runner.ts#renderIsolationError` supplies active binary identity to recovery templates.
+- Implementation constraint: the bundled isolation-error template uses `appDisplayName` even without a profile override.
 - Owner: `src/utils/resume-command.ts` owns profile-aware start and resume commands; `src/main.ts` renders recovery hints after profile selection.
 - Owner: `scripts/bundle-dist.ts` embeds validated package identity overrides into the bundled CLI.
 - Owner: `src/cli/update-cli.ts` owns fork-safe update behavior.
@@ -1033,7 +1052,10 @@ Preserve measurements, diagnostic sources, captures, and contribution history wh
 These archives are not live fork deltas and do not require investigative reruns during upgrades.
 Resume a paused investigation only after an explicit user request.
 
-Current non-contract artifact states: none.
+- `packages/coding-agent/scripts/inspect-tool-prompt-overrides.ts`: `NICHT-CONTRACT-AKTIV`.
+  - Consumer: `project-momp-upgrader` operator proofs render managed overrides without a provider inspection surface.
+  - Owner: the Source probe uses existing Tool description and Eval-topic owners; it never executes their operations.
+  - Proof: `momp-upgrade prove` checks every divergent runtime override against the probe output.
 
 ### Upstream Cutover and Delta Lifecycle
 

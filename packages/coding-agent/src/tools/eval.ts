@@ -205,7 +205,16 @@ export function getEvalDocTopics(options: EvalToolDescriptionOptions = {}): Reco
 		judge: prompt.render(evalJudgeTopic, context),
 		helpers: prompt.render(evalHelpersTopic, context),
 	};
-	if (context.spawns) topics.agents = prompt.render(evalAgentsTopic, context);
+	if (context.spawns) {
+		const source = options.agentDir
+			? resolveUserToolPromptSource({
+					agentDir: options.agentDir,
+					toolName: "eval-agents",
+					bundledSource: evalAgentsTopic,
+				})
+			: evalAgentsTopic;
+		topics.agents = prompt.render(source, context);
+	}
 	for (const prelude of options.preludes ?? []) {
 		const doc = prelude.documentation.trim();
 		if (doc) topics[prelude.name] = doc;

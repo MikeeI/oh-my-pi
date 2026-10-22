@@ -2,9 +2,17 @@
 
 ## [Unreleased]
 
+### Added
+
+- Added profile overrides for Eval agents, restricted Write, Replace/Sloppy, Security Scan, Reflect, and isolation errors.
+
 ### Changed
 
 - URL fetching now uses Chrome 156 and curl 8.23 identities while retaining the Googlebot Smartphone fallback.
+
+### Fixed
+
+- Isolation recovery commands now use the active CLI name, including `momp`.
 
 ## [18.12.6] - 2026-10-21
 

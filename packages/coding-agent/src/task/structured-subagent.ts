@@ -891,6 +891,7 @@ export async function runStructuredSubagent(request: StructuredSubagentRequest):
 				onSubprocessResult?.(result);
 			} else {
 				result = await runIsolatedSubprocess({
+					agentDir: request.session.settings.getAgentDir(),
 					baseOptions,
 					context: isolationContext,
 					preferredBackend: parseIsolationBackend(cfgIsolationBackend.get(request.session.settings)),
