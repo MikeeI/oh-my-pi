@@ -3,10 +3,13 @@ import type { AnimationFrame, TranscriptPresentationTarget } from "../chrome/tra
 import { type Component, Container } from "../tui";
 import { Disclosure } from "../components/disclosure";
 import { Markdown } from "../components/markdown";
-import { formatBytes } from "@oh-my-pi/pi-utils";
+import { Text } from "../components/text";
+import { formatBytes, sanitizeText } from "@oh-my-pi/pi-utils";
 import type { ImageContent } from "@oh-my-pi/pi-ai";
 import type { TspSpan } from "@oh-my-pi/pi-wire";
-import { ensureThemeSync, getMarkdownTheme, theme } from "../theme";
+import { ensureThemeSync, getMarkdownTheme, getThemeEpoch, theme } from "../theme";
+import { bgAnsi, BG_RESET, colorToAnsi, FG_RESET } from "../theme/color";
+import type { ColorMode } from "../theme/schema";
 import {
 	attachmentSgr,
 	collapseImageMarkers,
@@ -22,7 +25,7 @@ import { expandKeyHint, fileHyperlink, fileLinkSpan } from "../render";
 import { imageLinksEnabled, imageReferenceHyperlink } from "../prompt/image-references";
 import { highlightMagicKeywords } from "../prompt/magic-keywords";
 import type { ReactionTarget } from "./reaction";
-import { card, md, node, row, span, text } from "../native/describe";
+import { ansi, card, md, node, row, span, text } from "../native/describe";
 import { base64ImageNode, openableImageProps } from "../native/blobs";
 import { hasTranscriptActions, runTranscriptAction } from "./transcript-actions";
 import {
@@ -56,6 +59,10 @@ const OSC133_COMMAND_START = "\x1b]133;C\x07";
 const OSC133_COMMAND_DONE = "\x1b]133;D;0\x07";
 const OSC133_ZONE_CLOSE = OSC133_ZONE_END + OSC133_COMMAND_START + OSC133_COMMAND_DONE;
 
+const COMMAND_ARGUMENT_GAP = "   ";
+const COMMAND_RAIL = "┃";
+const COMMAND_CHIP_TEXT_COLOR = "#282a36";
+
 /** How a user bubble styles its prose and chips (see {@link userBubbleColor}). */
 export interface UserBubbleOptions {
 	/** Filesystem paths for attached image chips, indexed by chip number. */
@@ -70,6 +77,8 @@ export interface UserBubbleOptions {
 	skillPath?: (name: string) => string | undefined;
 	/** When the message was sent (ms); shown beside the native hover toolbar. */
 	timestamp?: number;
+	/** Confirmed file-command invocation; ordinary slash-looking messages remain unstyled. */
+	commandInvocation?: string;
 }
 
 /**
@@ -143,8 +152,11 @@ export class UserMessageComponent extends Container implements ReactionTarget, T
 	readonly #text: string;
 	/** Matches the composer tokens in {@link #text} (chips, skills, this message's mentions). */
 	readonly #tokens: RegExp;
+	readonly #command: { name: string; args: string } | undefined;
 	#reaction: string | undefined;
+	#transcriptVersion = 0;
 	#native: NativeNode | undefined;
+	#nativeThemeEpoch: number | undefined;
 	/** The terminal's clock and the image link policy {@link #native} was described with. */
 	#nativeHour12: boolean | undefined;
 	#nativeLinked = false;
@@ -172,12 +184,29 @@ export class UserMessageComponent extends Container implements ReactionTarget, T
 		this.#imageLinks = options.imageLinks;
 		this.#text = text;
 		this.#tokens = composerTokenRegex(mentionLabels);
-		const markdown = new Markdown(text, 1, 1, getMarkdownTheme(), {
-			bgColor,
-			color: userBubbleColor(options, this.#tokens),
-		});
-		markdown.setIgnoreTight(true);
-		this.addChild(markdown);
+		const command = !this.#synthetic && options.commandInvocation ? /^(\/\S+)[ \t]*([\s\S]*)$/.exec(text) : null;
+		this.#command = command ? { name: command[1]!, args: command[2]! } : undefined;
+		if (this.#command) {
+			// Keep source/copy text untouched; only the presentation adds the argument gap.
+			// Plain Text preserves that gap and literal argument markup across wrapping.
+			const command = this.#command;
+			const content = command.name + (command.args ? COMMAND_ARGUMENT_GAP + command.args : "");
+			const label = new Text(content, 1, 1, bgColor);
+			label.setStyleFn(
+				value =>
+					this.#commandChip(value.slice(0, command.name.length), theme.getColorMode()) +
+					userBubbleColor(options, this.#tokens)(value.slice(command.name.length)),
+			);
+			label.setIgnoreTight(true);
+			this.addChild(label);
+		} else {
+			const markdown = new Markdown(text, 1, 1, getMarkdownTheme(), {
+				bgColor,
+				color: userBubbleColor(options, this.#tokens),
+			});
+			markdown.setIgnoreTight(true);
+			this.addChild(markdown);
+		}
 	}
 
 	override releaseRenderCaches(): void {
@@ -189,8 +218,15 @@ export class UserMessageComponent extends Container implements ReactionTarget, T
 	setReaction(emoji: string): void {
 		if (this.#reaction === emoji) return;
 		this.#reaction = emoji;
+		this.#transcriptVersion++;
 		this.#zoneLines = undefined;
 		this.#native = undefined;
+	}
+
+	// Native cards may update reactions in place, but accepted terminal rows
+	// must retain the presentation the transcript previously committed.
+	getTranscriptBlockVersion(): number {
+		return this.#transcriptVersion;
 	}
 
 	/**
@@ -207,7 +243,15 @@ export class UserMessageComponent extends Container implements ReactionTarget, T
 		const hour12 = cx?.hour12;
 		// Chip marks and thumbnails carry links only under an enabled policy.
 		const linked = imageLinksEnabled();
-		if (this.#native && this.#nativeHour12 === hour12 && this.#nativeLinked === linked) return this.#native;
+		const themeEpoch = getThemeEpoch();
+		if (
+			this.#native &&
+			this.#nativeHour12 === hour12 &&
+			this.#nativeLinked === linked &&
+			this.#nativeThemeEpoch === themeEpoch
+		)
+			return this.#native;
+		this.#nativeThemeEpoch = themeEpoch;
 		this.#nativeHour12 = hour12;
 		this.#nativeLinked = linked;
 		const children: NativeChild[] = [];
@@ -264,8 +308,28 @@ export class UserMessageComponent extends Container implements ReactionTarget, T
 		if (thumbs.length > 0) {
 			children.push(row(thumbs, { gap: "sm", wrap: true, align: "start", role: "omp.user.images" }));
 		}
-		const marks = this.#synthetic ? [] : tokenMarks(this.#text, this.#tokens, this.#imageLinks);
-		children.push(md(this.#text, marks.length > 0 ? { marks } : undefined));
+		if (this.#command) {
+			const command = this.#command;
+			const args = command.args ? COMMAND_ARGUMENT_GAP + sanitizeText(command.args) : "";
+			const foreground = colorToAnsi(theme.getColorHex("commandPrompt"), "truecolor");
+			children.push(
+				row(
+					[
+						// TSP owns its palette; explicit SGR preserves this fork-only rail and chip.
+						ansi(`${foreground}${COMMAND_RAIL} ${FG_RESET}`, { shrink: 0 }),
+						ansi(
+							this.#commandChip(sanitizeText(command.name), "truecolor") +
+								userBubbleColor({ imageLinks: this.#imageLinks }, this.#tokens)(args),
+							{ grow: 1, min: { w: 0 } },
+						),
+					],
+					{ gap: "none", align: "start" },
+				),
+			);
+		} else {
+			const marks = this.#synthetic ? [] : tokenMarks(this.#text, this.#tokens, this.#imageLinks);
+			children.push(md(this.#text, marks.length > 0 ? { marks } : undefined));
+		}
 		const badges: NativeChild[] = [];
 		if (this.#liveSteered) {
 			badges.push(
@@ -320,7 +384,8 @@ export class UserMessageComponent extends Container implements ReactionTarget, T
 	 * viewport does not leave stale prompt marks on lines it no longer occupies.
 	 */
 	renderTranscriptBlockEmergencyRow(width: number): string | undefined {
-		return this.#selectEmergencyRow(super.render(width));
+		const row = this.#selectEmergencyRow(super.render(this.#command ? Math.max(1, width - 1) : width));
+		return row !== undefined && this.#command ? this.#commandRail() + row : row;
 	}
 
 	#selectEmergencyRow(lines: readonly string[]): string | undefined {
@@ -337,24 +402,35 @@ export class UserMessageComponent extends Container implements ReactionTarget, T
 	}
 
 	override render(width: number): readonly string[] {
-		const lines = super.render(width);
+		const lines = super.render(this.#command ? Math.max(1, width - 1) : width);
 		if (lines.length === 0) {
 			return lines;
 		}
 		if (this.#allocation === 1) {
 			const emergency = this.#selectEmergencyRow(lines);
-			if (emergency !== undefined) return [emergency];
+			if (emergency !== undefined) return [this.#command ? this.#commandRail() + emergency : emergency];
 		}
 		if (this.#zoneSource === lines && this.#zoneLines !== undefined) {
 			return this.#zoneLines;
 		}
-		const wrapped = lines.slice();
+		const wrapped = this.#command ? lines.map(line => this.#commandRail() + line) : lines.slice();
 		if (this.#reaction !== undefined || this.#liveSteered) wrapped[0] = this.#badgeRow(width);
 		wrapped[0] = OSC133_ZONE_START + wrapped[0];
 		wrapped[wrapped.length - 1] = wrapped[wrapped.length - 1] + OSC133_ZONE_CLOSE;
 		this.#zoneSource = lines;
 		this.#zoneLines = wrapped;
 		return wrapped;
+	}
+
+	#commandRail(): string {
+		return this.#bgColor(theme.fg("commandPrompt", COMMAND_RAIL));
+	}
+
+	#commandChip(name: string, mode: ColorMode): string {
+		const background = bgAnsi(theme.getColorHex("commandPrompt"), mode);
+		const foreground = colorToAnsi(COMMAND_CHIP_TEXT_COLOR, mode);
+		// Both rendering paths close the chip before the argument gap so neither color leaks.
+		return background + foreground + theme.bold(` ${name} `) + FG_RESET + BG_RESET;
 	}
 }
 

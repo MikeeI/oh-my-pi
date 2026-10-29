@@ -6,6 +6,7 @@ import * as path from "node:path";
 import type { Model } from "@oh-my-pi/pi-ai/types";
 import { buildModel } from "@oh-my-pi/pi-catalog/build";
 import { readModelCache, writeModelCache } from "@oh-my-pi/pi-catalog/model-cache";
+import { persistedModelCacheProviderId } from "../../catalog/test/model-cache-fixture";
 import { removeWithRetries } from "../../utils/src/temp";
 
 const TTL_MS = 24 * 60 * 60 * 1000;
@@ -105,8 +106,8 @@ describe("model cache migrations", () => {
 		// The plaintext SQLite payload therefore persists no model headers.
 		const raw = new Database(dbPath, { readonly: true });
 		const row = raw
-			.query<{ models: string }, []>("SELECT models FROM model_cache WHERE provider_id = 'runtime-ext'")
-			.get();
+			.query<{ models: string }, [string]>("SELECT models FROM model_cache WHERE provider_id = ?")
+			.get(persistedModelCacheProviderId(raw, "runtime-ext"));
 		raw.close();
 		expect(row?.models).not.toContain("standard-secret");
 		expect(row?.models).not.toContain("google-secret");
@@ -124,17 +125,18 @@ describe("model cache migrations", () => {
 		writeModelCache("runtime-ext", Date.now(), [model], true, "static-v1", dbPath);
 
 		const db = new Database(dbPath);
+		const physicalProviderId = persistedModelCacheProviderId(db, "runtime-ext");
 		db.run("UPDATE model_cache SET header_omitted_model_ids = ? WHERE provider_id = ?", [
 			JSON.stringify({ invalid: "not-an-id-list" }),
-			"runtime-ext",
+			physicalProviderId,
 		]);
 		db.close();
 
 		expect(readModelCache("runtime-ext", TTL_MS, Date.now, dbPath)).toBeNull();
 		const verified = new Database(dbPath, { readonly: true });
 		const row = verified
-			.query<{ count: number }, []>("SELECT COUNT(*) AS count FROM model_cache WHERE provider_id = 'runtime-ext'")
-			.get();
+			.query<{ count: number }, [string]>("SELECT COUNT(*) AS count FROM model_cache WHERE provider_id = ?")
+			.get(physicalProviderId);
 		verified.close();
 		expect(row?.count).toBe(0);
 	});

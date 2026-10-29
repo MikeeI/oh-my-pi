@@ -67,8 +67,8 @@ export class RpcPromptResults {
 	 * @param session read for queue state and, at report time, the `sessionSettled` predicate.
 	 * @param scheduledTurn reports a host-scheduled turn not yet admitted (not settled).
 	 * @param hooks.costCapRefusal the session's latest cost-gate refusal; a new one before a prompt's run ends makes its outcome `cost_cap`.
-	 * @param hooks.settledWithoutRun a prompt reported without starting a run (refused or aborted before
-	 *   dispatch): no `agent_end` follows, so the host re-checks session settlement here.
+	 * @param hooks.settledWithoutRun re-check settlement after a locally completed prompt or a refusal before dispatch.
+	 *   Routine turns can end before their outer prompt releases its admission, so `agent_end` alone is insufficient.
 	 */
 	constructor(
 		session: SessionSettleState,
@@ -122,11 +122,13 @@ export class RpcPromptResults {
 	/** The prompt was handled locally without an agent turn. */
 	completeLocal(ticket: RpcPromptTicket): void {
 		this.#report(ticket, false, { status: "completed" });
+		this.#settledWithoutRun?.();
 	}
 
 	/** The prompt failed before reaching the agent. */
 	fail(ticket: RpcPromptTicket, message: string): void {
 		this.#report(ticket, false, { status: "error", error: { message, retryable: false } });
+		this.#settledWithoutRun?.();
 	}
 
 	/**

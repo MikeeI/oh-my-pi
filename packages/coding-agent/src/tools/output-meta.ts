@@ -213,9 +213,9 @@ export class OutputMetaBuilder {
 		// Middle elision: the sink retained head + tail with an elision marker.
 		if (summary.elidedBytes != null && summary.elidedBytes > 0) {
 			const elidedLines = summary.elidedLines ?? Math.max(0, totalLines - summary.outputLines);
-			const keptLines = Math.max(0, summary.outputLines - 1); // -1 for marker line
-			const headLines = Math.ceil(keptLines / 2);
-			const tailLines = keptLines - headLines;
+			// The sink reports exact line metadata only while its inline lines map onto the
+			// artifact; without it, no range can be stated truthfully.
+			const { headLines, tailLines, elidedLineRange } = summary;
 			this.#meta.truncation = {
 				direction: "middle",
 				truncatedBy: "middle",
@@ -223,8 +223,9 @@ export class OutputMetaBuilder {
 				totalBytes: summary.totalBytes,
 				outputLines: summary.outputLines,
 				outputBytes: summary.outputBytes,
-				headRange: headLines > 0 ? { start: 1, end: headLines } : undefined,
-				tailRange: tailLines > 0 ? { start: totalLines - tailLines + 1, end: totalLines } : undefined,
+				headRange: headLines ? { start: 1, end: headLines } : undefined,
+				tailRange: tailLines ? { start: totalLines - tailLines + 1, end: totalLines } : undefined,
+				...(elidedLineRange ? { elidedRange: { start: elidedLineRange.first, end: elidedLineRange.last } } : {}),
 				elidedBytes: summary.elidedBytes,
 				elidedLines,
 				artifactId,

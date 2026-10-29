@@ -5,7 +5,7 @@ import type { EffectiveExtensionRoots } from "../capability/types";
 import { appendInlineArgsFallback, templateUsesInlineArgPlaceholders } from "../config/prompt-templates";
 import type { SlashCommand } from "../discovery";
 import { loadCapability } from "../discovery";
-import { EMBEDDED_COMMAND_TEMPLATES } from "../task/commands";
+import { EMBEDDED_COMMAND_TEMPLATES } from "../task/command-templates";
 import { parseCommandArgs, substituteArgs } from "../utils/command-args";
 
 export type SlashCommandSource = "extension" | "prompt" | "skill";
@@ -40,8 +40,6 @@ export interface FileSlashCommand {
 	/** Source metadata for display */
 	_source?: { providerName: string; level: "user" | "project" | "native" };
 }
-
-const EMBEDDED_SLASH_COMMANDS = EMBEDDED_COMMAND_TEMPLATES;
 
 function parseCommandTemplate(
 	content: string,
@@ -102,7 +100,7 @@ export async function loadSlashCommands(options: LoadSlashCommandsOptions = {}):
 	});
 
 	const seenNames = new Set(fileCommands.map(cmd => cmd.name));
-	for (const cmd of EMBEDDED_SLASH_COMMANDS) {
+	for (const cmd of EMBEDDED_COMMAND_TEMPLATES) {
 		const name = cmd.name.replace(/\.md$/, "");
 		if (seenNames.has(name)) continue;
 
@@ -124,6 +122,24 @@ export async function loadSlashCommands(options: LoadSlashCommandsOptions = {}):
 	return fileCommands;
 }
 
+export function renderFileSlashCommand(
+	command: FileSlashCommand,
+	argsString: string,
+	options: { rawArgumentsText?: string } = {},
+): string {
+	const args = parseCommandArgs(argsString);
+	const argsText = options.rawArgumentsText ?? args.join(" ");
+	const usesInlineArgPlaceholders = templateUsesInlineArgPlaceholders(command.content);
+	const rawArgumentsSentinel = "\u0000OMP_RAW_ARGUMENTS\u0000";
+	const template =
+		options.rawArgumentsText === undefined
+			? command.content
+			: command.content.replaceAll("$ARGUMENTS", rawArgumentsSentinel).replace(/\$@(?!\[)/g, rawArgumentsSentinel);
+	const substituted = substituteArgs(template, args).replaceAll(rawArgumentsSentinel, argsText);
+	const rendered = prompt.render(substituted, { args, ARGUMENTS: argsText, arguments: argsText });
+	return appendInlineArgsFallback(rendered, argsText, usesInlineArgPlaceholders);
+}
+
 /**
  * Split a `/name args` invocation into the file-command name (the whole first token,
  * so namespaced `/plugin:cmd` stays intact) and its raw argument string.
@@ -133,16 +149,6 @@ export function parseFileSlashInvocation(text: string): { name: string; args: st
 	const spaceIndex = text.indexOf(" ");
 	if (spaceIndex === -1) return { name: text.slice(1), args: "" };
 	return { name: text.slice(1, spaceIndex), args: text.slice(spaceIndex + 1) };
-}
-
-/** Render a file command's template with `argsString`. Throws on a malformed template. */
-export function renderFileSlashCommand(command: FileSlashCommand, argsString: string): string {
-	const args = parseCommandArgs(argsString);
-	const argsText = args.join(" ");
-	const usesInlineArgPlaceholders = templateUsesInlineArgPlaceholders(command.content);
-	const substituted = substituteArgs(command.content, args);
-	const rendered = prompt.render(substituted, { args, ARGUMENTS: argsText, arguments: argsText });
-	return appendInlineArgsFallback(rendered, argsText, usesInlineArgPlaceholders);
 }
 
 /**

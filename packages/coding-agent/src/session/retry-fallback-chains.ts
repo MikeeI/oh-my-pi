@@ -315,8 +315,12 @@ export function validateRetryFallbackChains(
 				if (resolvesForKindRole(selectorStr, providerScopedPool(modelRegistry, patterns))) continue;
 				kindRoleCatalog ??= modelRegistry.getAll("all");
 				if (resolvesForKindRole(selectorStr, kindRoleCatalog)) continue;
+				// A known model of the wrong kind is already incompatible; only
+				// unresolved selectors can become valid when discovery completes.
+				const knownModel = resolveModelRoleValue(selectorStr, kindRoleCatalog, { settings }).model;
 
 				const pending =
+					knownModel === undefined &&
 					patterns.length > 0 &&
 					patterns.every(pattern => {
 						const parsed = parseRetryFallbackSelector(pattern, modelRegistry);

@@ -6,34 +6,38 @@
 omp [command] [flags] [messages...]
 ```
 
-When the first positional argument is **not** a registered subcommand, `omp`
-normally routes to the default [`launch`](#launch-the-default-command) command.
-So `omp "fix the build"` launches a session with that message, while `omp models`
-runs the `models` subcommand. Bare plugin-management words such as `marketplace`,
-`uninstall`, or `extensions` instead produce a hint to use `omp plugin …`;
-use `omp launch <word>` when such a word is the intended prompt.
+Unless a registered subcommand is selected, `omp` normally routes to [`launch`](#launch-the-default-command).
+So `omp "fix the build"` launches a session with that message, while `omp models` runs the `models` subcommand.
+Bare plugin-management words such as `marketplace`, `uninstall`, or `extensions` instead suggest `omp plugin …`.
+Use `omp launch <word>` when such a word is the intended prompt.
 
-A recognized subcommand can follow leading launch flags. Those flags are
-forwarded to `launch` and `acp`, but recognized launch-only flags before other
-subcommands are stripped, not applied (for example, `omp --cwd dir update`).
+A recognized subcommand can follow leading launch flags.
+Those flags are forwarded to `launch` and `acp`, but stripped rather than applied before other subcommands.
+For example, `omp --cwd dir update` strips `--cwd dir`.
 
-`--profile` is applied before subcommand routing, so it also scopes commands
-such as `config`, `models`, and `update`.
+`--profile` is applied before subcommand routing, so it also scopes commands such as `config`, `models`, and `update`.
 
 Runtime help is also available:
 
 - `omp --help` lists user-facing subcommands and common launch flags.
 - `omp <command> --help` prints that command's public flags and examples.
 
-This page is the consolidated reference for the shared **launch surface** (the
-flags accepted by `omp` / `omp launch`) and every top-level **subcommand**.
-Per-subcommand flags (for example `omp auth-broker --json`) are documented by
-each command's `--help`.
+This page covers the shared **launch surface** accepted by `omp` / `omp launch` and every top-level **subcommand**.
+Each command's `--help` documents its own flags, such as `omp auth-broker --json`.
+
+## Executable identity
+
+Examples on this page use the source executable `omp`; the published MOMP fork uses `momp`.
+MOMP's help examples, resume commands, usage errors, and recovery hints name `momp`, not the upstream executable.
+For example, a default-profile resume hint is `momp --resume <id>`.
+A named-profile hint retains that profile: `momp --profile <name> --resume <id>`.
+Missing-session picker and new-session recovery hints retain the named profile too.
+Shared `.omp` data paths, environment keys, and protocol identifiers do not change with executable branding.
 
 ## Launch (the default command)
 
-`omp` and `omp launch` start a coding session. Positional arguments become the
-initial message(s):
+`omp` and `omp launch` start a coding session.
+Positional arguments become the initial message(s):
 
 ```sh
 # Interactive session
@@ -55,14 +59,10 @@ omp --continue "What did we discuss?"
 Argument handling:
 
 - `@<path>` attaches a file or image to the initial message.
-- Outside protocol modes, non-TTY stdin is read to EOF automatically as prompt
-  text; do not add a `-` marker. Piped input or a non-TTY stdin selects print mode
-  when `--mode` is omitted. Without stdin text, an argv prompt or attachment is
-  required.
-- Stdin text, text attachments, and the first positional message are combined
-  into the initial prompt; remaining positional messages are sent as later turns.
-- `--` ends flag parsing; everything after it is literal message text, even if it
-  looks like a flag.
+- Outside protocol modes, non-TTY stdin is read to EOF as prompt text without a `-` marker.
+- Piped input or non-TTY stdin selects print mode when `--mode` is omitted; without stdin text, an argv prompt or attachment is required.
+- Stdin text, text attachments, and the first positional message form the initial prompt; remaining messages are later turns.
+- `--` ends flag parsing; everything after it is literal message text, even if it looks like a flag.
 
 ### Launch flags
 
@@ -81,21 +81,19 @@ Argument handling:
 
 #### Session history
 
-| Flag                                    | Description                                                                                                                                                                                                                                                                                                   |
-| --------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `--continue`, `-c`                      | Continue the previous session.                                                                                                                                                                                                                                                                                |
-| `--resume [id]`, `-r`, `--session [id]` | Resume a session by ID prefix or path, or open the picker when no value is given.                                                                                                                                                                                                                             |
-| `--restore [id]`                        | Resume a session as `--resume` does, then go on with what its last process left unfinished when it crashed or was killed: the interrupted turn and the subagents it was running. Interactive only; takes no prompt. See [session operations](./session-operations-export-share-fork-resume.md#cli---restore). |
-| `--fork <session>`                      | Fork a saved session (by ID prefix or path) into a new session. See [session operations](./session-operations-export-share-fork-resume.md).                                                                                                                                                                   |
-| `--from-claude`                         | Import a Claude Code session into OMP.                                                                                                                                                                                                                                                                        |
-| `--from-codex`                          | Import a Codex session into OMP.                                                                                                                                                                                                                                                                              |
-| `--export <session>`                    | Export a session file to HTML and exit.                                                                                                                                                                                                                                                                       |
-| `--no-title`                            | Disable title auto-generation (equivalent to the `PI_NO_TITLE` [environment variable](./environment-variables.md)).                                                                                                                                                                                           |
+| Flag | Description |
+| --- | --- |
+| `--continue`, `-c` | Continue the previous session. |
+| `--resume [id]`, `-r`, `--session [id]` | Resume a session by ID prefix or path, or open the picker when no value is given. |
+| `--restore [id]` | Resume as `--resume` does, then continue the turn and subagents left unfinished by a crash or kill; interactive only, with no prompt; see [session operations](./session-operations-export-share-fork-resume.md#cli---restore). |
+| `--fork <session>` | Fork a saved session by ID prefix or path; see [session operations](./session-operations-export-share-fork-resume.md). |
+| `--from-claude` | Import a Claude Code session into OMP. |
+| `--from-codex` | Import a Codex session into OMP. |
+| `--export <session>` | Export a session file to HTML and exit. |
+| `--no-title` | Disable title auto-generation (equivalent to the `PI_NO_TITLE` [environment variable](./environment-variables.md)). |
 
-`--continue`, `--resume`, `--restore`, `--fork`, and foreign-session imports require
-persistence and cannot use `--no-session`. `--from-claude` and `--from-codex`
-are mutually exclusive and cannot be combined with `--continue`, `--resume`,
-or `--fork`.
+`--continue`, `--resume`, `--restore`, `--fork`, and foreign-session imports reject `--no-session`.
+`--from-claude` and `--from-codex` are mutually exclusive and cannot combine with `--continue`, `--resume`, `--restore`, or `--fork`.
 
 #### Model selection
 
@@ -105,7 +103,7 @@ or `--fork`.
 | `--smol <id>`                | Smol/fast model for lightweight tasks (or `PI_SMOL_MODEL`).                                                                |
 | `--slow <id>`                | Slow/reasoning model for thorough analysis (or `PI_SLOW_MODEL`).                                                           |
 | `--plan <id>`                | Plan model for architectural planning (or `PI_PLAN_MODEL`).                                                                |
-| `--model <id-or-role>` | Model or configured role to use (role: `slow` or `@slow`; fuzzy model match: `opus`, `gpt-5.2`; with a provider the id must be exact: `openai/gpt-5.2`). |
+| `--models <a,b,c>` | Comma-separated model patterns for `Ctrl+P` cycling. |
 | `--provider <name>`          | Provider to use (legacy; prefer `--model`).                                                                                |
 | `--api-key <key>`            | API key (defaults to env vars).                                                                                            |
 | `--provider-session-id <id>` | Reuse a specific provider-side session id for continuity and cache scoping.                                                |
@@ -113,6 +111,8 @@ or `--fork`.
 | `--service-tier <tier>`      | OpenAI service tier: `none`, `auto`, `default`, `flex`, `scale`, `priority`, or `ultrafast` (`none` omits `service_tier`). |
 
 See [providers](./providers.md) and [models](./models.md) for model resolution.
+MOMP rejects a configured default that remains unavailable after discovery and its configured fallback chain.
+It does not select an unrelated model merely because that model has credentials.
 
 #### Thinking and reasoning
 
@@ -166,11 +166,14 @@ See [providers](./providers.md) and [models](./models.md) for model resolution.
 
 #### System prompt
 
-| Flag                                  | Description                                                                                                                                                                    |
-| ------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
-| `--system-prompt <text\|file>`        | Plain-text system prompt override (default: coding assistant prompt). See [system prompt customization](./system-prompt-customization.md).                                     |
-| `--system-prompt-template <path>`     | Strictly read `<path>` as a Handlebars system-prompt template; mutually exclusive with `--system-prompt`. See [system prompt customization](./system-prompt-customization.md). |
-| `--append-system-prompt <text\|file>` | Append plain text or file contents to the system prompt.                                                                                                                       |
+| Flag | Description |
+| --- | --- |
+| `--system-prompt <text\|file>` | Plain-text system prompt override (default: coding assistant prompt). See [system prompt customization](./system-prompt-customization.md). |
+| `--system-template <path>` | Read a mandatory Handlebars template; mutually exclusive with `--system-prompt`. |
+| `--agents-file <path>` | Replace user-level AGENTS context for this process while retaining project context. |
+| `--append-system-prompt <text\|file>` | Append plain text or file contents to the system prompt. |
+
+`--agents-file` and `--no-context-files` are mutually exclusive; conflicting explicit context choices fail before startup.
 
 #### Output mode
 
@@ -189,10 +192,9 @@ See [providers](./providers.md) and [models](./models.md) for model resolution.
 
 ### Headless / print mode
 
-`--print` / `-p` runs `omp` non-interactively: it processes the prompts, writes
-the last assistant response to stdout, and exits without entering the TUI. Text
-output is emitted after the turn completes, not token-by-token; a `Working...`
-indicator goes to stderr. This is the entry point for scripting and automation.
+`--print` / `-p` runs non-interactively, writes the last assistant response to stdout, and exits without entering the TUI.
+Text output arrives after the turn completes, not token-by-token; a `Working...` indicator goes to stderr.
+This is the entry point for scripting and automation.
 
 ```sh
 # Print the answer and exit
@@ -217,14 +219,13 @@ Related flags for headless runs:
 - `--wait-async` — keep the run alive for its background jobs (below).
 - `--warn-cost <usd>` / `--max-cost <usd>` — warn at, or stop sending model requests from, a spend.
 
-Print mode is single-shot by default: once its prompts are answered it disposes
-the session, which cancels background jobs the run started (`bash` or `task`
-calls the model ran asynchronously). With `--wait-async` (or
-`async.printWake: true`) it instead waits for them; each job's result is
-delivered to the same session as it is in the TUI, starting another turn, and a
-turn may start further jobs. The run exits once no owned job or undelivered
-result remains, and text mode prints the answer of the last turn. Bound
-unattended runs with `--max-time`.
+Print mode is single-shot by default.
+After answering its prompts, it disposes the session and cancels its background jobs.
+These include asynchronous `bash` and `task` calls started by the model.
+With `--wait-async` or `async.printWake: true`, it waits for those jobs and delivers each result to the same session.
+Each delivery starts another turn, which may start further jobs.
+The run exits once no owned job or undelivered result remains; text mode prints the last turn's answer.
+Use `--max-time` to bound unattended runs.
 
 ```sh
 # Start a long build in the background, then react to its result in the same session
@@ -232,105 +233,124 @@ omp -p --wait-async --max-time 2h "Run the integration suite in the background a
 ```
 
 `--mode json` emits a session header followed by events as JSON lines.
-Incremental `message_update` events omit full partial-message snapshots; completed
-messages arrive in `message_end`, and opaque provider replay payloads are omitted.
+Incremental `message_update` events omit full partial snapshots; `message_end` contains completed messages without opaque replay payloads.
 Terminal turn failures produce a nonzero exit status in both text and JSON modes.
-A run stopped by `--max-cost` exits with status `3`: the cap message goes to
-stderr (a `cost-gate` notice in JSON mode) and no answer is printed.
+A run stopped by `--max-cost` exits with status `3`: the cap message goes to stderr (a `cost-gate` notice in JSON mode) and no answer is printed.
 
-`plan.defaultOnStartup` is ignored in print mode because there is no plan-review
-UI. Use `--plan-yolo` for unattended planning and implementation.
+Print mode ignores `plan.defaultOnStartup` because it has no plan-review UI.
+Use `--plan-yolo` for unattended planning and implementation.
 
-The [advisor / watchdog](./advisor-watchdog.md#headless-runs) doc describes
-print-mode disposal semantics when the advisor runtime is enabled.
+CLI-authored messages dispatch `/compact`, `/handoff`, `/retry`, and `/mcp reauth <name>` locally instead of prompting the model.
+For example, `omp -p '/compact'` runs compaction and exits 1 if the command fails.
+Slash text merged from stdin or `@file` remains prompt content; `/stats` is not locally dispatched in print mode.
+
+See [advisor / watchdog](./advisor-watchdog.md#headless-runs) for print-mode disposal with the advisor enabled.
 
 ### Output modes (`--mode`)
 
-| Mode     | Description                                                                                                                                                       |
-| -------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `text`   | Rendered text. Omitting `--mode` allows the TUI; explicit `--mode text` selects non-interactive text output.                                                      |
-| `json`   | Newline-delimited JSON event stream for headless/machine consumption; `-p` is optional.                                                                           |
-| `rpc`    | Line-delimited JSON command/response/event transport over stdio (not JSON-RPC 2.0). See [RPC](./rpc.md).                                                          |
-| `rpc-ui` | RPC transport with UI extension events enabled.                                                                                                                   |
-| `acp`    | Agent Client Protocol server over stdio. Equivalent to the [`acp`](#subcommands) subcommand; see [approval mode → ACP sessions](./approval-mode.md#acp-sessions). |
+| Mode | Description |
+| --- | --- |
+| `text` | Rendered text: omitted `--mode` allows the TUI; explicit `--mode text` selects non-interactive text output. |
+| `json` | Newline-delimited JSON event stream for headless/machine consumption; `-p` is optional. |
+| `rpc` | Line-delimited JSON command/response/event transport over stdio, not JSON-RPC 2.0; see [RPC](./rpc.md). |
+| `rpc-ui` | RPC transport with UI extension events enabled. |
+| `acp` | Agent Client Protocol server over stdio, equivalent to [`acp`](#subcommands); see [ACP sessions](./approval-mode.md#acp-sessions). |
 
-`--no-ui` (with `--mode rpc` or `--mode rpc-ui`) runs extensions headless: `ctx.hasUI` is `false`, extension dialogs resolve to defaults, and extension presentation updates are dropped. In `rpc-ui`, tool UI such as `ask` still sends `extension_ui_request` frames for the host to answer. Host-issued `login` UI is unaffected. See [RPC startup](./rpc.md#startup).
+`--no-ui` with `--mode rpc` or `--mode rpc-ui` runs extensions headless: `ctx.hasUI` is `false`, extension dialogs use defaults, and extension presentation updates are dropped.
+In `rpc-ui`, tool UI such as `ask` still sends `extension_ui_request` frames for the host to answer.
+Host-issued `login` UI is unaffected.
+See [RPC startup](./rpc.md#startup).
 
 ## Subcommands
 
 Run `omp <command> --help` for each command's own flags and examples.
 
-| Command                     | Purpose                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                | See also                                                                                                                                             |
-| --------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `launch`                    | Start a coding session (the default command).                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                          | [Launch flags](#launch-flags)                                                                                                                        |
-| `acp`                       | Run omp as an ACP (Agent Client Protocol) server over stdio.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                           | [approval mode](./approval-mode.md#acp-sessions)                                                                                                     |
-| `auth-broker`               | Manage the omp auth-broker (credential vault).                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                         | [auth broker / gateway](./auth-broker-gateway.md)                                                                                                    |
-| `auth-gateway`              | Run an auth-gateway: an HTTP forward proxy backed by the configured broker (`serve`), or JSON lines on stdin/stdout for a parent process with your own credentials (`stdio`).                                                                                                                                                                                                                                                                                                                                                                                                                                          | [auth broker / gateway](./auth-broker-gateway.md)                                                                                                    |
-| `agents`                    | Manage bundled task agents.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                            | [task agent discovery](./task-agent-discovery.md)                                                                                                    |
-| `bench`                     | Benchmark models: TTFT/prefill vs decode throughput with p50/p95 across chat, prefill, generation, and prompt-cache workloads, rendered in a live dashboard (`--prefill-bytes` sizes the synthetic prefill input). `--detailed` runs single-user, `--par`-way parallel (aggregate tok/s and scaling), and prefill phases per model.                                                                                                                                                                                                                                                                                    |                                                                                                                                                      |
-| `browser-relay`             | Run the local CDP relay used by Eval's browser API to drive your own Chrome tabs.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                      | [computer use](./computer-use.md)                                                                                                                    |
-| `cleanse`                   | Detect and fix project diagnostics with weighted parallel subagents.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                   |                                                                                                                                                      |
-| `collab`                    | List active local Collab hosts without exposing URLs; `collab link <instanceId\|pid>` retrieves a control link (`--view` for view-only).                                                                                                                                                                                                                                                                                                                                                                                                                                                                               | [collab](./collab.md)                                                                                                                                |
-| `clip`                      | Upload a `/record` recording to live.omp.sh as a public clip and print its URL.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                        |                                                                                                                                                      |
-| `commit`                    | Generate a commit message and update changelogs.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                       |                                                                                                                                                      |
-| `completions`               | Print a shell completion script (bash, zsh, or fish).                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                  |                                                                                                                                                      |
-| `compress`                  | Rewrite a text file into the dense prompt register, reporting what it drops.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                           |                                                                                                                                                      |
-| `config`                    | Manage configuration settings.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                         | [config usage](./config-usage.md), [settings](./settings.md)                                                                                         |
-| `dry-balance`               | Dry-run OAuth account balancing across random session ids.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                             |                                                                                                                                                      |
-| `find`                      | Semantic search for implementing files and line ranges.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                |                                                                                                                                                      |
-| `gc`                        | Run storage garbage collection.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                        |                                                                                                                                                      |
-| `grep`                      | Test the grep tool from the CLI. (The [`grep` tool](./tools/grep.md) is a separate agent tool.)                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                        |                                                                                                                                                      |
-| `gallery`                   | Preview tool, composer, and status-line renderers in a deterministic gallery.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                          |                                                                                                                                                      |
-| `git`                       | Interactive fullscreen git UI: split diff viewer, staging sidebar, and commit composer.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                |                                                                                                                                                      |
-| `grievances`                | View, clean, or push reported tool issues (auto-QA grievances).                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                        |                                                                                                                                                      |
-| `if-bench`                  | Benchmark instruction following and working memory: one cached thread of glyph array actions with a cat-sound directive that moves through the prompt.                                                                                                                                                                                                                                                                                                                                                                                                                                                                 |                                                                                                                                                      |
-| `images`, `img`             | Inspect, diagnose, probe, and purge image publication backends.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                        |                                                                                                                                                      |
-| `install`                   | Install or link an extension package (alias of `plugin install` / `plugin link`).                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                      | [extensions](./extensions.md)                                                                                                                        |
-| `join`                      | Join a shared collab session (same as `/join`).                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                        | [collab](./collab.md)                                                                                                                                |
-| `login`                     | Log in to a model provider from the terminal (counterpart of `/login`).                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                |                                                                                                                                                      |
-| `models`                    | List, search, and refresh available models.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                            | [models](./models.md)                                                                                                                                |
-| `plugin`, `plugins`         | Manage plugins (install, uninstall, list, etc.).                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                       | [extensions](./extensions.md), [marketplace](./marketplace.md)                                                                                       |
-| `play`                      | Replay a `/record` recording in the terminal; Space pauses and `q` quits.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                              |                                                                                                                                                      |
-| `predict`                   | Compare word-completion engines' live ghost text for a prompt.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                         |                                                                                                                                                      |
-| `ps`                        | List and control daemon-supervised background processes (logs, stop, kill, restart).                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                   |                                                                                                                                                      |
-| `say`                       | Synthesize text with the local TTS engine and play it through the speakers.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                            | [tts tool](./tools/tts.md)                                                                                                                           |
-| `share`                     | Share a saved session via an encrypted link (same as the `/share` slash command).                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                      | [session operations](./session-operations-export-share-fork-resume.md)                                                                               |
-| `setup`                     | Run onboarding setup or install dependencies for optional features.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                    |                                                                                                                                                      |
-| `shell`                     | Interactive shell console.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                             |                                                                                                                                                      |
-| `read`                      | Show what the read tool will return for a path, URL, or internal URI. (The [`read` tool](./tools/read.md) is a separate agent tool.)                                                                                                                                                                                                                                                                                                                                                                                                                                                                                   |                                                                                                                                                      |
-| `render`                    | Draw a session's entire thread through the production transcript pipeline (with repaint timing).                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                       |                                                                                                                                                      |
-| `skill`, `skills`           | Install, search, publish, and manage skills on skills.omp.sh.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                          | [skills](./skills.md)                                                                                                                                |
-| `ssh`                       | Manage SSH host configurations.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                        |                                                                                                                                                      |
-| `stats`                     | View usage statistics.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                 |                                                                                                                                                      |
-| `stream`                    | Broadcast local OMP session screens and chat to a public live channel.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                 |                                                                                                                                                      |
-| `update`                    | Check for and install updates; `--canary`/`--stable` switch release channels.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                          |                                                                                                                                                      |
-| `usage`                     | Show provider usage limits for every authenticated account, flagging saved resets close to expiry; `usage clients` breaks token burn down per client (with `--days`), `usage invalidate` drops cached reports, `usage accounts` lists each OAuth account's provider and identity key (the key `task.agentAccountPools` and broker account pools take; no tokens, `--json` supported), and `usage reset` lists each Codex and Claude account's saved rate-limit resets by `<provider>/<credential id>` (`--json`, `--redact`) and `usage reset <provider>/<credential id>` spends one, also from an auth-broker client. | [Task agent discovery](./task-agent-discovery.md#model-and-structured-output-precedence), [saved resets](./settings.md#saved-reset-auto-consumption) |
-| `tiny-models`               | Download tiny local models for session titles, memory, and word completion.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                            | [local models](./local-models.md)                                                                                                                    |
-| `token`                     | Get the API key or OAuth token for a provider.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                         | [secrets](./secrets.md)                                                                                                                              |
-| `toks`                      | Count file or text tokens with the embedded offline tokenizers.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                        |                                                                                                                                                      |
-| `ttsr`                      | Inspect and test Time-Traveling Stream Rules (TTSR). (Covers the CLI command; the [TTSR feature](./ttsr-injection-lifecycle.md) is documented separately.)                                                                                                                                                                                                                                                                                                                                                                                                                                                             |                                                                                                                                                      |
-| `worktree`, `wt`            | Add, list, or clear git worktrees; uses clone-first behavior when enabled.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                             |                                                                                                                                                      |
-| `search`, `q`, `web-search` | Test web search providers from the CLI.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                | [web_search tool](./tools/web_search.md)                                                                                                             |
+| Command | Purpose | See also |
+| --- | --- | --- |
+| `launch` | Start a coding session (the default command). | [Launch flags](#launch-flags) |
+| `acp` | Run omp as an ACP (Agent Client Protocol) server over stdio. | [approval mode](./approval-mode.md#acp-sessions) |
+| `auth-broker` | Manage the omp auth-broker (credential vault). | [auth broker / gateway](./auth-broker-gateway.md) |
+| `auth-gateway` | Run an auth-gateway: an HTTP forward proxy backed by the configured broker (`serve`), or JSON lines on stdin/stdout for a parent process with your own credentials (`stdio`). | [auth broker / gateway](./auth-broker-gateway.md) |
+| `agents` | Manage bundled task agents. | [task agent discovery](./task-agent-discovery.md) |
+| `auth` | Export or import provider sign-ins as JSON. | |
+| `anonymize` | Write a shareable session copy with redacted turn contents and consistent mock literals. | |
+| `bench` | Benchmark models: TTFT/prefill vs decode throughput with p50/p95 across chat, prefill, generation, and prompt-cache workloads, rendered in a live dashboard (`--prefill-bytes` sizes the synthetic prefill input). `--detailed` runs single-user, `--par`-way parallel (aggregate tok/s and scaling), and prefill phases per model. | |
+| `browser-relay` | Run the local CDP relay used by Eval's browser API to drive your own Chrome tabs. | [computer use](./computer-use.md) |
+| `cleanse` | Detect and fix project diagnostics with weighted parallel subagents. | |
+| `collab` | List active local Collab hosts without exposing URLs; `collab link <instanceId\|pid>` retrieves a control link (`--view` for view-only). | [collab](./collab.md) |
+| `clip` | Upload a `/record` recording to live.omp.sh as a public clip and print its URL. | |
+| `commit` | Generate a commit message and update changelogs. | |
+| `completions` | Print a shell completion script (bash, zsh, or fish). | |
+| `compress` | Rewrite a text file into the dense prompt register, reporting what it drops. | |
+| `config` | Manage configuration settings. | [config usage](./config-usage.md), [settings](./settings.md) |
+| `dry-balance` | Dry-run OAuth account balancing across random session ids. | |
+| `find` | Semantic search for implementing files and line ranges. | |
+| `gc` | Run storage garbage collection. | |
+| `grep` | Test the grep tool from the CLI. (The [`grep` tool](./tools/grep.md) is a separate agent tool.) | |
+| `gallery` | Preview tool, composer, and status-line renderers in a deterministic gallery. | |
+| `git` | Interactive fullscreen git UI: split diff viewer, staging sidebar, and commit composer. | |
+| `grievances` | View, clean, or push reported tool issues (auto-QA grievances). | |
+| `if-bench` | Benchmark instruction following and working memory: one cached thread of glyph array actions with a cat-sound directive that moves through the prompt. | |
+| `images`, `img` | Inspect, diagnose, probe, and purge image publication backends. | |
+| `install` | Install or link an extension package (alias of `plugin install` / `plugin link`). | [extensions](./extensions.md) |
+| `join` | Join a shared collab session (same as `/join`). | [collab](./collab.md) |
+| `login` | Log in to a model provider from the terminal (counterpart of `/login`). | |
+| `models` | List, search, and refresh available models. | [models](./models.md) |
+| `plugin`, `plugins` | Manage plugins (install, uninstall, list, etc.). | [extensions](./extensions.md), [marketplace](./marketplace.md) |
+| `play` | Replay a `/record` recording in the terminal; Space pauses and `q` quits. | |
+| `predict` | Compare word-completion engines' live ghost text for a prompt. | |
+| `ps` | List and control daemon-supervised background processes (logs, stop, kill, restart). | |
+| `say` | Synthesize text with the local TTS engine and play it through the speakers. | [tts tool](./tools/tts.md) |
+| `share` | Share a saved session via an encrypted link (same as the `/share` slash command). | [session operations](./session-operations-export-share-fork-resume.md) |
+| `session` | Pack a session and its artifacts, unpack it elsewhere, or mark the local copy moved. | |
+| `setup` | Run onboarding setup or install dependencies for optional features. | |
+| `shell` | Interactive shell console. | |
+| `read` | Show what the read tool will return for a path, URL, or internal URI. (The [`read` tool](./tools/read.md) is a separate agent tool.) | |
+| `render` | Draw a session's entire thread through the production transcript pipeline (with repaint timing). | |
+| `skill`, `skills` | Install, search, publish, and manage skills on skills.omp.sh. | [skills](./skills.md) |
+| `ssh` | Manage SSH host configurations. | |
+| `stats` | View usage statistics. | |
+| `system-prompt` | Inspect Main or configured Child provider prompts, dynamic parts, token breakdown, or Codex wire hashes. | |
+| `stream` | Broadcast local OMP session screens and chat to a public live channel. | |
+| `update` | Check for and install updates; `--canary`/`--stable` switch release channels. Published `momp` never self-installs: it prints the manual install command, exits 0 for `--check`, and exits 1 otherwise; `-l` still updates plugins. | |
+| `usage` | Show provider usage limits for every authenticated account, flagging saved resets close to expiry; `usage clients` breaks token burn down per client (with `--days`), `usage invalidate` drops cached reports, `usage accounts` lists each OAuth account's provider and identity key (the key `task.agentAccountPools` and broker account pools take; no tokens, `--json` supported), and `usage reset` lists each Codex and Claude account's saved rate-limit resets by `<provider>/<credential id>` (`--json`, `--redact`) and `usage reset <provider>/<credential id>` spends one, also from an auth-broker client. | [Task agent discovery](./task-agent-discovery.md#model-and-structured-output-precedence), [saved resets](./settings.md#saved-reset-auto-consumption) |
+| `tiny-models` | Download tiny local models for session titles, memory, and word completion. | [local models](./local-models.md) |
+| `token` | Get the API key or OAuth token for a provider. | [secrets](./secrets.md) |
+| `toks` | Count file or text tokens with the embedded offline tokenizers. | |
+| `ttsr` | Inspect and test Time-Traveling Stream Rules (TTSR). (Covers the CLI command; the [TTSR feature](./ttsr-injection-lifecycle.md) is documented separately.) | |
+| `worktree`, `wt` | Add, list, or clear git worktrees; uses clone-first behavior when enabled. | |
+| `search`, `q`, `web-search` | Test web search providers from the CLI. | [web_search tool](./tools/web_search.md) |
 
-> `install`, `join`, `browser-relay`, `auth-gateway`, and `tiny-models` are also
-> reachable through related mechanisms (the `plugin` command, the `/join` slash
-> command, and so on). The table lists each as it is registered in
-> `packages/coding-agent/src/cli-commands.ts`.
+> `install`, `join`, `browser-relay`, `auth-gateway`, and `tiny-models` are also reachable through related mechanisms.
+> These include the `plugin` command and `/join` slash command.
+> The table lists each as registered in `packages/coding-agent/src/cli-commands.ts`.
 
 `__complete` is an internal, hidden subcommand used by shell completion scripts.
 
+### Configured Child prompt inspection
+
+`omp system-prompt inspect --subagent <name> --json` previews a configured fresh top-level Child.
+The preview follows the configured Task result mode, including schema and `yield` availability.
+Plain-text result mode does not advertise `yield` or apply the agent's structured output schema.
+Invocation-only state remains outside this configured preview.
+
+`omp system-prompt inspect --provider --json` also emits `tools`, the rendered provider tool names and descriptions.
+Operators use it to verify that profile-selected tool prompt overrides reach the provider request.
+
+Main inspection previews the headless print, RPC, and SDK Main by default.
+`omp system-prompt inspect --ui` previews the interactive TUI Main instead: it adds `ask`, `cfg://`, terminal rendering guidance, and `textColors`.
+It never starts LSP servers or changes MCP discovery or model fallback, and it is rejected together with `--subagent`.
+
+Invalid flag combinations, a missing `--cwd`, and unknown or disabled `--subagent` names print `error: <message>` and the usage line to stderr and exit 1.
+
 ### Worktree clones
 
-When `worktree.clone` is enabled, `omp worktree add` and other clone-first
-worktree callers carry relocatable ignored caches such as `node_modules`.
-Directories containing `pyvenv.cfg` or `CMakeCache.txt` are not carried, even
-when they are nested or ignore themselves. Recreate Python environments and
-CMake build trees in the new worktree so their absolute paths name the new
-checkout. Tracked files inside excluded directories are restored from Git;
-when keeping changes, their live source contents and staged state are preserved.
+When `worktree.clone` is enabled, `omp worktree add` and other clone-first worktree callers carry relocatable ignored caches such as `node_modules`.
+Directories containing `pyvenv.cfg` or `CMakeCache.txt` are not carried, even when they are nested or ignore themselves.
+Recreate Python environments and CMake build trees in the new worktree so their absolute paths name the new checkout.
+Tracked files inside excluded directories are restored from Git; when keeping changes, their live source contents and staged state are preserved.
 
-Clean clones also discard carried files that are untracked under the target
-commit's own ignore rules, after its tree and index have been written. Caches
-ignored by the target remain, even if the source did not ignore them. Nested
-repositories are preserved and symlinks are not followed. This target-ignore
-cleanup is skipped when keeping the source's uncommitted changes.
+Clean clones also discard carried files that are untracked under the target commit's own ignore rules, after its tree and index have been written.
+Caches ignored by the target remain, even if the source did not ignore them.
+Nested repositories are preserved and symlinks are not followed.
+This target-ignore cleanup is skipped when keeping the source's uncommitted changes.

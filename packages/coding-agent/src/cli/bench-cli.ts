@@ -43,6 +43,7 @@ import { createLiveBoard, type LiveBoardOutput } from "@oh-my-pi/pi-tui/chrome/l
 import { formatCost } from "@oh-my-pi/pi-tui/overlays/agent-hub-renderer";
 
 import { cfgTierAnthropic, cfgTierGoogle, cfgTierOpenai } from "../session/settings";
+import { APP_DISPLAY_NAME } from "../app-version";
 
 const DEFAULT_PAR = 4;
 const DEFAULT_CACHE_MAX_TOKENS = 64;
@@ -1115,7 +1116,7 @@ export async function runBenchCommand(command: BenchCommandArgs, deps: BenchDepe
 	const now = deps.now ?? (() => performance.now());
 	const interactive = deps.stdoutIsTTY ?? process.stdout.isTTY === true;
 	if (command.models.length === 0) {
-		throw new Error("Pass at least one model selector, e.g. `omp bench opus gpt-5.2`");
+		throw new Error(`Pass at least one model selector, e.g. \`${APP_DISPLAY_NAME} bench opus gpt-5.2\``);
 	}
 	// One row per model, filled as runs finish. Outside cache mode the comparison
 	// table doubles as the live footer; cache mode shows a one-line status.
@@ -1190,7 +1191,7 @@ export async function runBenchCommand(command: BenchCommandArgs, deps: BenchDepe
 			if (!preflightKey) {
 				const failure: BenchRunFailure = {
 					ok: false,
-					error: `No credentials for provider "${model.provider}". Run \`omp\` and use /login, or set the provider API key.`,
+					error: `No credentials for provider "${model.provider}". Run \`${APP_DISPLAY_NAME}\` and use /login, or set the provider API key.`,
 				};
 				results.push(failure);
 				if (!json) print(formatRunLine(failure, 0, runs, { tagKind }));

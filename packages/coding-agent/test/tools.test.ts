@@ -2685,6 +2685,7 @@ function b() {
 			expect(getTextOutput(result)).toContain(
 				"(killed once it has run 3600s in total; `timeout: 0` disables the deadline)",
 			);
+			expect(result.details?.timeoutSeconds).toBe(3_600);
 
 			const jobId = result.details?.async?.jobId;
 			if (!jobId) {

@@ -783,6 +783,7 @@ pub struct UserMessage {
 	pub synthetic: Option<bool>,
 	pub steering: Option<bool>,
 	pub live_steered: Option<bool>,
+	pub command_invocation: Option<String>,
 	pub history_rewrite_at: Option<f64>,
 	pub attribution: Option<Attribution>,
 	pub provider_payload: Option<Map<String, Value>>,
@@ -808,6 +809,9 @@ impl Serialize for UserMessage {
 		if let Some(value) = &self.live_steered {
 			map.serialize_entry("liveSteered", value)?;
 		}
+		if let Some(value) = &self.command_invocation {
+			map.serialize_entry("commandInvocation", value)?;
+		}
 		if let Some(value) = &self.history_rewrite_at {
 			map.serialize_entry("historyRewriteAt", value)?;
 		}
@@ -824,6 +828,7 @@ impl Serialize for UserMessage {
 				"synthetic" if self.synthetic.is_some() => continue,
 				"steering" if self.steering.is_some() => continue,
 				"liveSteered" if self.live_steered.is_some() => continue,
+				"commandInvocation" if self.command_invocation.is_some() => continue,
 				"historyRewriteAt" if self.history_rewrite_at.is_some() => continue,
 				"attribution" if self.attribution.is_some() => continue,
 				"providerPayload" if self.provider_payload.is_some() => continue,
@@ -844,6 +849,7 @@ impl<'de> Deserialize<'de> for UserMessage {
 			synthetic: take(&mut extra, "synthetic"),
 			steering: take(&mut extra, "steering"),
 			live_steered: take(&mut extra, "liveSteered"),
+			command_invocation: take(&mut extra, "commandInvocation"),
 			history_rewrite_at: take(&mut extra, "historyRewriteAt"),
 			attribution: take(&mut extra, "attribution"),
 			provider_payload: take(&mut extra, "providerPayload"),
@@ -2794,6 +2800,8 @@ pub enum SlashCommandSource {
 	McpPrompt,
 	#[serde(rename = "file")]
 	File,
+	#[serde(rename = "routine")]
+	Routine,
 }
 
 impl SlashCommandSource {
@@ -2806,6 +2814,7 @@ impl SlashCommandSource {
 			Self::Custom => "custom",
 			Self::McpPrompt => "mcp_prompt",
 			Self::File => "file",
+			Self::Routine => "routine",
 		}
 	}
 }

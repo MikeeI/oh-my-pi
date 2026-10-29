@@ -90,6 +90,7 @@ export const messageDefs = {
 		"synthetic?": "boolean",
 		"steering?": "boolean",
 		"liveSteered?": "boolean",
+		"commandInvocation?": "string",
 		"historyRewriteAt?": "number",
 		"attribution?": "Attribution",
 		"providerPayload?": JSON_OBJECT,

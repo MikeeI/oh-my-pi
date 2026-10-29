@@ -1,0 +1,149 @@
+{
+  "version": 1,
+  "flow": "rename-title",
+  "cases_paths": [
+    ".omp/ratchet/rename-title/cases.json",
+    ".omp/ratchet/rename-title/selection.json"
+  ],
+  "harness_paths": [
+    ".omp/ratchet/rename-title/harness"
+  ],
+  "change_paths": [
+    "packages/coding-agent/src/prompts/system/title-transcript-system.md"
+  ],
+  "off_limits": [
+    "packages/coding-agent/src/utils/title-generator.ts",
+    "packages/coding-agent/src/session/agent-session.ts",
+    "MOMP_VERSION"
+  ],
+  "stop": {
+    "plateau": 3,
+    "rounds": 4
+  },
+  "train_ids": [
+    "rename-001",
+    "rename-005",
+    "rename-007",
+    "rename-009",
+    "rename-012",
+    "rename-013",
+    "rename-014",
+    "rename-015",
+    "rename-016",
+    "rename-017",
+    "rename-018",
+    "rename-019",
+    "rename-024",
+    "rename-025",
+    "rename-026",
+    "rename-027",
+    "rename-028",
+    "rename-031",
+    "rename-033",
+    "rename-036",
+    "rename-039",
+    "rename-043",
+    "rename-044",
+    "rename-047"
+  ],
+  "test_ids": [
+    "rename-002",
+    "rename-006",
+    "rename-008",
+    "rename-011",
+    "rename-020",
+    "rename-021",
+    "rename-022",
+    "rename-029",
+    "rename-030",
+    "rename-032",
+    "rename-034",
+    "rename-035",
+    "rename-037",
+    "rename-038",
+    "rename-040",
+    "rename-048"
+  ],
+  "approvals": {
+    "inputs": {
+      "sha": "9d84bae7d46c9854ebe0ceba527513c695fc6e33baf7a84363c80f7ed2f301a0",
+      "at": "2026-10-22T13:58:15.676Z"
+    },
+    "grader": {
+      "sha": "6e1f2d5a4e0fd5af659d849aefbe6c0600b2dcbfe24fbd5f52431405bbd1a30d",
+      "at": "2026-10-22T13:59:33.674Z"
+    },
+    "plan": {
+      "sha": "f912bd1ec03cf01059db9c309634b764243a41e339f67c56347da6d3c4af2bea",
+      "at": "2026-10-22T14:01:06.246Z"
+    }
+  },
+  "rounds": [
+    {
+      "round": 0,
+      "variant": "baseline",
+      "change": "baseline",
+      "decision": "baseline",
+      "reasons": [
+        "test noise floor on quality: ±0.182"
+      ],
+      "train": {
+        "quality": {
+          "n": 24,
+          "mean": 0.9652777777777778,
+          "half": 0.04140480695968315
+        },
+        "format": {
+          "n": 24,
+          "mean": 0.9444444444444445,
+          "half": 0.07949144837655611
+        },
+        "cost_usd": {
+          "n": 24,
+          "mean": 0.008567875277777777,
+          "half": 0.0019843216048090816
+        }
+      },
+      "test": {
+        "quality": {
+          "n": 16,
+          "mean": 0.875,
+          "half": 0.18196876735216583
+        },
+        "format": {
+          "n": 16,
+          "mean": 0.9583333333333333,
+          "half": 0.060656255784055285
+        },
+        "cost_usd": {
+          "n": 16,
+          "mean": 0.008189570833333333,
+          "half": 0.0014542345143795084
+        }
+      },
+      "errors": 0,
+      "truncated": 0,
+      "at": "2026-10-22T14:05:44.808Z"
+    }
+  ],
+  "current_round": 0,
+  "flat_rounds": 0,
+  "prices": {},
+  "split_seed": 20261022,
+  "goal": {
+    "target": "quality",
+    "direction": "higher",
+    "hold": [
+      "format"
+    ],
+    "directions": {}
+  },
+  "reps": 3,
+  "command": "bun .omp/ratchet/rename-title/harness/run.ts --mode run --variant {variant} --out {flow_dir}/{variant}",
+  "baseline_inputs_sha": "9d84bae7d46c9854ebe0ceba527513c695fc6e33baf7a84363c80f7ed2f301a0",
+  "best": {
+    "round": 0,
+    "variant": "baseline",
+    "test_score": 0.875
+  }
+}

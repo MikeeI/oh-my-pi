@@ -1464,11 +1464,18 @@ describe("cold revival replays the system prompt the last request sent", () => {
 		expect(warm.toolRequests.at(-1)).toBe(spawned.toolRequests.at(-1)!);
 	});
 
-	/** The executor's own subagent prompt over a default block listing the active tools. */
+	/** The executor's own subagent prompt over a default block listing the active tools, composed as the SDK does. */
 	function subagentPrompt(toolNames: string[], options?: CreateAgentSessionOptions): string[] {
+		const transform = options?.systemPromptTransform;
+		if (!transform) throw new Error("Expected a subagent system prompt transform");
+		const transformed = transform({
+			systemPrompt: [`default: ${toolNames.join(",")}`],
+			dynamicParts: [],
+		}).systemPrompt;
 		const build = options?.systemPrompt;
+		if (build === undefined) return transformed;
 		if (typeof build !== "function") throw new Error("Expected a system prompt builder");
-		return [build([`default: ${toolNames.join(",")}`])].flat();
+		return [build(transformed)].flat();
 	}
 
 	function registerPeer(): void {
@@ -1509,8 +1516,13 @@ describe("cold revival replays the system prompt the last request sent", () => {
 
 	it("warm-revives with the system prompt it was sent with after a peer joins, and keeps it on rebuild", async () => {
 		const cwd = makeTempDir("@pi-revive-warm-roster-");
+		// Operator templates own empty-roster wording; pin this case to a selected wrapper with explicit IRC branches.
+		await Bun.write(
+			path.join(cwd, ".omp", "SUBAGENT-SYSTEM.template.md"),
+			"{{#if ircSelfId}}ROSTER:{{#each ircPeers}}{{id}};{{else}}EMPTY{{/each}}{{else}}IRC:DISABLED{{/if}}",
+		);
 		const spawned = await spawn(cwd, subagentPrompt, spawnResponses());
-		expect(spawned.requests.at(-1)!.join("\n")).toContain("(no other agents)");
+		expect(spawned.requests.at(-1)!.join("\n")).toContain("ROSTER:EMPTY");
 		const { live, warm } = await parkAndRevive(registerPeer);
 		expect(warm.requests[0]).toEqual(spawned.requests.at(-1)!);
 		// A rebuild after the revive keeps the roster too: a live one would rewrite the cached conversation.

@@ -330,6 +330,7 @@ const FIELD_RULES: Record<string, Rule> = {
 		"log",
 		"messages",
 		"body",
+		"commandInvocation",
 	]),
 	...fields("label", ["title", "previousTitle", "label", "injectedRules", "intent", "emoji", "nf"]),
 	...fields("error", ["errorMessage", "explanation", "errorClassificationMessage", "upstreamError"]),

@@ -1,0 +1,20 @@
+[
+  {
+    "role": "system",
+    "content": "Generate a concise title (3-7 words) for this coding session.\nThe title MUST be clear enough that the user recognizes the session in a list.\nUse sentence case: capitalize only the first word and proper nouns.\n\nThe recent conversation transcript is provided inside `<chat>` tags.\nIt contains up to the last 5 user messages and last 5 assistant messages, text only.\nTool calls, tool results, thinking, and code fences are omitted.\n\nPrioritize the user's intent.\nUse assistant text only as context for what was actually being solved.\nFor generic review, apply, or commit requests, name the concrete subject they act on.\n\nIgnore assistant follow-up questions unless a later user reply explicitly selects or answers them.\nExamples include `q1`, `q2`, `q1 ja`, or `1 and 3`.\nIn that case, use the selected question text as context for the user's short reply.\n\nIgnore verification chatter, command-output summaries, status updates, and incidental side-effects unless they are the actual topic.\n\nProduce only the title text.\nWhen the transcript carries no concrete task yet, use exactly \"none\".\n\nOutput only the title wrapped in `<title>` and `</title>` tags, with nothing before or after. When the message carries no concrete task yet (a bare greeting, acknowledgement, small talk, or a request too vague to title without context you cannot see, e.g. \"help\" or \"fix this\"), output exactly `<title>none</title>`."
+  },
+  {
+    "role": "user",
+    "content": "<chat>\n<user>\nist ratchet custom impewntierung und nurnein name osee ist es etwas wkgwbundes\n</user>\n\n<assistant>\n**Ja: `ratchet()` ist hier eine eigene, in OMP eingebaute Implementierung mit einem eigenen Namen — aber für eine etablierte Methode.**\n\nDie Unterscheidung:\n\n- **Implementierung:** Der Code liegt direkt in [`src/ratchet/ratchet.ts`](packages/coding-agent/src/ratchet/ratchet.ts), mit Python- und JavaScript-Anbindung für Eval. Es ist nicht bloß ein Alias für ein externes „Ratchet“-Framework.\n- **Name:** „Ratchet“ bedeutet **Ratsche**: schrittweise vorwärts, ohne akzeptierte Verbesserungen wieder zu verlieren. Hier ist das die Metapher für „Änderung messen, behalten oder zurücknehmen“.\n- **Methode:** Eval-getriebenes *Hill Climbing*: Baseline messen, genau eine Änderung ausprobieren, auf getrennten Train-/Test-Fällen bewerten und anhand festgelegter Kriterien behalten oder verwerfen.\n- **Herkunft:** Die Dokumentation nennt ausdrücklich Anthropics `claude-api`-Skill mit den Guides **build-eval, eval-audit und hillclimb** als Vorlage. Der Workflow ist also adaptiert, nicht vollständig neu erfunden.\n\n**Es ist mehr als nur ein Prompt mit hübschem Namen:** Der Host-Code verwaltet Freigaben mit Inhalts-Hashes, den eingefrorenen Datensplit, Vollständigkeits- und Leakage-Prüfungen sowie die Rundenentscheidung. Der Agent übernimmt Analyse und Änderungen.\n\nMeine Einordnung: **eigene Workflow-Engine um bekannte Optimierungsprinzipien, kein eigenständiger neuer Optimierungsalgorithmus.**\n\n• **Q1** — Wie sieht ein konkreter Ratchet-Durchlauf hier aus?\n• **Q2** — Welche Aufgaben profitieren tatsächlich von dieser Art der Optimierung?\n• **Q3** — Wie belastbar sind Ratchets statistische Entscheidungen bei kleinen Fallzahlen wirklich?\n• **Q4** — Wo schützt Ratchet technisch vor Fehlern, und wo vertraut es dem Agenten?\n• **Q5** — Worin unterscheidet sich diese Implementierung praktisch von DSPy und einer einfachen manuellen Eval-Schleife?\n</assistant>\n\n<user>\nq5\n</user>\n</chat>"
+  },
+  {
+    "role": "assistant",
+    "content": [
+      {
+        "type": "text",
+        "text": "<title>Ratchet im Vergleich zu DSPy</title>",
+        "textSignature": "{\"v\":1,\"id\":\"msg_01634b8afe073f54016ada250fd31c8191a750fd0f5f4b98fb\",\"phase\":\"final_answer\"}"
+      }
+    ]
+  }
+]

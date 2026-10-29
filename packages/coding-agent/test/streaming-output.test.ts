@@ -637,6 +637,7 @@ describe("OutputSink", () => {
 			artifactPath: path.join(dir, "sampled.log"),
 			artifactId: "art-sampled",
 			spillThreshold: 16,
+			headBytes: 8,
 			maxColumns: 8,
 			artifactMaxBytes: 32,
 			artifactHeadBytes: 16,
@@ -659,6 +660,28 @@ describe("OutputSink", () => {
 			),
 		).toHaveLength(2);
 		expect(notice).not.toContain("for full output");
+		expect(notice).not.toContain("to recover omitted artifact lines");
+	});
+
+	test("a middle-elided sink names exactly the artifact lines it omitted", async () => {
+		const dir = await createTempDir();
+		const artifactPath = path.join(dir, "middle.log");
+		// Head and tail budgets of unequal line counts, both cut inside a row.
+		const sink = new OutputSink({ artifactPath, artifactId: "art-middle", spillThreshold: 128, headBytes: 64 });
+		const rows = Array.from({ length: 200 }, (_, i) => `row-${i + 1}`);
+		sink.push(`${rows.join("\n")}\n`);
+		const summary = await sink.dump();
+
+		const notice = formatOutputNotice(outputMeta().truncationFromSummary(summary, { direction: "tail" }).get());
+		const range = /Read artifact:\/\/art-middle:(\d+)-(\d+) to recover omitted artifact lines/.exec(notice);
+		if (!range) throw new Error(`expected an exact recovery range in: ${notice}`);
+		const [first, last] = [Number(range[1]), Number(range[2])];
+		const shown = new Set(summary.output.split("\n"));
+		// Every row outside the range is shown whole; every row strictly inside it is not shown at all.
+		expect(rows.filter((row, i) => (i + 1 < first || i + 1 > last) && !shown.has(row))).toEqual([]);
+		expect(rows.slice(first, last - 1).filter(row => shown.has(row))).toEqual([]);
+		const artifactRows = (await Bun.file(artifactPath).text()).split("\n");
+		expect(artifactRows.slice(first - 1, last)).toEqual(rows.slice(first - 1, last));
 	});
 	test("createInput decodes streamed UTF-8 chunks correctly", async () => {
 		const sink = new OutputSink();

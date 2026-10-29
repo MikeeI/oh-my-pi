@@ -50,6 +50,7 @@ import { getDiagnosticsLedger } from "../lsp/diagnostics-ledger";
 import writeDescription from "../prompts/tools/write.md" with { type: "text" };
 import writeDeviceOnlyDescription from "../prompts/tools/write-device-only.md" with { type: "text" };
 import writeDeviceOnlyRefusal from "../prompts/tools/write-device-only-refusal.md" with { type: "text" };
+import { resolveUserToolPromptSource } from "../prompts/tool-prompt-source";
 import type { ToolSession } from "../sdk";
 
 import { routeWriteThroughBridge, shouldRouteWriteThroughBridge } from "./acp-bridge";
@@ -605,7 +606,14 @@ export class WriteTool implements AgentTool<typeof writeSchema, WriteToolDetails
 	readonly label = "Write";
 	get description(): string {
 		const deviceOnly = this.session.deviceOnlyWrite === true && this.session.pendingFullWriteDescription !== true;
-		return prompt.render(deviceOnly ? writeDeviceOnlyDescription : writeDescription);
+		const source = deviceOnly
+			? resolveUserToolPromptSource({
+					agentDir: this.session.settings.getAgentDir(),
+					toolName: "write-device-only",
+					bundledSource: writeDeviceOnlyDescription,
+				})
+			: writeDescription;
+		return prompt.render(source);
 	}
 	readonly parameters = writeSchema;
 	readonly strict = true;

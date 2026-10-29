@@ -2,6 +2,7 @@ import { afterEach, describe, expect, it, vi } from "bun:test";
 import * as fs from "node:fs/promises";
 import * as os from "node:os";
 import * as path from "node:path";
+import { APP_DISPLAY_NAME } from "@oh-my-pi/pi-coding-agent/app-version";
 import { AgentLifecycleManager } from "@oh-my-pi/pi-coding-agent/registry/agent-lifecycle";
 import { AgentRegistry } from "@oh-my-pi/pi-coding-agent/registry/agent-registry";
 import type { AgentSession } from "@oh-my-pi/pi-coding-agent/session/agent-session";
@@ -94,6 +95,7 @@ async function commitsAcrossRelease(id: string, runEndPatch: string, releasePatc
 	});
 
 	await runIsolatedSubprocess({
+		agentDir: artifactsDir,
 		baseOptions: {
 			cwd: "/repo",
 			agent: { name: "task", description: "Task agent", systemPrompt: "test", source: "bundled" },
@@ -126,5 +128,53 @@ describe("isolated agent release", () => {
 	it("lets held peer messages wake the agent only after the run-end branch is committed", async () => {
 		await commitsAcrossRelease("ReleaseAfterCapture", patch, patch);
 		expect(events).toEqual(["commit", "irc wakes released"]);
+	});
+
+	it("renders the owning profile's recovery template without losing retained work after capture fails", async () => {
+		const root = await fs.mkdtemp(path.join(os.tmpdir(), "omp-isolation-prompt-"));
+		tempRoots.push(root);
+		const profile = path.join(root, "profile");
+		const workspace = path.join(root, "workspace", "m");
+		await fs.mkdir(workspace, { recursive: true });
+		await Bun.write(path.join(workspace, "work.txt"), "uncommitted work");
+		await Bun.write(
+			path.join(profile, "prompts", "tools", "isolation-error.md"),
+			"{{kind}}: {{message}}\nRecovery: {{appDisplayName}} worktree clear\nRetained: {{retainedDir}}",
+		);
+		vi.spyOn(worktreeModule, "ensureIsolation").mockResolvedValue({
+			mergedDir: workspace,
+			backend: natives.IsoBackendKind.Rcopy,
+			fellBack: false,
+			fallbackReason: null,
+		});
+		vi.spyOn(worktreeModule, "captureIsolationBaseline").mockResolvedValue({
+			root: { repoRoot: root, headCommit: "base", staged: "", unstaged: "", untracked: [], untrackedPatch: "" },
+			nested: [],
+		});
+		vi.spyOn(worktreeModule, "captureDeltaPatch").mockRejectedValue(new Error("capture failed"));
+		vi.spyOn(worktreeModule, "cleanupIsolation").mockResolvedValue();
+		vi.spyOn(executorModule, "runSubprocess").mockResolvedValue(result("ProfileRecovery"));
+		const outcome = await runIsolatedSubprocess({
+			agentDir: profile,
+			baseOptions: {
+				cwd: root,
+				agent: { name: "task", description: "Task agent", systemPrompt: "test", source: "bundled" },
+				task: "Do work",
+				index: 0,
+				id: "ProfileRecovery",
+				keepAlive: false,
+			},
+			context: { repoRoot: root },
+			preferredBackend: undefined,
+			agentId: "ProfileRecovery",
+			mergeMode: "patch",
+			artifactsDir: path.join(root, "artifacts"),
+			buildFailureResult: error => ({ ...result("ProfileRecovery"), exitCode: 1, error: String(error) }),
+		});
+		expect(outcome.error).toContain(`Recovery: ${APP_DISPLAY_NAME} worktree clear`);
+		expect(outcome.error).toContain("patch-capture-failed: capture failed");
+		const retainedDir = outcome.error?.match(/^Retained: (.+)$/m)?.[1];
+		if (!retainedDir) throw new Error("The recovery template did not report the retained workspace");
+		expect(await Bun.file(path.join(retainedDir, "work.txt")).text()).toBe("uncommitted work");
 	});
 });

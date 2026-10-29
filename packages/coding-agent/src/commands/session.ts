@@ -11,6 +11,7 @@
  */
 import chalk from "@oh-my-pi/pi-utils/chalk";
 import { Args, CliUsageError, Command, Flags } from "@oh-my-pi/pi-utils/cli";
+import { APP_DISPLAY_NAME } from "../app-version";
 import { sessionHelp as commandHelp } from "../cli/command-help";
 import { resolveSessionFileArg } from "../cli/session-arg";
 import { SessionMoveRefusedError } from "../session/session-manager";
@@ -27,10 +28,10 @@ const ACTIONS = ["pack", "unpack", "moved", "lease"] as const;
 type SessionAction = (typeof ACTIONS)[number];
 
 const USAGE: Record<SessionAction, string> = {
-	pack: "omp session pack <session> <out.tar>",
-	unpack: "omp session unpack <archive.tar> --cwd <dir>",
-	moved: "omp session moved <session> --to <label>",
-	lease: "omp session lease [--json] -- <session-id>...",
+	pack: `${APP_DISPLAY_NAME} session pack <session> <out.tar>`,
+	unpack: `${APP_DISPLAY_NAME} session unpack <archive.tar> --cwd <dir>`,
+	moved: `${APP_DISPLAY_NAME} session moved <session> --to <label>`,
+	lease: `${APP_DISPLAY_NAME} session lease [--json] -- <session-id>...`,
 };
 
 const UNPACK_NOTE: Record<UnpackMode, string> = {
@@ -84,10 +85,10 @@ export default class Session extends Command {
 	};
 
 	static examples = [
-		"# Pack a session with its artifacts and image blobs\n  omp session pack ~/.omp/agent/sessions/<project>/<file>.jsonl /tmp/session.tar",
-		"# Unpack it on another machine; prints the session file path\n  omp session unpack /tmp/session.tar --cwd ~/src/project",
-		"# Mark the local copy stale; resuming it later forks it\n  omp session moved <file>.jsonl --to cloud",
-		"# List which of these sessions a running omp owns, without taking ownership (`--` keeps ids starting with `-` from parsing as options)\n  omp session lease --json -- <id> <id>",
+		`# Pack a session with its artifacts and image blobs\n  ${APP_DISPLAY_NAME} session pack ~/.omp/agent/sessions/<project>/<file>.jsonl /tmp/session.tar`,
+		`# Unpack it on another machine; prints the session file path\n  ${APP_DISPLAY_NAME} session unpack /tmp/session.tar --cwd ~/src/project`,
+		`# Mark the local copy stale; resuming it later forks it\n  ${APP_DISPLAY_NAME} session moved <file>.jsonl --to cloud`,
+		`# List which of these sessions a running ${APP_DISPLAY_NAME} owns, without taking ownership (\`--\` keeps ids starting with \`-\` from parsing as options)\n  ${APP_DISPLAY_NAME} session lease --json -- <id> <id>`,
 	];
 
 	async run(): Promise<void> {

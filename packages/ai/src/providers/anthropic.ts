@@ -4367,8 +4367,9 @@ function applyPromptCaching(params: MessageCreateParamsStreaming, cacheControl?:
  * System-prompt segments whose bytes differ between sessions or turns of the
  * same agent: per-turn memory recall (`<memories>`) and the coding agent's
  * working-directory context (`<project-context>`: context files with their
- * paths, workspace tree, workspace roots, session append text; advisors use
- * the same tag for their context-file block). The coding agent renders them
+ * paths and session append text, followed by `<workspace-context>` with the
+ * workspace tree and roots; advisors use the same tag for their context-file
+ * block). The coding agent renders them
  * as their own `systemPrompt` array elements after the large static prompt.
  * The system cache breakpoint anchors on the block right before the first
  * such segment, so the static head is shared byte-for-byte across sessions in
@@ -4384,7 +4385,8 @@ function applyPromptCaching(params: MessageCreateParamsStreaming, cacheControl?:
  * Detection is by our own markup, not model identity: only a leading tag
  * counts, so stable segments quoting these tags elsewhere are unaffected.
  */
-const VOLATILE_SYSTEM_SEGMENT_MARKERS = ["<memories>", "<project-context>"];
+const PROJECT_CONTEXT_SEGMENT_MARKER = "<project-context>";
+const VOLATILE_SYSTEM_SEGMENT_MARKERS = ["<memories>", PROJECT_CONTEXT_SEGMENT_MARKER];
 
 function volatileSystemSuffixStart(systemBlocks: readonly AnthropicSystemBlock[]): number {
 	const start = systemBlocks.findIndex(block =>
@@ -4462,6 +4464,38 @@ function applyHeadCaching(
 			anchor.cache_control = cloneAnthropicCacheControl(cacheControl);
 		}
 	}
+}
+
+/**
+ * Spend a breakpoint the message pass left idle on the `<project-context>`
+ * block that opens the volatile suffix (#16883). Anthropic writes cache entries
+ * only at breakpoints, so without one every new session re-writes the project
+ * context at its first message breakpoint, even in an unchanged directory. A
+ * session's first request carries one message (the date/cwd reminder shares
+ * it) and leaves a slot, so same-cwd sessions read the project context instead;
+ * later turns keep both rolling message breakpoints, which already cover it,
+ * and the tool breakpoint stays in place.
+ *
+ * A first request whose interior message carries a per-call mark spends both
+ * message slots in `applyPromptCaching` and gets no project breakpoint.
+ */
+function applyProjectContextCaching(
+	params: MessageCreateParamsStreaming,
+	systemBlocks: AnthropicSystemBlock[] | undefined,
+	cacheControl?: AnthropicCacheControl,
+): void {
+	if (!cacheControl || !systemBlocks) return;
+	const block = systemBlocks[volatileSystemSuffixStart(systemBlocks)];
+	if (!block || block.cache_control != null || !block.text.startsWith(PROJECT_CONTEXT_SEGMENT_MARKER)) return;
+	let used = countHeadBreakpoints(params);
+	for (const message of params.messages) {
+		if (!Array.isArray(message.content)) continue;
+		for (const part of message.content) {
+			if ("cache_control" in part && part.cache_control != null) used++;
+		}
+	}
+	if (used >= ANTHROPIC_MAX_BREAKPOINTS) return;
+	block.cache_control = cloneAnthropicCacheControl(cacheControl);
 }
 
 function usesAdaptiveThinkingTagOnly(model: Model<"anthropic-messages">): boolean {
@@ -5404,6 +5438,7 @@ function buildParams(
 	disableThinkingIfToolChoiceForced(params, model);
 	ensureMaxTokensForThinking(params, maxOutputTokens);
 	applyPromptCaching(params, cacheControl);
+	applyProjectContextCaching(params, systemBlocks, cacheControl);
 
 	return { params, requestControls };
 }

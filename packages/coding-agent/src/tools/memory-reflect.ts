@@ -4,6 +4,7 @@ import { logger, prompt, untilAborted } from "@oh-my-pi/pi-utils";
 import { isHindsightConfigured, loadHindsightConfig } from "../hindsight/config";
 import { ensureBankExists } from "../hindsight/bank";
 import reflectDescription from "../prompts/tools/reflect.md" with { type: "text" };
+import { resolveUserToolPromptSource } from "../prompts/tool-prompt-source";
 import { sessionMemoryToolRefs } from "../memory-backend/tool-names";
 import type { ToolSession } from ".";
 
@@ -21,9 +22,14 @@ export class MemoryReflectTool implements AgentTool<typeof memoryReflectSchema> 
 	readonly approval = "read" as const;
 	readonly label = "Reflect";
 	get description(): string {
-		return prompt.render(reflectDescription, {
-			toolRefs: sessionMemoryToolRefs(this.session),
-		});
+		return prompt.render(
+			resolveUserToolPromptSource({
+				agentDir: this.session.settings.getAgentDir(),
+				toolName: this.name,
+				bundledSource: reflectDescription,
+			}),
+			{ toolRefs: sessionMemoryToolRefs(this.session) },
+		);
 	}
 	readonly parameters = memoryReflectSchema;
 	readonly strict = true;

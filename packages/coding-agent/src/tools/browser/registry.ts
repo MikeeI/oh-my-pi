@@ -2,6 +2,7 @@ import * as path from "node:path";
 import { getLogsDir, isCompiledBinary, logger, untilAborted, withTimeout, workerHostEntry } from "@oh-my-pi/pi-utils";
 import type { Subprocess } from "bun";
 import type { Browser, CDPSession } from "puppeteer-core";
+import { APP_DISPLAY_NAME } from "../../app-version";
 import { ToolAbortError } from "../tool-errors";
 import { ToolError } from "@oh-my-pi/pi-tui/tools/tool-errors";
 import { findFreeCdpPort, findReusableCdp, gracefulKillTreeOnce, resolveSpawnArgs, waitForCdp } from "./attach";
@@ -497,7 +498,7 @@ async function openSharedHeadlessHandle(
 		});
 		if (!shared) {
 			throw new ToolError(
-				`Shared browser daemon unavailable (broker start or Chromium launch failed); check \`omp ps\` for omp.browser.* daemons and ${getLogsDir()} for details`,
+				`Shared browser daemon unavailable (broker start or Chromium launch failed); check \`${APP_DISPLAY_NAME} ps\` for omp.browser.* daemons and ${getLogsDir()} for details`,
 			);
 		}
 		const puppeteer = await loadPuppeteer();

@@ -98,6 +98,7 @@ export interface UserMessage {
 	synthetic?: boolean;
 	steering?: boolean;
 	liveSteered?: boolean;
+	commandInvocation?: string;
 	historyRewriteAt?: number;
 	attribution?: Attribution;
 	providerPayload?: Record<string, unknown>;
@@ -387,7 +388,7 @@ export type GoalOp = "get" | "create" | "resume" | "pause" | "drop";
 
 export type GoalStatus = "active" | "paused" | "budget-limited" | "complete" | "dropped";
 
-export type SlashCommandSource = "builtin" | "skill" | "extension" | "custom" | "mcp_prompt" | "file";
+export type SlashCommandSource = "builtin" | "skill" | "extension" | "custom" | "mcp_prompt" | "file" | "routine";
 
 /** Forwarded subagent frames: none, lifecycle and progress, or also raw session events. */
 export type SubagentSubscriptionLevel = "off" | "progress" | "events";

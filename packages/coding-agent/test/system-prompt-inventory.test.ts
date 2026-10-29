@@ -1,4 +1,4 @@
-import { afterEach, beforeEach, describe, expect, it } from "bun:test";
+import { afterEach, beforeEach, describe, expect, it, spyOn } from "bun:test";
 import * as fs from "node:fs";
 import * as os from "node:os";
 import * as path from "node:path";
@@ -803,12 +803,19 @@ describe("system prompt tool inventory", () => {
 		expect(text).not.toContain("`skill://<name>`");
 	});
 
-	it("keeps real provider tool definitions free of skill URL guidance", async () => {
-		const session = { ...makeToolSession(Settings.isolated()), skills: [] };
-		const tools = await createTools(session, ["read", "bash"]);
-		const bash = tools.find(tool => tool.name === "bash")!;
+	it("keeps the bundled Bash description free of skill URL guidance", async () => {
+		const settings = Settings.isolated();
+		// The bundled description must not depend on the operator's profile overrides.
+		const agentDir = spyOn(settings, "getAgentDir").mockReturnValue(tempHomeDir);
+		try {
+			const session = { ...makeToolSession(settings), skills: [] };
+			const tools = await createTools(session, ["read", "bash"]);
+			const bash = tools.find(tool => tool.name === "bash")!;
 
-		expect(bash.description).not.toContain("skill://");
+			expect(bash.description).not.toContain("skill://");
+		} finally {
+			agentDir.mockRestore();
+		}
 	});
 
 	it("advertises loaded skills in the SDK system prompt built from real tools", async () => {

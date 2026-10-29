@@ -39,11 +39,16 @@ export type SpecialHandler = (
 /** Network read bound for a fetched body; the only size limit on rendered URL content. */
 export const MAX_BYTES = 50 * 1024 * 1024;
 
+// Chrome Stable: https://googlechromelabs.github.io/chrome-for-testing/last-known-good-versions.json
+const CHROME_MAJOR_VERSION = "156";
+const GOOGLEBOT_CHROME_VERSION = "155.0.8059.39";
+const CURL_VERSION = "8.23.0";
+
 const USER_AGENTS = [
-	"curl/8.0",
-	"Mozilla/5.0 (compatible; TextBot/1.0)",
-	"Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36",
-];
+	`Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/${CHROME_MAJOR_VERSION}.0.0.0 Safari/537.36`,
+	`Mozilla/5.0 (Linux; Android 6.0.1; Nexus 5X Build/MMB29P) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/${GOOGLEBOT_CHROME_VERSION} Mobile Safari/537.36 (compatible; Googlebot/2.1; +http://www.google.com/bot.html)`,
+	`curl/${CURL_VERSION}`,
+] as const;
 
 /**
  * Statuses sites answer a user agent they refuse with (999 is LinkedIn's), whatever the body
@@ -147,16 +152,10 @@ export async function loadPage(url: string, options: LoadPageOptions = {}): Prom
 			const contentType = rawContentType.split(";")[0]?.trim().toLowerCase() ?? "";
 			const finalUrl = response.url;
 
-			const lastAgent = !rotates || attempt === USER_AGENTS.length - 1;
-			if (!lastAgent && BLOCKED_STATUSES.has(response.status)) {
-				void response.body?.cancel().catch(() => {});
-				continue;
-			}
-
 			if (response.status === 429 && !retried429) {
-				// Rate limited under the last user agent: retry it once, honoring a bounded
-				// Retry-After. The wait observes the caller's signal so an Esc during the backoff
-				// does not stall for up to the full delay.
+				// Honor the rate limit before changing identity; otherwise a transient
+				// throttle needlessly invalidates the site's current client identity.
+				// The bounded wait remains cancellable by the caller.
 				retried429 = true;
 				const delayMs = parseRetryAfterMs(response.headers.get("retry-after"));
 				void response.body?.cancel().catch(() => {});
@@ -166,6 +165,11 @@ export async function loadPage(url: string, options: LoadPageOptions = {}): Prom
 					throw new ToolAbortError();
 				}
 				attempt--; // Reuse the same user agent for the retry.
+				continue;
+			}
+			const lastAgent = !rotates || attempt === USER_AGENTS.length - 1;
+			if (!lastAgent && BLOCKED_STATUSES.has(response.status)) {
+				void response.body?.cancel().catch(() => {});
 				continue;
 			}
 

@@ -7,12 +7,32 @@ import { compileCodingAgent } from "./compile-binary";
 const packageDir = path.join(import.meta.dir, "..");
 const repoRoot = path.join(packageDir, "..", "..");
 
+function parseMetafilePath(args: readonly string[]): string | undefined {
+	if (args.length === 0) return undefined;
+	if (args.length !== 2 || args[0] !== "--metafile" || !args[1]) {
+		throw new Error("Usage: bun scripts/build-binary.ts [--metafile <path>]");
+	}
+	return path.resolve(args[1]);
+}
+
 /** Binary cross-compilation settings selected by `CROSS_TARGET`. */
 export interface CrossBuild {
 	readonly id: string;
 	readonly platform: string;
 	readonly arch: string;
 	readonly target: Bun.Build.CompileTarget;
+}
+
+/** Exact production output, recorded only when build metadata is requested. */
+export interface CodingAgentBuildMetadata extends Bun.BuildMetafile {
+	compiledArtifact: {
+		path: string;
+		bytes: number;
+		sha256: string;
+		platform: string;
+		arch: string;
+		target: Bun.Build.CompileTarget | null;
+	};
 }
 
 /** Resolves a CROSS_TARGET value to the Bun compile target used by local binary builds. */
@@ -69,6 +89,7 @@ async function runCommand(command: string[]): Promise<void> {
 }
 
 async function main(): Promise<void> {
+	const metafilePath = parseMetafilePath(Bun.argv.slice(2));
 	const crossBuild = resolveCrossBuild(Bun.env.CROSS_TARGET);
 	const shouldAdhocSign =
 		process.platform === "darwin" &&
@@ -83,7 +104,7 @@ async function main(): Promise<void> {
 		// Embed metadata for the same content-addressed viewer used by source exports.
 		// Generate here too for clean checkouts that skipped install hooks.
 		await runCommand(["bun", "--cwd=../collab-web", "run", "gen:export-viewer"]);
-		await compileCodingAgent({
+		const metafile = await compileCodingAgent({
 			repoRoot,
 			entrypoint: path.join(packageDir, "src", "cli.ts"),
 			outfile: outputPath,
@@ -92,6 +113,7 @@ async function main(): Promise<void> {
 			target: crossBuild?.target,
 			executablePath: Bun.env.BUN_COMPILE_EXECUTABLE_PATH || undefined,
 			skipBuiltinCodesign: shouldAdhocSign,
+			metafile: metafilePath !== undefined,
 		});
 
 		if (shouldAdhocSign) {
@@ -104,6 +126,23 @@ async function main(): Promise<void> {
 				path.join(repoRoot, "scripts", "macos-entitlements.plist"),
 				outputPath,
 			]);
+		}
+		if (metafilePath) {
+			if (!metafile) throw new Error("Coding-agent build did not return the requested metafile");
+			// Hash the final artifact after signing, not the unsigned compile output.
+			const bytes = await Bun.file(outputPath).arrayBuffer();
+			const metadata: CodingAgentBuildMetadata = {
+				...metafile,
+				compiledArtifact: {
+					path: outputPath,
+					bytes: bytes.byteLength,
+					sha256: Bun.CryptoHasher.hash("sha256", bytes, "hex"),
+					platform: crossBuild?.platform ?? process.platform,
+					arch: crossBuild?.arch ?? process.arch,
+					target: crossBuild?.target ?? null,
+				},
+			};
+			await Bun.write(metafilePath, `${JSON.stringify(metadata, null, 2)}\n`);
 		}
 	} finally {
 		await runCommand(["bun", "--cwd=../stats", "run", "gen:stats:reset"]);

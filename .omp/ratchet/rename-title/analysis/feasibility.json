@@ -1,0 +1,10 @@
+{
+  "trainCases": 24,
+  "perfectCases": 21,
+  "improvableCases": 3,
+  "maximumMeanGain": 0.03472222222222223,
+  "maximumPairedT": 1.8126539343499315,
+  "requiredPairedT": 2.069,
+  "viable": false,
+  "reason": "The frozen training baseline has insufficient independent imperfect cases for any candidate to clear the approved paired 95% gate."
+}

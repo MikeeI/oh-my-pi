@@ -383,6 +383,29 @@ describe("loadEntriesFromFileStream (Bun.JSONL parity)", () => {
 		expect(loaded.malformedRecords).toBe(0);
 	});
 
+	it("resumes an unfinished value with invalid UTF-8 at its exact byte offset across chunks", async () => {
+		// Bun's first file-stream chunk is 256 KiB, so the padding splits the
+		// value across chunks. The decoded batch replaces each invalid byte with a
+		// 3-byte U+FFFD, so mapping the unparsed remainder back by re-encoded
+		// length would resume a few bytes early and corrupt the header line's tail.
+		const content = Buffer.concat([
+			Buffer.from(`${JSON.stringify(HEADER)}\n{"type":"message","id":"split","note":"bad`),
+			Buffer.from([0xff, 0xfe]),
+			Buffer.from(
+				`"\n${" ".repeat(512 * 1024)}\n,"parentId":"s1","timestamp":"${ISO}","message":{"role":"user","content":"continued","timestamp":0}}\n`,
+			),
+			Buffer.from(`${JSON.stringify(msg("tail", "split", "after"))}\n`),
+		]);
+		const file = await writeTemp("");
+		fs.writeFileSync(file, content);
+		const loaded = await sessionLoader.loadEntriesFromFileStream(file);
+
+		const reference = sessionLoader.parseSessionContent(content.toString("utf8"));
+		expect(entryIds(loaded.entries)).toEqual(["s1", "split", "tail"]);
+		expect(loaded.entries).toEqual(reference.entries);
+		expect(loaded.malformedRecords).toBe(0);
+	});
+
 	it("counts an unfinished malformed record across chunks before a valid trailing record", async () => {
 		const content = `${JSON.stringify(HEADER)}\n{${" ".repeat(128 * 1024)}\n${JSON.stringify(msg("tail", "s1", "x".repeat(128 * 1024)))}\n`;
 		const file = await writeTemp(content);

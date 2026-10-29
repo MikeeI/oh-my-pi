@@ -106,6 +106,7 @@ import {
 	postmortem,
 	prompt,
 	Snowflake,
+	sanitizeText,
 	stringProperty,
 	toError,
 	untilAborted,
@@ -166,6 +167,14 @@ import { ManagedTimers } from "../extensibility/extensions/managed-timers";
 import { createExtensionModelQuery } from "../extensibility/extensions/model-api";
 import type { CompactOptions, ContextUsage } from "../extensibility/extensions/types";
 import type { CustomCommandContext } from "../extensibility/custom-commands/types";
+import {
+	buildRoutineExecutionPlan,
+	parseRoutineInvocation,
+	type Routine,
+	type RoutineExecutionPlan,
+	type RoutineProgress,
+	validateRoutineCommandNames,
+} from "../extensibility/routines";
 import { SkillDescriptionCatalog } from "../extensibility/skill-descriptions";
 import {
 	type BuiltSkillPromptMessage,
@@ -226,7 +235,7 @@ import { type AgentRef, AgentRegistry } from "../registry/agent-registry";
 import { cfgSecretsEnabled } from "../secrets/settings";
 import { releaseSharpshooterSession } from "../sharpshooter/backend";
 import { flushSharpshooterExtraction } from "../sharpshooter/extract";
-import { toolReadsSkillUris } from "../system-prompt";
+import { type BuildSystemPromptResult, toolReadsSkillUris } from "../system-prompt";
 import {
 	AUTO_THINKING,
 	type ConfiguredThinkingLevel,
@@ -256,6 +265,7 @@ import {
 	revokeComputerControlForOwner,
 } from "../tools/computer/supervisor";
 import { isAutoQaEnabled } from "../tools/report-tool-issue";
+import type { ReadToolDetails } from "@oh-my-pi/pi-tui/tools/read";
 import {
 	buildResolveReminderMessage,
 	isPreviewResolutionToolCall,
@@ -285,7 +295,12 @@ import {
 	parseCardTitleReply,
 	splitCardTitle,
 } from "../utils/title-card";
-import { generateSessionTitle, nerdGlyphsActive } from "../utils/title-generator";
+import {
+	formatRecentTitleTranscript,
+	generateSessionTitle,
+	nerdGlyphsActive,
+	TITLE_TRANSCRIPT_SYSTEM_PROMPT,
+} from "../utils/title-generator";
 import { buildNamedToolChoice, isToolChoiceActive } from "../utils/tool-choice";
 import type { VibeModeState } from "../vibe/state";
 import type { AgentSessionEvent, AgentSessionEventListener } from "./agent-session-events";
@@ -973,6 +988,9 @@ export class AgentSession implements SettingsScope {
 	 * command.
 	 */
 	readonly #queuedMessageRawText = new WeakMap<AgentMessage, string>();
+	#routines: Routine[];
+	#activeRoutineToken: symbol | undefined;
+	#activeRoutineAbortController: AbortController | undefined;
 
 	// Event subscription state
 	#unsubscribeAgent?: () => void;
@@ -2078,6 +2096,7 @@ export class AgentSession implements SettingsScope {
 		};
 		this.#todo = new TodoTracker(todoHost);
 		this.#modelMentions = new ModelMentionRegistry({
+			agentDir: this.settings.getAgentDir(),
 			sessionManager: this.sessionManager,
 			modelRegistry: this.#modelRegistry,
 			scopedModels: () => this.scopedModels.map(s => s.model),
@@ -2116,6 +2135,7 @@ export class AgentSession implements SettingsScope {
 		});
 
 		this.#promptTemplates = config.promptTemplates ?? [];
+		this.#routines = config.routines ?? [];
 		this.#slashCommands = config.slashCommands ?? [];
 		this.#extensionRunner = config.extensionRunner;
 		this.#cacheWarmer = config.cacheWarmer;
@@ -2133,6 +2153,10 @@ export class AgentSession implements SettingsScope {
 		this.#reconcileBrowserMcpFilter = config.reconcileBrowserMcpFilter;
 		this.#setMcpServerInstructionsSource = config.setMcpServerInstructionsSource;
 		this.#customCommands = config.customCommands ?? [];
+		// SDK and print sessions never run the transport advertisement checks, and routines
+		// dispatch before file-command expansion, so an unchecked collision would silently
+		// shadow the file command.
+		this.#assertRoutineCatalog(this.#slashCommands, this.#routines);
 		const recoveryHost: TurnRecoveryHost = {
 			agent: this.agent,
 			sessionManager: this.sessionManager,
@@ -2448,6 +2472,7 @@ export class AgentSession implements SettingsScope {
 			ensureGoalRegistered: config.ensureGoalRegistered,
 			reconcileSettingsGatedTools: config.reconcileSettingsGatedTools,
 			rebuildSystemPrompt: config.rebuildSystemPrompt,
+			initialSystemPromptResult: config.initialSystemPromptResult,
 			getMcpServerInstructions: config.getMcpServerInstructions,
 			xdev: config.xdev,
 			setActiveToolNames: config.setActiveToolNames,
@@ -3102,6 +3127,10 @@ export class AgentSession implements SettingsScope {
 
 	getAgentId(): string | undefined {
 		return this.#agentId;
+	}
+
+	agentKind(): "main" | "sub" {
+		return this.#agentKind;
 	}
 
 	/** Dequeue the next HARD forced tool choice for the upcoming LLM call, dropping
@@ -5597,7 +5626,24 @@ export class AgentSession implements SettingsScope {
 			this.#synchronouslyTerminatedYieldToolCallIds.add(ctx.toolCall.id);
 			this.agent.abort(TERMINAL_TOOL_RESULT_ABORT_REASON);
 		}
-		return this.#ttsr.afterToolCall(ctx);
+		const ttsrResult = this.#ttsr.afterToolCall(ctx);
+		if (ctx.toolCall.name !== "read") return ttsrResult;
+
+		const content = ttsrResult?.content ?? ctx.result.content;
+		const textFragments: string[] = [];
+		for (const block of content) {
+			if (block.type === "text") textFragments.push(sanitizeText(block.text));
+		}
+		if (textFragments.length === 0) return ttsrResult;
+		const readTextTokens = this.agent.tokenizer.countTokensExact(textFragments);
+		if (readTextTokens === undefined) return ttsrResult;
+
+		const details = ttsrResult?.details ?? ctx.result.details;
+		const readDetails: ReadToolDetails = {
+			...(isRecord(details) ? details : {}),
+			readTextTokens,
+		};
+		return { ...ttsrResult, details: readDetails };
 	}
 	/**
 	 * Emits the extension `tool_call` event for a loop-dispatched call at
@@ -6975,6 +7021,11 @@ export class AgentSession implements SettingsScope {
 		this.#textOutputCommitted = committed;
 	}
 
+	/** Latest accepted structured system prompt build. */
+	getSystemPromptResult(): BuildSystemPromptResult {
+		return this.#tools.systemPromptResult;
+	}
+
 	/** Current retry attempt (0 if not retrying) */
 	get retryAttempt(): number {
 		return this.#recovery.attempt;
@@ -7139,10 +7190,13 @@ export class AgentSession implements SettingsScope {
 			.catch(() => {})
 			.then(async () => {
 				resetCapabilities();
-				this.#slashCommands = await loadSlashCommands({
+				const slashCommands = await loadSlashCommands({
 					cwd: this.sessionManager.getCwd(),
 					extensionRoots: this.effectiveExtensionRoots,
 				});
+				// Reject before committing so a reloaded file command never hides behind a routine.
+				this.#assertRoutineCatalog(slashCommands, this.#routines);
+				this.#slashCommands = slashCommands;
 				// Resets the capability cache again, rediscovers skills, rebuilds the prompt,
 				// and fires the command-metadata notification after both lists are current.
 				await this.#tools.refreshSkills();
@@ -7609,6 +7663,11 @@ export class AgentSession implements SettingsScope {
 		}
 	}
 
+	/** A routine owns the transcript between turns, including awaited progress callbacks. */
+	get isRunningRoutine(): boolean {
+		return this.#activeRoutineToken !== undefined;
+	}
+
 	/**
 	 * True while a turn, user bash/eval, compaction, handoff, or retry could still write
 	 * into the transcript, so a snapshot of it would miss or split that work.
@@ -7620,7 +7679,8 @@ export class AgentSession implements SettingsScope {
 			this.isEvalRunning ||
 			this.isCompacting ||
 			this.isGeneratingHandoff ||
-			this.isRetrying
+			this.isRetrying ||
+			this.isRunningRoutine
 		);
 	}
 
@@ -7808,11 +7868,40 @@ export class AgentSession implements SettingsScope {
 
 	/** Replace file-based slash commands used for prompt expansion. */
 	setSlashCommands(slashCommands: FileSlashCommand[]): void {
+		this.#assertRoutineCatalog(slashCommands, this.#routines);
 		this.#slashCommands = [...slashCommands];
 	}
 	/** File-based slash commands discovered at session construction (or last set). */
 	get slashCommands(): ReadonlyArray<FileSlashCommand> {
 		return this.#slashCommands;
+	}
+
+	get routines(): ReadonlyArray<Routine> {
+		return this.#routines;
+	}
+
+	setRoutines(routines: Routine[]): void {
+		this.#assertRoutineCatalog(this.#slashCommands, routines);
+		this.#routines = [...routines];
+	}
+
+	/** Atomically replace the validated pair so names can move between command namespaces. */
+	setCommandCatalog(slashCommands: readonly FileSlashCommand[], routines: readonly Routine[]): void {
+		this.#assertRoutineCatalog(slashCommands, routines);
+		this.#slashCommands = [...slashCommands];
+		this.#routines = [...routines];
+	}
+
+	/**
+	 * Rejects duplicate routine names and names owned by session commands.
+	 * Transports add their own builtin and alias names before calling the session;
+	 * this check covers every path, including sessions that never advertise commands.
+	 */
+	#assertRoutineCatalog(slashCommands: readonly FileSlashCommand[], routines: readonly Routine[]): void {
+		const reservedNames = new Set<string>();
+		for (const command of slashCommands) reservedNames.add(command.name);
+		for (const command of this.customCommands) reservedNames.add(command.command.name);
+		validateRoutineCommandNames(routines, reservedNames);
 	}
 
 	/** Custom commands (TypeScript slash commands and MCP prompts) */
@@ -8098,7 +8187,7 @@ export class AgentSession implements SettingsScope {
 	 * {@link PromptDroppedError} instead.
 	 */
 	async prompt(text: string, options?: PromptOptions): Promise<boolean> {
-		return this.#admitSubmission(() => this.#prompt(text, options));
+		return this.#admitSubmission(() => this.#promptInternal(text, options, undefined));
 	}
 
 	/**
@@ -8138,7 +8227,14 @@ export class AgentSession implements SettingsScope {
 		this.#toolChoiceQueue.removeByLabel("plan-mode-decision");
 	}
 
-	async #prompt(text: string, options?: PromptOptions): Promise<boolean> {
+	async #promptInternal(
+		text: string,
+		options: PromptOptions | undefined,
+		routineToken: symbol | undefined,
+	): Promise<boolean> {
+		if (this.#activeRoutineToken && routineToken !== this.#activeRoutineToken) {
+			throw new AgentBusyError("A routine is running");
+		}
 		// Stamp the operator's submission instant before ANY async preprocessing —
 		// command execution, image normalization, vision-model description — so the
 		// prompt→yield delta includes the whole wait, whatever path the prompt takes.
@@ -8194,6 +8290,7 @@ export class AgentSession implements SettingsScope {
 		// Slash/custom-command handling below rewrites `text`; keep the original
 		// so a dropped prompt is handed back exactly as the user typed it.
 		const typedText = text;
+		let commandInvocation: string | undefined;
 		// Handle extension commands first (execute immediately, even during streaming)
 		if (expandPromptTemplates && text.startsWith("/")) {
 			if (options?.runCommands !== false) {
@@ -8212,10 +8309,20 @@ export class AgentSession implements SettingsScope {
 				}
 			}
 
+			if (text.startsWith("/")) {
+				const handledRoutine = await this.runRoutineInvocation(text);
+				if (handledRoutine) {
+					return false;
+				}
+			}
 			// Try file-based slash commands (markdown files from commands/ directories)
 			// Only if text still starts with "/" (wasn't transformed by custom command)
 			if (text.startsWith("/")) {
-				text = expandSlashCommand(text, this.#slashCommands);
+				const expanded = expandSlashCommand(text, this.#slashCommands);
+				// The transcript shows the typed invocation instead of the expanded body;
+				// an unknown command returns its input unchanged and keeps plain rendering.
+				if (expanded !== text) commandInvocation = text;
+				text = expanded;
 			}
 		}
 
@@ -8259,6 +8366,7 @@ export class AgentSession implements SettingsScope {
 				attribution: promptAttribution,
 				prependMessages: prependNotices,
 				rawText: typedText,
+				commandInvocation,
 				onPromptQueued: options?.onPromptQueued,
 				onPromptAdmitted: options?.onPromptAdmitted,
 				promptGeneration: queueGeneration,
@@ -8335,6 +8443,7 @@ export class AgentSession implements SettingsScope {
 				attribution: promptAttribution,
 				prependMessages: prependNotices,
 				rawText: typedText,
+				commandInvocation,
 				preprocessed: {
 					images: normalizedImages,
 					descriptionNotice: imageDescriptionNotice,
@@ -8361,7 +8470,13 @@ export class AgentSession implements SettingsScope {
 					synthetic: true,
 					userInitiated: options?.userInitiated === true ? true : undefined,
 				}
-			: { role: "user" as const, content: userContent, attribution: promptAttribution, timestamp: submittedAt };
+			: {
+					role: "user" as const,
+					content: userContent,
+					attribution: promptAttribution,
+					timestamp: submittedAt,
+					...(commandInvocation ? { commandInvocation } : {}),
+				};
 
 		const preludeMessages: AgentMessage[] = [];
 		if (eagerTodoPrelude) {
@@ -8430,6 +8545,107 @@ export class AgentSession implements SettingsScope {
 		}
 		if (!dispatched && options?.throwOnDrop) throw new PromptDroppedError();
 		return true;
+	}
+
+	#throwIfRoutineRunning(): void {
+		if (this.#activeRoutineToken) {
+			throw new AgentBusyError("A routine is running");
+		}
+	}
+
+	async runRoutineInvocation(
+		text: string,
+		options: {
+			onProgress?: (progress: RoutineProgress) => void | Promise<void>;
+		} = {},
+	): Promise<boolean> {
+		const invocation = parseRoutineInvocation(text, this.#routines);
+		if (!invocation) return false;
+		if (this.#activeRoutineToken) {
+			throw new AgentBusyError("A routine is already running");
+		}
+
+		const token = Symbol(invocation.routine.name);
+		const abortController = new AbortController();
+		const throwIfCancelled = () => {
+			if (abortController.signal.aborted) throw new Error("Routine cancelled");
+		};
+		this.#activeRoutineToken = token;
+		this.#activeRoutineAbortController = abortController;
+		this.refreshIdleMaintenance();
+		let currentIndex = 0;
+		let total = invocation.routine.steps.length;
+		try {
+			if (this.isStreaming || this.queuedMessageCount > 0) {
+				await options.onProgress?.({
+					routine: invocation.routine.name,
+					status: "queued",
+					index: 0,
+					total,
+				});
+				await this.waitForIdle();
+			}
+
+			const plan: RoutineExecutionPlan = buildRoutineExecutionPlan(
+				invocation,
+				this.#slashCommands,
+				new Set(this.#routines.map(routine => routine.name)),
+			);
+			total = plan.steps.length;
+			for (let i = 0; i < plan.steps.length; i++) {
+				throwIfCancelled();
+				const step = plan.steps[i];
+				currentIndex = i + 1;
+				await options.onProgress?.({
+					routine: plan.routine.name,
+					status: "running",
+					index: currentIndex,
+					total,
+					step: step.label,
+				});
+				throwIfCancelled();
+				const previousAssistant = this.getLastAssistantMessage();
+				const previousCostRefusal = this.#costCapRefusal;
+				await this.#promptInternal(step.text, { expandPromptTemplates: false, throwOnDrop: true }, token);
+				// Recovery can replace a failed turn; evaluate only the settled outcome.
+				await this.waitForIdle();
+				throwIfCancelled();
+				if (this.#costCapRefusal && this.#costCapRefusal !== previousCostRefusal) {
+					throw new Error(this.#costCapRefusal.message);
+				}
+				const assistant = this.getLastAssistantMessage();
+				if (
+					assistant &&
+					assistant !== previousAssistant &&
+					(assistant.stopReason === "error" || assistant.stopReason === "aborted")
+				) {
+					throw new Error(
+						assistant.errorMessage ?? `Routine step ${step.label} ended with ${assistant.stopReason}`,
+					);
+				}
+			}
+			await options.onProgress?.({
+				routine: invocation.routine.name,
+				status: "complete",
+				index: total,
+				total,
+			});
+			return true;
+		} catch (error) {
+			const message = error instanceof Error ? error.message : String(error);
+			await options.onProgress?.({
+				routine: invocation.routine.name,
+				status: abortController.signal.aborted ? "cancelled" : "failed",
+				index: currentIndex,
+				total,
+				message,
+			});
+			throw error;
+		} finally {
+			this.#activeRoutineToken = undefined;
+			this.#activeRoutineAbortController = undefined;
+			this.refreshIdleMaintenance();
+		}
 	}
 
 	/**
@@ -9230,6 +9446,7 @@ export class AgentSession implements SettingsScope {
 	 * Queue a steering message to interrupt the agent mid-run.
 	 */
 	async steer(text: string, images?: ImageContent[], options?: SteerOptions): Promise<void> {
+		this.#throwIfRoutineRunning();
 		if (text.startsWith("/")) {
 			this.#throwIfExtensionCommand(text);
 		}
@@ -9254,6 +9471,7 @@ export class AgentSession implements SettingsScope {
 	 * flipping advisor auto-resume.
 	 */
 	async followUp(text: string, images?: ImageContent[], options?: FollowUpOptions): Promise<void> {
+		this.#throwIfRoutineRunning();
 		if (text.startsWith("/")) {
 			this.#throwIfExtensionCommand(text);
 		}
@@ -9431,6 +9649,8 @@ export class AgentSession implements SettingsScope {
 			 *  it later. Defaults to `text` (the common case: no transformation ran,
 			 *  so raw and queued content are identical). */
 			rawText?: string;
+			/** Typed file-command invocation shown instead of the expanded `text`; see {@link UserMessage.commandInvocation}. */
+			commandInvocation?: string;
 			/**
 			 * Set only when image normalization and the vision description already
 			 * ran for this prompt; its presence suppresses both here. Companions
@@ -9474,6 +9694,7 @@ export class AgentSession implements SettingsScope {
 		const rawText = options?.rawText ?? text;
 		const preprocessed = options?.preprocessed;
 		const prependMessages = options?.prependMessages ?? [];
+		const display = options?.commandInvocation ? { commandInvocation: options.commandInvocation } : {};
 		// Captured before any await below so the aside branch can detect a
 		// newSession()/switchSession() that completed while normalization/vision
 		// description was in flight and drop a record that would otherwise land in a
@@ -9526,7 +9747,13 @@ export class AgentSession implements SettingsScope {
 			if (await this.#sessionGenerationChanged(sessionGeneration)) return false;
 			const records: AgentMessage[] = [...prependMessages, ...attachmentSourceNotices];
 			if (imageDescriptionNotice) records.push(imageDescriptionNotice);
-			const userMessage: AgentMessage = { role: "user", content, attribution, timestamp: timestamp ?? Date.now() };
+			const userMessage: AgentMessage = {
+				role: "user",
+				content,
+				attribution,
+				timestamp: timestamp ?? Date.now(),
+				...display,
+			};
 			this.#queuedMessageRawText.set(userMessage, rawText);
 			records.push(userMessage);
 			this.#irc.queueAside(records);
@@ -9552,6 +9779,7 @@ export class AgentSession implements SettingsScope {
 				content,
 				attribution,
 				timestamp: timestamp ?? Date.now(),
+				...display,
 			};
 			this.#queuedMessageRawText.set(userMessage, rawText);
 			this.agent.followUp(userMessage);
@@ -9565,6 +9793,7 @@ export class AgentSession implements SettingsScope {
 				steering: true,
 				attribution,
 				timestamp: timestamp ?? Date.now(),
+				...display,
 			};
 			this.#queuedMessageRawText.set(userMessage, rawText);
 			this.agent.steer(userMessage);
@@ -11095,7 +11324,7 @@ export class AgentSession implements SettingsScope {
 	 */
 	async renameTitle(title?: string, signal?: AbortSignal): Promise<string | null | undefined> {
 		if (title && (this.#cardIcons() === "boring" || splitCardTitle(title))) return title;
-		const context = title ? undefined : this.#buildReplanTitleContext();
+		const context = title ? undefined : formatRecentTitleTranscript(this.messages);
 		if (context !== undefined && (!context || isLowSignalTitleInput(context))) return null;
 		const { sessionManager } = this;
 		const revision = sessionManager.reserveTitleRevision();
@@ -11105,7 +11334,11 @@ export class AgentSession implements SettingsScope {
 			(!title && titleSignal.aborted) ||
 			sessionManager.getSessionId() !== sessionId ||
 			sessionManager.titleRevision !== revision;
-		const named = context === undefined ? title : await this.#retitle(context, signal);
+		// Manual blank rename uses visible transcript guidance; automatic replan
+		// titles keep their separate context and prompt policy in #retitle.
+		const generated =
+			context === undefined ? undefined : await this.generateTitle(context, TITLE_TRANSCRIPT_SYSTEM_PROMPT, signal);
+		const named = context === undefined ? title : generated && keepTitleCard(this.sessionName, generated);
 		if (stale()) return undefined;
 		if (!named) return null;
 		const carded = await this.#cardTitle(named, signal);
@@ -11220,6 +11453,7 @@ export class AgentSession implements SettingsScope {
 	}): Promise<void> {
 		const userInterrupt = options?.reason === USER_INTERRUPT_LABEL;
 		this.#pendingAbortErrorId = userInterrupt ? AIError.create(AIError.Flag.UserInterrupt) : undefined;
+		this.#activeRoutineAbortController?.abort();
 		// Latch only when the interrupt stops something; an idle Esc would otherwise fold
 		// every later background completion for the rest of the session.
 		if (userInterrupt && (this.isStreaming || this.agent.hasQueuedMessages())) {

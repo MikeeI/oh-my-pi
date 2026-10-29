@@ -24,7 +24,7 @@ import {
 import { readMediaPath } from "@oh-my-pi/pi-tui/native/blobs";
 import { TodoReminderComponent } from "@oh-my-pi/pi-tui/chat/todo-reminder";
 import { isNativeRendering } from "@oh-my-pi/pi-tui/native/state";
-import { textContent } from "@oh-my-pi/pi-tui/chat/transcript-entry";
+import { userDisplayText } from "@oh-my-pi/pi-tui/chat/transcript-entry";
 import {
 	asyncJobState,
 	isSettledJobFrame,
@@ -1278,7 +1278,8 @@ export class EventController {
 				this.#turnStartedAt = event.message.timestamp;
 				this.#turnUsage.reset();
 			}
-			const userText = textContent(event.message.content);
+			// Matches the submitted draft, so a typed file-command keeps its optimistic row.
+			const userText = userDisplayText(event.message);
 			const imageBlocks =
 				typeof event.message.content === "string"
 					? []

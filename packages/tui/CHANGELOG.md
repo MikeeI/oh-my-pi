@@ -29,6 +29,11 @@
 - Fixed LSP diagnostics that incorrectly showed “No issues” before a language server had reported; such files are now shown as unverified. ([#17293](https://github.com/can1357/oh-my-pi/pull/17293) by [@JustasMasiulis](https://github.com/JustasMasiulis))
 - Fixed Esc-Esc rewind in Tern selecting interrupted turns with no visible output instead of the last displayed turn.
 - Fixed streamed code blocks losing lines that scrolled off screen before the closing fence arrived; completed lines now remain available in scrollback. ([#17333](https://github.com/can1357/oh-my-pi/pull/17333) by [@gzkGit777](https://github.com/gzkGit777))
+### Fixed
+
+- Accepted history is committed before frame-write callbacks, preventing duplicate replay after a synchronous reset.
+- Stopping during a delayed tmux resize leaves stale-grid history offers uncommitted.
+- Native cache-miss markers and file commands retain their theme foregrounds without TSP palette synchronization.
 
 ## [18.13.3] - 2026-10-28
 
@@ -157,6 +162,11 @@
 - Fixed an inline image (such as a table's chart) disappearing in iTerm2 when new output pushed it past the top of the screen; it now moves to scrollback whole ([#16467](https://github.com/can1357/oh-my-pi/pull/16467) by [@galtamam-cmyk](https://github.com/galtamam-cmyk))
 - Fixed inline images, hyperlinks, notifications and styled underlines staying off in iTerm2 sessions reached over SSH, where the forwarded `LC_TERMINAL` marker was ignored ([#16450](https://github.com/can1357/oh-my-pi/pull/16450) by [@yuzu-octopus](https://github.com/yuzu-octopus))
 - Added Eval `mcp_progress` status events, updated in place per call and evictable under the status-event cap, plus `formatMCPProgress()` and `MCPToolDetails.progress` for MCP progress display ([#16431](https://github.com/can1357/oh-my-pi/pull/16431) by [@alphastorm](https://github.com/alphastorm))
+### Fixed
+
+- Fixed resizing after an earlier message changed (expanded tool output, late diagnostics, toggled thinking) re-rendering the whole transcript instead of only the visible tail
+- Fixed middle-elided output notices naming the wrong shown lines and artifact recovery range
+- Fixed history scrolls duplicating image placements and overrunning tmux's synchronized-output hold
 
 ## [18.12.3] - 2026-10-19
 
@@ -329,6 +339,9 @@
 ### Removed
 
 - Removed `tools/eval-format/code-mode-declarations` (`generateCodeModeDeclarations`), which only served Codex Code Mode.
+### Fixed
+
+- Fixed tmux history repeating finalized output or losing new answer tails when pane resizing precedes SIGWINCH.
 
 ## [18.10.3] - 2026-10-12
 
@@ -380,6 +393,10 @@
 - `CountdownTimer`'s native `elapsed` no longer sends `stopped: 0`, which froze every native countdown (extension input, selector and editor prompts) at zero from the start
 - The native backend's focus now reaches a field inside an `overlay`/`picker` sheet hoisted into the layer from a dock component (the MCP add wizard, login), so that field shows the live caret and focus ring
 - `MCPAddWizard` keeps a refused name or URL in its field, clears a stale refusal on Back, ignores a connection test that settles after the user stepped back, and Edit OAuth settings after a failed sign-in opens the settings again instead of doing nothing
+### Fixed
+
+- Fixed partial transcript replay losing accepted paragraph separators or changing rows after a late reaction.
+- Fixed transcript rows being lost or repeated during tmux resizing by retiring finalized blocks whole in preserve mode.
 
 ## [18.10.0] - 2026-10-12
 
@@ -524,6 +541,13 @@
 - Reduced memory retained by discarded TSP images and previews ([#14336](https://github.com/can1357/oh-my-pi/pull/14336) by [@iliaal](https://github.com/iliaal)).
 - Fixed startup capability probes printing as text in the prompt (e.g. `25a1;stsp;q;{…}pppppp`) on terminals that cannot parse them, such as macOS Terminal.app.
 - Fixed the `/resume` picker flashing while a search runs over a large session history: background fuzzy matches now land in one update instead of reordering the list dozens of times per keystroke.
+### Changed
+
+- Cache-miss markers now use lemon yellow, with a dedicated optional `cacheMiss` theme color.
+
+### Fixed
+
+- Enabled response foreground colors now remain visible in native Assistant rendering.
 
 ## [18.8.6] - 2026-10-08
 
@@ -590,6 +614,13 @@
 - Fixed slow Markdown processing for certain LaTeX environments and incomplete delimiters.
 - Fixed excessive slowdown when formatting long semicolon-free JavaScript evaluations.
 - Fixed prompt-editor lag in large drafts containing magic keywords.
+### Fixed
+
+- Fixed finalized response tails disappearing under viewport pressure while SVG figures finish rendering.
+- Fixed missing Read-token totals in settings and process Read cards.
+- Fixed duplicated accepted transcript prefixes and stale history after presentation resets.
+- Fixed leading whitespace after hard line breaks when foreground-color spans are enabled.
+- Fixed duplicate tool previews and editor rows when fullscreen return races a delayed tmux resize.
 
 ## [18.7.0] - 2026-10-06
 

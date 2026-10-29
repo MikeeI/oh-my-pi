@@ -8,6 +8,7 @@ import { initializeWithSettings } from "../discovery";
 import { cfgDisabledExtensions, cfgExtensions, cfgSkills, type SkillsSettings } from "../extensibility/settings";
 import { loadSkills, type SkillWarning } from "../extensibility/skills";
 import { expandTilde } from "../tools/path-utils";
+import { APP_DISPLAY_NAME } from "../app-version";
 
 /** Public skill listing entry: the fields a machine consumer may rely on. */
 export interface SkillSummary {
@@ -103,7 +104,7 @@ function toTerminalSafe(value: string): string {
  * including discovery warnings.
  */
 export async function handleSkillList(args: string[], cwd: string, json: boolean): Promise<number> {
-	if (args.length > 1) throw new CliUsageError("usage: omp skill list [dir] [--json]");
+	if (args.length > 1) throw new CliUsageError(`usage: ${APP_DISPLAY_NAME} skill list [dir] [--json]`);
 	const target = args[0] ? path.resolve(cwd, args[0]) : cwd;
 	let isDirectory = false;
 	try {

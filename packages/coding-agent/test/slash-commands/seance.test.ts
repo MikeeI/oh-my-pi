@@ -10,6 +10,7 @@ import * as discoveryModule from "@oh-my-pi/pi-coding-agent/task/discovery";
 import { getBundledAgent } from "@oh-my-pi/pi-coding-agent/task/agents";
 import type { SessionInfo } from "@oh-my-pi/pi-coding-agent/session/session-listing";
 import type { InteractiveModeContext } from "@oh-my-pi/pi-coding-agent/modes/types";
+import { getAgentDir } from "@oh-my-pi/pi-utils";
 import { createInteractiveModeContext } from "../helpers/interactive-mode-context";
 
 const command = BUILTIN_LIFECYCLE_SLASH_COMMANDS.find(candidate => candidate.name === "seance");
@@ -50,7 +51,7 @@ function taskResult(details: Partial<TaskToolDetails>, text = ""): AgentToolResu
 }
 
 beforeEach(() => {
-	const seanceAgent = getBundledAgent("seance");
+	const seanceAgent = getBundledAgent("seance", getAgentDir());
 	if (!seanceAgent) throw new Error("Expected the bundled seance agent");
 	vi.spyOn(discoveryModule, "discoverAgents").mockResolvedValue({ agents: [seanceAgent], projectAgentsDir: null });
 });

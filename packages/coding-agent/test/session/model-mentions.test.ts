@@ -25,7 +25,7 @@ import {
 } from "@oh-my-pi/pi-coding-agent/session/model-mentions";
 import { SessionManager } from "@oh-my-pi/pi-coding-agent/session/session-manager";
 import { getBundledAgent } from "@oh-my-pi/pi-coding-agent/task/agents";
-import { removeWithRetries } from "@oh-my-pi/pi-utils";
+import { getAgentDir, removeWithRetries, TempDir } from "@oh-my-pi/pi-utils";
 
 function model(provider: string, id: string, name: string): Model {
 	return buildModel({
@@ -63,6 +63,7 @@ beforeEach(async () => {
 	session = SessionManager.inMemory();
 	scoped = [];
 	mentions = new ModelMentionRegistry({
+		agentDir: getAgentDir(),
 		sessionManager: session,
 		modelRegistry: registry,
 		scopedModels: () => scoped,
@@ -111,7 +112,7 @@ describe("model mentions", () => {
 
 	test("child sessions retain parent model agents and reserve their pseudonyms", async () => {
 		vi.spyOn(registry, "getApiKey").mockResolvedValue("test-key");
-		const task = getBundledAgent("task");
+		const task = getBundledAgent("task", getAgentDir());
 		if (!task) throw new Error("Missing bundled task agent");
 		const inheritedAgent = { ...task, name: "m1", model: ["b/y"] };
 		const agent = new Agent({
@@ -274,7 +275,13 @@ describe("model mentions", () => {
 		});
 		const { dir, skill } = await createTaggedSkill();
 		const results = new RpcPromptResults(
-			{ isStreaming: false, hasAdmittedSubmission: false, queuedMessageCount: 0, hasPendingAsyncWork: () => false },
+			{
+				isStreaming: false,
+				isRunningRoutine: false,
+				hasAdmittedSubmission: false,
+				queuedMessageCount: 0,
+				hasPendingAsyncWork: () => false,
+			},
 			() => {},
 		);
 		try {
@@ -319,7 +326,7 @@ describe("model mentions", () => {
 			["m1", ["a/x"]],
 			["m2", ["b/y"]],
 		]);
-		const task = getBundledAgent("task");
+		const task = getBundledAgent("task", getAgentDir());
 		if (!task) throw new Error("Missing bundled task agent");
 		expect(agents[0].systemPrompt).toBe(task.systemPrompt);
 	});
@@ -390,6 +397,42 @@ describe("model mentions", () => {
 		} finally {
 			agentSession.agent.state.isStreaming = false;
 			await agentSession.dispose();
+		}
+	});
+
+	test("loads both tagged-agent prompts from its session profile", async () => {
+		using temp = TempDir.createSync("model-mention-profile-");
+		const profileDir = temp.join("agent");
+		await Bun.write(temp.join("agent", "prompts", "agents", "task.md"), "Tagged task profile sentinel.");
+		await Bun.write(
+			temp.join("agent", "prompts", "agents", "model-mention.md"),
+			"Tagged model-mention profile sentinel: {{name}} {{selector}}.",
+		);
+		const settings = await Settings.loadReadOnly({
+			cwd: temp.path(),
+			agentDir: profileDir,
+			overrides: { "compaction.enabled": false },
+		});
+		vi.spyOn(registry, "getApiKey").mockResolvedValue("test-key");
+		const agent = new Agent({
+			getApiKey: () => "test-key",
+			initialState: { model: models[0], systemPrompt: ["Test"], tools: [], messages: [] },
+			streamFn: createMockModel({ responses: [{ content: ["Done"] }] }).stream,
+		});
+		const taggedSession = new AgentSession({
+			agent,
+			sessionManager: SessionManager.inMemory(),
+			modelRegistry: registry,
+			settings,
+		});
+		try {
+			await taggedSession.prompt("ask ^a/x");
+			const taggedAgent = taggedSession.getSessionAgents().find(candidate => candidate.name === "m1");
+			if (!taggedAgent) throw new Error("Missing tagged model agent");
+			expect(taggedAgent.systemPrompt).toContain("Tagged task profile sentinel.");
+			expect(taggedAgent.description).toContain("Tagged model-mention profile sentinel");
+		} finally {
+			await taggedSession.dispose();
 		}
 	});
 });

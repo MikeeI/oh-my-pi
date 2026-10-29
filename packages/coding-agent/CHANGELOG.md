@@ -27,6 +27,10 @@
 - Browser `fill` in Chrome replaces the text of rich-text editors such as Slate (Discord) and Lexical instead of leaving the old text in place or breaking the editor, and an empty fill clears them ([#17417](https://github.com/can1357/oh-my-pi/pull/17417) by [@will-bogusz](https://github.com/will-bogusz))
 - Requests to the Anthropic API and Factory Droid's hosts now drop their oldest images when long text, tool arguments, or re-declared tool definitions would otherwise push the request past the host's size limit ([#17492](https://github.com/can1357/oh-my-pi/pull/17492) by [@will-bogusz](https://github.com/will-bogusz))
 - Factory Droid requests size images against what each route actually sends: Gemini models count their expanded tool schemas and no longer drop images for another model's reasoning, and only Claude models count withdrawn tool definitions ([#17492](https://github.com/can1357/oh-my-pi/pull/17492))
+### Fixed
+
+- Kept offline prompt capture from starting Codex WebSocket connections or credential usage prefetch.
+- Corrected Child prompt inspection for agents that require structured output when the global Task setting is disabled.
 
 ## [18.14.0] - 2026-10-29
 
@@ -101,6 +105,20 @@
 - Fixed unavailable configured default or dictation models being silently replaced; omp now warns and identifies the fallback model.
 - Fixed LSP references for files in sibling Git worktrees by adding those checkouts to the active workspace.
 - Improved macOS computer-use behavior for applications without windows by opening the app and inspecting its returned window in one operation.
+### Fixed
+
+- Ordinary subagents no longer load AGENTS context through additional workspace roots.
+- Seance consults retain their embedded tool capabilities despite unsupported profile template overrides.
+- Routines fail when a model request reaches the session cost cap instead of advancing or reporting completion.
+- Explicit AGENTS overrides reject `--no-context-files` rather than being silently ignored.
+- Relay-extension recovery commands use the active executable name.
+- Warm subagent revives keep their selected base-template snapshot after the source file changes or disappears.
+- Routine completion no longer clears drafts entered while the routine was running.
+- Command catalog replacements reject routine collisions before committing either namespace.
+- Subagents keep explicit AGENTS replacements isolated regardless of filename.
+- Routines remain busy for idle maintenance and RPC settlement between steps.
+- Conversation search excludes active continuation copies without hiding divergent messages.
+- RPC clients receive final settlement after a locally completed or failed routine releases its prompt.
 
 ## [18.13.3] - 2026-10-28
 
@@ -433,6 +451,18 @@
 - Fixed the `computer` tool prompt leaving `el.selectText` out of the element helpers; it now says a following `el.type` on that element replaces the selection ([#16769](https://github.com/can1357/oh-my-pi/pull/16769) by [@will-bogusz](https://github.com/will-bogusz))
 - Fixed language servers keeping every file omp ever opened loaded for the whole session; files unused for 5 minutes are now closed when omp opens another, so the server can free that memory ([#15418](https://github.com/can1357/oh-my-pi/pull/15418) by [@will-bogusz](https://github.com/will-bogusz))
 - Fixed `write` turning a CRLF file into LF and dropping its UTF-8 BOM when it replaces the file; it now keeps both, as `edit` does ([#16575](https://github.com/can1357/oh-my-pi/pull/16575) by [@will-bogusz](https://github.com/will-bogusz))
+### Added
+
+- Added profile overrides for Eval agents, restricted Write, Replace/Sloppy, Security Scan, Reflect, and isolation errors.
+
+### Changed
+
+- URL fetching now uses Chrome 156 and curl 8.23 identities while retaining the Googlebot Smartphone fallback.
+
+### Fixed
+
+- Isolation recovery commands now use the active CLI name, including `momp`.
+- Fixed the `eval` tool telling sessions with only the Python runtime to call `tool.<name>(args)` without `await`, which returns a coroutine and never runs the tool
 
 ## [18.12.6] - 2026-10-21
 

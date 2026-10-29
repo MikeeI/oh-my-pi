@@ -10,6 +10,7 @@ import { type GeneratedProvider, getBundledModels, getBundledProviders } from "@
 import { modelsDevCatalogFallback } from "@oh-my-pi/pi-catalog/provider-models/openai-compat";
 import type { FetchImpl, Model, ModelSpec } from "@oh-my-pi/pi-catalog/types";
 import { removeWithRetries } from "../../utils/src/temp";
+import { persistedModelCacheProviderId } from "./model-cache-fixture";
 
 const TTL_MS = 24 * 60 * 60 * 1000;
 
@@ -43,7 +44,7 @@ function payloadRow(dbPath: string, providerId: string): PayloadRow | null {
 	try {
 		return db
 			.query<PayloadRow, [string]>("SELECT updated_at, authoritative, models FROM model_cache WHERE provider_id = ?")
-			.get(providerId);
+			.get(persistedModelCacheProviderId(db, providerId));
 	} finally {
 		db.close();
 	}
@@ -125,9 +126,11 @@ describe("model cache write churn", () => {
 	it("ignores a side row left behind by a payload another writer replaced", () => {
 		writeModelCache("rewrite-test", 1_000, [model("a")], true, "fp", dbPath);
 		writeModelCache("rewrite-test", 5_000, [model("a")], true, "fp", dbPath);
-		// Simulate an older binary rewriting the payload without knowing the side table.
+		// A compatible writer can replace the payload without updating its side row.
 		const db = new Database(dbPath);
-		db.run("UPDATE model_cache SET updated_at = 3000, authoritative = 0 WHERE provider_id = 'rewrite-test'");
+		db.run("UPDATE model_cache SET updated_at = 3000, authoritative = 0 WHERE provider_id = ?", [
+			persistedModelCacheProviderId(db, "rewrite-test"),
+		]);
 		db.close();
 		const entry = readModelCache("rewrite-test", TTL_MS, () => 3_000, dbPath);
 		expect(entry?.updatedAt).toBe(3_000);
@@ -162,8 +165,8 @@ describe("model cache write churn", () => {
 			)
 			SELECT provider_id, version, materialization_policy, updated_at, authoritative, static_fingerprint,
 				header_omitted_model_ids, unrestorable_header_model_ids, header_restore_version, ?
-			FROM model_cache WHERE provider_id = 'rewrite-test'`,
-			[replacement],
+			FROM model_cache WHERE provider_id = ?`,
+			[replacement, persistedModelCacheProviderId(db, "rewrite-test")],
 		);
 		db.close();
 		expect(readModelCache("rewrite-test", TTL_MS, () => 1_000, dbPath)?.models.map(m => m.id)).toEqual([
@@ -177,7 +180,10 @@ describe("model cache write churn", () => {
 		expect(readModelCache("rewrite-test", TTL_MS, () => 1_000, dbPath)?.models.map(m => m.id)).toEqual(["a"]);
 		const edited = payloadFor(["a", "edited"]);
 		const db = new Database(dbPath);
-		db.run("UPDATE model_cache SET models = ? WHERE provider_id = 'rewrite-test'", [edited]);
+		db.run("UPDATE model_cache SET models = ? WHERE provider_id = ?", [
+			edited,
+			persistedModelCacheProviderId(db, "rewrite-test"),
+		]);
 		db.close();
 		expect(readModelCache("rewrite-test", TTL_MS, () => 1_000, dbPath)?.models.map(m => m.id)).toEqual([
 			"a",
@@ -187,6 +193,146 @@ describe("model cache write churn", () => {
 		// Writing the original snapshot again must replace the edited row, not skip it as unchanged.
 		writeModelCache("rewrite-test", 1_000, [model("a")], true, "fp", dbPath);
 		expect(readModelCache("rewrite-test", TTL_MS, () => 1_000, dbPath)?.models.map(m => m.id)).toEqual(["a"]);
+	});
+
+	it("isolates payload and freshness from old and incompatible materialization writers", () => {
+		writeModelCache("rewrite-test", 1_000, [model("a")], true, "fp", dbPath);
+		writeModelCache("rewrite-test", 5_000, [model("a")], true, "fp", dbPath);
+		readModelCache("rewrite-test", TTL_MS, () => 6_000, dbPath);
+		const db = new Database(dbPath);
+		try {
+			const current = db
+				.query<{ provider_id: string; materialization_policy: string }, []>(
+					"SELECT provider_id, materialization_policy FROM model_cache",
+				)
+				.get();
+			if (!current) throw new Error("Missing current cache fixture");
+			const foreignPolicy = "incompatible-materialization-policy";
+			const foreignId = current.provider_id.replace(current.materialization_policy, foreignPolicy);
+			const writers: [string, string][] = [
+				[foreignId, foreignPolicy],
+				["rewrite-test", "legacy-materialization-policy"],
+			];
+			// Foreign writers stay live (recent wall-clock activity), so idle-policy pruning must keep them.
+			const liveAt = Date.now();
+			for (const [providerId, policy] of writers) {
+				// Clone a valid payload but give both foreign freshness rows the
+				// same payload timestamp, exposing incorrectly shared side-row keys.
+				db.run(
+					`INSERT OR REPLACE INTO model_cache (
+						provider_id, version, materialization_policy, updated_at, authoritative,
+						static_fingerprint, header_omitted_model_ids, unrestorable_header_model_ids,
+						header_restore_version, models
+					) SELECT ?, version, ?, ?, authoritative, static_fingerprint,
+						header_omitted_model_ids, unrestorable_header_model_ids, header_restore_version, models
+					FROM model_cache WHERE provider_id = ?`,
+					[providerId, policy, liveAt, current.provider_id],
+				);
+				db.run(
+					`INSERT OR REPLACE INTO model_cache_refresh
+						(provider_id, payload_updated_at, updated_at, authoritative) VALUES (?, ?, ?, 0)`,
+					[providerId, liveAt, liveAt + 1],
+				);
+			}
+			const otherRows = () => ({
+				payloads: db
+					.query<Record<string, string | number>, [string, string]>(
+						"SELECT * FROM model_cache WHERE provider_id IN (?, ?) ORDER BY provider_id",
+					)
+					.all(foreignId, "rewrite-test"),
+				refreshes: db
+					.query<Record<string, string | number>, [string, string]>(
+						"SELECT * FROM model_cache_refresh WHERE provider_id IN (?, ?) ORDER BY provider_id",
+					)
+					.all(foreignId, "rewrite-test"),
+			});
+			const foreignRows = otherRows();
+			expect(readModelCache("rewrite-test", TTL_MS, () => 6_000, dbPath)).toMatchObject({
+				models: [{ id: "a" }],
+				updatedAt: 5_000,
+				authoritative: true,
+				fresh: true,
+			});
+
+			const before = getModelCacheWriteStats();
+			writeModelCache("rewrite-test", 6_000, [model("a")], true, "fp", dbPath);
+			expect(getModelCacheWriteStats().payloadWrites).toBe(before.payloadWrites);
+			expect(getModelCacheWriteStats().refreshWrites).toBe(before.refreshWrites + 1);
+			expect(readModelCache("rewrite-test", TTL_MS, () => 6_000, dbPath)?.updatedAt).toBe(6_000);
+			expect(otherRows()).toEqual(foreignRows);
+
+			writeModelCache("rewrite-test", 7_000, [model("a"), model("c")], false, "fp", dbPath);
+			expect(readModelCache("rewrite-test", TTL_MS, () => 7_000, dbPath)).toMatchObject({
+				models: [{ id: "a" }, { id: "c" }],
+				updatedAt: 7_000,
+				authoritative: false,
+			});
+			expect(otherRows()).toEqual(foreignRows);
+		} finally {
+			db.close();
+		}
+	});
+
+	it("prunes whole idle foreign policy groups and keeps live and current ones", () => {
+		writeModelCache("rewrite-test", 1_000, [model("a")], true, "fp", dbPath);
+		const day = 24 * 60 * 60 * 1000;
+		const now = Date.now();
+		// Each group: [policy, payload updated_at, freshness updated_at | null], two providers per group.
+		const groups: [string, number, number | null][] = [
+			["idle-policy", now - 30 * day, now - 20 * day],
+			["live-policy", now - 1 * day, null],
+			["refreshed-policy", now - 40 * day, now - 2 * day],
+		];
+		const db = new Database(dbPath);
+		try {
+			const current = db.query<{ provider_id: string }, []>("SELECT provider_id FROM model_cache").get();
+			if (!current) throw new Error("Missing current cache fixture");
+			for (const [policy, updatedAt, refreshedAt] of groups) {
+				for (const provider of ["p1", "p2"]) {
+					const id = `${policy}/${provider}`;
+					db.run(
+						`INSERT INTO model_cache (provider_id, version, materialization_policy, updated_at, models)
+						SELECT ?, version, ?, ?, models FROM model_cache WHERE provider_id = ?`,
+						[id, policy, updatedAt, current.provider_id],
+					);
+					if (refreshedAt !== null) {
+						db.run(
+							`INSERT INTO model_cache_refresh (provider_id, payload_updated_at, updated_at, authoritative)
+							VALUES (?, ?, ?, 0)`,
+							[id, updatedAt, refreshedAt],
+						);
+					}
+				}
+			}
+			// A freshness row whose payload is long gone.
+			db.run(
+				`INSERT INTO model_cache_refresh (provider_id, payload_updated_at, updated_at, authoritative)
+				VALUES ('orphan', 1, ?, 0)`,
+				[now - 30 * day],
+			);
+		} finally {
+			db.close();
+		}
+
+		// The next connection prunes on open; the current snapshot stays readable.
+		expect(readModelCache("rewrite-test", TTL_MS, () => 1_000, dbPath)?.models.map(m => m.id)).toEqual(["a"]);
+		const check = new Database(dbPath, { readonly: true });
+		try {
+			const policies = check
+				.query<{ materialization_policy: string }, []>(
+					"SELECT DISTINCT materialization_policy FROM model_cache WHERE provider_id LIKE '%-policy/%' ORDER BY 1",
+				)
+				.all()
+				.map(row => row.materialization_policy);
+			expect(policies).toEqual(["live-policy", "refreshed-policy"]);
+			const refreshIds = check
+				.query<{ provider_id: string }, []>("SELECT provider_id FROM model_cache_refresh ORDER BY 1")
+				.all()
+				.map(row => row.provider_id);
+			expect(refreshIds).toEqual(["refreshed-policy/p1", "refreshed-policy/p2"]);
+		} finally {
+			check.close();
+		}
 	});
 
 	it("does not re-persist an unchanged snapshot while discovery keeps failing", async () => {

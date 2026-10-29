@@ -17,7 +17,7 @@ import type { ModelRegistry } from "../config/model-registry";
 import type { TaskItem, TaskParams } from "@oh-my-pi/pi-tui/tools/task";
 import type { ToolSession } from "../tools";
 import { resolveToCwd } from "../tools/path-utils";
-import { getBundledAgent } from "./agents";
+import { getBundledAgentsMap } from "./agents";
 import { SEANCE_AGENT_NAME } from "./seance-policy";
 import type { AgentDefinition, SeanceTaskSchemaFields } from "./types";
 
@@ -297,7 +297,7 @@ export async function restoreSeanceSession(context: {
 	modelRegistry: ModelRegistry;
 }): Promise<RestoredSeanceSession | undefined> {
 	const { init, cwd, modelRegistry } = context;
-	const readOnlyTools = new Set([...(getBundledAgent(SEANCE_AGENT_NAME)?.tools ?? []), "yield"]);
+	const readOnlyTools = new Set([...(getBundledAgentsMap().get(SEANCE_AGENT_NAME)?.tools ?? []), "yield"]);
 	if (
 		!init ||
 		typeof init !== "object" ||

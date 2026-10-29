@@ -5,7 +5,8 @@
  */
 
 import * as path from "node:path";
-import { APP_NAME, getPluginsNodeModules, getProjectDir } from "@oh-my-pi/pi-utils";
+import { getPluginsNodeModules, getProjectDir } from "@oh-my-pi/pi-utils";
+import { APP_DISPLAY_NAME as APP_NAME } from "../app-version";
 import chalk from "@oh-my-pi/pi-utils/chalk";
 import { resolveOrDefaultProjectRegistryPath } from "../discovery/helpers";
 import { PluginManager, parseSettingValue, validateSetting } from "../extensibility/plugins";
@@ -332,7 +333,7 @@ async function handleUpgrade(
 			if (flags.scope) {
 				console.error(
 					chalk.yellow(
-						`Warning: --scope is ignored when upgrading all plugins. Use 'omp plugin upgrade <id> --scope ${flags.scope}' to target a specific plugin and scope.`,
+						`Warning: --scope is ignored when upgrading all plugins. Use '${APP_NAME} plugin upgrade <id> --scope ${flags.scope}' to target a specific plugin and scope.`,
 					),
 				);
 			}

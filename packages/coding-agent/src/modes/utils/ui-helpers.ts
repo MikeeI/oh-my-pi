@@ -7,6 +7,7 @@ import { type Component, Text } from "@oh-my-pi/pi-tui";
 import { StatusNotice } from "@oh-my-pi/pi-tui/chrome/status-notice";
 import { QueuedMessagesBand } from "@oh-my-pi/pi-tui/prompt/queued-messages";
 import { logger } from "@oh-my-pi/pi-utils";
+import { APP_PACKAGE_NAME, updateNotificationDetails } from "../../app-version";
 import type { AdvisorMessageDetails } from "../../advisor";
 import { InternalUrlRouter } from "../../internal-urls";
 import { COLLAB_PROMPT_MESSAGE_TYPE, type CollabPromptDetails } from "../../collab/protocol";
@@ -41,7 +42,7 @@ import {
 import { ReplyWriteComponent, replyDisplayMessage, toolResultReplies } from "@oh-my-pi/pi-tui/chat/reply-write";
 import { SkillMessageComponent } from "@oh-my-pi/pi-tui/chat/skill-message";
 import { StrippedToolCallsPlaceholder } from "@oh-my-pi/pi-tui/chat/stripped-tool-calls-placeholder";
-import { imageContent, textContent } from "@oh-my-pi/pi-tui/chat/transcript-entry";
+import { imageContent, userDisplayText } from "@oh-my-pi/pi-tui/chat/transcript-entry";
 import { ToolActivityContainer } from "@oh-my-pi/pi-tui/chrome/tool-activity";
 import {
 	isSettledJobFrame,
@@ -68,6 +69,7 @@ import { theme } from "@oh-my-pi/pi-tui/theme";
 import type {
 	CompactionQueuedMessage,
 	InteractiveModeContext,
+	NewVersionNotificationOptions,
 	RenderSessionContextOptions,
 	ShowStatusOptions,
 } from "../../modes/types";
@@ -404,7 +406,7 @@ export class UiHelpers {
 			}
 			case "user":
 			case "developer": {
-				const userText = message.role === "user" ? textContent(message.content) : "";
+				const userText = message.role === "user" ? userDisplayText(message) : "";
 				if (userText) {
 					const isSynthetic = message.role === "developer" ? true : (message.synthetic ?? false);
 					const cached = options?.reuseSettledComponent
@@ -423,6 +425,7 @@ export class UiHelpers {
 							images,
 							liveSteered: message.role === "user" && message.liveSteered === true,
 							timestamp: message.timestamp,
+							commandInvocation: message.role === "user" ? message.commandInvocation : undefined,
 						});
 						this.ctx.transcriptMessageComponents.set(message, userComponent);
 					}
@@ -1254,25 +1257,23 @@ export class UiHelpers {
 		this.ctx.present(options?.hideWithToolActivity ? new ToolActivityContainer(notice) : notice);
 	}
 
-	showNewVersionNotification(newVersion: string): void {
+	showNewVersionNotification(newVersion: string, options: NewVersionNotificationOptions = {}): void {
+		const source = options.sourceLabel ? `${options.sourceLabel} ` : "";
+		const actionText = options.actionText ?? updateNotificationDetails(APP_PACKAGE_NAME).actionText;
 		const title = "Update Available";
-		const prefix = `New version ${newVersion} is available. Run: `;
-		const command = "omp update";
+		const prefix = `New ${source}version ${newVersion} is available. `;
+		const message = `${prefix}${actionText}`;
 		const native = noticeRow(
 			"info",
-			[
-				span("Update available", "strong"),
-				span(` · New version ${newVersion} is available. Run `),
-				span(command, "code"),
-			],
+			[span("Update available", "strong"), span(` · ${prefix}`), span(actionText, "code")],
 			{ icon: "download" },
 		);
 		this.ctx.present(
 			new TranscriptNotice(native, [
 				new DynamicBorder(text => theme.fg("warning", text)),
-				new Text(`${title}\n${prefix}${command}`, 1, 0).setStyleFn(
+				new Text(`${title}\n${message}`, 1, 0).setStyleFn(
 					() =>
-						`${theme.bold(theme.fg("warning", title))}\n${theme.fg("muted", prefix)}${theme.fg("accent", command)}`,
+						`${theme.bold(theme.fg("warning", title))}\n${theme.fg("muted", prefix)}${theme.fg("accent", actionText)}`,
 				),
 				new DynamicBorder(text => theme.fg("warning", text)),
 			]),
@@ -1380,13 +1381,11 @@ export class UiHelpers {
 	}
 
 	isKnownSlashCommand(text: string): boolean {
-		if (!text.startsWith("/")) return false;
 		const parsed = parseSlashCommand(text);
-		const builtin = parsed && lookupBuiltinSlashCommand(parsed.name);
+		if (!parsed) return false;
+		const commandName = parsed.name;
+		const builtin = lookupBuiltinSlashCommand(commandName);
 		if (builtin && (builtin.allowArgs || !parsed.args)) return true;
-		const spaceIndex = text.indexOf(" ");
-		const commandName = spaceIndex === -1 ? text.slice(1) : text.slice(1, spaceIndex);
-		if (!commandName) return false;
 
 		if (this.ctx.session.extensionRunner?.getCommand(commandName)) {
 			return true;
@@ -1398,7 +1397,7 @@ export class UiHelpers {
 			}
 		}
 
-		return this.ctx.fileSlashCommands.has(commandName);
+		return this.ctx.fileSlashCommands.has(commandName) || this.ctx.routineSlashCommands.has(commandName);
 	}
 
 	async flushCompactionQueue(options?: { willRetry?: boolean }): Promise<void> {

@@ -164,6 +164,9 @@ export interface DashboardStats {
 	costSeries: CostTimeSeriesPoint[];
 }
 
+/** Complete summary aggregates, without chart series or the dashboard's folder cap. */
+export type SummaryStats = Pick<DashboardStats, "overall" | "byModel" | "byFolder" | "byAgentType">;
+
 /**
  * Which agent produced a message, derived from its transcript file location
  * inside the session directory: the top-level `<project>/<file>.jsonl` is the
@@ -191,6 +194,8 @@ export interface AgentTypeStats {
 	totalCacheWriteTokens: number;
 	/** Total cost */
 	totalCost: number;
+	/** Requests excluded because no public-equivalent subscription price exists. */
+	unpricedRequests: number;
 }
 
 /**

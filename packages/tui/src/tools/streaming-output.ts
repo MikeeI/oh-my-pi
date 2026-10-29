@@ -48,6 +48,14 @@ export interface OutputSummary {
 	elidedBytes?: number;
 	/** Lines elided from the middle when head-retain mode is active. */
 	elidedLines?: number;
+	/** Source lines shown before/after the middle marker, including a partly shown boundary line. */
+	headLines?: number;
+	tailLines?: number;
+	/**
+	 * 1-indexed artifact lines holding every middle-elided byte. Absent when
+	 * inline line numbers cannot match the artifact (a substituted chunk was stored).
+	 */
+	elidedLineRange?: { first: number; last: number };
 	/** Bytes dropped by the per-line column cap (sum across all lines). */
 	columnDroppedBytes?: number;
 	/** Number of distinct lines that hit the per-line column cap. */
@@ -188,6 +196,12 @@ function countNewlines(text: string): number {
 		pos = text.indexOf(NL, pos + 1);
 	}
 	return count;
+}
+
+/** Whether a tail `window` cut from the end of `source` begins inside a source line. */
+function startsInsideLine(source: string, window: string): boolean {
+	const cut = source.length - window.length;
+	return cut > 0 && source.charCodeAt(cut - 1) !== 10;
 }
 
 /** Zero-copy view of a Uint8Array as a Buffer (copies only if already a Buffer). */
@@ -929,6 +943,10 @@ export class OutputSink {
 	#bufferBytes = 0;
 	/** The overflowed tail window may exceed its budget until {@link #trimTail} runs. */
 	#tailUntrimmed = false;
+	/** The tail window begins inside a source line, so that line is partly elided. */
+	#tailStartsMidLine = false;
+	/** A substituted inline chunk was stored, so inline line numbers no longer match the artifact. */
+	#inlineLinesUnmapped = false;
 	#head = "";
 	#headBytes = 0;
 	#headLines = 0; // newline count inside #head
@@ -1111,7 +1129,10 @@ export class OutputSink {
 		const capped = this.#maxColumns > 0 ? this.#applyColumnCap(inlineChunk, firstLine) : inlineChunk;
 		const cappedBytes = capped === inlineChunk ? inlineBytes : Buffer.byteLength(capped, "utf-8");
 		const cappedThisChunk = cappedBytes < inlineBytes;
-		if (substituted) this.#truncated = true;
+		if (substituted) {
+			this.#truncated = true;
+			this.#inlineLinesUnmapped = true;
+		}
 
 		// Mirror the complete chunk to the artifact file whenever the inline
 		// representation differs, overflows memory, hits the column cap, or a
@@ -1271,6 +1292,7 @@ export class OutputSink {
 		// Avoid creating a giant intermediate string when chunk alone dominates.
 		if (dataBytes >= threshold) {
 			const { text, bytes } = truncateTailBytes(chunk, threshold);
+			this.#tailStartsMidLine = startsInsideLine(chunk, text);
 			this.#buffer = text;
 			this.#bufferBytes = bytes;
 			this.#tailUntrimmed = false;
@@ -1292,6 +1314,7 @@ export class OutputSink {
 		const threshold = Math.max(0, this.#spillThreshold - this.#headBytes);
 		if (this.#bufferBytes <= threshold) return;
 		const { text, bytes } = truncateTailBytes(this.#buffer, threshold);
+		this.#tailStartsMidLine = startsInsideLine(this.#buffer, text);
 		this.#buffer = text;
 		this.#bufferBytes = bytes;
 	}
@@ -1598,6 +1621,9 @@ export class OutputSink {
 		outputLines: number;
 		elidedBytes?: number;
 		elidedLines?: number;
+		headLines?: number;
+		tailLines?: number;
+		elidedLineRange?: { first: number; last: number };
 	} {
 		this.#trimTail();
 		const totalLines = this.#sawData ? this.#totalLines + 1 : 0;
@@ -1625,6 +1651,10 @@ export class OutputSink {
 				outputLines: headLines + 1 + tailLines,
 				elidedBytes,
 				elidedLines,
+				// Substituted inline text has its own line numbering, so no range can address the artifact.
+				...(this.#inlineLinesUnmapped
+					? {}
+					: { headLines, tailLines, elidedLineRange: this.#elidedLineRange(totalLines, tailBuf) }),
 			};
 		}
 		if (headBytes > 0) {
@@ -1637,6 +1667,18 @@ export class OutputSink {
 			};
 		}
 		return { body: tailBuf, outputBytes: tailBytes, outputLines: tailLines };
+	}
+
+	/**
+	 * Artifact lines holding every elided byte: the line after the head's last
+	 * newline through the tail's first line when the tail window starts inside it.
+	 * A boundary line shown in part is included, since a selector cannot address bytes.
+	 */
+	#elidedLineRange(totalLines: number, tailBuf: string): { first: number; last: number } | undefined {
+		const first = this.#headLines + 1;
+		const tailFirstLine = totalLines - countNewlines(tailBuf);
+		const last = this.#tailStartsMidLine ? tailFirstLine : tailFirstLine - 1;
+		return first <= last ? { first, last } : undefined;
 	}
 
 	async dump(notice?: string): Promise<OutputSummary> {
@@ -1653,7 +1695,8 @@ export class OutputSink {
 
 		await this.#finalizeFile();
 
-		const { body, outputBytes, outputLines, elidedBytes, elidedLines } = this.#composeBody();
+		const { body, outputBytes, outputLines, elidedBytes, elidedLines, headLines, tailLines, elidedLineRange } =
+			this.#composeBody();
 		if (elidedBytes !== undefined) this.#truncated = true;
 
 		return {
@@ -1665,6 +1708,9 @@ export class OutputSink {
 			outputBytes,
 			elidedBytes,
 			elidedLines,
+			headLines,
+			tailLines,
+			elidedLineRange,
 			columnDroppedBytes: this.#columnDroppedBytes > 0 ? this.#columnDroppedBytes : undefined,
 			columnTruncatedLines: this.#columnTruncatedLines > 0 ? this.#columnTruncatedLines : undefined,
 			columnMax: this.#columnTruncatedLines > 0 ? this.#maxColumns : undefined,

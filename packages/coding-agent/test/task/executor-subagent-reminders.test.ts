@@ -231,10 +231,13 @@ describe("runSubprocess yield reminders", () => {
 			task: "Your assignment is below.\nBe thorough and complete fully before yielding.\n\nDo the task.",
 		});
 
-		const systemPromptBuilder = createAgentSessionSpy.mock.calls[0]?.[0]?.systemPrompt;
-		expect(systemPromptBuilder).toBeFunction();
-		if (typeof systemPromptBuilder !== "function") throw new Error("Expected system prompt builder");
-		const systemPrompt = systemPromptBuilder(["system", "<project-context>\ncwd\n</project-context>"]);
+		const transform = createAgentSessionSpy.mock.calls[0]?.[0]?.systemPromptTransform;
+		if (!transform) throw new Error("Expected system prompt transform");
+		const { systemPrompt } = transform({
+			systemPrompt: ["system", "<project-context>\ncwd\n</project-context>"],
+			dynamicParts: [],
+			xdevCatalogNames: [],
+		});
 
 		expect(systemPrompt).toHaveLength(3);
 		expect(systemPrompt?.[0]).toBe("system");
@@ -594,9 +597,11 @@ describe("runSubprocess yield reminders", () => {
 		const sessionOptions = createAgentSessionSpy.mock.calls[0]?.[0];
 		expect(sessionOptions?.requireYieldTool).toBe(false);
 		expect(sessionOptions?.toolNames).toEqual(["read"]);
-		const systemPromptBuilder = sessionOptions?.systemPrompt;
-		if (typeof systemPromptBuilder !== "function") throw new Error("Expected system prompt builder");
-		expect(systemPromptBuilder(["system"])?.at(-1)).toContain("your final message is your result");
+		const transform = sessionOptions?.systemPromptTransform;
+		if (!transform) throw new Error("Expected system prompt transform");
+		expect(
+			transform({ systemPrompt: ["system"], dynamicParts: [], xdevCatalogNames: [] }).systemPrompt.at(-1),
+		).toMatch(/your final message is your result/i);
 		expect(prompts).toHaveLength(1);
 		expect(result.exitCode).toBe(0);
 		expect(result.output).toBe(report);
