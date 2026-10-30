@@ -125,6 +125,9 @@ The upgrader validates these IDs against its executable and manual proof mapping
 - Contract: workstation context identifies current execution as `user@host`.
 - Contract: OS context combines distribution, OS type and release, and architecture in one line.
 - Contract: workstation context surfaces the current IANA timezone.
+- Contract: workstation context lists only tailnet IPv4 from interfaces named `tailscale*` or carrying a `fd7a:115c:a1e0::/48` address, sorted.
+- Contract: hardware context shows physical cores, logical threads when they differ, and usable RAM in GiB with at most one decimal.
+- Implementation constraint: hardware context ignores CPU affinity and counts Linux cores from sysfs `core_cpus_list`.
 - Owner: current upstream `src/system-prompt.ts#getEnvironmentInfo` owns workstation context rendering.
 - Required action: extend that owner directly; never add a parallel fork prompt block.
 - Proof: `test/system-prompt-kernel.test.ts`.

@@ -248,11 +248,72 @@ async function getDistroName(): Promise<string | undefined> {
 	}
 }
 
-/** MOMP adds compact host identity and timezone without reviving removed GPU probes. */
-function getEnvironmentInfo(distroName: string | undefined): Array<{ label: string; value: string }> {
+/**
+ * Physical cores as unique sysfs `core_cpus_list` values; unlike `/proc/cpuinfo`, this topology exists on
+ * x64 and arm64 alike. Apple Silicon has no SMT, so cores equal logical CPUs there.
+ */
+async function getPhysicalCoreCount(): Promise<number | undefined> {
+	const threads = os.cpus().length;
+	if (process.platform === "darwin" && os.arch() === "arm64") return threads;
+	if (process.platform !== "linux") return undefined;
+	try {
+		const lists = await Promise.all(
+			Array.from({ length: threads }, (_, cpu) =>
+				Bun.file(`/sys/devices/system/cpu/cpu${cpu}/topology/core_cpus_list`).text(),
+			),
+		);
+		return new Set(lists.map(list => list.trim())).size;
+	} catch (error) {
+		logger.debug("Could not read CPU topology", { error: String(error) });
+		return undefined;
+	}
+}
+
+/** Hardware facts, not process limits: CPU affinity is deliberately ignored. RAM is usable memory in GiB. */
+function formatHardware(physicalCores: number | undefined): string {
+	const threads = os.cpus().length;
+	const ramGib = Number((os.totalmem() / 1024 ** 3).toFixed(1));
+	const cpu =
+		physicalCores === undefined
+			? `${threads} threads`
+			: physicalCores === threads
+				? `${physicalCores} cores`
+				: `${physicalCores} cores · ${threads} threads`;
+	return `${cpu} · ${ramGib} GiB RAM`;
+}
+
+// Tailscale pairs its 100.64.0.0/10 IPv4 with an IPv6 from its fixed ULA prefix on the same interface.
+// Matching that prefix, not `utun*` or the CGNAT range, keeps macOS VPNs such as Cloudflare WARP
+// (also CGNAT on utun) and carrier CGNAT from being mislabeled as tailnet addresses. The `tailscale*`
+// name covers Linux hosts with IPv6 disabled, where the ULA address cannot be assigned.
+const TAILSCALE_ULA_PREFIX = "fd7a:115c:a1e0:";
+
+/** Tailnet IPv4 only; sorted so OS interface order never changes the cached project block. */
+function getTailscaleIpv4(): string[] {
+	const addresses: string[] = [];
+	for (const [name, entries = []] of Object.entries(os.networkInterfaces())) {
+		const isTailscale =
+			/^tailscale/i.test(name) ||
+			entries.some(entry => entry.family === "IPv6" && entry.address.startsWith(TAILSCALE_ULA_PREFIX));
+		if (!isTailscale) continue;
+		for (const entry of entries) {
+			if (entry.family === "IPv4" && !entry.internal) addresses.push(entry.address);
+		}
+	}
+	return addresses.sort();
+}
+
+/** MOMP adds compact host identity, tailnet address, hardware, and timezone without reviving removed GPU probes. */
+function getEnvironmentInfo(
+	distroName: string | undefined,
+	physicalCores: number | undefined,
+): Array<{ label: string; value: string }> {
 	const system = `${os.type()} ${os.release()} · ${os.arch()}`;
+	const tailscale = getTailscaleIpv4();
 	return [
 		{ label: "Identity", value: `${os.userInfo().username}@${os.hostname()}` },
+		...(tailscale.length > 0 ? [{ label: "Tailscale", value: tailscale.join(", ") }] : []),
+		{ label: "Hardware", value: formatHardware(physicalCores) },
 		{ label: "OS", value: distroName ? `${distroName} · ${system}` : system },
 		{ label: "Timezone", value: Intl.DateTimeFormat().resolvedOptions().timeZone },
 	];
@@ -1034,6 +1095,7 @@ export async function buildSystemPrompt(options: BuildSystemPromptOptions = {}):
 		} satisfies WorkspaceTree,
 		activeRepoContext: null as ActiveRepoContext | null,
 		distroName: undefined as string | undefined,
+		physicalCores: undefined as number | undefined,
 	};
 
 	const { promise: deadline, resolve: fireDeadline } = Promise.withResolvers<"__timeout__">();
@@ -1134,6 +1196,7 @@ export async function buildSystemPrompt(options: BuildSystemPromptOptions = {}):
 					.time("loadPersonalityOverride", loadPersonalityOverride)
 					.then(override => override ?? bundledPersonality);
 	const distroNamePromise = logger.time("getDistroName", getDistroName);
+	const physicalCoresPromise = logger.time("getPhysicalCoreCount", getPhysicalCoreCount);
 
 	const [
 		resolvedSystemPromptTemplate,
@@ -1146,6 +1209,7 @@ export async function buildSystemPrompt(options: BuildSystemPromptOptions = {}):
 		activeRepoContext,
 		personalityBlock,
 		distroName,
+		physicalCores,
 	] = await Promise.all([
 		providedResolvedSystemPromptTemplate !== undefined
 			? Promise.resolve(providedResolvedSystemPromptTemplate)
@@ -1173,6 +1237,7 @@ export async function buildSystemPrompt(options: BuildSystemPromptOptions = {}):
 		withDeadline("resolveActiveRepoContext", activeRepoContextPromise, prepDefaults.activeRepoContext),
 		withDeadline("loadPersonalityOverride", personalityPromise, bundledPersonality),
 		withDeadline("getDistroName", distroNamePromise, prepDefaults.distroName),
+		withDeadline("getPhysicalCoreCount", physicalCoresPromise, prepDefaults.physicalCores),
 	]);
 	clearTimeout(deadlineTimer);
 	const agentsMdFiles = noContextFiles
@@ -1289,7 +1354,7 @@ export async function buildSystemPrompt(options: BuildSystemPromptOptions = {}):
 	];
 	const injectedAlwaysApplyRules = dedupeAlwaysApplyRules(alwaysApplyRules, promptSources);
 
-	const environment = getEnvironmentInfo(distroName);
+	const environment = getEnvironmentInfo(distroName, physicalCores);
 	const renderData: prompt.TemplateContext = {
 		systemPromptCustomization: effectiveSystemPromptCustomization,
 		customPrompt: resolvedCustomPrompt,
