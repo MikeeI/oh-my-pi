@@ -132,8 +132,7 @@ export const sayHelp = {
 export const searchHelp = { description: "Test web search providers" } satisfies CommandMetadata;
 
 export const sessionHelp = {
-	description:
-		"Hand a session to another machine (pack, unpack, moved) or check which sessions a running omp owns (lease)",
+	description: `Hand a session to another machine (pack, unpack, moved) or check which sessions a running ${APP_DISPLAY_NAME} owns (lease)`,
 } satisfies CommandMetadata;
 
 export const shareHelp = {

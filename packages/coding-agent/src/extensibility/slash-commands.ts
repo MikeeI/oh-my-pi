@@ -151,13 +151,18 @@ export function parseFileSlashInvocation(text: string): { name: string; args: st
 	return { name: text.slice(1, spaceIndex), args: text.slice(spaceIndex + 1) };
 }
 
+export interface ExpandedSlashCommand {
+	text: string;
+	commandInvocation?: string;
+}
+
 /**
- * Expand a slash command if it matches a file-based command.
- * Returns the expanded content or the original text if not a slash command.
+ * Expand a file command and retain its confirmed invocation even when the rendered bytes equal the input.
+ * Unknown commands keep their text without acquiring command presentation.
  */
-export function expandSlashCommand(text: string, fileCommands: readonly FileSlashCommand[]): string {
+export function expandSlashCommand(text: string, fileCommands: readonly FileSlashCommand[]): ExpandedSlashCommand {
 	const invocation = parseFileSlashInvocation(text);
-	if (!invocation) return text;
+	if (!invocation) return { text };
 	const command = fileCommands.find(cmd => cmd.name === invocation.name);
-	return command ? renderFileSlashCommand(command, invocation.args) : text;
+	return command ? { text: renderFileSlashCommand(command, invocation.args), commandInvocation: text } : { text };
 }

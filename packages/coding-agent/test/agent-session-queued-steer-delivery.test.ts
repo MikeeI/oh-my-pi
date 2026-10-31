@@ -320,6 +320,15 @@ describe("AgentSession queued steer delivery", () => {
 			await session.prompt("/cmd queued", { streamingBehavior: "followUp" });
 			const queued = session.agent.peekFollowUpQueue().find(message => message.role === "user");
 			expect(queued?.role === "user" && userDisplayText(queued)).toBe("/cmd queued");
+			session.setSlashCommands([{ name: "same", description: "Test", content: "/same", source: "(test)" }]);
+			await session.prompt("/same", { streamingBehavior: "followUp" });
+			const unchanged = session.agent.peekFollowUpQueue().findLast(message => message.role === "user");
+			expect(unchanged?.role === "user" && unchanged.commandInvocation).toBe("/same");
+			expect(unchanged?.role === "user" && unchanged.content).toEqual([{ type: "text", text: "/same" }]);
+
+			await session.prompt("/unknown", { streamingBehavior: "followUp" });
+			const unknown = session.agent.peekFollowUpQueue().findLast(message => message.role === "user");
+			expect(unknown?.role === "user" && unknown.commandInvocation).toBeUndefined();
 		} finally {
 			session.agent.state.isStreaming = false;
 		}

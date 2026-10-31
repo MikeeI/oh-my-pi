@@ -6,6 +6,7 @@
 
 - Kept offline prompt capture from starting Codex WebSocket connections or credential usage prefetch.
 - Corrected Child prompt inspection for agents that require structured output when the global Task setting is disabled.
+- Preserved file-command transcript styling when a command expands to its own invocation.
 
 ## [18.14.1] - 2026-10-31
 

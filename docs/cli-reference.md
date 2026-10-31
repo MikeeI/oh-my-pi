@@ -302,7 +302,7 @@ Run `omp <command> --help` for each command's own flags and examples.
 | `ps` | List and control daemon-supervised background processes (logs, stop, kill, restart). | |
 | `say` | Synthesize text with the local TTS engine and play it through the speakers. | [tts tool](./tools/tts.md) |
 | `share` | Share a saved session via an encrypted link (same as the `/share` slash command). | [session operations](./session-operations-export-share-fork-resume.md) |
-| `session` | Pack a session and its artifacts, unpack it elsewhere, or mark the local copy moved. | |
+| `session` | Pack a session and its artifacts, unpack it elsewhere, mark the local copy moved, or probe session ownership without taking leases. | |
 | `setup` | Run onboarding setup or install dependencies for optional features. | |
 | `shell` | Interactive shell console. | |
 | `read` | Show what the read tool will return for a path, URL, or internal URI. (The [`read` tool](./tools/read.md) is a separate agent tool.) | |
@@ -326,6 +326,17 @@ Run `omp <command> --help` for each command's own flags and examples.
 > The table lists each as registered in `packages/coding-agent/src/cli-commands.ts`.
 
 `__complete` is an internal, hidden subcommand used by shell completion scripts.
+
+### Session ownership probes
+
+omp session lease [--json] -- <session-id>...
+
+- At least one session ID is required; `--` keeps IDs beginning with `-` from being parsed as flags.
+- `--cwd` and `--to` are rejected for `lease`; `--json` is rejected for other session actions.
+- JSON stdout contains `{"held": [...], "unknown": [...]}`; IDs absent from both lists are free, including unknown session IDs.
+- Text stdout contains `held<TAB><id>` and `unknown<TAB><id>` rows; free IDs produce no row.
+- Probing never takes a session lease; valid probes exit 0 even when no IDs are held.
+- Invalid arguments exit 1 with a usage error on stderr.
 
 ### Configured Child prompt inspection
 

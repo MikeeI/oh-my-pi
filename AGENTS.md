@@ -496,8 +496,11 @@ The upgrader validates these IDs against its executable and manual proof mapping
 - Contract: timestamp-coincident writes never reuse an earlier archive member index.
 - Owner: upstream `src/tools/read-archive.ts#readArchive` owns opening the current archive index.
 - Reason: upstream's cross-call stat-keyed cache can return old members when a rapid rewrite also preserves ctime.
+- Coverage: upstream v18.14.1 avoids caching archive indexes inside a two-second ctime window.
+- Required action: retain unconditional reopening rather than making freshness depend on clock and timestamp granularity.
 - Required action: reopen through `openArchive` per Read without hashing whole payloads or retaining the unsafe cache.
 - Proof: the same-size, restored-mtime archive rewrite case in `test/tools.test.ts`.
+- Proof: repeated TAR member reads preserve ranged payload IO in `test/tools/read-archive-tar-range.test.ts`.
 - Trade-off: repeated reads re-index ZIP, ASAR, and ISO members instead of reusing an unprovable snapshot.
 
 #### `MOMP-READ-USER-AGENTS` — URL fetch identity fallback
@@ -656,6 +659,7 @@ The upgrader validates these IDs against its executable and manual proof mapping
 - Contract: unknown commands keep their literal text and record no invocation.
 - Contract: rewind drafts and automatic titles use the typed invocation, never the expanded body.
 - Owner: `src/session/agent-session.ts#dispatchPrompt` records the invocation at expansion for idle and queued prompts.
+- Owner: `src/extensibility/slash-commands.ts#expandSlashCommand` returns confirmed invocation provenance even when expansion leaves the bytes unchanged.
 - Owner: upstream `packages/ai/src/types.ts#UserMessage` carries the display-only field beside `liveSteered`.
 - Owner: `packages/tui/src/chat/transcript-entry.ts#userDisplayText` selects displayed and restored text.
 - Owner: `src/modes/rpc/wire/content.ts` declares the field for generated RPC clients.
@@ -1042,6 +1046,7 @@ The upgrader validates these IDs against its executable and manual proof mapping
 - Owner: `scripts/bundle-dist.ts` embeds validated package identity overrides into the bundled CLI.
 - Owner: `src/cli/update-cli.ts` owns fork-safe update behavior.
 - Owner: `src/commands/update.ts` and `src/cli/command-help.ts#updateHelp` render identity-specific update help.
+- Owner: `src/commands/session.ts` and `src/cli/command-help.ts#sessionHelp` use active identity for session transfer and lease-probe help and usage.
 - Owner: `src/extensibility/plugins/legacy-pi-compat.ts` owns installed-package self-import compatibility.
 - Coverage: upstream v18.12.4 loads custom tools through `loadLegacyPiModule`; the fork's loader delta is removed.
 - Coverage: upstream v18.12.5 owns custom-registry manifest fallback for empty Artifactory `dist-tags`.

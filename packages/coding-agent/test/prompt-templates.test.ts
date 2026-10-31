@@ -208,7 +208,7 @@ describe("template expansion fallback", () => {
 	}
 
 	function expandSlash(invocation: string, content: string): string {
-		return expandSlashCommand(invocation, [createSlashCommand(content)]);
+		return expandSlashCommand(invocation, [createSlashCommand(content)]).text;
 	}
 
 	function expandPrompt(invocation: string, content: string): string {

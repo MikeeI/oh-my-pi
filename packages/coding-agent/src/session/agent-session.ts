@@ -8319,10 +8319,10 @@ export class AgentSession implements SettingsScope {
 			// Only if text still starts with "/" (wasn't transformed by custom command)
 			if (text.startsWith("/")) {
 				const expanded = expandSlashCommand(text, this.#slashCommands);
-				// The transcript shows the typed invocation instead of the expanded body;
-				// an unknown command returns its input unchanged and keeps plain rendering.
-				if (expanded !== text) commandInvocation = text;
-				text = expanded;
+				// Presentation follows a confirmed command match, not changed bytes:
+				// a valid command may render its own invocation, while unknown commands stay plain.
+				commandInvocation = expanded.commandInvocation;
+				text = expanded.text;
 			}
 		}
 
