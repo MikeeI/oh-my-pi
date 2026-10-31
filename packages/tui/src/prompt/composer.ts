@@ -84,6 +84,8 @@ export interface ComposerStatusCache {
 
 /** Optional dependencies and initial state for a standalone composer. */
 export interface ComposerOptions {
+	/** Executable used by copyable welcome tips; standalone hosts retain the library identity when omitted. */
+	readonly appName?: string;
 	readonly terminal?: Terminal;
 	/** Extra TUI construction options (render scheduler injection for tests and `omp render`). */
 	readonly tuiOptions?: TUIOptions;
@@ -255,6 +257,7 @@ export class Composer implements TerminalFrameProvider, NativeSurfaceProvider {
 	#preferences: ComposerPreferences;
 	#welcome: WelcomeComponent | undefined;
 	#version = "";
+	readonly #appName: string | undefined;
 	#headerBefore: readonly Component[] = [];
 	#headerAfter: readonly Component[] = [];
 	#runtimeChildren: readonly Component[] = [];
@@ -366,6 +369,7 @@ export class Composer implements TerminalFrameProvider, NativeSurfaceProvider {
 		// ExtensionExitError through the guarded process.exit (#11789).
 		this.#exit = options.exit ?? (code => postmortem.exitProcess(code));
 		this.#now = options.now ?? Date.now;
+		this.#appName = options.appName;
 		this.#preferences = { ...COMPOSER_DEFAULTS, ...options.preferences };
 		this.#applyWelcomeUpdate(options.welcome ?? {});
 
@@ -1314,7 +1318,7 @@ export class Composer implements TerminalFrameProvider, NativeSurfaceProvider {
 	}
 
 	#ensureWelcome(): void {
-		this.#welcome ??= new WelcomeComponent(this.#version);
+		this.#welcome ??= new WelcomeComponent(this.#version, this.#appName);
 	}
 
 	#rebuildHeader(): void {

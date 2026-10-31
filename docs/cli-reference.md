@@ -32,6 +32,7 @@ MOMP's help examples, resume commands, usage errors, and recovery hints name `mo
 For example, a default-profile resume hint is `momp --resume <id>`.
 A named-profile hint retains that profile: `momp --profile <name> --resume <id>`.
 Missing-session picker and new-session recovery hints retain the named profile too.
+Copyable startup tips also use the active executable, so a `momp` session never recommends launching `omp`.
 Shared `.omp` data paths, environment keys, and protocol identifiers do not change with executable branding.
 
 ## Launch (the default command)

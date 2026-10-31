@@ -369,6 +369,7 @@ import type {
 import type { TodoItem, TodoPhase } from "@oh-my-pi/pi-tui/tools/todo";
 import type { ConversationPosition } from "./utils/conversation-position";
 import { materializeImageChipLinks, UiHelpers } from "./utils/ui-helpers";
+import { APP_DISPLAY_NAME } from "../app-version";
 
 import {
 	askTimeoutMs,
@@ -2036,6 +2037,7 @@ export class InteractiveMode implements InteractiveModeContext {
 		this.composer =
 			composer ??
 			new Composer({
+				appName: APP_DISPLAY_NAME,
 				preferences,
 				welcome: { version },
 			});

@@ -1047,6 +1047,7 @@ The upgrader validates these IDs against its executable and manual proof mapping
 - Owner: `src/cli/update-cli.ts` owns fork-safe update behavior.
 - Owner: `src/commands/update.ts` and `src/cli/command-help.ts#updateHelp` render identity-specific update help.
 - Owner: `src/commands/session.ts` and `src/cli/command-help.ts#sessionHelp` use active identity for session transfer and lease-probe help and usage.
+- Owner: `packages/tui/src/prompt/welcome.ts#WelcomeComponent` brands copyable startup-tip invocations using `APP_DISPLAY_NAME` passed through the startup and interactive Composer owners.
 - Owner: `src/extensibility/plugins/legacy-pi-compat.ts` owns installed-package self-import compatibility.
 - Coverage: upstream v18.12.4 loads custom tools through `loadLegacyPiModule`; the fork's loader delta is removed.
 - Coverage: upstream v18.12.5 owns custom-registry manifest fallback for empty Artifactory `dist-tags`.
@@ -1063,6 +1064,7 @@ The upgrader validates these IDs against its executable and manual proof mapping
 - Proof: `test/extension-loader-self-import.test.ts`.
 - Proof: late-profile recovery commands in `test/main-session-resolution-error.test.ts` and actual packed missing-session invocations.
 - Proof: published-identity and profile behavior in `test/utils/resume-command.test.ts`.
+- Proof: terminal and native startup-tip identity in `packages/tui/test/welcome.test.ts` and the actual installed startup surface.
 - Proof: actual candidate CLI help, usage errors, and resume recovery hints.
 - Proof: publish and smoke gates owned by `project-momp-upgrader`.
 

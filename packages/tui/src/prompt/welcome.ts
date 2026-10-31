@@ -17,6 +17,8 @@ import tipsText from "./tips.txt" with { type: "text" };
 /** Leading marker for a tip that pitches Tern: shown only while no TSP surface
  *  is live, since a live one means the user is already in Tern. */
 const NO_TERN_TIP_MARKER = /^\[NO-TERN\]\s*/;
+/** Only inline CLI invocations are host-branded; prose and links retain their upstream spelling. */
+const TIP_SELF_INVOCATION = /`omp(?=\s|`)/g;
 
 /** tips.txt lines embedded at build time; blanks dropped. Key placeholders
  *  (see {@link expandTipKeys}) stay raw until render time. */
@@ -212,15 +214,22 @@ export class WelcomeComponent implements Component {
 	#cachedWidth = -1;
 	#cachedLines: string[] | undefined;
 	#native: { tip: string | undefined; node: NativeNode } | undefined;
+	readonly #appName: string;
 
-	constructor(private version: string) {}
+	constructor(
+		private version: string,
+		appName?: string,
+	) {
+		this.#appName = appName ?? APP_NAME;
+	}
 	get tip(): string | undefined {
 		this.#nagRoll ??= Math.random();
 		this.#tipRoll ??= Math.random();
 		if (theme.getSymbolPreset() === "unicode" && this.#nagRoll < 0.1) {
 			return "Please use nerdfont 😭.";
 		}
-		return pickWeightedTip(isNativeRendering() ? TSP_TIPS : TIPS, this.#tipRoll) || undefined;
+		const tip = pickWeightedTip(isNativeRendering() ? TSP_TIPS : TIPS, this.#tipRoll);
+		return tip ? tip.replace(TIP_SELF_INVOCATION, () => `\`${this.#appName}`) : undefined;
 	}
 
 	invalidate(): void {

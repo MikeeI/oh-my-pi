@@ -2,6 +2,10 @@
 
 ## [Unreleased]
 
+### Fixed
+
+- Kept copyable welcome-tip commands on the host executable in terminal and native rendering.
+
 ## [18.14.1] - 2026-10-31
 
 ### Added

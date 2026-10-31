@@ -39,6 +39,25 @@ describe("WelcomeComponent", () => {
 		expect(welcome.tip).toBeDefined();
 	});
 
+	it("keeps copyable startup commands on the active executable in terminal and native output", () => {
+		vi.spyOn(theme, "getSymbolPreset").mockReturnValue("nerd");
+		const random = vi.spyOn(Math, "random");
+		let checkedResumeTip = false;
+		for (let sample = 0; sample < 100; sample++) {
+			random.mockReturnValue((sample + 0.5) / 100);
+			const upstream = new WelcomeComponent("1.0.0");
+			if (!upstream.tip?.includes("`omp -c`")) continue;
+			const fork = new WelcomeComponent("1.0.0", "momp");
+			expect(fork.tip).toContain("`momp -c`");
+			expect(Bun.stripANSI(fork.render(120).join("\n"))).toContain("`momp -c`");
+			expect(JSON.stringify(fork.describe({} as never))).toContain("`momp -c`");
+			expect(upstream.tip).toContain("`omp -c`");
+			checkedResumeTip = true;
+			break;
+		}
+		expect(checkedResumeTip).toBe(true);
+	});
+
 	it("selects nerdfont tip with 10% probability under unicode preset", () => {
 		vi.spyOn(theme, "getSymbolPreset").mockReturnValue("unicode");
 
