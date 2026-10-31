@@ -71,6 +71,7 @@ function makeCtx() {
 		routineSlashCommands: new Set<string>(["review-all"]),
 		locallySubmittedUserSignatures: new Set<string>(),
 		withLocalSubmission: async (_text: string, fn: () => unknown) => fn(),
+		sessionManager: { getSessionId: () => "session", getLeafId: () => null },
 	} as unknown as InteractiveModeContext;
 	const helpers = new UiHelpers(ctx);
 	ctx.queueCompactionMessage = helpers.queueCompactionMessage.bind(helpers);
