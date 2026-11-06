@@ -14,6 +14,8 @@
  *    runtime for internal callers.
  */
 import { afterEach, beforeEach, describe, expect, it, vi } from "bun:test";
+import * as os from "node:os";
+import * as path from "node:path";
 import { Agent, type AgentTool, validateAgentToolArguments } from "@oh-my-pi/pi-agent-core";
 import { createMockModel } from "@oh-my-pi/pi-ai/providers/mock";
 import { toolWireSchema } from "@oh-my-pi/pi-ai/utils/schema";
@@ -32,6 +34,8 @@ import { isRecord } from "@oh-my-pi/pi-utils";
 
 import { cfgTaskDisabledAgents, cfgTaskEnableEffort, cfgTaskStructured } from "@oh-my-pi/pi-coding-agent/task/settings";
 
+const MISSING_AGENT_DIR = path.join(os.tmpdir(), `omp-task-batch-${process.pid}`);
+
 const taskAgent: AgentDefinition = {
 	name: "task",
 	description: "General-purpose task agent",
@@ -48,10 +52,13 @@ function createSession(
 		spawns?: string;
 	} = {},
 ): ToolSession {
+	const settings = Settings.isolated(options.settings ?? {});
+	// Bundled description contracts must not read the operator's profile override.
+	Object.defineProperty(settings, "getAgentDir", { value: () => MISSING_AGENT_DIR });
 	return {
 		cwd: "/tmp",
 		hasUI: false,
-		settings: Settings.isolated(options.settings ?? {}),
+		settings,
 		getSessionFile: () => null,
 		getSessionSpawns: () => options.spawns ?? "*",
 		getAgentId: () => options.agentId ?? null,

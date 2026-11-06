@@ -1,0 +1,36 @@
+{
+  "name": "raw-scroll-control",
+  "stage": "contract",
+  "live": "NEW-LIVE-0\nNEW-LIVE-1\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n",
+  "full": "NEW-LIVE-0\nNEW-LIVE-1\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n",
+  "historySize": 0,
+  "history": "",
+  "paint": {
+    "t": 1790719664478,
+    "kind": "paint",
+    "stage": "contract",
+    "paint": 2,
+    "history": [],
+    "viewport": [
+      "NEW-LIVE-0",
+      "NEW-LIVE-1"
+    ],
+    "reset": false,
+    "alt": false,
+    "columns": 79,
+    "rows": 19,
+    "debug": {
+      "lines": [
+        "NEW-LIVE-0",
+        "NEW-LIVE-1"
+      ],
+      "windowTop": 0,
+      "altScreen": false,
+      "cursor": {
+        "x": 10,
+        "y": 1,
+        "visible": true
+      }
+    }
+  }
+}

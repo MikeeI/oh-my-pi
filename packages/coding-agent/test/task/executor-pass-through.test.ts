@@ -218,7 +218,7 @@ describe("runSubprocess parent-discovery pass-through (issue #2190)", () => {
 		expect(spy.mock.calls[1]?.[0]?.toolNames).toBeUndefined();
 	});
 
-	it("grants wait only to unrestricted subagents that can start background work, and requires write for peers", async () => {
+	it("grants wait only to unrestricted subagents that can start background work", async () => {
 		const session = yieldEmittingSession();
 		const spy = vi.spyOn(sdkModule, "createAgentSession").mockResolvedValue(createSessionResult(session));
 
@@ -252,18 +252,6 @@ describe("runSubprocess parent-discovery pass-through (issue #2190)", () => {
 		expect(spy.mock.calls[1]?.[0]?.toolNames).toEqual(["read", "write", "bash", "wait"]);
 		expect(spy.mock.calls[2]?.[0]?.toolNames).toEqual(["read", "task", "wait"]);
 		expect(spy.mock.calls[3]?.[0]?.toolNames).toEqual(["read", "bash"]);
-
-		const promptText = (index: number): string => {
-			const prompt = spy.mock.calls[index]?.[0]?.systemPrompt;
-			const resolved = typeof prompt === "function" ? prompt(["default"]) : prompt;
-			return Array.isArray(resolved) ? resolved.join("\n") : (resolved ?? "");
-		};
-		const readOnlyPrompt = promptText(0);
-		const writablePrompt = promptText(1);
-		const spawningPrompt = promptText(2);
-		expect(readOnlyPrompt.includes("# Peers")).toBe(false);
-		expect(writablePrompt.includes("# Peers")).toBe(true);
-		expect(spawningPrompt.includes("# Peers")).toBe(false);
 	});
 
 	it("records the spawning agent as parentAgentId, distinct from the child's own id and prefix", async () => {

@@ -6,7 +6,8 @@
 import * as path from "node:path";
 import { createInterface } from "node:readline/promises";
 import { Shell } from "@oh-my-pi/pi-natives";
-import { APP_NAME, getProjectDir } from "@oh-my-pi/pi-utils";
+import { getProjectDir } from "@oh-my-pi/pi-utils";
+import { APP_DISPLAY_NAME as APP_NAME } from "../app-version";
 import chalk from "@oh-my-pi/pi-utils/chalk";
 import { Settings } from "../config/settings";
 import { buildMinimizerOptions } from "../exec/bash-executor";

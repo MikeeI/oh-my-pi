@@ -80,7 +80,6 @@ export const taskItemSchema = type({
 	"outputSchema?": outputSchemaInputSchema,
 	"schemaMode?": '"permissive" | "strict"',
 	"tools?": "string[]",
-	"model?": "string",
 	"+": "delete",
 });
 const taskItemSchemaIsolated = type({
@@ -91,7 +90,6 @@ const taskItemSchemaIsolated = type({
 	"outputSchema?": outputSchemaInputSchema,
 	"schemaMode?": '"permissive" | "strict"',
 	"tools?": "string[]",
-	"model?": "string",
 	"isolated?": "boolean",
 	"+": "delete",
 });
@@ -104,7 +102,6 @@ export const taskSchema = type({
 	"outputSchema?": outputSchemaInputSchema,
 	"schemaMode?": '"permissive" | "strict"',
 	"tools?": "string[]",
-	"model?": "string",
 	"isolated?": "boolean",
 	"+": "delete",
 });
@@ -116,7 +113,6 @@ const taskSchemaNoIsolation = type({
 	"outputSchema?": outputSchemaInputSchema,
 	"schemaMode?": '"permissive" | "strict"',
 	"tools?": "string[]",
-	"model?": "string",
 	"+": "delete",
 });
 function guardBatchAgent(schema: BaseType): BaseType {
@@ -181,6 +177,7 @@ function createTaskSchema(options: {
 	evalToolsEnabled: boolean;
 	structured: boolean;
 	file: boolean;
+	perCallModelEnabled: boolean;
 	seanceFields: SeanceTaskSchemaFields;
 }): BaseType {
 	const agent = taskAgentSchemaRule(options.defaultAgent);
@@ -190,9 +187,11 @@ function createTaskSchema(options: {
 		? { "outputSchema?": outputSchemaInputSchema, "schemaMode?": '"permissive" | "strict"' }
 		: {};
 	const toolsField = options.evalToolsEnabled ? { "tools?": "string[]" } : {};
-	// `model` is always declared, and preflight decides whether a per-call model
-	// is allowed; seance widens it to a list.
-	const seanceFields = { "model?": "string", ...options.seanceFields };
+	// Keep disabled selectors out of the wire shape; batch preservation still lets preflight reject a forged `model`.
+	const seanceFields = {
+		...(options.perCallModelEnabled ? { "model?": "string" } : {}),
+		...options.seanceFields,
+	};
 	if (options.batchEnabled) {
 		if (options.isolationEnabled) {
 			const item = type.raw({
@@ -272,6 +271,8 @@ export function getTaskSchema(options: {
 	structured?: boolean;
 	/** Advertise `taskFile` (`task.file`); default off. */
 	file?: boolean;
+	/** Advertise ordinary `model` only while the operator enables task per-call selection. */
+	perCallModelEnabled?: boolean;
 	defaultAgent?: string;
 	/** Advertise historical source/model fields for the bundled seance agent. */
 	seanceFields?: SeanceTaskSchemaFields;
@@ -281,12 +282,21 @@ export function getTaskSchema(options: {
 	const evalToolsEnabled = options.evalToolsEnabled ?? true;
 	const structured = options.structured ?? true;
 	const file = options.file ?? false;
+	const perCallModelEnabled = options.perCallModelEnabled === true;
 	const seanceFields = options.seanceFields ?? {};
-	if (defaultAgent === "task" && !effortEnabled && evalToolsEnabled && structured && !file && !options.seanceFields) {
+	if (
+		defaultAgent === "task" &&
+		!effortEnabled &&
+		evalToolsEnabled &&
+		structured &&
+		!file &&
+		!perCallModelEnabled &&
+		!options.seanceFields
+	) {
 		if (options.batchEnabled) return options.isolationEnabled ? taskSchemaBatch : taskSchemaBatchNoIsolation;
 		return options.isolationEnabled ? taskSchema : taskSchemaNoIsolation;
 	}
-	const key = `${options.isolationEnabled ? "iso" : "flat"}:${options.batchEnabled ? "batch" : "single"}:${effortEnabled ? "effort" : "default"}:${evalToolsEnabled ? "tools" : "notools"}:${structured ? "structured" : "prose"}:${file ? "file" : "inline"}:${options.seanceFields ? "seance" : "plain"}:${defaultAgent}`;
+	const key = `${options.isolationEnabled ? "iso" : "flat"}:${options.batchEnabled ? "batch" : "single"}:${effortEnabled ? "effort" : "default"}:${evalToolsEnabled ? "tools" : "notools"}:${structured ? "structured" : "prose"}:${file ? "file" : "inline"}:${perCallModelEnabled ? "model" : "nomodel"}:${options.seanceFields ? "seance" : "plain"}:${defaultAgent}`;
 	const cached = taskSchemaCache.get(key);
 	if (cached) return cached;
 	const schema = createTaskSchema({
@@ -295,6 +305,7 @@ export function getTaskSchema(options: {
 		evalToolsEnabled,
 		structured,
 		file,
+		perCallModelEnabled,
 		defaultAgent,
 		seanceFields,
 	});

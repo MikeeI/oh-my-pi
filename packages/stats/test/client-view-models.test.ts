@@ -112,6 +112,7 @@ function agentStats(
 		totalCacheReadTokens: tokens.cacheRead ?? 0,
 		totalCacheWriteTokens: tokens.cacheWrite ?? 0,
 		totalCost: 0,
+		unpricedRequests: 0,
 	};
 }
 

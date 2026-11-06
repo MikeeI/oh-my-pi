@@ -9,6 +9,7 @@ import { formatBytes, pluralize } from "@oh-my-pi/pi-utils";
 import chalk from "@oh-my-pi/pi-utils/chalk";
 import { Args, CliUsageError, Command, Flags } from "@oh-my-pi/pi-utils/cli";
 import { toksHelp as commandHelp } from "../cli/command-help";
+import { APP_DISPLAY_NAME } from "../app-version";
 
 /** Display name and served model lines per native encoding; `Record` keeps it exhaustive. */
 const ENCODINGS: Record<natives.Encoding, { name: string; models: string }> = {
@@ -71,9 +72,9 @@ export default class Toks extends Command {
 	};
 
 	static examples = [
-		"omp toks README.md",
-		'omp toks "The quick brown fox jumps over the lazy dog"',
-		"omp toks src/main.ts --json",
+		`${APP_DISPLAY_NAME} toks README.md`,
+		`${APP_DISPLAY_NAME} toks "The quick brown fox jumps over the lazy dog"`,
+		`${APP_DISPLAY_NAME} toks src/main.ts --json`,
 	];
 
 	async run(): Promise<void> {

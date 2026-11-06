@@ -163,7 +163,7 @@ Starting in `repo/packages/api`:
 
 ## Injection behavior
 
-Discovered context files are injected as one `<repo-rules>` block, with one `<file>` element per surviving file in the sort order above. The block lives in the trailing `<project-context>` system block, after the static system prompt, together with every other working-directory-derived section (`<dir-context>`, `<workspace-tree>`, `<workspace-roots>`), so sessions in different directories share the static prompt as a cached prefix:
+Discovered context files are injected as one `<repo-rules>` block, with one `<file>` element per surviving file in the sort order above. The block lives in the trailing `<project-context>` system block, after the static system prompt, together with `<dir-context>`, so sessions in different directories share the static prompt as a cached prefix. Workspace state that changes within one directory (`<workspace-tree>`, `<workspace-roots>`) follows in a separate `<workspace-context>` block, so sessions in the same directory also share the project block:
 
 ```xml
 <repo-rules>

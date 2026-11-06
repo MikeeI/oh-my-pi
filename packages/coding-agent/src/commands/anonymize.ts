@@ -5,6 +5,7 @@ import { Args, Command, Flags } from "@oh-my-pi/pi-utils/cli";
 import { runAnonymizeCommand } from "../cli/anonymize-cli";
 import { reportCliUsageError } from "../cli/args";
 import { anonymizeHelp as commandHelp } from "../cli/command-help";
+import { APP_DISPLAY_NAME } from "../app-version";
 
 export default class Anonymize extends Command {
 	static description = commandHelp.description;
@@ -16,9 +17,9 @@ export default class Anonymize extends Command {
 	};
 
 	static examples = [
-		"omp anonymize",
-		"omp anonymize 01a0285c -o ./bug-report",
-		"omp anonymize ~/.omp/agent/sessions/--work-pi--/session.jsonl",
+		`${APP_DISPLAY_NAME} anonymize`,
+		`${APP_DISPLAY_NAME} anonymize 01a0285c -o ./bug-report`,
+		`${APP_DISPLAY_NAME} anonymize ~/.omp/agent/sessions/--work-pi--/session.jsonl`,
 	];
 
 	async run(): Promise<void> {

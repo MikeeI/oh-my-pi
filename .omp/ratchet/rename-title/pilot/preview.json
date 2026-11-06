@@ -1,0 +1,207 @@
+[
+  {
+    "id": "rename-001",
+    "intent": "Die ausgewählte Q1-Frage zur Reproduzierbarkeit des flaky Runtime-Audits bewerten; nicht beliebige weitere Anschlussfragen übernehmen.",
+    "title": "Diagnose runtime-audit flakiness",
+    "grade": {
+      "quality": 1,
+      "format": 1
+    },
+    "explanation": "focus=1; recognizable=1; strict_retry_failure=false",
+    "model": "openai-codex/gpt-6-luna",
+    "usage": {
+      "input": 1269,
+      "output": 17,
+      "cacheRead": 0,
+      "cacheWrite": 0,
+      "totalTokens": 1286,
+      "cost": {
+        "input": 0.00012690000000000002,
+        "output": 0.0000085,
+        "cacheRead": 0,
+        "cacheWrite": 0,
+        "total": 0.0001354
+      }
+    },
+    "judgeModel": "anthropic/claude-sonnet-5-5",
+    "judgeUsage": {
+      "input": 4,
+      "output": 15,
+      "cacheRead": 0,
+      "cacheWrite": 2812,
+      "totalTokens": 2831,
+      "cost": {
+        "input": 0.000008,
+        "output": 0.00015000000000000001,
+        "cacheRead": 0,
+        "cacheWrite": 0.011248,
+        "total": 0.011406
+      }
+    },
+    "latency_s": 1.432302801
+  },
+  {
+    "id": "rename-016",
+    "intent": "Das Kontextbudget von GPT-6.1 Sol per Settings-Override auf den ausdrücklich verlangten Wert 400000 setzen, nicht die vorgeschlagenen 500000.",
+    "title": "Set Sol context override to 400k",
+    "grade": {
+      "quality": 1,
+      "format": 1
+    },
+    "explanation": "focus=1; recognizable=1; strict_retry_failure=false",
+    "model": "openai-codex/gpt-6-luna",
+    "usage": {
+      "input": 3457,
+      "output": 17,
+      "cacheRead": 0,
+      "cacheWrite": 0,
+      "totalTokens": 3474,
+      "cost": {
+        "input": 0.00034570000000000005,
+        "output": 0.0000085,
+        "cacheRead": 0,
+        "cacheWrite": 0,
+        "total": 0.00035420000000000004
+      }
+    },
+    "judgeModel": "anthropic/claude-sonnet-5-5",
+    "judgeUsage": {
+      "input": 4,
+      "output": 15,
+      "cacheRead": 0,
+      "cacheWrite": 7141,
+      "totalTokens": 7160,
+      "cost": {
+        "input": 0.000008,
+        "output": 0.00015000000000000001,
+        "cacheRead": 0,
+        "cacheWrite": 0.028564,
+        "total": 0.028721999999999998
+      }
+    },
+    "latency_s": 2.52981201
+  },
+  {
+    "id": "rename-019",
+    "intent": "Den absichtlich leeren Web-Fallback-Override entfernen, damit vorhandene Suchfallbacks wieder greifen; keinen unbewiesenen Modellwechsel vornehmen.",
+    "title": "Websuche-Fallback entfernen",
+    "grade": {
+      "quality": 0.5,
+      "format": 0
+    },
+    "explanation": "focus=1; recognizable=0; strict_retry_failure=false",
+    "model": "openai-codex/gpt-6-luna",
+    "usage": {
+      "input": 2738,
+      "output": 15,
+      "cacheRead": 0,
+      "cacheWrite": 0,
+      "totalTokens": 2753,
+      "cost": {
+        "input": 0.00027380000000000004,
+        "output": 0.000007499999999999999,
+        "cacheRead": 0,
+        "cacheWrite": 0,
+        "total": 0.00028130000000000006
+      }
+    },
+    "judgeModel": "anthropic/claude-sonnet-5-5",
+    "judgeUsage": {
+      "input": 4,
+      "output": 14,
+      "cacheRead": 0,
+      "cacheWrite": 5306,
+      "totalTokens": 5324,
+      "cost": {
+        "input": 0.000008,
+        "output": 0.00014000000000000001,
+        "cacheRead": 0,
+        "cacheWrite": 0.021224,
+        "total": 0.021372
+      }
+    },
+    "latency_s": 1.4941786749999997
+  },
+  {
+    "id": "rename-031",
+    "intent": "Die empfohlenen Dracula-kompatiblen Antwortfarben in einer fiktiven strukturierten Findings-Antwort demonstrieren.",
+    "title": "Farbpalette in Beispielantwort anwenden",
+    "grade": {
+      "quality": 0.5,
+      "format": 1
+    },
+    "explanation": "focus=1; recognizable=0; strict_retry_failure=false",
+    "model": "openai-codex/gpt-6-luna",
+    "usage": {
+      "input": 4397,
+      "output": 17,
+      "cacheRead": 0,
+      "cacheWrite": 0,
+      "totalTokens": 4414,
+      "cost": {
+        "input": 0.00043970000000000006,
+        "output": 0.0000085,
+        "cacheRead": 0,
+        "cacheWrite": 0,
+        "total": 0.00044820000000000005
+      }
+    },
+    "judgeModel": "anthropic/claude-sonnet-5-5",
+    "judgeUsage": {
+      "input": 4,
+      "output": 14,
+      "cacheRead": 717,
+      "cacheWrite": 8442,
+      "totalTokens": 9177,
+      "cost": {
+        "input": 0.000008,
+        "output": 0.00014000000000000001,
+        "cacheRead": 0.00007170000000000001,
+        "cacheWrite": 0.033768,
+        "total": 0.0339877
+      }
+    },
+    "latency_s": 1.7539668010000005
+  },
+  {
+    "id": "rename-012",
+    "intent": "Die tatsächliche Ausgaberate in Tokens pro Sekunde von GPT-6 Luna messen, nicht nur dessen Erreichbarkeit prüfen.",
+    "title": "GPT-6 Luna Token-Geschwindigkeit messen",
+    "grade": {
+      "quality": 1,
+      "format": 1
+    },
+    "explanation": "focus=1; recognizable=1; strict_retry_failure=false",
+    "model": "openai-codex/gpt-6-luna",
+    "usage": {
+      "input": 458,
+      "output": 18,
+      "cacheRead": 0,
+      "cacheWrite": 0,
+      "totalTokens": 476,
+      "cost": {
+        "input": 0.0000458,
+        "output": 0.000009,
+        "cacheRead": 0,
+        "cacheWrite": 0,
+        "total": 0.000054800000000000004
+      }
+    },
+    "judgeModel": "anthropic/claude-sonnet-5-5",
+    "judgeUsage": {
+      "input": 4,
+      "output": 15,
+      "cacheRead": 717,
+      "cacheWrite": 569,
+      "totalTokens": 1305,
+      "cost": {
+        "input": 0.000008,
+        "output": 0.00015000000000000001,
+        "cacheRead": 0.00007170000000000001,
+        "cacheWrite": 0.002276,
+        "total": 0.0025057
+      }
+    },
+    "latency_s": 28.734148186000002
+  }
+]

@@ -590,6 +590,24 @@ describe("committed transcript blocks release render caches", () => {
 		expect(await becomesCollectible(rendered.at(-1)!)).toBe(true);
 		expect(replay(transcript, 80)).toEqual(["tail rendered at 80", ""]);
 	});
+
+	it("releases committed blocks a drifted resize tail renders", () => {
+		const transcript = new TranscriptContainer();
+		let version = 0;
+		const drifting = {
+			isTranscriptBlockFinalized: () => true,
+			getTranscriptBlockVersion: () => version,
+			render: () => ["drifting"],
+		};
+		transcript.addChild(drifting);
+		const settled = new ReleaseCountingBlock(["settled"], true);
+		transcript.addChild(settled);
+		commitAll(transcript, 80);
+		const releases = settled.releases;
+		version++;
+		expect(transcript.renderTail(80, 1)).toEqual(["settled"]);
+		expect(settled.releases).toBe(releases + 1);
+	});
 });
 
 describe("write renderer streaming preview state", () => {

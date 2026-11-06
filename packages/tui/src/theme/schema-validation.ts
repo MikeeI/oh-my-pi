@@ -10,6 +10,8 @@ const themeColorsSchema = type({
 	success: "string | number",
 	error: "string | number",
 	warning: "string | number",
+	"cacheMiss?": "string | number",
+	"commandPrompt?": "string | number",
 	muted: "string | number",
 	dim: "string | number",
 	text: "string | number",

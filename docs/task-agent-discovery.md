@@ -246,11 +246,11 @@ A call's per-call `model` (task item / flat call, eval `agent()` / `workpool()`;
 
 `task.perCallModel` decides where a model-facing call may pick its model:
 
-| Value           | Behavior                                                                                                                                                                                                    |
-| --------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `off` (default) | A task item, flat call, `agent()` or `workpool()` that passes `model` fails preflight (the bundled seance agent's own `model` is separate; see below). The field stays in the task schema.                  |
-| `eval`          | Accepted by eval `agent()` and `workpool()` only; task items behave as `off`. Use it to route a specialist (e.g. a pinned `reviewer`) from a script while ordinary delegation keeps its configured routing. |
-| `on`            | Accepted everywhere.                                                                                                                                                                                        |
+- `off` (default): reject ordinary `model` on Task, Eval `agent()`, and `workpool()`; Seance keeps its separate selector.
+- `eval`: allow Eval `agent()` and `workpool()` only; ordinary Task calls retain configured routing.
+- `on`: allow operator-approved per-call selection on all three surfaces.
+
+MOMP hides the Task `model` field at `off` or `eval` unless bundled Seance is spawnable.
 
 Only the operator's layers can turn it on: a project's `task.perCallModel` can lower the mode (`on` → `eval` → `off`) but never raise it.
 

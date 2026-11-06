@@ -1,7 +1,8 @@
 import type { CommandMetadata } from "@oh-my-pi/pi-utils/cli";
+import { APP_DISPLAY_NAME, APP_PACKAGE_NAME, isMompPackageName } from "../app-version";
 
 export const acpHelp = {
-	description: "Run omp as an ACP (Agent Client Protocol) server over stdio",
+	description: `Run ${APP_DISPLAY_NAME} as an ACP (Agent Client Protocol) server over stdio`,
 } satisfies CommandMetadata;
 
 export const agentsHelp = { description: "Manage bundled task agents" } satisfies CommandMetadata;
@@ -16,7 +17,7 @@ export const authHelp = {
 } satisfies CommandMetadata;
 
 export const authBrokerHelp = {
-	description: "Manage the omp auth-broker (credential vault)",
+	description: `Manage the ${APP_DISPLAY_NAME} auth-broker (credential vault)`,
 } satisfies CommandMetadata;
 
 export const authGatewayHelp = {
@@ -131,8 +132,7 @@ export const sayHelp = {
 export const searchHelp = { description: "Test web search providers" } satisfies CommandMetadata;
 
 export const sessionHelp = {
-	description:
-		"Hand a session to another machine (pack, unpack, moved) or check which sessions a running omp owns (lease)",
+	description: `Hand a session to another machine (pack, unpack, moved) or check which sessions a running ${APP_DISPLAY_NAME} owns (lease)`,
 } satisfies CommandMetadata;
 
 export const shareHelp = {
@@ -172,9 +172,12 @@ export const skillHelp = {
 export const sshHelp = { description: "Manage SSH host configurations" } satisfies CommandMetadata;
 
 export const statsHelp = { description: "View usage statistics" } satisfies CommandMetadata;
+export const systemPromptHelp = {
+	description: "Inspect provider-facing system prompts",
+} satisfies CommandMetadata;
 
 export const streamHelp = {
-	description: "Broadcast local omp session screens and chat to your public live channel",
+	description: `Broadcast local ${APP_DISPLAY_NAME} session screens and chat to your public live channel`,
 } satisfies CommandMetadata;
 
 export const tinyModelsHelp = {
@@ -191,7 +194,11 @@ export const ttsrHelp = {
 	description: "Inspect and test Time-Traveling Stream Rules (TTSR)",
 } satisfies CommandMetadata;
 
-export const updateHelp = { description: "Check for and install updates" } satisfies CommandMetadata;
+export const updateHelp = {
+	description: isMompPackageName(APP_PACKAGE_NAME)
+		? "Show the manual momp install command or update installed plugins"
+		: "Check for and install updates",
+} satisfies CommandMetadata;
 
 export const usageHelp = {
 	description: "Show provider usage limits for every authenticated account",

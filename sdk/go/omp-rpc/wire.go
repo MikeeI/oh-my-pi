@@ -536,14 +536,15 @@ func (v Usage) MarshalJSON() ([]byte, error) {
 }
 
 type UserMessage struct {
-	Content          MessageContent             `json:"content"`
-	Timestamp        float64                    `json:"timestamp"`
-	Synthetic        *bool                      `json:"synthetic,omitempty"`
-	Steering         *bool                      `json:"steering,omitempty"`
-	LiveSteered      *bool                      `json:"liveSteered,omitempty"`
-	HistoryRewriteAt *float64                   `json:"historyRewriteAt,omitempty"`
-	Attribution      *Attribution               `json:"attribution,omitempty"`
-	ProviderPayload  map[string]json.RawMessage `json:"providerPayload,omitempty"`
+	Content           MessageContent             `json:"content"`
+	Timestamp         float64                    `json:"timestamp"`
+	Synthetic         *bool                      `json:"synthetic,omitempty"`
+	Steering          *bool                      `json:"steering,omitempty"`
+	LiveSteered       *bool                      `json:"liveSteered,omitempty"`
+	CommandInvocation *string                    `json:"commandInvocation,omitempty"`
+	HistoryRewriteAt  *float64                   `json:"historyRewriteAt,omitempty"`
+	Attribution       *Attribution               `json:"attribution,omitempty"`
+	ProviderPayload   map[string]json.RawMessage `json:"providerPayload,omitempty"`
 	// Extra holds undeclared keys and declared keys whose value did not decode (that field stays zero).
 	// Encoding writes them back, over a declared field with the same key.
 	Extra map[string]json.RawMessage `json:"-"`
@@ -562,6 +563,7 @@ func (v *UserMessage) decodeFrom(raw map[string]json.RawMessage) error {
 	d.optional("synthetic", &out.Synthetic)
 	d.optional("steering", &out.Steering)
 	d.optional("liveSteered", &out.LiveSteered)
+	d.optional("commandInvocation", &out.CommandInvocation)
 	d.optional("historyRewriteAt", &out.HistoryRewriteAt)
 	d.optional("attribution", &out.Attribution)
 	d.optional("providerPayload", &out.ProviderPayload)
@@ -2051,6 +2053,7 @@ const (
 	SlashCommandSourceCustom    SlashCommandSource = "custom"
 	SlashCommandSourceMcpPrompt SlashCommandSource = "mcp_prompt"
 	SlashCommandSourceFile      SlashCommandSource = "file"
+	SlashCommandSourceRoutine   SlashCommandSource = "routine"
 )
 
 func (v *SlashCommandSource) UnmarshalJSON(data []byte) error {
@@ -2059,7 +2062,7 @@ func (v *SlashCommandSource) UnmarshalJSON(data []byte) error {
 		return err
 	}
 	switch value := SlashCommandSource(s); value {
-	case SlashCommandSourceBuiltin, SlashCommandSourceSkill, SlashCommandSourceExtension, SlashCommandSourceCustom, SlashCommandSourceMcpPrompt, SlashCommandSourceFile:
+	case SlashCommandSourceBuiltin, SlashCommandSourceSkill, SlashCommandSourceExtension, SlashCommandSourceCustom, SlashCommandSourceMcpPrompt, SlashCommandSourceFile, SlashCommandSourceRoutine:
 		*v = value
 		return nil
 	}
@@ -2597,6 +2600,12 @@ type BashResult struct {
 	ElidedBytes *int64 `json:"elidedBytes,omitempty"`
 	// Lines dropped from the middle of `output`.
 	ElidedLines *int64 `json:"elidedLines,omitempty"`
+	// Exact displayed head lines when inline output maps to the artifact.
+	HeadLines *int64 `json:"headLines,omitempty"`
+	// Exact displayed tail lines when inline output maps to the artifact.
+	TailLines *int64 `json:"tailLines,omitempty"`
+	// Artifact lines containing every elided byte; absent for substituted output.
+	ElidedLineRange *LineRange `json:"elidedLineRange,omitempty"`
 	// Bytes the per-line column cap cut from `output`, across all lines.
 	ColumnDroppedBytes *int64 `json:"columnDroppedBytes,omitempty"`
 	// Lines of `output` the per-line column cap cut; the artifact holds them whole.
@@ -2633,6 +2642,9 @@ func (v *BashResult) decodeFrom(raw map[string]json.RawMessage) error {
 	d.optional("artifactElidedBytes", &out.ArtifactElidedBytes)
 	d.optional("elidedBytes", &out.ElidedBytes)
 	d.optional("elidedLines", &out.ElidedLines)
+	d.optional("headLines", &out.HeadLines)
+	d.optional("tailLines", &out.TailLines)
+	d.optional("elidedLineRange", &out.ElidedLineRange)
 	d.optional("columnDroppedBytes", &out.ColumnDroppedBytes)
 	d.optional("columnTruncatedLines", &out.ColumnTruncatedLines)
 	d.optional("columnTruncatedRange", &out.ColumnTruncatedRange)

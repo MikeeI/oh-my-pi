@@ -1,0 +1,200 @@
+bun test v1.4.2 (744846f84)
+
+packages/tui/test/resize-anchor-recovery.test.ts:
+shrink-to-content: reported 6 actual 6
+shrink-into-content: reported 6 actual 4
+0 "hist-2"
+1 "hist-3"
+2 "hist-4"
+3 "hist-5"
+4 "VIEW-TOP"
+5 "VIEW-MID"
+6 "VIEW-BOT"
+combined: reported 7 actual 4 recovered 4
+0 "hist-2"
+1 "hist-3"
+2 "hist-4"
+3 "hist-5"
+4 "VIEW-TOP-zzzzzzzzzzzzzzzzzzz"
+5 "zzzzzz"
+6 "VIEW-MID"
+7 "VIEW-BOT"
+width-grow: reported 5 actual 5 recovered 5
+drag: reported 7 actual 4 recovered 4
+0 "hist-2"
+1 "hist-3"
+2 "hist-4"
+3 "hist-5"
+4 "VIEW-TOP-zzzzzzzzzzzzzzzzzzz"
+5 "zzzzzz"
+6 "VIEW-MID"
+7 "VIEW-BOT"
+
+packages/coding-agent/test/tmux-scrollback-exactness.test.ts:
+330 | 			const target = `${sessionName}:0.0`;
+331 | 			const draft = "ONE-DRAFT-alpha beta gamma delta END-DRAFT";
+332 | 			const expectPane = async (longPreview: boolean, hasDraft: boolean): Promise<void> => {
+333 | 				const live = (await runTmux(["capture-pane", "-p", "-t", target])).stdout;
+334 | 				const full = (await runTmux(["capture-pane", "-p", "-S", "-", "-t", target])).stdout;
+335 | 				expect(countOccurrences(live, "LIVE-STATUS"), live).toBe(1);
+                                                              ^
+error: ╭─── Edit: 🗒 resize.txt ──────────────────────────────────────────────────────╮
+│  +1│PREVIEW-000                                                             │
+│  +2│PREVIEW-001                                                             │
+│  +3│PREVIEW-002                                                             │
+│  +4│PREVIEW-003                                                             │
+│  +5│PREVIEW-004                                                             │
+│  +6│PREVIEW-005                                                             │
+│  +7│PREVIEW-006                                                             │
+│  +8│PREVIEW-007                                                             │
+│  +9│PREVIEW-008                                                             │
+│ +10│PREVIEW-009                                                             │
+│ +11│PREVIEW-010                                                             │
+│ +12│PREVIEW-011                                                             │
+│ +13│PREVIEW-012                                                             │
+│ +14│PREVIEW-013                                                             │
+│⣾                                                                            │
+╰─────────────────────────────────────────────────────────────────────────────╯
+╭──LIVE-STATUS────────────────────────────────────────────────────────────────╮
+╭─── Edit: 🗒 resize.txt ──────────────────────────────────────────────────────╮
+│  +1│PREVIEW-000                                                             │
+│  +2│PREVIEW-001                                                             │
+│⣷                                                                            │
+╰─────────────────────────────────────────────────────────────────────────────╯
+╭──LIVE-STATUS────────────────────────────────────────────────────────────────╮
+╰─                                                                           ─╯
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+Expected: 1
+Received: 2
+
+      at <anonymous> (/root/projects/project-oh-my-pi-fork/packages/coding-agent/test/tmux-scrollback-exactness.test.ts:335:57)
+      at async <anonymous> (/root/projects/project-oh-my-pi-fork/packages/coding-agent/test/tmux-scrollback-exactness.test.ts:461:11)
+(fail) tmux scrollback exactness > keeps live tool/editor rows exact across delayed resize, rotation and Stop with 0 history paragraphs [2643.61ms]
+330 | 			const target = `${sessionName}:0.0`;
+331 | 			const draft = "ONE-DRAFT-alpha beta gamma delta END-DRAFT";
+332 | 			const expectPane = async (longPreview: boolean, hasDraft: boolean): Promise<void> => {
+333 | 				const live = (await runTmux(["capture-pane", "-p", "-t", target])).stdout;
+334 | 				const full = (await runTmux(["capture-pane", "-p", "-S", "-", "-t", target])).stdout;
+335 | 				expect(countOccurrences(live, "LIVE-STATUS"), live).toBe(1);
+                                                              ^
+error: 
+ ACCEPTED-011
+
+╭─── Edit: 🗒 resize.txt ──────────────────────────────────────────────────────╮
+│  +1│PREVIEW-000                                                             │
+│  +2│PREVIEW-001                                                             │
+│  +3│PREVIEW-002                                                             │
+│  +4│PREVIEW-003                                                             │
+│  +5│PREVIEW-004                                                             │
+│  +6│PREVIEW-005                                                             │
+│  +7│PREVIEW-006                                                             │
+│  +8│PREVIEW-007                                                             │
+│  +9│PREVIEW-008                                                             │
+│ +10│PREVIEW-009                                                             │
+│ +11│PREVIEW-010                                                             │
+│ +12│PREVIEW-011                                                             │
+│ +13│PREVIEW-012                                                             │
+│ +14│PREVIEW-013                                                             │
+│⣾                                                                            │
+╰─────────────────────────────────────────────────────────────────────────────╯
+╭──LIVE-STATUS────────────────────────────────────────────────────────────────╮
+╭─── Edit: 🗒 resize.txt ──────────────────────────────────────────────────────╮
+│  +1│PREVIEW-000                                                             │
+│  +2│PREVIEW-001                                                             │
+│⣷                                                                            │
+╰─────────────────────────────────────────────────────────────────────────────╯
+╭──LIVE-STATUS────────────────────────────────────────────────────────────────╮
+╰─                                                                           ─╯
+
+
+
+
+
+
+
+
+
+
+
+
+
+Expected: 1
+Received: 2
+
+      at <anonymous> (/root/projects/project-oh-my-pi-fork/packages/coding-agent/test/tmux-scrollback-exactness.test.ts:335:57)
+      at async <anonymous> (/root/projects/project-oh-my-pi-fork/packages/coding-agent/test/tmux-scrollback-exactness.test.ts:461:11)
+(fail) tmux scrollback exactness > keeps live tool/editor rows exact across delayed resize, rotation and Stop with 12 history paragraphs [2646.25ms]
+330 | 			const target = `${sessionName}:0.0`;
+331 | 			const draft = "ONE-DRAFT-alpha beta gamma delta END-DRAFT";
+332 | 			const expectPane = async (longPreview: boolean, hasDraft: boolean): Promise<void> => {
+333 | 				const live = (await runTmux(["capture-pane", "-p", "-t", target])).stdout;
+334 | 				const full = (await runTmux(["capture-pane", "-p", "-S", "-", "-t", target])).stdout;
+335 | 				expect(countOccurrences(live, "LIVE-STATUS"), live).toBe(1);
+                                                              ^
+error:  ACCEPTED-025
+
+ ACCEPTED-026
+
+ ACCEPTED-027
+
+ ACCEPTED-028
+
+ ACCEPTED-029
+
+ ACCEPTED-030
+
+ ACCEPTED-031
+
+╭─── Edit: 🗒 resize.txt ──────────────────────────────────────────────────────╮
+│  +1│PREVIEW-000                                                             │
+│  +2│PREVIEW-001                                                             │
+│  +3│PREVIEW-002                                                             │
+│  +4│PREVIEW-003                                                             │
+│  +5│PREVIEW-004                                                             │
+│  +6│PREVIEW-005                                                             │
+│  +7│PREVIEW-006                                                             │
+│  +8│PREVIEW-007                                                             │
+│  +9│PREVIEW-008                                                             │
+│ +10│PREVIEW-009                                                             │
+│ +11│PREVIEW-010                                                             │
+│ +12│PREVIEW-011                                                             │
+│ +13│PREVIEW-012                                                             │
+│ +14│PREVIEW-013                                                             │
+│⣽                                                                            │
+╰─────────────────────────────────────────────────────────────────────────────╯
+╭──LIVE-STATUS────────────────────────────────────────────────────────────────╮
+╭─── Edit: 🗒 resize.txt ──────────────────────────────────────────────────────╮
+│  +1│PREVIEW-000                                                             │
+│  +2│PREVIEW-001                                                             │
+│⣽                                                                            │
+╰─────────────────────────────────────────────────────────────────────────────╯
+╭──LIVE-STATUS────────────────────────────────────────────────────────────────╮
+
+
+
+Expected: 1
+Received: 2
+
+      at <anonymous> (/root/projects/project-oh-my-pi-fork/packages/coding-agent/test/tmux-scrollback-exactness.test.ts:335:57)
+      at async <anonymous> (/root/projects/project-oh-my-pi-fork/packages/coding-agent/test/tmux-scrollback-exactness.test.ts:461:11)
+(fail) tmux scrollback exactness > keeps live tool/editor rows exact across delayed resize, rotation and Stop with 32 history paragraphs [2718.64ms]
+
+ 86 pass
+ 3 fail
+ 1085 expect() calls
+Ran 89 tests across 9 files. [18.13s]

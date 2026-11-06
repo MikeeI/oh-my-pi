@@ -10,6 +10,7 @@ function createSession() {
 	const backgroundDone = Promise.withResolvers<void>();
 	const session = {
 		isStreaming: false,
+		isRunningRoutine: false,
 		hasAdmittedSubmission: false,
 		queuedMessageCount: 0,
 		pendingAsyncWork: false,

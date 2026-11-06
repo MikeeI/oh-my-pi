@@ -727,25 +727,48 @@ describe("anthropic head caching (general API-key path)", () => {
 		expect(stableText(after)).toEqual(stableText(before));
 	});
 
-	it("anchors before the first volatile segment so blocks appended behind it stay out of the cached head", async () => {
+	it("anchors the project context in an idle slot so same-cwd sessions read it", async () => {
 		// Coding-agent layout: static prompt, cwd-derived `<project-context>`,
-		// per-spawn subagent role text, then per-turn recall.
-		const capture = (cwd: string, role: string) =>
+		// in-cwd `<workspace-context>`, per-spawn subagent role text, then per-turn recall.
+		const capture = (cwd: string, tree: string, role: string, messages = CONTEXT.messages) =>
 			captureWireBody(undefined, {
 				...CONTEXT,
+				messages,
 				systemPrompt: [
 					"Static agent prompt.",
 					`<project-context>\n<file path="${cwd}/AGENTS.md">rules</file>\n</project-context>`,
+					`<workspace-context>\n<workspace-tree>\n${tree}\n</workspace-tree>\n</workspace-context>`,
 					role,
 					"<memories>\nrecall\n</memories>",
 				],
 			});
-		const first = textSystemBlocks(await capture("/work/a", "Role: spawn 1"));
-		const second = textSystemBlocks(await capture("/work/b", "Role: spawn 2"));
-		for (const system of [first, second]) {
-			expect(system.flatMap((block, index) => (block.cache_control != null ? [index] : []))).toEqual([0]);
+		const cachedSystem = (body: MessageCreateParams): number[] =>
+			textSystemBlocks(body).flatMap((block, index) => (block.cache_control != null ? [index] : []));
+		const toolAnchored = (body: MessageCreateParams): boolean =>
+			body.tools?.some(tool => "cache_control" in tool && tool.cache_control != null) ?? false;
+		// A session's first request carries one message, leaving a slot for the project context.
+		const sameCwd = [
+			await capture("/work/a", "- a.ts", "Role: spawn 1"),
+			await capture("/work/a", "- b.ts", "Role: 2"),
+		];
+		const otherCwd = await capture("/work/b", "- a.ts", "Role: spawn 1");
+		for (const body of [...sameCwd, otherCwd]) {
+			expect(cachedSystem(body)).toEqual([0, 1]);
+			expect(toolAnchored(body)).toBe(true);
+			expect(countCacheBreakpoints(body)).toBe(4);
 		}
-		expect(second[0]).toEqual(first[0]);
+		const [first, second] = sameCwd.map(textSystemBlocks);
+		expect(second.slice(0, 2)).toEqual(first.slice(0, 2));
+		expect(textSystemBlocks(otherCwd)[0]).toEqual(first[0]);
+		// Later turns spend both message slots; their rolling anchors already cover the project context.
+		const multiTurn = await capture("/work/a", "- a.ts", "Role: spawn 1", [
+			{ role: "user", content: "hello", timestamp: 1 },
+			assistantMessage("hi there", 2),
+			{ role: "user", content: "again", timestamp: 3 },
+		]);
+		expect(cachedSystem(multiTurn)).toEqual([0]);
+		expect(toolAnchored(multiTurn)).toBe(true);
+		expect(countCacheBreakpoints(multiTurn)).toBe(4);
 	});
 
 	it("spends the OAuth system breakpoint on the last system block without taking one from the messages", async () => {

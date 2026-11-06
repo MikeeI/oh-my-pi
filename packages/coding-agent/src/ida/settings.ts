@@ -2,6 +2,7 @@
  * Settings declared by this domain (see `config/registry.ts`). Declaration order is the
  * settings-panel order; `config/all-settings.ts` registers every domain.
  */
+import { APP_DISPLAY_NAME } from "../app-version";
 import { register } from "../config/registry";
 
 /** Whether `read` opens executables in IDA Pro and the `ida` tool is enabled. */
@@ -54,8 +55,7 @@ export const cfgIdaMaxOpen = register({
 		tab: "tools",
 		group: "IDA Pro",
 		label: "IDA Max Open Databases",
-		description:
-			"Most IDA databases (omp.ida.* daemons in omp ps) open at once per project; opening another saves and closes the least recently used idle one",
+		description: `Most IDA databases (omp.ida.* daemons in ${APP_DISPLAY_NAME} ps) open at once per project; opening another saves and closes the least recently used idle one`,
 		options: [
 			{ value: "2", label: "2" },
 			{ value: "4", label: "4" },

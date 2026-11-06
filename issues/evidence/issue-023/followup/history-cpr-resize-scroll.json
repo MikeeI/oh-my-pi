@@ -1,0 +1,37 @@
+{
+  "name": "history-cpr-resize",
+  "stage": "scroll",
+  "live": "\n ASSISTANT-6\n\n ASSISTANT-7\n\n ASSISTANT-8\n\n ASSISTANT-9\n\n ASSISTANT-10\n\n ASSISTANT-11\n\n ASSISTANT-12\n\n ASSISTANT-13\n\n ASSISTANT-14\n\n ASSISTANT-15\n\n ASSISTANT-16\n\n ASSISTANT-17\n\n ASSISTANT-18\n\n ASSISTANT-19\n\n ASSISTANT-20\n\n ASSISTANT-21\n\n ASSISTANT-22\n\n ASSISTANT-23\n\n╭──AUDIT-STATUS───────────────────────────────────────────────────────────────╮\n╰─                                                                           ─╯\n",
+  "full": " PREFACE-0\n\n PREFACE-1\n\n PREFACE-2\n\n PREFACE-3\n\n PREFACE-4\n\n PREFACE-5\n\n PREFACE-6\n\n PREFACE-7\n\n PREFACE-8\n\n PREFACE-9\n\n PREFACE-10\n\n PREFACE-11\n\n PREFACE-12\n\n PREFACE-13\n\n PREFACE-14\n\n PREFACE-15\n\n PREFACE-16\n\n PREFACE-17\n\n PREFACE-18\n\n PREFACE-19\n\n PREFACE-20\n\n PREFACE-21\n\n PREFACE-22\n\n PREFACE-23\n\n PREFACE-24\n\n PREFACE-25\n\n PREFACE-26\n\n PREFACE-27\n\n PREFACE-28\n\n PREFACE-29\n\n PREFACE-30\n\n PREFACE-31\n\n╭─── ✎ Edit: 🗒 diagnostic.txt ⟦+2⟧ ───────────────────────────────────────────╮\n│  +1│FINAL-PREVIEW-0                                                         │\n│  +2│FINAL-PREVIEW-1                                                         │\n╰─────────────────────────────────────────────────────────────────────────────╯\n\n ASSISTANT-0\n\n ASSISTANT-1\n\n ASSISTANT-0\n\n ASSISTANT-1\n\n ASSISTANT-2\n\n ASSISTANT-3\n\n ASSISTANT-4\n\n ASSISTANT-5\n\n ASSISTANT-6\n\n ASSISTANT-7\n\n ASSISTANT-8\n\n ASSISTANT-9\n\n ASSISTANT-10\n\n ASSISTANT-11\n\n ASSISTANT-12\n\n ASSISTANT-13\n\n ASSISTANT-14\n\n ASSISTANT-15\n\n ASSISTANT-16\n\n ASSISTANT-17\n\n ASSISTANT-18\n\n ASSISTANT-19\n\n ASSISTANT-20\n\n ASSISTANT-21\n\n ASSISTANT-22\n\n ASSISTANT-23\n\n╭──AUDIT-STATUS───────────────────────────────────────────────────────────────╮\n╰─                                                                           ─╯\n",
+  "historySize": 84,
+  "history": " PREFACE-0\n\n PREFACE-1\n\n PREFACE-2\n\n PREFACE-3\n\n PREFACE-4\n\n PREFACE-5\n\n PREFACE-6\n\n PREFACE-7\n\n PREFACE-8\n\n PREFACE-9\n\n PREFACE-10\n\n PREFACE-11\n\n PREFACE-12\n\n PREFACE-13\n\n PREFACE-14\n\n PREFACE-15\n\n PREFACE-16\n\n PREFACE-17\n\n PREFACE-18\n\n PREFACE-19\n\n PREFACE-20\n\n PREFACE-21\n\n PREFACE-22\n\n PREFACE-23\n\n PREFACE-24\n\n PREFACE-25\n\n PREFACE-26\n\n PREFACE-27\n\n PREFACE-28\n\n PREFACE-29\n\n PREFACE-30\n\n PREFACE-31\n\n╭─── ✎ Edit: 🗒 diagnostic.txt ⟦+2⟧ ───────────────────────────────────────────╮\n│  +1│FINAL-PREVIEW-0                                                         │\n│  +2│FINAL-PREVIEW-1                                                         │\n╰─────────────────────────────────────────────────────────────────────────────╯\n\n ASSISTANT-0\n\n ASSISTANT-1\n\n ASSISTANT-0\n\n ASSISTANT-1\n\n ASSISTANT-2\n\n ASSISTANT-3\n\n ASSISTANT-4\n\n ASSISTANT-5",
+  "paint": {
+    "t": 1790720107594,
+    "kind": "paint",
+    "stage": "scroll",
+    "paint": 12,
+    "history": [],
+    "viewport": [
+      "╭──AUDIT-STATUS───────────────────────────────────────────────────────────────╮",
+      "╰─                                                                           ─╯"
+    ],
+    "reset": false,
+    "alt": false,
+    "columns": 79,
+    "rows": 39,
+    "draft": "",
+    "debug": {
+      "lines": [
+        "\u001b[38;2;61;66;74m╭──\u001b[39mAUDIT-STATUS\u001b[38;2;61;66;74m─────────────────────────────────────────────────────────────\u001b[39m\u001b[38;2;61;66;74m──╮\u001b[39m",
+        "\u001b[38;2;61;66;74m╰─ \u001b[39m\u001b[38;2;229;229;231m\u001b[39m                                                                         \u001b[38;2;61;66;74m ─╯\u001b[39m"
+      ],
+      "windowTop": 0,
+      "altScreen": false,
+      "cursor": {
+        "x": 3,
+        "y": 38,
+        "visible": true
+      }
+    }
+  }
+}

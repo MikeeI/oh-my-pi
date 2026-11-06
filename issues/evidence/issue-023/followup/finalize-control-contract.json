@@ -1,0 +1,82 @@
+{
+  "name": "finalize-control",
+  "stage": "contract",
+  "live": "│  +7│OLD-PREVIEW-6                                                           │\n│  +8│OLD-PREVIEW-7                                                           │\n│  +9│OLD-PREVIEW-8                                                           │\n│ +10│OLD-PREVIEW-9                                                           │\n│ +11│OLD-PREVIEW-10                                                          │\n│ +12│OLD-PREVIEW-11                                                          │\n│ +13│OLD-PREVIEW-12                                                          │\n│ +14│OLD-PREVIEW-13                                                          │\n│ +15│OLD-PREVIEW-14                                                          │\n│ +16│OLD-PREVIEW-15                                                          │\n│ +17│OLD-PREVIEW-16                                                          │\n│ +18│OLD-PREVIEW-17                                                          │\n│ +19│OLD-PREVIEW-18                                                          │\n│ +20│OLD-PREVIEW-19                                                          │\n│ +21│OLD-PREVIEW-20                                                          │\n│ +22│OLD-PREVIEW-21                                                          │\n│ +23│OLD-PREVIEW-22                                                          │\n│ +24│OLD-PREVIEW-23                                                          │\n│ +25│OLD-PREVIEW-24                                                          │\n│ +26│OLD-PREVIEW-25                                                          │\n│ +27│OLD-PREVIEW-26                                                          │\n│ +28│OLD-PREVIEW-27                                                          │\n│ +29│OLD-PREVIEW-28                                                          │\n│ +30│OLD-PREVIEW-29                                                          │\n│ +31│OLD-PREVIEW-30                                                          │\n│ +32│OLD-PREVIEW-31                                                          │\n│ +33│OLD-PREVIEW-32                                                          │\n│ +34│OLD-PREVIEW-33                                                          │\n│ +35│OLD-PREVIEW-34                                                          │\n│ +36│OLD-PREVIEW-35                                                          │\n│ +37│OLD-PREVIEW-36                                                          │\n│ +38│OLD-PREVIEW-37                                                          │\n│ +39│OLD-PREVIEW-38                                                          │\n│ +40│OLD-PREVIEW-39                                                          │\n│… (20 more lines) ⟦Ctrl+O: Expand⟧                                           │\n╰─────────────────────────────────────────────────────────────────────────────╯\n\n╭──AUDIT-STATUS───────────────────────────────────────────────────────────────╮\n╰─                                                                           ─╯\n",
+  "full": "╭─── ✎ Edit: 🗒 diagnostic.txt ⟦+60⟧ ──────────────────────────────────────────╮\n│  +1│OLD-PREVIEW-0                                                           │\n│  +2│OLD-PREVIEW-1                                                           │\n│  +3│OLD-PREVIEW-2                                                           │\n│  +4│OLD-PREVIEW-3                                                           │\n│  +5│OLD-PREVIEW-4                                                           │\n│  +6│OLD-PREVIEW-5                                                           │\n│  +7│OLD-PREVIEW-6                                                           │\n│  +8│OLD-PREVIEW-7                                                           │\n│  +9│OLD-PREVIEW-8                                                           │\n│ +10│OLD-PREVIEW-9                                                           │\n│ +11│OLD-PREVIEW-10                                                          │\n│ +12│OLD-PREVIEW-11                                                          │\n│ +13│OLD-PREVIEW-12                                                          │\n│ +14│OLD-PREVIEW-13                                                          │\n│ +15│OLD-PREVIEW-14                                                          │\n│ +16│OLD-PREVIEW-15                                                          │\n│ +17│OLD-PREVIEW-16                                                          │\n│ +18│OLD-PREVIEW-17                                                          │\n│ +19│OLD-PREVIEW-18                                                          │\n│ +20│OLD-PREVIEW-19                                                          │\n│ +21│OLD-PREVIEW-20                                                          │\n│ +22│OLD-PREVIEW-21                                                          │\n│ +23│OLD-PREVIEW-22                                                          │\n│ +24│OLD-PREVIEW-23                                                          │\n│ +25│OLD-PREVIEW-24                                                          │\n│ +26│OLD-PREVIEW-25                                                          │\n│ +27│OLD-PREVIEW-26                                                          │\n│ +28│OLD-PREVIEW-27                                                          │\n│ +29│OLD-PREVIEW-28                                                          │\n│ +30│OLD-PREVIEW-29                                                          │\n│ +31│OLD-PREVIEW-30                                                          │\n│ +32│OLD-PREVIEW-31                                                          │\n│ +33│OLD-PREVIEW-32                                                          │\n│ +34│OLD-PREVIEW-33                                                          │\n│ +35│OLD-PREVIEW-34                                                          │\n│ +36│OLD-PREVIEW-35                                                          │\n│ +37│OLD-PREVIEW-36                                                          │\n│ +38│OLD-PREVIEW-37                                                          │\n│ +39│OLD-PREVIEW-38                                                          │\n│ +40│OLD-PREVIEW-39                                                          │\n│… (20 more lines) ⟦Ctrl+O: Expand⟧                                           │\n╰─────────────────────────────────────────────────────────────────────────────╯\n\n╭──AUDIT-STATUS───────────────────────────────────────────────────────────────╮\n╰─                                                                           ─╯\n",
+  "historySize": 7,
+  "history": "╭─── ✎ Edit: 🗒 diagnostic.txt ⟦+60⟧ ──────────────────────────────────────────╮\n│  +1│OLD-PREVIEW-0                                                           │\n│  +2│OLD-PREVIEW-1                                                           │\n│  +3│OLD-PREVIEW-2                                                           │\n│  +4│OLD-PREVIEW-3                                                           │\n│  +5│OLD-PREVIEW-4                                                           │\n│  +6│OLD-PREVIEW-5                                                           │",
+  "paint": {
+    "t": 1790719800494,
+    "kind": "paint",
+    "stage": "contract",
+    "paint": 2,
+    "history": [
+      "╭─── ✎ Edit: 🗒 diagnostic.txt ⟦+60⟧ ──────────────────────────────────────────╮",
+      "│  +1│OLD-PREVIEW-0                                                           │",
+      "│  +2│OLD-PREVIEW-1                                                           │",
+      "│  +3│OLD-PREVIEW-2                                                           │",
+      "│  +4│OLD-PREVIEW-3                                                           │",
+      "│  +5│OLD-PREVIEW-4                                                           │",
+      "│  +6│OLD-PREVIEW-5                                                           │",
+      "│  +7│OLD-PREVIEW-6                                                           │",
+      "│  +8│OLD-PREVIEW-7                                                           │",
+      "│  +9│OLD-PREVIEW-8                                                           │",
+      "│ +10│OLD-PREVIEW-9                                                           │",
+      "│ +11│OLD-PREVIEW-10                                                          │",
+      "│ +12│OLD-PREVIEW-11                                                          │",
+      "│ +13│OLD-PREVIEW-12                                                          │",
+      "│ +14│OLD-PREVIEW-13                                                          │",
+      "│ +15│OLD-PREVIEW-14                                                          │",
+      "│ +16│OLD-PREVIEW-15                                                          │",
+      "│ +17│OLD-PREVIEW-16                                                          │",
+      "│ +18│OLD-PREVIEW-17                                                          │",
+      "│ +19│OLD-PREVIEW-18                                                          │",
+      "│ +20│OLD-PREVIEW-19                                                          │",
+      "│ +21│OLD-PREVIEW-20                                                          │",
+      "│ +22│OLD-PREVIEW-21                                                          │",
+      "│ +23│OLD-PREVIEW-22                                                          │",
+      "│ +24│OLD-PREVIEW-23                                                          │",
+      "│ +25│OLD-PREVIEW-24                                                          │",
+      "│ +26│OLD-PREVIEW-25                                                          │",
+      "│ +27│OLD-PREVIEW-26                                                          │",
+      "│ +28│OLD-PREVIEW-27                                                          │",
+      "│ +29│OLD-PREVIEW-28                                                          │",
+      "│ +30│OLD-PREVIEW-29                                                          │",
+      "│ +31│OLD-PREVIEW-30                                                          │",
+      "│ +32│OLD-PREVIEW-31                                                          │",
+      "│ +33│OLD-PREVIEW-32                                                          │",
+      "│ +34│OLD-PREVIEW-33                                                          │",
+      "│ +35│OLD-PREVIEW-34                                                          │",
+      "│ +36│OLD-PREVIEW-35                                                          │",
+      "│ +37│OLD-PREVIEW-36                                                          │",
+      "│ +38│OLD-PREVIEW-37                                                          │",
+      "│ +39│OLD-PREVIEW-38                                                          │",
+      "│ +40│OLD-PREVIEW-39                                                          │",
+      "│… (20 more lines) ⟦Ctrl+O: Expand⟧                                           │",
+      "╰─────────────────────────────────────────────────────────────────────────────╯",
+      ""
+    ],
+    "viewport": [
+      "╭──AUDIT-STATUS───────────────────────────────────────────────────────────────╮",
+      "╰─                                                                           ─╯"
+    ],
+    "reset": false,
+    "alt": false,
+    "columns": 79,
+    "rows": 39,
+    "draft": "",
+    "debug": {
+      "lines": [
+        "\u001b[38;2;61;66;74m╭──\u001b[39mAUDIT-STATUS\u001b[38;2;61;66;74m─────────────────────────────────────────────────────────────\u001b[39m\u001b[38;2;61;66;74m──╮\u001b[39m",
+        "\u001b[38;2;61;66;74m╰─ \u001b[39m\u001b[38;2;229;229;231m\u001b[39m                                                                         \u001b[38;2;61;66;74m ─╯\u001b[39m"
+      ],
+      "windowTop": 0,
+      "altScreen": false,
+      "cursor": {
+        "x": 3,
+        "y": 38,
+        "visible": true
+      }
+    }
+  }
+}

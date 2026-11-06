@@ -27,6 +27,11 @@ export interface TruncationMeta {
 	/** Head/tail line ranges shown when direction === "middle". */
 	headRange?: { start: number; end: number };
 	tailRange?: { start: number; end: number };
+	/**
+	 * Artifact lines holding every middle-elided byte, when the producer knows
+	 * them exactly; otherwise recovery derives them from complete head/tail ranges.
+	 */
+	elidedRange?: { start: number; end: number };
 	/** Bytes elided from the middle. */
 	elidedBytes?: number;
 	/** Lines elided from the middle. */
@@ -177,6 +182,13 @@ export function formatFullOutputReference(artifactId: string, artifactElidedByte
 	}
 	return `Read artifact://${artifactId} for full output`;
 }
+function formatMiddleRecoveryReference(artifactId: string, truncation: TruncationMeta): string {
+	const head = truncation.headRange;
+	const tail = truncation.tailRange;
+	const omitted = truncation.elidedRange ?? (head && tail ? { start: head.end + 1, end: tail.start - 1 } : undefined);
+	if (!omitted || omitted.start > omitted.end) return formatFullOutputReference(artifactId);
+	return `Read artifact://${artifactId}:${omitted.start}-${omitted.end} to recover omitted artifact lines`;
+}
 
 /** Strip the last literal notice or a matching final line; optionally preserve surrounding whitespace. */
 export function stripTrailingNotice(
@@ -271,10 +283,11 @@ export function stripGeneratedOutputNotice(text: string): string {
 /** Format truncation ranges and recovery hints. */
 export function formatTruncationMetaNotice(truncation: TruncationMeta, source?: SourceMeta): string {
 	let notice: string;
+	const artifactIsSample = (truncation.artifactElidedBytes ?? 0) > 0;
 	const artifactReference =
 		truncation.artifactId == null
 			? undefined
-			: source?.type === "report"
+			: source?.type === "report" && !artifactIsSample
 				? `Read artifact://${truncation.artifactId} for full report (${source.value})`
 				: formatFullOutputReference(truncation.artifactId, truncation.artifactElidedBytes);
 
@@ -296,8 +309,13 @@ export function formatTruncationMetaNotice(truncation: TruncationMeta, source?: 
 		if (truncation.nextOffset != null) {
 			notice += `. Use :${truncation.nextOffset} to continue`;
 		}
-		if (artifactReference) {
-			notice += `. ${artifactReference}`;
+		if (truncation.artifactId != null) {
+			// Capping changes artifact line coordinates and discards bytes that no recovery selector can retrieve.
+			const recoveryReference =
+				source?.type === "report" || artifactIsSample
+					? artifactReference
+					: formatMiddleRecoveryReference(truncation.artifactId, truncation);
+			if (recoveryReference) notice += `. ${recoveryReference}`;
 		}
 		return notice;
 	}

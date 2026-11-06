@@ -173,6 +173,7 @@ export class IdleMaintenance {
 		const session = this.#session;
 		return (
 			!session.isStreaming &&
+			!session.isRunningRoutine &&
 			!session.hasAdmittedSubmission &&
 			session.queuedMessageCount === 0 &&
 			this.#options.scheduledTurn?.() !== true

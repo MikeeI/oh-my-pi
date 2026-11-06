@@ -1,0 +1,1091 @@
+{
+  "variant": "baseline",
+  "history": {
+    "rename-001": {
+      "baseline": 1
+    },
+    "rename-005": {
+      "baseline": 1
+    },
+    "rename-007": {
+      "baseline": 0.8333333333333334
+    },
+    "rename-009": {
+      "baseline": 1
+    },
+    "rename-012": {
+      "baseline": 1
+    },
+    "rename-013": {
+      "baseline": 1
+    },
+    "rename-014": {
+      "baseline": 1
+    },
+    "rename-015": {
+      "baseline": 1
+    },
+    "rename-016": {
+      "baseline": 1
+    },
+    "rename-017": {
+      "baseline": 1
+    },
+    "rename-018": {
+      "baseline": 1
+    },
+    "rename-019": {
+      "baseline": 0.6666666666666666
+    },
+    "rename-024": {
+      "baseline": 1
+    },
+    "rename-025": {
+      "baseline": 1
+    },
+    "rename-026": {
+      "baseline": 1
+    },
+    "rename-027": {
+      "baseline": 1
+    },
+    "rename-028": {
+      "baseline": 0.6666666666666666
+    },
+    "rename-031": {
+      "baseline": 1
+    },
+    "rename-033": {
+      "baseline": 1
+    },
+    "rename-036": {
+      "baseline": 1
+    },
+    "rename-039": {
+      "baseline": 1
+    },
+    "rename-043": {
+      "baseline": 1
+    },
+    "rename-044": {
+      "baseline": 1
+    },
+    "rename-047": {
+      "baseline": 1
+    }
+  },
+  "rows": [
+    {
+      "prompt_id": "rename-001",
+      "rep": 0,
+      "grade": {
+        "quality": 1,
+        "format": 1
+      },
+      "explanation": "focus=1; recognizable=1; strict_retry_failure=false",
+      "status": "ok",
+      "attempts": 1
+    },
+    {
+      "prompt_id": "rename-001",
+      "rep": 2,
+      "grade": {
+        "quality": 1,
+        "format": 1
+      },
+      "explanation": "focus=1; recognizable=1; strict_retry_failure=false",
+      "status": "ok",
+      "attempts": 1
+    },
+    {
+      "prompt_id": "rename-001",
+      "rep": 1,
+      "grade": {
+        "quality": 1,
+        "format": 1
+      },
+      "explanation": "focus=1; recognizable=1; strict_retry_failure=false",
+      "status": "ok",
+      "attempts": 1
+    },
+    {
+      "prompt_id": "rename-005",
+      "rep": 0,
+      "grade": {
+        "quality": 1,
+        "format": 1
+      },
+      "explanation": "focus=1; recognizable=1; strict_retry_failure=false",
+      "status": "ok",
+      "attempts": 1
+    },
+    {
+      "prompt_id": "rename-005",
+      "rep": 1,
+      "grade": {
+        "quality": 1,
+        "format": 1
+      },
+      "explanation": "focus=1; recognizable=1; strict_retry_failure=false",
+      "status": "ok",
+      "attempts": 1
+    },
+    {
+      "prompt_id": "rename-005",
+      "rep": 2,
+      "grade": {
+        "quality": 1,
+        "format": 1
+      },
+      "explanation": "focus=1; recognizable=1; strict_retry_failure=false",
+      "status": "ok",
+      "attempts": 1
+    },
+    {
+      "prompt_id": "rename-007",
+      "rep": 2,
+      "grade": {
+        "quality": 1,
+        "format": 1
+      },
+      "explanation": "focus=1; recognizable=1; strict_retry_failure=false",
+      "status": "ok",
+      "attempts": 1
+    },
+    {
+      "prompt_id": "rename-007",
+      "rep": 1,
+      "grade": {
+        "quality": 0.5,
+        "format": 1
+      },
+      "explanation": "focus=1; recognizable=0; strict_retry_failure=false",
+      "status": "ok",
+      "attempts": 1
+    },
+    {
+      "prompt_id": "rename-009",
+      "rep": 0,
+      "grade": {
+        "quality": 1,
+        "format": 1
+      },
+      "explanation": "focus=1; recognizable=1; strict_retry_failure=false",
+      "status": "ok",
+      "attempts": 1
+    },
+    {
+      "prompt_id": "rename-007",
+      "rep": 0,
+      "grade": {
+        "quality": 1,
+        "format": 1
+      },
+      "explanation": "focus=1; recognizable=1; strict_retry_failure=false",
+      "status": "ok",
+      "attempts": 1
+    },
+    {
+      "prompt_id": "rename-009",
+      "rep": 1,
+      "grade": {
+        "quality": 1,
+        "format": 1
+      },
+      "explanation": "focus=1; recognizable=1; strict_retry_failure=false",
+      "status": "ok",
+      "attempts": 1
+    },
+    {
+      "prompt_id": "rename-009",
+      "rep": 2,
+      "grade": {
+        "quality": 1,
+        "format": 1
+      },
+      "explanation": "focus=1; recognizable=1; strict_retry_failure=false",
+      "status": "ok",
+      "attempts": 1
+    },
+    {
+      "prompt_id": "rename-012",
+      "rep": 0,
+      "grade": {
+        "quality": 1,
+        "format": 1
+      },
+      "explanation": "focus=1; recognizable=1; strict_retry_failure=false",
+      "status": "ok",
+      "attempts": 1
+    },
+    {
+      "prompt_id": "rename-012",
+      "rep": 1,
+      "grade": {
+        "quality": 1,
+        "format": 1
+      },
+      "explanation": "focus=1; recognizable=1; strict_retry_failure=false",
+      "status": "ok",
+      "attempts": 1
+    },
+    {
+      "prompt_id": "rename-013",
+      "rep": 1,
+      "grade": {
+        "quality": 1,
+        "format": 1
+      },
+      "explanation": "focus=1; recognizable=1; strict_retry_failure=false",
+      "status": "ok",
+      "attempts": 1
+    },
+    {
+      "prompt_id": "rename-012",
+      "rep": 2,
+      "grade": {
+        "quality": 1,
+        "format": 1
+      },
+      "explanation": "focus=1; recognizable=1; strict_retry_failure=false",
+      "status": "ok",
+      "attempts": 1
+    },
+    {
+      "prompt_id": "rename-013",
+      "rep": 2,
+      "grade": {
+        "quality": 1,
+        "format": 1
+      },
+      "explanation": "focus=1; recognizable=1; strict_retry_failure=false",
+      "status": "ok",
+      "attempts": 1
+    },
+    {
+      "prompt_id": "rename-013",
+      "rep": 0,
+      "grade": {
+        "quality": 1,
+        "format": 1
+      },
+      "explanation": "focus=1; recognizable=1; strict_retry_failure=false",
+      "status": "ok",
+      "attempts": 1
+    },
+    {
+      "prompt_id": "rename-014",
+      "rep": 0,
+      "grade": {
+        "quality": 1,
+        "format": 1
+      },
+      "explanation": "focus=1; recognizable=1; strict_retry_failure=false",
+      "status": "ok",
+      "attempts": 1
+    },
+    {
+      "prompt_id": "rename-014",
+      "rep": 1,
+      "grade": {
+        "quality": 1,
+        "format": 1
+      },
+      "explanation": "focus=1; recognizable=1; strict_retry_failure=false",
+      "status": "ok",
+      "attempts": 1
+    },
+    {
+      "prompt_id": "rename-014",
+      "rep": 2,
+      "grade": {
+        "quality": 1,
+        "format": 1
+      },
+      "explanation": "focus=1; recognizable=1; strict_retry_failure=false",
+      "status": "ok",
+      "attempts": 1
+    },
+    {
+      "prompt_id": "rename-015",
+      "rep": 2,
+      "grade": {
+        "quality": 1,
+        "format": 1
+      },
+      "explanation": "focus=1; recognizable=1; strict_retry_failure=false",
+      "status": "ok",
+      "attempts": 1
+    },
+    {
+      "prompt_id": "rename-015",
+      "rep": 0,
+      "grade": {
+        "quality": 1,
+        "format": 1
+      },
+      "explanation": "focus=1; recognizable=1; strict_retry_failure=false",
+      "status": "ok",
+      "attempts": 1
+    },
+    {
+      "prompt_id": "rename-015",
+      "rep": 1,
+      "grade": {
+        "quality": 1,
+        "format": 1
+      },
+      "explanation": "focus=1; recognizable=1; strict_retry_failure=false",
+      "status": "ok",
+      "attempts": 1
+    },
+    {
+      "prompt_id": "rename-016",
+      "rep": 0,
+      "grade": {
+        "quality": 1,
+        "format": 1
+      },
+      "explanation": "focus=1; recognizable=1; strict_retry_failure=false",
+      "status": "ok",
+      "attempts": 1
+    },
+    {
+      "prompt_id": "rename-016",
+      "rep": 2,
+      "grade": {
+        "quality": 1,
+        "format": 1
+      },
+      "explanation": "focus=1; recognizable=1; strict_retry_failure=false",
+      "status": "ok",
+      "attempts": 1
+    },
+    {
+      "prompt_id": "rename-016",
+      "rep": 1,
+      "grade": {
+        "quality": 1,
+        "format": 1
+      },
+      "explanation": "focus=1; recognizable=1; strict_retry_failure=false",
+      "status": "ok",
+      "attempts": 1
+    },
+    {
+      "prompt_id": "rename-017",
+      "rep": 1,
+      "grade": {
+        "quality": 1,
+        "format": 1
+      },
+      "explanation": "focus=1; recognizable=1; strict_retry_failure=false",
+      "status": "ok",
+      "attempts": 1
+    },
+    {
+      "prompt_id": "rename-017",
+      "rep": 2,
+      "grade": {
+        "quality": 1,
+        "format": 1
+      },
+      "explanation": "focus=1; recognizable=1; strict_retry_failure=false",
+      "status": "ok",
+      "attempts": 1
+    },
+    {
+      "prompt_id": "rename-017",
+      "rep": 0,
+      "grade": {
+        "quality": 1,
+        "format": 1
+      },
+      "explanation": "focus=1; recognizable=1; strict_retry_failure=false",
+      "status": "ok",
+      "attempts": 1
+    },
+    {
+      "prompt_id": "rename-018",
+      "rep": 0,
+      "grade": {
+        "quality": 1,
+        "format": 1
+      },
+      "explanation": "focus=1; recognizable=1; strict_retry_failure=false",
+      "status": "ok",
+      "attempts": 1
+    },
+    {
+      "prompt_id": "rename-019",
+      "rep": 1,
+      "grade": {
+        "quality": 1,
+        "format": 0
+      },
+      "explanation": "focus=1; recognizable=1; strict_retry_failure=false",
+      "status": "ok",
+      "attempts": 1
+    },
+    {
+      "prompt_id": "rename-018",
+      "rep": 2,
+      "grade": {
+        "quality": 1,
+        "format": 1
+      },
+      "explanation": "focus=1; recognizable=1; strict_retry_failure=false",
+      "status": "ok",
+      "attempts": 1
+    },
+    {
+      "prompt_id": "rename-019",
+      "rep": 2,
+      "grade": {
+        "quality": 1,
+        "format": 1
+      },
+      "explanation": "focus=1; recognizable=1; strict_retry_failure=false",
+      "status": "ok",
+      "attempts": 1
+    },
+    {
+      "prompt_id": "rename-018",
+      "rep": 1,
+      "grade": {
+        "quality": 1,
+        "format": 1
+      },
+      "explanation": "focus=1; recognizable=1; strict_retry_failure=false",
+      "status": "ok",
+      "attempts": 1
+    },
+    {
+      "prompt_id": "rename-019",
+      "rep": 0,
+      "grade": {
+        "quality": 0,
+        "format": 0
+      },
+      "explanation": "focus=0; recognizable=0; strict_retry_failure=false",
+      "status": "ok",
+      "attempts": 1
+    },
+    {
+      "prompt_id": "rename-024",
+      "rep": 1,
+      "grade": {
+        "quality": 1,
+        "format": 1
+      },
+      "explanation": "focus=1; recognizable=1; strict_retry_failure=false",
+      "status": "ok",
+      "attempts": 1
+    },
+    {
+      "prompt_id": "rename-024",
+      "rep": 0,
+      "grade": {
+        "quality": 1,
+        "format": 1
+      },
+      "explanation": "focus=1; recognizable=1; strict_retry_failure=false",
+      "status": "ok",
+      "attempts": 1
+    },
+    {
+      "prompt_id": "rename-025",
+      "rep": 1,
+      "grade": {
+        "quality": 1,
+        "format": 1
+      },
+      "explanation": "focus=1; recognizable=1; strict_retry_failure=false",
+      "status": "ok",
+      "attempts": 1
+    },
+    {
+      "prompt_id": "rename-025",
+      "rep": 2,
+      "grade": {
+        "quality": 1,
+        "format": 1
+      },
+      "explanation": "focus=1; recognizable=1; strict_retry_failure=false",
+      "status": "ok",
+      "attempts": 1
+    },
+    {
+      "prompt_id": "rename-024",
+      "rep": 2,
+      "grade": {
+        "quality": 1,
+        "format": 1
+      },
+      "explanation": "focus=1; recognizable=1; strict_retry_failure=false",
+      "status": "ok",
+      "attempts": 1
+    },
+    {
+      "prompt_id": "rename-026",
+      "rep": 0,
+      "grade": {
+        "quality": 1,
+        "format": 1
+      },
+      "explanation": "focus=1; recognizable=1; strict_retry_failure=false",
+      "status": "ok",
+      "attempts": 1
+    },
+    {
+      "prompt_id": "rename-025",
+      "rep": 0,
+      "grade": {
+        "quality": 1,
+        "format": 1
+      },
+      "explanation": "focus=1; recognizable=1; strict_retry_failure=false",
+      "status": "ok",
+      "attempts": 1
+    },
+    {
+      "prompt_id": "rename-026",
+      "rep": 1,
+      "grade": {
+        "quality": 1,
+        "format": 1
+      },
+      "explanation": "focus=1; recognizable=1; strict_retry_failure=false",
+      "status": "ok",
+      "attempts": 1
+    },
+    {
+      "prompt_id": "rename-026",
+      "rep": 2,
+      "grade": {
+        "quality": 1,
+        "format": 1
+      },
+      "explanation": "focus=1; recognizable=1; strict_retry_failure=false",
+      "status": "ok",
+      "attempts": 1
+    },
+    {
+      "prompt_id": "rename-027",
+      "rep": 2,
+      "grade": {
+        "quality": 1,
+        "format": 1
+      },
+      "explanation": "focus=1; recognizable=1; strict_retry_failure=false",
+      "status": "ok",
+      "attempts": 1
+    },
+    {
+      "prompt_id": "rename-028",
+      "rep": 0,
+      "grade": {
+        "quality": 1,
+        "format": 1
+      },
+      "explanation": "focus=1; recognizable=1; strict_retry_failure=false",
+      "status": "ok",
+      "attempts": 1
+    },
+    {
+      "prompt_id": "rename-027",
+      "rep": 0,
+      "grade": {
+        "quality": 1,
+        "format": 0
+      },
+      "explanation": "focus=1; recognizable=1; strict_retry_failure=false",
+      "status": "ok",
+      "attempts": 1
+    },
+    {
+      "prompt_id": "rename-027",
+      "rep": 1,
+      "grade": {
+        "quality": 1,
+        "format": 0
+      },
+      "explanation": "focus=1; recognizable=1; strict_retry_failure=false",
+      "status": "ok",
+      "attempts": 1
+    },
+    {
+      "prompt_id": "rename-028",
+      "rep": 2,
+      "grade": {
+        "quality": 0,
+        "format": 1
+      },
+      "explanation": "focus=0; recognizable=0; strict_retry_failure=false",
+      "status": "ok",
+      "attempts": 1
+    },
+    {
+      "prompt_id": "rename-028",
+      "rep": 1,
+      "grade": {
+        "quality": 1,
+        "format": 1
+      },
+      "explanation": "focus=1; recognizable=1; strict_retry_failure=false",
+      "status": "ok",
+      "attempts": 1
+    },
+    {
+      "prompt_id": "rename-031",
+      "rep": 0,
+      "grade": {
+        "quality": 1,
+        "format": 1
+      },
+      "explanation": "focus=1; recognizable=1; strict_retry_failure=false",
+      "status": "ok",
+      "attempts": 1
+    },
+    {
+      "prompt_id": "rename-031",
+      "rep": 1,
+      "grade": {
+        "quality": 1,
+        "format": 1
+      },
+      "explanation": "focus=1; recognizable=1; strict_retry_failure=false",
+      "status": "ok",
+      "attempts": 1
+    },
+    {
+      "prompt_id": "rename-031",
+      "rep": 2,
+      "grade": {
+        "quality": 1,
+        "format": 1
+      },
+      "explanation": "focus=1; recognizable=1; strict_retry_failure=false",
+      "status": "ok",
+      "attempts": 1
+    },
+    {
+      "prompt_id": "rename-033",
+      "rep": 1,
+      "grade": {
+        "quality": 1,
+        "format": 1
+      },
+      "explanation": "focus=1; recognizable=1; strict_retry_failure=false",
+      "status": "ok",
+      "attempts": 1
+    },
+    {
+      "prompt_id": "rename-033",
+      "rep": 0,
+      "grade": {
+        "quality": 1,
+        "format": 1
+      },
+      "explanation": "focus=1; recognizable=1; strict_retry_failure=false",
+      "status": "ok",
+      "attempts": 1
+    },
+    {
+      "prompt_id": "rename-033",
+      "rep": 2,
+      "grade": {
+        "quality": 1,
+        "format": 1
+      },
+      "explanation": "focus=1; recognizable=1; strict_retry_failure=false",
+      "status": "ok",
+      "attempts": 1
+    },
+    {
+      "prompt_id": "rename-036",
+      "rep": 1,
+      "grade": {
+        "quality": 1,
+        "format": 1
+      },
+      "explanation": "focus=1; recognizable=1; strict_retry_failure=false",
+      "status": "ok",
+      "attempts": 1
+    },
+    {
+      "prompt_id": "rename-036",
+      "rep": 2,
+      "grade": {
+        "quality": 1,
+        "format": 1
+      },
+      "explanation": "focus=1; recognizable=1; strict_retry_failure=false",
+      "status": "ok",
+      "attempts": 1
+    },
+    {
+      "prompt_id": "rename-036",
+      "rep": 0,
+      "grade": {
+        "quality": 1,
+        "format": 1
+      },
+      "explanation": "focus=1; recognizable=1; strict_retry_failure=false",
+      "status": "ok",
+      "attempts": 1
+    },
+    {
+      "prompt_id": "rename-039",
+      "rep": 0,
+      "grade": {
+        "quality": 1,
+        "format": 1
+      },
+      "explanation": "focus=1; recognizable=1; strict_retry_failure=false",
+      "status": "ok",
+      "attempts": 1
+    },
+    {
+      "prompt_id": "rename-039",
+      "rep": 1,
+      "grade": {
+        "quality": 1,
+        "format": 1
+      },
+      "explanation": "focus=1; recognizable=1; strict_retry_failure=false",
+      "status": "ok",
+      "attempts": 1
+    },
+    {
+      "prompt_id": "rename-043",
+      "rep": 0,
+      "grade": {
+        "quality": 1,
+        "format": 1
+      },
+      "explanation": "focus=1; recognizable=1; strict_retry_failure=false",
+      "status": "ok",
+      "attempts": 1
+    },
+    {
+      "prompt_id": "rename-043",
+      "rep": 2,
+      "grade": {
+        "quality": 1,
+        "format": 1
+      },
+      "explanation": "focus=1; recognizable=1; strict_retry_failure=false",
+      "status": "ok",
+      "attempts": 1
+    },
+    {
+      "prompt_id": "rename-043",
+      "rep": 1,
+      "grade": {
+        "quality": 1,
+        "format": 1
+      },
+      "explanation": "focus=1; recognizable=1; strict_retry_failure=false",
+      "status": "ok",
+      "attempts": 1
+    },
+    {
+      "prompt_id": "rename-039",
+      "rep": 2,
+      "grade": {
+        "quality": 1,
+        "format": 1
+      },
+      "explanation": "focus=1; recognizable=1; strict_retry_failure=false",
+      "status": "ok",
+      "attempts": 1
+    },
+    {
+      "prompt_id": "rename-044",
+      "rep": 0,
+      "grade": {
+        "quality": 1,
+        "format": 1
+      },
+      "explanation": "focus=1; recognizable=1; strict_retry_failure=false",
+      "status": "ok",
+      "attempts": 1
+    },
+    {
+      "prompt_id": "rename-044",
+      "rep": 2,
+      "grade": {
+        "quality": 1,
+        "format": 1
+      },
+      "explanation": "focus=1; recognizable=1; strict_retry_failure=false",
+      "status": "ok",
+      "attempts": 1
+    },
+    {
+      "prompt_id": "rename-047",
+      "rep": 0,
+      "grade": {
+        "quality": 1,
+        "format": 1
+      },
+      "explanation": "focus=1; recognizable=1; strict_retry_failure=false",
+      "status": "ok",
+      "attempts": 1
+    },
+    {
+      "prompt_id": "rename-047",
+      "rep": 2,
+      "grade": {
+        "quality": 1,
+        "format": 1
+      },
+      "explanation": "focus=1; recognizable=1; strict_retry_failure=false",
+      "status": "ok",
+      "attempts": 1
+    },
+    {
+      "prompt_id": "rename-047",
+      "rep": 1,
+      "grade": {
+        "quality": 1,
+        "format": 1
+      },
+      "explanation": "focus=1; recognizable=1; strict_retry_failure=false",
+      "status": "ok",
+      "attempts": 1
+    },
+    {
+      "prompt_id": "rename-044",
+      "rep": 1,
+      "grade": {
+        "quality": 1,
+        "format": 1
+      },
+      "explanation": "focus=1; recognizable=1; strict_retry_failure=false",
+      "status": "ok",
+      "attempts": 1
+    }
+  ],
+  "traces": [
+    ".omp/ratchet/rename-title/baseline/traces/rename-014_rep2.json",
+    ".omp/ratchet/rename-title/baseline/traces/rename-028_rep0.json",
+    ".omp/ratchet/rename-title/baseline/traces/rename-043_rep0.json",
+    ".omp/ratchet/rename-title/baseline/traces/rename-013_rep0.json",
+    ".omp/ratchet/rename-title/baseline/traces/rename-033_rep0.json",
+    ".omp/ratchet/rename-title/baseline/traces/rename-007_rep0.json",
+    ".omp/ratchet/rename-title/baseline/traces/rename-016_rep1.json",
+    ".omp/ratchet/rename-title/baseline/traces/rename-018_rep2.json",
+    ".omp/ratchet/rename-title/baseline/traces/rename-015_rep0.json",
+    ".omp/ratchet/rename-title/baseline/traces/rename-013_rep1.json",
+    ".omp/ratchet/rename-title/baseline/traces/rename-027_rep2.json",
+    ".omp/ratchet/rename-title/baseline/traces/rename-013_rep2.json",
+    ".omp/ratchet/rename-title/baseline/traces/rename-025_rep0.json",
+    ".omp/ratchet/rename-title/baseline/traces/rename-044_rep0.json",
+    ".omp/ratchet/rename-title/baseline/traces/rename-033_rep1.json",
+    ".omp/ratchet/rename-title/baseline/traces/rename-012_rep2.json",
+    ".omp/ratchet/rename-title/baseline/traces/rename-017_rep1.json",
+    ".omp/ratchet/rename-title/baseline/traces/rename-028_rep1.json",
+    ".omp/ratchet/rename-title/baseline/traces/rename-016_rep0.json",
+    ".omp/ratchet/rename-title/baseline/traces/rename-028_rep2.json",
+    ".omp/ratchet/rename-title/baseline/traces/rename-039_rep0.json",
+    ".omp/ratchet/rename-title/baseline/traces/rename-043_rep1.json",
+    ".omp/ratchet/rename-title/baseline/traces/rename-015_rep2.json",
+    ".omp/ratchet/rename-title/baseline/traces/rename-025_rep1.json",
+    ".omp/ratchet/rename-title/baseline/traces/rename-027_rep1.json",
+    ".omp/ratchet/rename-title/baseline/traces/rename-044_rep2.json",
+    ".omp/ratchet/rename-title/baseline/traces/rename-026_rep0.json",
+    ".omp/ratchet/rename-title/baseline/traces/rename-047_rep0.json",
+    ".omp/ratchet/rename-title/baseline/traces/rename-033_rep2.json",
+    ".omp/ratchet/rename-title/baseline/traces/rename-005_rep2.json",
+    ".omp/ratchet/rename-title/baseline/traces/rename-026_rep1.json",
+    ".omp/ratchet/rename-title/baseline/traces/rename-036_rep0.json",
+    ".omp/ratchet/rename-title/baseline/traces/rename-001_rep1.json",
+    ".omp/ratchet/rename-title/baseline/traces/rename-012_rep1.json",
+    ".omp/ratchet/rename-title/baseline/traces/rename-024_rep2.json",
+    ".omp/ratchet/rename-title/baseline/traces/rename-018_rep1.json",
+    ".omp/ratchet/rename-title/baseline/traces/rename-015_rep1.json",
+    ".omp/ratchet/rename-title/baseline/traces/rename-019_rep2.json",
+    ".omp/ratchet/rename-title/baseline/traces/rename-025_rep2.json",
+    ".omp/ratchet/rename-title/baseline/traces/rename-018_rep0.json",
+    ".omp/ratchet/rename-title/baseline/traces/rename-005_rep1.json",
+    ".omp/ratchet/rename-title/baseline/traces/rename-036_rep2.json",
+    ".omp/ratchet/rename-title/baseline/traces/rename-001_rep0.json",
+    ".omp/ratchet/rename-title/baseline/traces/rename-024_rep0.json",
+    ".omp/ratchet/rename-title/baseline/traces/rename-043_rep2.json",
+    ".omp/ratchet/rename-title/baseline/traces/rename-014_rep1.json",
+    ".omp/ratchet/rename-title/baseline/traces/rename-017_rep2.json",
+    ".omp/ratchet/rename-title/baseline/traces/rename-019_rep0.json",
+    ".omp/ratchet/rename-title/baseline/traces/rename-027_rep0.json",
+    ".omp/ratchet/rename-title/baseline/traces/rename-026_rep2.json",
+    ".omp/ratchet/rename-title/baseline/traces/rename-031_rep0.json",
+    ".omp/ratchet/rename-title/baseline/traces/rename-036_rep1.json",
+    ".omp/ratchet/rename-title/baseline/traces/rename-007_rep2.json",
+    ".omp/ratchet/rename-title/baseline/traces/rename-039_rep2.json",
+    ".omp/ratchet/rename-title/baseline/traces/rename-005_rep0.json",
+    ".omp/ratchet/rename-title/baseline/traces/rename-009_rep1.json",
+    ".omp/ratchet/rename-title/baseline/traces/rename-044_rep1.json",
+    ".omp/ratchet/rename-title/baseline/traces/rename-016_rep2.json",
+    ".omp/ratchet/rename-title/baseline/traces/rename-047_rep2.json",
+    ".omp/ratchet/rename-title/baseline/traces/rename-007_rep1.json",
+    ".omp/ratchet/rename-title/baseline/traces/rename-001_rep2.json",
+    ".omp/ratchet/rename-title/baseline/traces/rename-031_rep1.json",
+    ".omp/ratchet/rename-title/baseline/traces/rename-019_rep1.json",
+    ".omp/ratchet/rename-title/baseline/traces/rename-039_rep1.json",
+    ".omp/ratchet/rename-title/baseline/traces/rename-014_rep0.json",
+    ".omp/ratchet/rename-title/baseline/traces/rename-009_rep0.json",
+    ".omp/ratchet/rename-title/baseline/traces/rename-024_rep1.json",
+    ".omp/ratchet/rename-title/baseline/traces/rename-017_rep0.json",
+    ".omp/ratchet/rename-title/baseline/traces/rename-012_rep0.json",
+    ".omp/ratchet/rename-title/baseline/traces/rename-031_rep2.json",
+    ".omp/ratchet/rename-title/baseline/traces/rename-047_rep1.json",
+    ".omp/ratchet/rename-title/baseline/traces/rename-009_rep2.json"
+  ],
+  "expectations": [
+    {
+      "id": "rename-001",
+      "intent": "Die ausgewählte Q1-Frage zur Reproduzierbarkeit des flaky Runtime-Audits bewerten; nicht beliebige weitere Anschlussfragen übernehmen.",
+      "oracle": "Flaky Runtime-Audit gezielt untersuchen",
+      "tag": "q-reference"
+    },
+    {
+      "id": "rename-005",
+      "intent": "Nach Auswahl von Q1 auch Änderungen in agent, catalog, natives und stats seit 18.11.0 durchsehen.",
+      "oracle": "Weitere Paketänderungen seit 18.11.0 prüfen",
+      "tag": "q-reference"
+    },
+    {
+      "id": "rename-007",
+      "intent": "Die soeben umgesetzten Routine-Konflikt- und Conversation-Search-Korrekturen committen und pushen; keine ungewählte Folgeuntersuchung.",
+      "oracle": "Routine- und Suchkorrekturen abschließen",
+      "tag": "q-reference"
+    },
+    {
+      "id": "rename-009",
+      "intent": "Den konkret gemeldeten Drift des setup-project-upgrade-Skills korrigieren; allgemeine Release-Nebenfragen sind nicht ausgewählt.",
+      "oracle": "Setup-Upgrade-Skill-Drift korrigieren",
+      "tag": "continuation"
+    },
+    {
+      "id": "rename-012",
+      "intent": "Die tatsächliche Ausgaberate in Tokens pro Sekunde von GPT-6 Luna messen, nicht nur dessen Erreichbarkeit prüfen.",
+      "oracle": "GPT-6 Luna Tokens pro Sekunde messen",
+      "tag": "direct"
+    },
+    {
+      "id": "rename-013",
+      "intent": "Die vorgeschlagenen Git-Output-Regeln im Bash-Prompt korrigieren, besonders commit-Ausgabe und show --name-status, und die gerenderte Guidance prüfen.",
+      "oracle": "Git-Output-Guidance im Bash-Prompt korrigieren",
+      "tag": "continuation"
+    },
+    {
+      "id": "rename-014",
+      "intent": "Vorher-Nachher-Beispiele zu kompakter Git-Recherche und bestehenden VCS-Funktionen zeigen; nicht einen neuen Git-Wrapper bauen.",
+      "oracle": "Tokenarme Git-Recherche anhand Beispielen erklären",
+      "tag": "direct"
+    },
+    {
+      "id": "rename-015",
+      "intent": "Kostenloses Gemini-API-Kontingent und Google-Search-Grounding unterscheiden und prüfen; bestehende Suche nicht ungefragt umstellen.",
+      "oracle": "Gemini-Free-Tier und Grounding prüfen",
+      "tag": "direct"
+    },
+    {
+      "id": "rename-016",
+      "intent": "Das Kontextbudget von GPT-6.1 Sol per Settings-Override auf den ausdrücklich verlangten Wert 400000 setzen, nicht die vorgeschlagenen 500000.",
+      "oracle": "Sol-Kontextbudget auf 400000 Tokens setzen",
+      "tag": "topic-shift"
+    },
+    {
+      "id": "rename-017",
+      "intent": "Erklären, wann Linux nach der Swap-Vergrößerung zurückgeholte Speicherseiten wieder auslagert; kein künstliches Leeren durchführen.",
+      "oracle": "Swap-Auslagerung nach Speicherumstellung erklären",
+      "tag": "direct"
+    },
+    {
+      "id": "rename-018",
+      "intent": "Funktionale und logische Änderungen zwischen MOMP 18.8.3 und 18.8.6 erläutern, nicht nochmals das abgeschlossene Upgrade ausführen.",
+      "oracle": "MOMP-Änderungen von 18.8.3 bis 18.8.6",
+      "tag": "topic-shift"
+    },
+    {
+      "id": "rename-019",
+      "intent": "Den absichtlich leeren Web-Fallback-Override entfernen, damit vorhandene Suchfallbacks wieder greifen; keinen unbewiesenen Modellwechsel vornehmen.",
+      "oracle": "Leeren Web-Fallback-Override entfernen",
+      "tag": "continuation"
+    },
+    {
+      "id": "rename-024",
+      "intent": "Die Kohärenzregel für den ausdrücklich gewünschten Gesamtcommit aussetzen; nicht stattdessen einen Aufteilungsplan zum Thema machen.",
+      "oracle": "Gesamtcommit mit Kohärenzregel-Ausnahme erstellen",
+      "tag": "q-reference"
+    },
+    {
+      "id": "rename-025",
+      "intent": "Den konkreten Nutzen des Puppeteer-Patches erklären; der breite Vertragsaudit bildet nur den Kontext.",
+      "oracle": "Nutzen des Puppeteer-Patches erklären",
+      "tag": "topic-shift"
+    },
+    {
+      "id": "rename-026",
+      "intent": "Ausschließlich den Source-Fix für Read-Token-Anzeigen bei cfg und proc committen und pushen; die Settings-Korrekturen sind Kontext.",
+      "oracle": "Read-Token-Anzeigen für cfg und proc korrigieren",
+      "tag": "q-reference"
+    },
+    {
+      "id": "rename-027",
+      "intent": "Den Fix zur Übernahme laufender Remote-Kompaktierung committen; Kompaktierung soll nicht unnötig abgebrochen und neu gestartet werden.",
+      "oracle": "Laufende Remote-Kompaktierung übernehmen",
+      "tag": "continuation"
+    },
+    {
+      "id": "rename-028",
+      "intent": "Die wiederhergestellte Modellcache-Isolation abschließen und committen; entfernte GPT-6-Tarifkorrekturen bleiben entfernt.",
+      "oracle": "Modellcache-Isolation wiederherstellen und abschließen",
+      "tag": "continuation"
+    },
+    {
+      "id": "rename-031",
+      "intent": "Die empfohlenen Dracula-kompatiblen Antwortfarben in einer fiktiven strukturierten Findings-Antwort demonstrieren.",
+      "oracle": "Dracula-Antwortfarben an Findings demonstrieren",
+      "tag": "direct"
+    },
+    {
+      "id": "rename-033",
+      "intent": "Weitere verwendete Native-Builds und mögliche Verbesserungen untersuchen; automatisierte Native-Vorbereitung ist der bisherige Kontext.",
+      "oracle": "Native-Builds und Verbesserungspotenzial untersuchen",
+      "tag": "topic-shift"
+    },
+    {
+      "id": "rename-036",
+      "intent": "Die Startup-Default- und Modellcache-Isolationskorrekturen veröffentlichen und installieren; nicht auf einen bloßen Commitbericht ausweichen.",
+      "oracle": "Modellauswahl- und Cache-Fixes veröffentlichen",
+      "tag": "continuation"
+    },
+    {
+      "id": "rename-039",
+      "intent": "Fallback-Warnungen nicht nur nach Discovery korrigieren, sondern ihr kurzes Aufblitzen während Discovery verhindern, wie ausdrücklich durch Q1 ausgewählt.",
+      "oracle": "Aufblitzende Fallback-Warnungen verhindern",
+      "tag": "q-reference"
+    },
+    {
+      "id": "rename-043",
+      "intent": "GPT-6.1 in project-settings-omp wie die anderen GPT-6-Modelle begrenzen; der vorherige Upgrade-Promptabgleich ist nicht mehr das konkrete Ziel.",
+      "oracle": "GPT-6.1 in MOMP-Settings begrenzen",
+      "tag": "topic-shift"
+    },
+    {
+      "id": "rename-044",
+      "intent": "Konkrete sinnvolle KDL-Anwendungen im Paperless-Classifier aufzeigen statt weitere allgemeine KDL-versus-JSON-Beispiele.",
+      "oracle": "KDL-Nutzen im Paperless-Classifier bewerten",
+      "tag": "topic-shift"
+    },
+    {
+      "id": "rename-047",
+      "intent": "Auto-Learn und dessen Verhalten anhand eines Beispiels erklären; die zwei zuvor gezeigten Prompts sind Kontext, kein Ausführungsauftrag.",
+      "oracle": "Auto-Learn anhand eines Beispiels erklären",
+      "tag": "direct"
+    }
+  ]
+}

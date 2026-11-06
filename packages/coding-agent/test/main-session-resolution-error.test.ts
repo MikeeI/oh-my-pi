@@ -20,6 +20,7 @@ import * as sessionListingModule from "@oh-my-pi/pi-coding-agent/session/session
 import { loadEntriesFromFile, loadSessionFile } from "@oh-my-pi/pi-coding-agent/session/session-loader";
 import { ForkSourceNotFoundError, SessionManager } from "@oh-my-pi/pi-coding-agent/session/session-manager";
 import { FileSessionStorage } from "@oh-my-pi/pi-coding-agent/session/session-storage";
+import * as dirs from "@oh-my-pi/pi-utils/dirs";
 
 function buildResumeArgs(resume: string, sessionDir?: string): Args {
 	return {
@@ -105,8 +106,9 @@ describe("writeStartupNotice", () => {
 });
 
 describe("createSessionManager — missing session (#2084)", () => {
-	it("rejects --resume with SessionResolutionError carrying a usage hint", async () => {
+	it("preserves the late-selected profile in missing-session recovery commands", async () => {
 		vi.spyOn(sessionListingModule, "resolveResumableSession").mockResolvedValue(undefined);
+		vi.spyOn(dirs, "getActiveProfile").mockReturnValue("personal");
 		try {
 			await expect(
 				createSessionManager(
@@ -117,7 +119,7 @@ describe("createSessionManager — missing session (#2084)", () => {
 			).rejects.toMatchObject({
 				name: "SessionResolutionError",
 				message: 'Session "019ea530-0000-7000-0000-000000000000" not found.',
-				hint: expect.stringContaining("omp --resume"),
+				hint: expect.stringContaining("omp --profile personal --resume"),
 			});
 
 			// Confirm it's the exported class so `runRootCommand`'s `instanceof` check works.
@@ -127,6 +129,9 @@ describe("createSessionManager — missing session (#2084)", () => {
 				stubSettings,
 			).catch((err: unknown) => err);
 			expect(caught).toBeInstanceOf(SessionResolutionError);
+			expect(caught).toMatchObject({
+				hint: expect.stringContaining("`omp --profile personal` to start a new one"),
+			});
 		} finally {
 			vi.restoreAllMocks();
 		}

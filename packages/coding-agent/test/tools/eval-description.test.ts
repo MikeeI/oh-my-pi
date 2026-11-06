@@ -1,4 +1,5 @@
 import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it } from "bun:test";
+import * as os from "node:os";
 import * as path from "node:path";
 import type { AgentTool } from "@oh-my-pi/pi-agent-core";
 import type { Tool as AiTool } from "@oh-my-pi/pi-ai";
@@ -15,6 +16,8 @@ import { TempDir } from "@oh-my-pi/pi-utils";
 import { cfgEvalPy } from "@oh-my-pi/pi-coding-agent/eval/settings";
 import { cfgTaskMaxRecursionDepth } from "@oh-my-pi/pi-coding-agent/task/settings";
 
+const MISSING_AGENT_DIR = path.join(os.tmpdir(), `omp-eval-description-${process.pid}`);
+
 function makeSession(opts: {
 	spawns?: string | null;
 	backends?: Record<string, boolean>;
@@ -25,6 +28,8 @@ function makeSession(opts: {
 	readActive?: boolean;
 }): ToolSession {
 	const settings = Settings.isolated({ ...opts.backends, ...opts.settings });
+	// The bundled API contract must not depend on an operator's editable Eval overrides.
+	Object.defineProperty(settings, "getAgentDir", { value: () => MISSING_AGENT_DIR });
 	if (opts.maxRecursionDepth !== undefined) cfgTaskMaxRecursionDepth.set(settings, opts.maxRecursionDepth);
 	return {
 		cwd: "/tmp/eval-test",
@@ -151,6 +156,17 @@ describe("eval tool description", () => {
 		expect(pyOnly.helpers).not.toContain("await budget.total()");
 	});
 
+	it("tells every runtime to await session tool calls", () => {
+		// Python's `tool.<name>()` returns a coroutine, so an un-awaited call never runs the tool.
+		for (const runtimes of [
+			{ py: true, js: false },
+			{ py: false, js: true },
+			{ py: true, js: true },
+		]) {
+			expect(getEvalToolDescription(runtimes)).toContain("await tool.<name>(args)");
+		}
+	});
+
 	it("inlines every topic when the session cannot read xd:// URLs", () => {
 		const linked = new EvalTool(makeSession({})).description;
 		const inlined = new EvalTool(makeSession({ readActive: false })).description;
@@ -180,7 +196,9 @@ describe("eval tool description", () => {
 			["helpers", "budget.total"],
 			["helpers", "%load <path>"],
 		]) {
-			const result = await readTool.execute("read-eval-topic", { path: `xd://eval/${topic}` });
+			const result = await readTool.execute("read-eval-topic", {
+				path: `xd://eval/${topic}`,
+			});
 			expect(result.content.some(part => part.type === "text" && part.text.includes(signature))).toBe(true);
 		}
 	});

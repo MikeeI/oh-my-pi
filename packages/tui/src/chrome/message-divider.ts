@@ -1,7 +1,8 @@
 import type { Component } from "../tui";
 import { getThemeEpoch, type ThemeColor, theme } from "../theme";
+import { colorToAnsi, FG_RESET } from "../theme/color";
 import { truncateToWidth } from "../utils";
-import { node, span, text } from "../native/describe";
+import { ansi, node, span, text } from "../native/describe";
 import type { NativeNode } from "../native/node";
 import { plainText } from "../native/spans";
 import { Memo } from "../native/memo";
@@ -49,7 +50,14 @@ export class MessageDividerComponent implements Component {
 			return this.#native.get([getThemeEpoch()], () =>
 				node("row", { gap: "sm", role: this.#options.role ?? "omp.divider" }, [
 					node("icon", { name: inline.icon }),
-					text([span(inline.label(), this.#options.labelColor)], { truncate: "end" }),
+					// Fork-only foregrounds have no host token after TSP palette synchronization was retired.
+					this.#options.labelColor === "cacheMiss"
+						? ansi(
+								colorToAnsi(theme.getColorHex(this.#options.labelColor), "truecolor") +
+									inline.label() +
+									FG_RESET,
+							)
+						: text([span(inline.label(), this.#options.labelColor)], { truncate: "end" }),
 				]),
 			);
 		}

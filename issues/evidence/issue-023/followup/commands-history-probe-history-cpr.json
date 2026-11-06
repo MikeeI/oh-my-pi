@@ -1,0 +1,2989 @@
+{
+  "socket": "issue-023-followup-594748",
+  "commands": [
+    {
+      "args": [
+        "new-session",
+        "-d",
+        "-x",
+        "79",
+        "-y",
+        "39",
+        "-s",
+        "history-probe-control",
+        "AUDIT_LOG='/root/projects/project-oh-my-pi-fork/issues/evidence/issue-023/followup/history-probe-control.jsonl' AUDIT_SCENARIO='history-probe' '/root/.bun/bin/bun' '/root/projects/project-oh-my-pi-fork/issues/evidence/issue-023/followup-driver.ts'"
+      ],
+      "at": 1790720100160
+    },
+    {
+      "args": [
+        "set-option",
+        "-w",
+        "-t",
+        "history-probe-control",
+        "remain-on-exit",
+        "on"
+      ],
+      "at": 1790720100190
+    },
+    {
+      "args": [
+        "display-message",
+        "-p",
+        "-t",
+        "history-probe-control",
+        "#{pane_dead}|#{pane_title}"
+      ],
+      "at": 1790720100199
+    },
+    {
+      "args": [
+        "display-message",
+        "-p",
+        "-t",
+        "history-probe-control",
+        "#{pane_dead}|#{pane_title}"
+      ],
+      "at": 1790720100228
+    },
+    {
+      "args": [
+        "display-message",
+        "-p",
+        "-t",
+        "history-probe-control",
+        "#{pane_dead}|#{pane_title}"
+      ],
+      "at": 1790720100260
+    },
+    {
+      "args": [
+        "display-message",
+        "-p",
+        "-t",
+        "history-probe-control",
+        "#{pane_dead}|#{pane_title}"
+      ],
+      "at": 1790720100290
+    },
+    {
+      "args": [
+        "display-message",
+        "-p",
+        "-t",
+        "history-probe-control",
+        "#{pane_dead}|#{pane_title}"
+      ],
+      "at": 1790720100321
+    },
+    {
+      "args": [
+        "display-message",
+        "-p",
+        "-t",
+        "history-probe-control",
+        "#{pane_dead}|#{pane_title}"
+      ],
+      "at": 1790720100348
+    },
+    {
+      "args": [
+        "display-message",
+        "-p",
+        "-t",
+        "history-probe-control",
+        "#{pane_dead}|#{pane_title}"
+      ],
+      "at": 1790720100377
+    },
+    {
+      "args": [
+        "display-message",
+        "-p",
+        "-t",
+        "history-probe-control",
+        "#{pane_dead}|#{pane_title}"
+      ],
+      "at": 1790720100406
+    },
+    {
+      "args": [
+        "display-message",
+        "-p",
+        "-t",
+        "history-probe-control",
+        "#{pane_dead}|#{pane_title}"
+      ],
+      "at": 1790720100440
+    },
+    {
+      "args": [
+        "display-message",
+        "-p",
+        "-t",
+        "history-probe-control",
+        "#{pane_dead}|#{pane_title}"
+      ],
+      "at": 1790720100471
+    },
+    {
+      "args": [
+        "display-message",
+        "-p",
+        "-t",
+        "history-probe-control",
+        "#{pane_dead}|#{pane_title}"
+      ],
+      "at": 1790720100498
+    },
+    {
+      "args": [
+        "display-message",
+        "-p",
+        "-t",
+        "history-probe-control",
+        "#{pane_dead}|#{pane_title}"
+      ],
+      "at": 1790720100527
+    },
+    {
+      "args": [
+        "display-message",
+        "-p",
+        "-t",
+        "history-probe-control",
+        "#{pane_dead}|#{pane_title}"
+      ],
+      "at": 1790720100556
+    },
+    {
+      "args": [
+        "display-message",
+        "-p",
+        "-t",
+        "history-probe-control",
+        "#{pane_dead}|#{pane_title}"
+      ],
+      "at": 1790720100586
+    },
+    {
+      "args": [
+        "display-message",
+        "-p",
+        "-t",
+        "history-probe-control",
+        "#{pane_dead}|#{pane_title}"
+      ],
+      "at": 1790720100615
+    },
+    {
+      "args": [
+        "display-message",
+        "-p",
+        "-t",
+        "history-probe-control",
+        "#{pane_dead}|#{pane_title}"
+      ],
+      "at": 1790720100643
+    },
+    {
+      "args": [
+        "display-message",
+        "-p",
+        "-t",
+        "history-probe-control",
+        "#{pane_dead}|#{pane_title}"
+      ],
+      "at": 1790720100676
+    },
+    {
+      "args": [
+        "display-message",
+        "-p",
+        "-t",
+        "history-probe-control",
+        "#{pane_dead}|#{pane_title}"
+      ],
+      "at": 1790720100704
+    },
+    {
+      "args": [
+        "display-message",
+        "-p",
+        "-t",
+        "history-probe-control",
+        "#{pane_dead}|#{pane_title}"
+      ],
+      "at": 1790720100732
+    },
+    {
+      "args": [
+        "display-message",
+        "-p",
+        "-t",
+        "history-probe-control",
+        "#{pane_dead}|#{pane_title}"
+      ],
+      "at": 1790720100760
+    },
+    {
+      "args": [
+        "display-message",
+        "-p",
+        "-t",
+        "history-probe-control",
+        "#{pane_dead}|#{pane_title}"
+      ],
+      "at": 1790720100792
+    },
+    {
+      "args": [
+        "display-message",
+        "-p",
+        "-t",
+        "history-probe-control",
+        "#{pane_dead}|#{pane_title}"
+      ],
+      "at": 1790720100820
+    },
+    {
+      "args": [
+        "display-message",
+        "-p",
+        "-t",
+        "history-probe-control",
+        "#{pane_dead}|#{pane_title}"
+      ],
+      "at": 1790720100847
+    },
+    {
+      "args": [
+        "display-message",
+        "-p",
+        "-t",
+        "history-probe-control",
+        "#{pane_dead}|#{pane_title}"
+      ],
+      "at": 1790720100879
+    },
+    {
+      "args": [
+        "display-message",
+        "-p",
+        "-t",
+        "history-probe-control",
+        "#{pane_dead}|#{pane_title}"
+      ],
+      "at": 1790720100910
+    },
+    {
+      "args": [
+        "display-message",
+        "-p",
+        "-t",
+        "history-probe-control",
+        "#{pane_dead}|#{pane_title}"
+      ],
+      "at": 1790720100942
+    },
+    {
+      "args": [
+        "display-message",
+        "-p",
+        "-t",
+        "history-probe-control",
+        "#{pane_dead}|#{pane_title}"
+      ],
+      "at": 1790720100973
+    },
+    {
+      "args": [
+        "display-message",
+        "-p",
+        "-t",
+        "history-probe-control",
+        "#{pane_dead}|#{pane_title}"
+      ],
+      "at": 1790720101000
+    },
+    {
+      "args": [
+        "display-message",
+        "-p",
+        "-t",
+        "history-probe-control",
+        "#{pane_dead}|#{pane_title}"
+      ],
+      "at": 1790720101028
+    },
+    {
+      "args": [
+        "display-message",
+        "-p",
+        "-t",
+        "history-probe-control",
+        "#{pane_dead}|#{pane_title}"
+      ],
+      "at": 1790720101059
+    },
+    {
+      "args": [
+        "capture-pane",
+        "-p",
+        "-t",
+        "history-probe-control"
+      ],
+      "at": 1790720101069
+    },
+    {
+      "args": [
+        "capture-pane",
+        "-p",
+        "-S",
+        "-",
+        "-t",
+        "history-probe-control"
+      ],
+      "at": 1790720101075
+    },
+    {
+      "args": [
+        "display-message",
+        "-p",
+        "-t",
+        "history-probe-control",
+        "#{history_size}"
+      ],
+      "at": 1790720101080
+    },
+    {
+      "args": [
+        "send-keys",
+        "-t",
+        "history-probe-control",
+        "F6"
+      ],
+      "at": 1790720101091
+    },
+    {
+      "args": [
+        "display-message",
+        "-p",
+        "-t",
+        "history-probe-control",
+        "#{pane_dead}|#{pane_title}"
+      ],
+      "at": 1790720101101
+    },
+    {
+      "args": [
+        "display-message",
+        "-p",
+        "-t",
+        "history-probe-control",
+        "#{pane_dead}|#{pane_title}"
+      ],
+      "at": 1790720101134
+    },
+    {
+      "args": [
+        "capture-pane",
+        "-p",
+        "-t",
+        "history-probe-control"
+      ],
+      "at": 1790720101143
+    },
+    {
+      "args": [
+        "capture-pane",
+        "-p",
+        "-S",
+        "-",
+        "-t",
+        "history-probe-control"
+      ],
+      "at": 1790720101148
+    },
+    {
+      "args": [
+        "display-message",
+        "-p",
+        "-t",
+        "history-probe-control",
+        "#{history_size}"
+      ],
+      "at": 1790720101167
+    },
+    {
+      "args": [
+        "send-keys",
+        "-t",
+        "history-probe-control",
+        "F7"
+      ],
+      "at": 1790720101176
+    },
+    {
+      "args": [
+        "display-message",
+        "-p",
+        "-t",
+        "history-probe-control",
+        "#{pane_dead}|#{pane_title}"
+      ],
+      "at": 1790720101184
+    },
+    {
+      "args": [
+        "display-message",
+        "-p",
+        "-t",
+        "history-probe-control",
+        "#{pane_dead}|#{pane_title}"
+      ],
+      "at": 1790720101214
+    },
+    {
+      "args": [
+        "capture-pane",
+        "-p",
+        "-t",
+        "history-probe-control"
+      ],
+      "at": 1790720101326
+    },
+    {
+      "args": [
+        "capture-pane",
+        "-p",
+        "-S",
+        "-",
+        "-t",
+        "history-probe-control"
+      ],
+      "at": 1790720101338
+    },
+    {
+      "args": [
+        "display-message",
+        "-p",
+        "-t",
+        "history-probe-control",
+        "#{history_size}"
+      ],
+      "at": 1790720101345
+    },
+    {
+      "args": [
+        "send-keys",
+        "-t",
+        "history-probe-control",
+        "F8"
+      ],
+      "at": 1790720101358
+    },
+    {
+      "args": [
+        "display-message",
+        "-p",
+        "-t",
+        "history-probe-control",
+        "#{pane_dead}|#{pane_title}"
+      ],
+      "at": 1790720101370
+    },
+    {
+      "args": [
+        "display-message",
+        "-p",
+        "-t",
+        "history-probe-control",
+        "#{pane_dead}|#{pane_title}"
+      ],
+      "at": 1790720101404
+    },
+    {
+      "args": [
+        "capture-pane",
+        "-p",
+        "-t",
+        "history-probe-control"
+      ],
+      "at": 1790720101514
+    },
+    {
+      "args": [
+        "capture-pane",
+        "-p",
+        "-S",
+        "-",
+        "-t",
+        "history-probe-control"
+      ],
+      "at": 1790720101522
+    },
+    {
+      "args": [
+        "display-message",
+        "-p",
+        "-t",
+        "history-probe-control",
+        "#{history_size}"
+      ],
+      "at": 1790720101528
+    },
+    {
+      "args": [
+        "send-keys",
+        "-t",
+        "history-probe-control",
+        "F9"
+      ],
+      "at": 1790720101535
+    },
+    {
+      "args": [
+        "new-session",
+        "-d",
+        "-x",
+        "79",
+        "-y",
+        "39",
+        "-s",
+        "history-probe-resize",
+        "AUDIT_LOG='/root/projects/project-oh-my-pi-fork/issues/evidence/issue-023/followup/history-probe-resize.jsonl' AUDIT_SCENARIO='history-probe' '/root/.bun/bin/bun' '/root/projects/project-oh-my-pi-fork/issues/evidence/issue-023/followup-driver.ts'"
+      ],
+      "at": 1790720101542
+    },
+    {
+      "args": [
+        "set-option",
+        "-w",
+        "-t",
+        "history-probe-resize",
+        "remain-on-exit",
+        "on"
+      ],
+      "at": 1790720101555
+    },
+    {
+      "args": [
+        "display-message",
+        "-p",
+        "-t",
+        "history-probe-resize",
+        "#{pane_dead}|#{pane_title}"
+      ],
+      "at": 1790720101562
+    },
+    {
+      "args": [
+        "display-message",
+        "-p",
+        "-t",
+        "history-probe-resize",
+        "#{pane_dead}|#{pane_title}"
+      ],
+      "at": 1790720101589
+    },
+    {
+      "args": [
+        "display-message",
+        "-p",
+        "-t",
+        "history-probe-resize",
+        "#{pane_dead}|#{pane_title}"
+      ],
+      "at": 1790720101618
+    },
+    {
+      "args": [
+        "display-message",
+        "-p",
+        "-t",
+        "history-probe-resize",
+        "#{pane_dead}|#{pane_title}"
+      ],
+      "at": 1790720101645
+    },
+    {
+      "args": [
+        "display-message",
+        "-p",
+        "-t",
+        "history-probe-resize",
+        "#{pane_dead}|#{pane_title}"
+      ],
+      "at": 1790720101677
+    },
+    {
+      "args": [
+        "display-message",
+        "-p",
+        "-t",
+        "history-probe-resize",
+        "#{pane_dead}|#{pane_title}"
+      ],
+      "at": 1790720101717
+    },
+    {
+      "args": [
+        "display-message",
+        "-p",
+        "-t",
+        "history-probe-resize",
+        "#{pane_dead}|#{pane_title}"
+      ],
+      "at": 1790720101750
+    },
+    {
+      "args": [
+        "display-message",
+        "-p",
+        "-t",
+        "history-probe-resize",
+        "#{pane_dead}|#{pane_title}"
+      ],
+      "at": 1790720101784
+    },
+    {
+      "args": [
+        "display-message",
+        "-p",
+        "-t",
+        "history-probe-resize",
+        "#{pane_dead}|#{pane_title}"
+      ],
+      "at": 1790720101818
+    },
+    {
+      "args": [
+        "display-message",
+        "-p",
+        "-t",
+        "history-probe-resize",
+        "#{pane_dead}|#{pane_title}"
+      ],
+      "at": 1790720101849
+    },
+    {
+      "args": [
+        "display-message",
+        "-p",
+        "-t",
+        "history-probe-resize",
+        "#{pane_dead}|#{pane_title}"
+      ],
+      "at": 1790720101879
+    },
+    {
+      "args": [
+        "display-message",
+        "-p",
+        "-t",
+        "history-probe-resize",
+        "#{pane_dead}|#{pane_title}"
+      ],
+      "at": 1790720101919
+    },
+    {
+      "args": [
+        "display-message",
+        "-p",
+        "-t",
+        "history-probe-resize",
+        "#{pane_dead}|#{pane_title}"
+      ],
+      "at": 1790720101966
+    },
+    {
+      "args": [
+        "display-message",
+        "-p",
+        "-t",
+        "history-probe-resize",
+        "#{pane_dead}|#{pane_title}"
+      ],
+      "at": 1790720101998
+    },
+    {
+      "args": [
+        "display-message",
+        "-p",
+        "-t",
+        "history-probe-resize",
+        "#{pane_dead}|#{pane_title}"
+      ],
+      "at": 1790720102032
+    },
+    {
+      "args": [
+        "display-message",
+        "-p",
+        "-t",
+        "history-probe-resize",
+        "#{pane_dead}|#{pane_title}"
+      ],
+      "at": 1790720102067
+    },
+    {
+      "args": [
+        "display-message",
+        "-p",
+        "-t",
+        "history-probe-resize",
+        "#{pane_dead}|#{pane_title}"
+      ],
+      "at": 1790720102102
+    },
+    {
+      "args": [
+        "display-message",
+        "-p",
+        "-t",
+        "history-probe-resize",
+        "#{pane_dead}|#{pane_title}"
+      ],
+      "at": 1790720102135
+    },
+    {
+      "args": [
+        "display-message",
+        "-p",
+        "-t",
+        "history-probe-resize",
+        "#{pane_dead}|#{pane_title}"
+      ],
+      "at": 1790720102163
+    },
+    {
+      "args": [
+        "display-message",
+        "-p",
+        "-t",
+        "history-probe-resize",
+        "#{pane_dead}|#{pane_title}"
+      ],
+      "at": 1790720102195
+    },
+    {
+      "args": [
+        "display-message",
+        "-p",
+        "-t",
+        "history-probe-resize",
+        "#{pane_dead}|#{pane_title}"
+      ],
+      "at": 1790720102227
+    },
+    {
+      "args": [
+        "display-message",
+        "-p",
+        "-t",
+        "history-probe-resize",
+        "#{pane_dead}|#{pane_title}"
+      ],
+      "at": 1790720102262
+    },
+    {
+      "args": [
+        "display-message",
+        "-p",
+        "-t",
+        "history-probe-resize",
+        "#{pane_dead}|#{pane_title}"
+      ],
+      "at": 1790720102295
+    },
+    {
+      "args": [
+        "display-message",
+        "-p",
+        "-t",
+        "history-probe-resize",
+        "#{pane_dead}|#{pane_title}"
+      ],
+      "at": 1790720102350
+    },
+    {
+      "args": [
+        "display-message",
+        "-p",
+        "-t",
+        "history-probe-resize",
+        "#{pane_dead}|#{pane_title}"
+      ],
+      "at": 1790720102382
+    },
+    {
+      "args": [
+        "display-message",
+        "-p",
+        "-t",
+        "history-probe-resize",
+        "#{pane_dead}|#{pane_title}"
+      ],
+      "at": 1790720102411
+    },
+    {
+      "args": [
+        "capture-pane",
+        "-p",
+        "-t",
+        "history-probe-resize"
+      ],
+      "at": 1790720102418
+    },
+    {
+      "args": [
+        "capture-pane",
+        "-p",
+        "-S",
+        "-",
+        "-t",
+        "history-probe-resize"
+      ],
+      "at": 1790720102425
+    },
+    {
+      "args": [
+        "display-message",
+        "-p",
+        "-t",
+        "history-probe-resize",
+        "#{history_size}"
+      ],
+      "at": 1790720102439
+    },
+    {
+      "args": [
+        "resize-window",
+        "-t",
+        "history-probe-resize",
+        "-x",
+        "79",
+        "-y",
+        "33"
+      ],
+      "at": 1790720102449
+    },
+    {
+      "args": [
+        "display-message",
+        "-p",
+        "-t",
+        "history-probe-resize",
+        "#{pane_dead}|#{pane_title}"
+      ],
+      "at": 1790720102462
+    },
+    {
+      "args": [
+        "display-message",
+        "-p",
+        "-t",
+        "history-probe-resize",
+        "#{pane_dead}|#{pane_title}"
+      ],
+      "at": 1790720102492
+    },
+    {
+      "args": [
+        "display-message",
+        "-p",
+        "-t",
+        "history-probe-resize",
+        "#{pane_dead}|#{pane_title}"
+      ],
+      "at": 1790720102517
+    },
+    {
+      "args": [
+        "display-message",
+        "-p",
+        "-t",
+        "history-probe-resize",
+        "#{pane_dead}|#{pane_title}"
+      ],
+      "at": 1790720102543
+    },
+    {
+      "args": [
+        "display-message",
+        "-p",
+        "-t",
+        "history-probe-resize",
+        "#{pane_dead}|#{pane_title}"
+      ],
+      "at": 1790720102570
+    },
+    {
+      "args": [
+        "display-message",
+        "-p",
+        "-t",
+        "history-probe-resize",
+        "#{pane_dead}|#{pane_title}"
+      ],
+      "at": 1790720102597
+    },
+    {
+      "args": [
+        "capture-pane",
+        "-p",
+        "-t",
+        "history-probe-resize"
+      ],
+      "at": 1790720102605
+    },
+    {
+      "args": [
+        "capture-pane",
+        "-p",
+        "-S",
+        "-",
+        "-t",
+        "history-probe-resize"
+      ],
+      "at": 1790720102611
+    },
+    {
+      "args": [
+        "display-message",
+        "-p",
+        "-t",
+        "history-probe-resize",
+        "#{history_size}"
+      ],
+      "at": 1790720102618
+    },
+    {
+      "args": [
+        "resize-window",
+        "-t",
+        "history-probe-resize",
+        "-x",
+        "79",
+        "-y",
+        "39"
+      ],
+      "at": 1790720102625
+    },
+    {
+      "args": [
+        "display-message",
+        "-p",
+        "-t",
+        "history-probe-resize",
+        "#{pane_dead}|#{pane_title}"
+      ],
+      "at": 1790720102636
+    },
+    {
+      "args": [
+        "display-message",
+        "-p",
+        "-t",
+        "history-probe-resize",
+        "#{pane_dead}|#{pane_title}"
+      ],
+      "at": 1790720102667
+    },
+    {
+      "args": [
+        "display-message",
+        "-p",
+        "-t",
+        "history-probe-resize",
+        "#{pane_dead}|#{pane_title}"
+      ],
+      "at": 1790720102694
+    },
+    {
+      "args": [
+        "display-message",
+        "-p",
+        "-t",
+        "history-probe-resize",
+        "#{pane_dead}|#{pane_title}"
+      ],
+      "at": 1790720102722
+    },
+    {
+      "args": [
+        "display-message",
+        "-p",
+        "-t",
+        "history-probe-resize",
+        "#{pane_dead}|#{pane_title}"
+      ],
+      "at": 1790720102747
+    },
+    {
+      "args": [
+        "display-message",
+        "-p",
+        "-t",
+        "history-probe-resize",
+        "#{pane_dead}|#{pane_title}"
+      ],
+      "at": 1790720102779
+    },
+    {
+      "args": [
+        "display-message",
+        "-p",
+        "-t",
+        "history-probe-resize",
+        "#{pane_dead}|#{pane_title}"
+      ],
+      "at": 1790720102820
+    },
+    {
+      "args": [
+        "display-message",
+        "-p",
+        "-t",
+        "history-probe-resize",
+        "#{pane_dead}|#{pane_title}"
+      ],
+      "at": 1790720102852
+    },
+    {
+      "args": [
+        "capture-pane",
+        "-p",
+        "-t",
+        "history-probe-resize"
+      ],
+      "at": 1790720102862
+    },
+    {
+      "args": [
+        "capture-pane",
+        "-p",
+        "-S",
+        "-",
+        "-t",
+        "history-probe-resize"
+      ],
+      "at": 1790720102872
+    },
+    {
+      "args": [
+        "display-message",
+        "-p",
+        "-t",
+        "history-probe-resize",
+        "#{history_size}"
+      ],
+      "at": 1790720102885
+    },
+    {
+      "args": [
+        "send-keys",
+        "-t",
+        "history-probe-resize",
+        "F6"
+      ],
+      "at": 1790720102902
+    },
+    {
+      "args": [
+        "display-message",
+        "-p",
+        "-t",
+        "history-probe-resize",
+        "#{pane_dead}|#{pane_title}"
+      ],
+      "at": 1790720102912
+    },
+    {
+      "args": [
+        "display-message",
+        "-p",
+        "-t",
+        "history-probe-resize",
+        "#{pane_dead}|#{pane_title}"
+      ],
+      "at": 1790720102943
+    },
+    {
+      "args": [
+        "capture-pane",
+        "-p",
+        "-t",
+        "history-probe-resize"
+      ],
+      "at": 1790720102958
+    },
+    {
+      "args": [
+        "capture-pane",
+        "-p",
+        "-S",
+        "-",
+        "-t",
+        "history-probe-resize"
+      ],
+      "at": 1790720102974
+    },
+    {
+      "args": [
+        "display-message",
+        "-p",
+        "-t",
+        "history-probe-resize",
+        "#{history_size}"
+      ],
+      "at": 1790720102985
+    },
+    {
+      "args": [
+        "send-keys",
+        "-t",
+        "history-probe-resize",
+        "F7"
+      ],
+      "at": 1790720102995
+    },
+    {
+      "args": [
+        "display-message",
+        "-p",
+        "-t",
+        "history-probe-resize",
+        "#{pane_dead}|#{pane_title}"
+      ],
+      "at": 1790720103005
+    },
+    {
+      "args": [
+        "display-message",
+        "-p",
+        "-t",
+        "history-probe-resize",
+        "#{pane_dead}|#{pane_title}"
+      ],
+      "at": 1790720103032
+    },
+    {
+      "args": [
+        "capture-pane",
+        "-p",
+        "-t",
+        "history-probe-resize"
+      ],
+      "at": 1790720103140
+    },
+    {
+      "args": [
+        "capture-pane",
+        "-p",
+        "-S",
+        "-",
+        "-t",
+        "history-probe-resize"
+      ],
+      "at": 1790720103155
+    },
+    {
+      "args": [
+        "display-message",
+        "-p",
+        "-t",
+        "history-probe-resize",
+        "#{history_size}"
+      ],
+      "at": 1790720103166
+    },
+    {
+      "args": [
+        "send-keys",
+        "-t",
+        "history-probe-resize",
+        "F8"
+      ],
+      "at": 1790720103175
+    },
+    {
+      "args": [
+        "display-message",
+        "-p",
+        "-t",
+        "history-probe-resize",
+        "#{pane_dead}|#{pane_title}"
+      ],
+      "at": 1790720103184
+    },
+    {
+      "args": [
+        "capture-pane",
+        "-p",
+        "-t",
+        "history-probe-resize"
+      ],
+      "at": 1790720103318
+    },
+    {
+      "args": [
+        "capture-pane",
+        "-p",
+        "-S",
+        "-",
+        "-t",
+        "history-probe-resize"
+      ],
+      "at": 1790720103330
+    },
+    {
+      "args": [
+        "display-message",
+        "-p",
+        "-t",
+        "history-probe-resize",
+        "#{history_size}"
+      ],
+      "at": 1790720103339
+    },
+    {
+      "args": [
+        "send-keys",
+        "-t",
+        "history-probe-resize",
+        "F9"
+      ],
+      "at": 1790720103347
+    },
+    {
+      "args": [
+        "new-session",
+        "-d",
+        "-x",
+        "79",
+        "-y",
+        "39",
+        "-s",
+        "history-cpr-control",
+        "AUDIT_LOG='/root/projects/project-oh-my-pi-fork/issues/evidence/issue-023/followup/history-cpr-control.jsonl' AUDIT_SCENARIO='history-cpr' '/root/.bun/bin/bun' '/root/projects/project-oh-my-pi-fork/issues/evidence/issue-023/followup-driver.ts'"
+      ],
+      "at": 1790720103368
+    },
+    {
+      "args": [
+        "set-option",
+        "-w",
+        "-t",
+        "history-cpr-control",
+        "remain-on-exit",
+        "on"
+      ],
+      "at": 1790720103395
+    },
+    {
+      "args": [
+        "display-message",
+        "-p",
+        "-t",
+        "history-cpr-control",
+        "#{pane_dead}|#{pane_title}"
+      ],
+      "at": 1790720103412
+    },
+    {
+      "args": [
+        "display-message",
+        "-p",
+        "-t",
+        "history-cpr-control",
+        "#{pane_dead}|#{pane_title}"
+      ],
+      "at": 1790720103441
+    },
+    {
+      "args": [
+        "display-message",
+        "-p",
+        "-t",
+        "history-cpr-control",
+        "#{pane_dead}|#{pane_title}"
+      ],
+      "at": 1790720103475
+    },
+    {
+      "args": [
+        "display-message",
+        "-p",
+        "-t",
+        "history-cpr-control",
+        "#{pane_dead}|#{pane_title}"
+      ],
+      "at": 1790720103502
+    },
+    {
+      "args": [
+        "display-message",
+        "-p",
+        "-t",
+        "history-cpr-control",
+        "#{pane_dead}|#{pane_title}"
+      ],
+      "at": 1790720103536
+    },
+    {
+      "args": [
+        "display-message",
+        "-p",
+        "-t",
+        "history-cpr-control",
+        "#{pane_dead}|#{pane_title}"
+      ],
+      "at": 1790720103565
+    },
+    {
+      "args": [
+        "display-message",
+        "-p",
+        "-t",
+        "history-cpr-control",
+        "#{pane_dead}|#{pane_title}"
+      ],
+      "at": 1790720103593
+    },
+    {
+      "args": [
+        "display-message",
+        "-p",
+        "-t",
+        "history-cpr-control",
+        "#{pane_dead}|#{pane_title}"
+      ],
+      "at": 1790720103629
+    },
+    {
+      "args": [
+        "display-message",
+        "-p",
+        "-t",
+        "history-cpr-control",
+        "#{pane_dead}|#{pane_title}"
+      ],
+      "at": 1790720103660
+    },
+    {
+      "args": [
+        "display-message",
+        "-p",
+        "-t",
+        "history-cpr-control",
+        "#{pane_dead}|#{pane_title}"
+      ],
+      "at": 1790720103697
+    },
+    {
+      "args": [
+        "display-message",
+        "-p",
+        "-t",
+        "history-cpr-control",
+        "#{pane_dead}|#{pane_title}"
+      ],
+      "at": 1790720103729
+    },
+    {
+      "args": [
+        "display-message",
+        "-p",
+        "-t",
+        "history-cpr-control",
+        "#{pane_dead}|#{pane_title}"
+      ],
+      "at": 1790720103760
+    },
+    {
+      "args": [
+        "display-message",
+        "-p",
+        "-t",
+        "history-cpr-control",
+        "#{pane_dead}|#{pane_title}"
+      ],
+      "at": 1790720103796
+    },
+    {
+      "args": [
+        "display-message",
+        "-p",
+        "-t",
+        "history-cpr-control",
+        "#{pane_dead}|#{pane_title}"
+      ],
+      "at": 1790720103827
+    },
+    {
+      "args": [
+        "display-message",
+        "-p",
+        "-t",
+        "history-cpr-control",
+        "#{pane_dead}|#{pane_title}"
+      ],
+      "at": 1790720103858
+    },
+    {
+      "args": [
+        "display-message",
+        "-p",
+        "-t",
+        "history-cpr-control",
+        "#{pane_dead}|#{pane_title}"
+      ],
+      "at": 1790720103884
+    },
+    {
+      "args": [
+        "display-message",
+        "-p",
+        "-t",
+        "history-cpr-control",
+        "#{pane_dead}|#{pane_title}"
+      ],
+      "at": 1790720103924
+    },
+    {
+      "args": [
+        "display-message",
+        "-p",
+        "-t",
+        "history-cpr-control",
+        "#{pane_dead}|#{pane_title}"
+      ],
+      "at": 1790720103958
+    },
+    {
+      "args": [
+        "display-message",
+        "-p",
+        "-t",
+        "history-cpr-control",
+        "#{pane_dead}|#{pane_title}"
+      ],
+      "at": 1790720103996
+    },
+    {
+      "args": [
+        "display-message",
+        "-p",
+        "-t",
+        "history-cpr-control",
+        "#{pane_dead}|#{pane_title}"
+      ],
+      "at": 1790720104031
+    },
+    {
+      "args": [
+        "display-message",
+        "-p",
+        "-t",
+        "history-cpr-control",
+        "#{pane_dead}|#{pane_title}"
+      ],
+      "at": 1790720104064
+    },
+    {
+      "args": [
+        "display-message",
+        "-p",
+        "-t",
+        "history-cpr-control",
+        "#{pane_dead}|#{pane_title}"
+      ],
+      "at": 1790720104095
+    },
+    {
+      "args": [
+        "display-message",
+        "-p",
+        "-t",
+        "history-cpr-control",
+        "#{pane_dead}|#{pane_title}"
+      ],
+      "at": 1790720104134
+    },
+    {
+      "args": [
+        "display-message",
+        "-p",
+        "-t",
+        "history-cpr-control",
+        "#{pane_dead}|#{pane_title}"
+      ],
+      "at": 1790720104170
+    },
+    {
+      "args": [
+        "display-message",
+        "-p",
+        "-t",
+        "history-cpr-control",
+        "#{pane_dead}|#{pane_title}"
+      ],
+      "at": 1790720104204
+    },
+    {
+      "args": [
+        "display-message",
+        "-p",
+        "-t",
+        "history-cpr-control",
+        "#{pane_dead}|#{pane_title}"
+      ],
+      "at": 1790720104236
+    },
+    {
+      "args": [
+        "display-message",
+        "-p",
+        "-t",
+        "history-cpr-control",
+        "#{pane_dead}|#{pane_title}"
+      ],
+      "at": 1790720104279
+    },
+    {
+      "args": [
+        "display-message",
+        "-p",
+        "-t",
+        "history-cpr-control",
+        "#{pane_dead}|#{pane_title}"
+      ],
+      "at": 1790720104315
+    },
+    {
+      "args": [
+        "display-message",
+        "-p",
+        "-t",
+        "history-cpr-control",
+        "#{pane_dead}|#{pane_title}"
+      ],
+      "at": 1790720104348
+    },
+    {
+      "args": [
+        "display-message",
+        "-p",
+        "-t",
+        "history-cpr-control",
+        "#{pane_dead}|#{pane_title}"
+      ],
+      "at": 1790720104380
+    },
+    {
+      "args": [
+        "display-message",
+        "-p",
+        "-t",
+        "history-cpr-control",
+        "#{pane_dead}|#{pane_title}"
+      ],
+      "at": 1790720104417
+    },
+    {
+      "args": [
+        "display-message",
+        "-p",
+        "-t",
+        "history-cpr-control",
+        "#{pane_dead}|#{pane_title}"
+      ],
+      "at": 1790720104450
+    },
+    {
+      "args": [
+        "display-message",
+        "-p",
+        "-t",
+        "history-cpr-control",
+        "#{pane_dead}|#{pane_title}"
+      ],
+      "at": 1790720104492
+    },
+    {
+      "args": [
+        "display-message",
+        "-p",
+        "-t",
+        "history-cpr-control",
+        "#{pane_dead}|#{pane_title}"
+      ],
+      "at": 1790720104522
+    },
+    {
+      "args": [
+        "display-message",
+        "-p",
+        "-t",
+        "history-cpr-control",
+        "#{pane_dead}|#{pane_title}"
+      ],
+      "at": 1790720104554
+    },
+    {
+      "args": [
+        "display-message",
+        "-p",
+        "-t",
+        "history-cpr-control",
+        "#{pane_dead}|#{pane_title}"
+      ],
+      "at": 1790720104585
+    },
+    {
+      "args": [
+        "capture-pane",
+        "-p",
+        "-t",
+        "history-cpr-control"
+      ],
+      "at": 1790720104601
+    },
+    {
+      "args": [
+        "capture-pane",
+        "-p",
+        "-S",
+        "-",
+        "-t",
+        "history-cpr-control"
+      ],
+      "at": 1790720104612
+    },
+    {
+      "args": [
+        "display-message",
+        "-p",
+        "-t",
+        "history-cpr-control",
+        "#{history_size}"
+      ],
+      "at": 1790720104618
+    },
+    {
+      "args": [
+        "send-keys",
+        "-t",
+        "history-cpr-control",
+        "F6"
+      ],
+      "at": 1790720104639
+    },
+    {
+      "args": [
+        "display-message",
+        "-p",
+        "-t",
+        "history-cpr-control",
+        "#{pane_dead}|#{pane_title}"
+      ],
+      "at": 1790720104667
+    },
+    {
+      "args": [
+        "capture-pane",
+        "-p",
+        "-t",
+        "history-cpr-control"
+      ],
+      "at": 1790720104693
+    },
+    {
+      "args": [
+        "capture-pane",
+        "-p",
+        "-S",
+        "-",
+        "-t",
+        "history-cpr-control"
+      ],
+      "at": 1790720104720
+    },
+    {
+      "args": [
+        "display-message",
+        "-p",
+        "-t",
+        "history-cpr-control",
+        "#{history_size}"
+      ],
+      "at": 1790720104744
+    },
+    {
+      "args": [
+        "send-keys",
+        "-t",
+        "history-cpr-control",
+        "F7"
+      ],
+      "at": 1790720104787
+    },
+    {
+      "args": [
+        "display-message",
+        "-p",
+        "-t",
+        "history-cpr-control",
+        "#{pane_dead}|#{pane_title}"
+      ],
+      "at": 1790720104800
+    },
+    {
+      "args": [
+        "display-message",
+        "-p",
+        "-t",
+        "history-cpr-control",
+        "#{pane_dead}|#{pane_title}"
+      ],
+      "at": 1790720104846
+    },
+    {
+      "args": [
+        "capture-pane",
+        "-p",
+        "-t",
+        "history-cpr-control"
+      ],
+      "at": 1790720104966
+    },
+    {
+      "args": [
+        "capture-pane",
+        "-p",
+        "-S",
+        "-",
+        "-t",
+        "history-cpr-control"
+      ],
+      "at": 1790720104991
+    },
+    {
+      "args": [
+        "display-message",
+        "-p",
+        "-t",
+        "history-cpr-control",
+        "#{history_size}"
+      ],
+      "at": 1790720105010
+    },
+    {
+      "args": [
+        "send-keys",
+        "-t",
+        "history-cpr-control",
+        "F8"
+      ],
+      "at": 1790720105025
+    },
+    {
+      "args": [
+        "display-message",
+        "-p",
+        "-t",
+        "history-cpr-control",
+        "#{pane_dead}|#{pane_title}"
+      ],
+      "at": 1790720105037
+    },
+    {
+      "args": [
+        "display-message",
+        "-p",
+        "-t",
+        "history-cpr-control",
+        "#{pane_dead}|#{pane_title}"
+      ],
+      "at": 1790720105073
+    },
+    {
+      "args": [
+        "capture-pane",
+        "-p",
+        "-t",
+        "history-cpr-control"
+      ],
+      "at": 1790720105196
+    },
+    {
+      "args": [
+        "capture-pane",
+        "-p",
+        "-S",
+        "-",
+        "-t",
+        "history-cpr-control"
+      ],
+      "at": 1790720105205
+    },
+    {
+      "args": [
+        "display-message",
+        "-p",
+        "-t",
+        "history-cpr-control",
+        "#{history_size}"
+      ],
+      "at": 1790720105217
+    },
+    {
+      "args": [
+        "send-keys",
+        "-t",
+        "history-cpr-control",
+        "F9"
+      ],
+      "at": 1790720105230
+    },
+    {
+      "args": [
+        "new-session",
+        "-d",
+        "-x",
+        "79",
+        "-y",
+        "39",
+        "-s",
+        "history-cpr-resize",
+        "AUDIT_LOG='/root/projects/project-oh-my-pi-fork/issues/evidence/issue-023/followup/history-cpr-resize.jsonl' AUDIT_SCENARIO='history-cpr' '/root/.bun/bin/bun' '/root/projects/project-oh-my-pi-fork/issues/evidence/issue-023/followup-driver.ts'"
+      ],
+      "at": 1790720105243
+    },
+    {
+      "args": [
+        "set-option",
+        "-w",
+        "-t",
+        "history-cpr-resize",
+        "remain-on-exit",
+        "on"
+      ],
+      "at": 1790720105256
+    },
+    {
+      "args": [
+        "display-message",
+        "-p",
+        "-t",
+        "history-cpr-resize",
+        "#{pane_dead}|#{pane_title}"
+      ],
+      "at": 1790720105269
+    },
+    {
+      "args": [
+        "display-message",
+        "-p",
+        "-t",
+        "history-cpr-resize",
+        "#{pane_dead}|#{pane_title}"
+      ],
+      "at": 1790720105302
+    },
+    {
+      "args": [
+        "display-message",
+        "-p",
+        "-t",
+        "history-cpr-resize",
+        "#{pane_dead}|#{pane_title}"
+      ],
+      "at": 1790720105336
+    },
+    {
+      "args": [
+        "display-message",
+        "-p",
+        "-t",
+        "history-cpr-resize",
+        "#{pane_dead}|#{pane_title}"
+      ],
+      "at": 1790720105374
+    },
+    {
+      "args": [
+        "display-message",
+        "-p",
+        "-t",
+        "history-cpr-resize",
+        "#{pane_dead}|#{pane_title}"
+      ],
+      "at": 1790720105405
+    },
+    {
+      "args": [
+        "display-message",
+        "-p",
+        "-t",
+        "history-cpr-resize",
+        "#{pane_dead}|#{pane_title}"
+      ],
+      "at": 1790720105445
+    },
+    {
+      "args": [
+        "display-message",
+        "-p",
+        "-t",
+        "history-cpr-resize",
+        "#{pane_dead}|#{pane_title}"
+      ],
+      "at": 1790720105476
+    },
+    {
+      "args": [
+        "display-message",
+        "-p",
+        "-t",
+        "history-cpr-resize",
+        "#{pane_dead}|#{pane_title}"
+      ],
+      "at": 1790720105510
+    },
+    {
+      "args": [
+        "display-message",
+        "-p",
+        "-t",
+        "history-cpr-resize",
+        "#{pane_dead}|#{pane_title}"
+      ],
+      "at": 1790720105547
+    },
+    {
+      "args": [
+        "display-message",
+        "-p",
+        "-t",
+        "history-cpr-resize",
+        "#{pane_dead}|#{pane_title}"
+      ],
+      "at": 1790720105583
+    },
+    {
+      "args": [
+        "display-message",
+        "-p",
+        "-t",
+        "history-cpr-resize",
+        "#{pane_dead}|#{pane_title}"
+      ],
+      "at": 1790720105634
+    },
+    {
+      "args": [
+        "display-message",
+        "-p",
+        "-t",
+        "history-cpr-resize",
+        "#{pane_dead}|#{pane_title}"
+      ],
+      "at": 1790720105669
+    },
+    {
+      "args": [
+        "display-message",
+        "-p",
+        "-t",
+        "history-cpr-resize",
+        "#{pane_dead}|#{pane_title}"
+      ],
+      "at": 1790720105702
+    },
+    {
+      "args": [
+        "display-message",
+        "-p",
+        "-t",
+        "history-cpr-resize",
+        "#{pane_dead}|#{pane_title}"
+      ],
+      "at": 1790720105735
+    },
+    {
+      "args": [
+        "display-message",
+        "-p",
+        "-t",
+        "history-cpr-resize",
+        "#{pane_dead}|#{pane_title}"
+      ],
+      "at": 1790720105771
+    },
+    {
+      "args": [
+        "display-message",
+        "-p",
+        "-t",
+        "history-cpr-resize",
+        "#{pane_dead}|#{pane_title}"
+      ],
+      "at": 1790720105816
+    },
+    {
+      "args": [
+        "display-message",
+        "-p",
+        "-t",
+        "history-cpr-resize",
+        "#{pane_dead}|#{pane_title}"
+      ],
+      "at": 1790720105848
+    },
+    {
+      "args": [
+        "display-message",
+        "-p",
+        "-t",
+        "history-cpr-resize",
+        "#{pane_dead}|#{pane_title}"
+      ],
+      "at": 1790720105876
+    },
+    {
+      "args": [
+        "display-message",
+        "-p",
+        "-t",
+        "history-cpr-resize",
+        "#{pane_dead}|#{pane_title}"
+      ],
+      "at": 1790720105910
+    },
+    {
+      "args": [
+        "display-message",
+        "-p",
+        "-t",
+        "history-cpr-resize",
+        "#{pane_dead}|#{pane_title}"
+      ],
+      "at": 1790720105953
+    },
+    {
+      "args": [
+        "display-message",
+        "-p",
+        "-t",
+        "history-cpr-resize",
+        "#{pane_dead}|#{pane_title}"
+      ],
+      "at": 1790720105985
+    },
+    {
+      "args": [
+        "display-message",
+        "-p",
+        "-t",
+        "history-cpr-resize",
+        "#{pane_dead}|#{pane_title}"
+      ],
+      "at": 1790720106018
+    },
+    {
+      "args": [
+        "display-message",
+        "-p",
+        "-t",
+        "history-cpr-resize",
+        "#{pane_dead}|#{pane_title}"
+      ],
+      "at": 1790720106048
+    },
+    {
+      "args": [
+        "display-message",
+        "-p",
+        "-t",
+        "history-cpr-resize",
+        "#{pane_dead}|#{pane_title}"
+      ],
+      "at": 1790720106081
+    },
+    {
+      "args": [
+        "display-message",
+        "-p",
+        "-t",
+        "history-cpr-resize",
+        "#{pane_dead}|#{pane_title}"
+      ],
+      "at": 1790720106114
+    },
+    {
+      "args": [
+        "display-message",
+        "-p",
+        "-t",
+        "history-cpr-resize",
+        "#{pane_dead}|#{pane_title}"
+      ],
+      "at": 1790720106145
+    },
+    {
+      "args": [
+        "display-message",
+        "-p",
+        "-t",
+        "history-cpr-resize",
+        "#{pane_dead}|#{pane_title}"
+      ],
+      "at": 1790720106184
+    },
+    {
+      "args": [
+        "display-message",
+        "-p",
+        "-t",
+        "history-cpr-resize",
+        "#{pane_dead}|#{pane_title}"
+      ],
+      "at": 1790720106222
+    },
+    {
+      "args": [
+        "display-message",
+        "-p",
+        "-t",
+        "history-cpr-resize",
+        "#{pane_dead}|#{pane_title}"
+      ],
+      "at": 1790720106254
+    },
+    {
+      "args": [
+        "display-message",
+        "-p",
+        "-t",
+        "history-cpr-resize",
+        "#{pane_dead}|#{pane_title}"
+      ],
+      "at": 1790720106289
+    },
+    {
+      "args": [
+        "display-message",
+        "-p",
+        "-t",
+        "history-cpr-resize",
+        "#{pane_dead}|#{pane_title}"
+      ],
+      "at": 1790720106320
+    },
+    {
+      "args": [
+        "display-message",
+        "-p",
+        "-t",
+        "history-cpr-resize",
+        "#{pane_dead}|#{pane_title}"
+      ],
+      "at": 1790720106351
+    },
+    {
+      "args": [
+        "display-message",
+        "-p",
+        "-t",
+        "history-cpr-resize",
+        "#{pane_dead}|#{pane_title}"
+      ],
+      "at": 1790720106387
+    },
+    {
+      "args": [
+        "display-message",
+        "-p",
+        "-t",
+        "history-cpr-resize",
+        "#{pane_dead}|#{pane_title}"
+      ],
+      "at": 1790720106419
+    },
+    {
+      "args": [
+        "display-message",
+        "-p",
+        "-t",
+        "history-cpr-resize",
+        "#{pane_dead}|#{pane_title}"
+      ],
+      "at": 1790720106452
+    },
+    {
+      "args": [
+        "display-message",
+        "-p",
+        "-t",
+        "history-cpr-resize",
+        "#{pane_dead}|#{pane_title}"
+      ],
+      "at": 1790720106483
+    },
+    {
+      "args": [
+        "display-message",
+        "-p",
+        "-t",
+        "history-cpr-resize",
+        "#{pane_dead}|#{pane_title}"
+      ],
+      "at": 1790720106510
+    },
+    {
+      "args": [
+        "display-message",
+        "-p",
+        "-t",
+        "history-cpr-resize",
+        "#{pane_dead}|#{pane_title}"
+      ],
+      "at": 1790720106546
+    },
+    {
+      "args": [
+        "display-message",
+        "-p",
+        "-t",
+        "history-cpr-resize",
+        "#{pane_dead}|#{pane_title}"
+      ],
+      "at": 1790720106581
+    },
+    {
+      "args": [
+        "display-message",
+        "-p",
+        "-t",
+        "history-cpr-resize",
+        "#{pane_dead}|#{pane_title}"
+      ],
+      "at": 1790720106614
+    },
+    {
+      "args": [
+        "display-message",
+        "-p",
+        "-t",
+        "history-cpr-resize",
+        "#{pane_dead}|#{pane_title}"
+      ],
+      "at": 1790720106649
+    },
+    {
+      "args": [
+        "display-message",
+        "-p",
+        "-t",
+        "history-cpr-resize",
+        "#{pane_dead}|#{pane_title}"
+      ],
+      "at": 1790720106681
+    },
+    {
+      "args": [
+        "display-message",
+        "-p",
+        "-t",
+        "history-cpr-resize",
+        "#{pane_dead}|#{pane_title}"
+      ],
+      "at": 1790720106715
+    },
+    {
+      "args": [
+        "display-message",
+        "-p",
+        "-t",
+        "history-cpr-resize",
+        "#{pane_dead}|#{pane_title}"
+      ],
+      "at": 1790720106748
+    },
+    {
+      "args": [
+        "capture-pane",
+        "-p",
+        "-t",
+        "history-cpr-resize"
+      ],
+      "at": 1790720106760
+    },
+    {
+      "args": [
+        "capture-pane",
+        "-p",
+        "-S",
+        "-",
+        "-t",
+        "history-cpr-resize"
+      ],
+      "at": 1790720106769
+    },
+    {
+      "args": [
+        "display-message",
+        "-p",
+        "-t",
+        "history-cpr-resize",
+        "#{history_size}"
+      ],
+      "at": 1790720106784
+    },
+    {
+      "args": [
+        "resize-window",
+        "-t",
+        "history-cpr-resize",
+        "-x",
+        "79",
+        "-y",
+        "33"
+      ],
+      "at": 1790720106793
+    },
+    {
+      "args": [
+        "display-message",
+        "-p",
+        "-t",
+        "history-cpr-resize",
+        "#{pane_dead}|#{pane_title}"
+      ],
+      "at": 1790720106800
+    },
+    {
+      "args": [
+        "display-message",
+        "-p",
+        "-t",
+        "history-cpr-resize",
+        "#{pane_dead}|#{pane_title}"
+      ],
+      "at": 1790720106833
+    },
+    {
+      "args": [
+        "display-message",
+        "-p",
+        "-t",
+        "history-cpr-resize",
+        "#{pane_dead}|#{pane_title}"
+      ],
+      "at": 1790720106864
+    },
+    {
+      "args": [
+        "display-message",
+        "-p",
+        "-t",
+        "history-cpr-resize",
+        "#{pane_dead}|#{pane_title}"
+      ],
+      "at": 1790720106899
+    },
+    {
+      "args": [
+        "display-message",
+        "-p",
+        "-t",
+        "history-cpr-resize",
+        "#{pane_dead}|#{pane_title}"
+      ],
+      "at": 1790720106926
+    },
+    {
+      "args": [
+        "capture-pane",
+        "-p",
+        "-t",
+        "history-cpr-resize"
+      ],
+      "at": 1790720106941
+    },
+    {
+      "args": [
+        "capture-pane",
+        "-p",
+        "-S",
+        "-",
+        "-t",
+        "history-cpr-resize"
+      ],
+      "at": 1790720106950
+    },
+    {
+      "args": [
+        "display-message",
+        "-p",
+        "-t",
+        "history-cpr-resize",
+        "#{history_size}"
+      ],
+      "at": 1790720106962
+    },
+    {
+      "args": [
+        "resize-window",
+        "-t",
+        "history-cpr-resize",
+        "-x",
+        "79",
+        "-y",
+        "39"
+      ],
+      "at": 1790720106975
+    },
+    {
+      "args": [
+        "display-message",
+        "-p",
+        "-t",
+        "history-cpr-resize",
+        "#{pane_dead}|#{pane_title}"
+      ],
+      "at": 1790720106988
+    },
+    {
+      "args": [
+        "display-message",
+        "-p",
+        "-t",
+        "history-cpr-resize",
+        "#{pane_dead}|#{pane_title}"
+      ],
+      "at": 1790720107023
+    },
+    {
+      "args": [
+        "display-message",
+        "-p",
+        "-t",
+        "history-cpr-resize",
+        "#{pane_dead}|#{pane_title}"
+      ],
+      "at": 1790720107052
+    },
+    {
+      "args": [
+        "display-message",
+        "-p",
+        "-t",
+        "history-cpr-resize",
+        "#{pane_dead}|#{pane_title}"
+      ],
+      "at": 1790720107093
+    },
+    {
+      "args": [
+        "display-message",
+        "-p",
+        "-t",
+        "history-cpr-resize",
+        "#{pane_dead}|#{pane_title}"
+      ],
+      "at": 1790720107132
+    },
+    {
+      "args": [
+        "display-message",
+        "-p",
+        "-t",
+        "history-cpr-resize",
+        "#{pane_dead}|#{pane_title}"
+      ],
+      "at": 1790720107164
+    },
+    {
+      "args": [
+        "display-message",
+        "-p",
+        "-t",
+        "history-cpr-resize",
+        "#{pane_dead}|#{pane_title}"
+      ],
+      "at": 1790720107197
+    },
+    {
+      "args": [
+        "capture-pane",
+        "-p",
+        "-t",
+        "history-cpr-resize"
+      ],
+      "at": 1790720107211
+    },
+    {
+      "args": [
+        "capture-pane",
+        "-p",
+        "-S",
+        "-",
+        "-t",
+        "history-cpr-resize"
+      ],
+      "at": 1790720107223
+    },
+    {
+      "args": [
+        "display-message",
+        "-p",
+        "-t",
+        "history-cpr-resize",
+        "#{history_size}"
+      ],
+      "at": 1790720107232
+    },
+    {
+      "args": [
+        "send-keys",
+        "-t",
+        "history-cpr-resize",
+        "F6"
+      ],
+      "at": 1790720107245
+    },
+    {
+      "args": [
+        "display-message",
+        "-p",
+        "-t",
+        "history-cpr-resize",
+        "#{pane_dead}|#{pane_title}"
+      ],
+      "at": 1790720107255
+    },
+    {
+      "args": [
+        "display-message",
+        "-p",
+        "-t",
+        "history-cpr-resize",
+        "#{pane_dead}|#{pane_title}"
+      ],
+      "at": 1790720107281
+    },
+    {
+      "args": [
+        "capture-pane",
+        "-p",
+        "-t",
+        "history-cpr-resize"
+      ],
+      "at": 1790720107293
+    },
+    {
+      "args": [
+        "capture-pane",
+        "-p",
+        "-S",
+        "-",
+        "-t",
+        "history-cpr-resize"
+      ],
+      "at": 1790720107300
+    },
+    {
+      "args": [
+        "display-message",
+        "-p",
+        "-t",
+        "history-cpr-resize",
+        "#{history_size}"
+      ],
+      "at": 1790720107308
+    },
+    {
+      "args": [
+        "send-keys",
+        "-t",
+        "history-cpr-resize",
+        "F7"
+      ],
+      "at": 1790720107318
+    },
+    {
+      "args": [
+        "display-message",
+        "-p",
+        "-t",
+        "history-cpr-resize",
+        "#{pane_dead}|#{pane_title}"
+      ],
+      "at": 1790720107347
+    },
+    {
+      "args": [
+        "display-message",
+        "-p",
+        "-t",
+        "history-cpr-resize",
+        "#{pane_dead}|#{pane_title}"
+      ],
+      "at": 1790720107380
+    },
+    {
+      "args": [
+        "capture-pane",
+        "-p",
+        "-t",
+        "history-cpr-resize"
+      ],
+      "at": 1790720107487
+    },
+    {
+      "args": [
+        "capture-pane",
+        "-p",
+        "-S",
+        "-",
+        "-t",
+        "history-cpr-resize"
+      ],
+      "at": 1790720107502
+    },
+    {
+      "args": [
+        "display-message",
+        "-p",
+        "-t",
+        "history-cpr-resize",
+        "#{history_size}"
+      ],
+      "at": 1790720107529
+    },
+    {
+      "args": [
+        "send-keys",
+        "-t",
+        "history-cpr-resize",
+        "F8"
+      ],
+      "at": 1790720107548
+    },
+    {
+      "args": [
+        "display-message",
+        "-p",
+        "-t",
+        "history-cpr-resize",
+        "#{pane_dead}|#{pane_title}"
+      ],
+      "at": 1790720107558
+    },
+    {
+      "args": [
+        "capture-pane",
+        "-p",
+        "-t",
+        "history-cpr-resize"
+      ],
+      "at": 1790720107668
+    },
+    {
+      "args": [
+        "capture-pane",
+        "-p",
+        "-S",
+        "-",
+        "-t",
+        "history-cpr-resize"
+      ],
+      "at": 1790720107673
+    },
+    {
+      "args": [
+        "display-message",
+        "-p",
+        "-t",
+        "history-cpr-resize",
+        "#{history_size}"
+      ],
+      "at": 1790720107685
+    },
+    {
+      "args": [
+        "send-keys",
+        "-t",
+        "history-cpr-resize",
+        "F9"
+      ],
+      "at": 1790720107703
+    }
+  ],
+  "results": [
+    {
+      "name": "history-probe-control",
+      "stage": "initial",
+      "draft": "",
+      "viewportRows": 19,
+      "historySize": 44,
+      "physicalStatus": 1,
+      "plannedStatus": 1,
+      "oldPreviewLive": true,
+      "oldPreviewPlanned": true,
+      "oldPreviewHistory": false,
+      "oldLiveHistory": false
+    },
+    {
+      "name": "history-probe-control",
+      "stage": "contract",
+      "draft": "",
+      "viewportRows": 7,
+      "historySize": 44,
+      "physicalStatus": 1,
+      "plannedStatus": 1,
+      "oldPreviewLive": false,
+      "oldPreviewPlanned": false,
+      "oldPreviewHistory": false,
+      "oldLiveHistory": false
+    },
+    {
+      "name": "history-probe-control",
+      "stage": "assistant",
+      "draft": "",
+      "viewportRows": 10,
+      "historySize": 44,
+      "physicalStatus": 1,
+      "plannedStatus": 1,
+      "oldPreviewLive": false,
+      "oldPreviewPlanned": false,
+      "oldPreviewHistory": false,
+      "oldLiveHistory": false
+    },
+    {
+      "name": "history-probe-control",
+      "stage": "scroll",
+      "draft": "",
+      "viewportRows": 2,
+      "historySize": 84,
+      "physicalStatus": 1,
+      "plannedStatus": 1,
+      "oldPreviewLive": false,
+      "oldPreviewPlanned": false,
+      "oldPreviewHistory": false,
+      "oldLiveHistory": false
+    },
+    {
+      "name": "history-probe-resize",
+      "stage": "initial",
+      "draft": "",
+      "viewportRows": 19,
+      "historySize": 44,
+      "physicalStatus": 1,
+      "plannedStatus": 1,
+      "oldPreviewLive": true,
+      "oldPreviewPlanned": true,
+      "oldPreviewHistory": false,
+      "oldLiveHistory": false
+    },
+    {
+      "name": "history-probe-resize",
+      "stage": "shrunk",
+      "draft": "",
+      "viewportRows": 19,
+      "historySize": 50,
+      "physicalStatus": 1,
+      "plannedStatus": 1,
+      "oldPreviewLive": true,
+      "oldPreviewPlanned": true,
+      "oldPreviewHistory": false,
+      "oldLiveHistory": false
+    },
+    {
+      "name": "history-probe-resize",
+      "stage": "settled",
+      "draft": "",
+      "viewportRows": 19,
+      "historySize": 44,
+      "physicalStatus": 2,
+      "plannedStatus": 1,
+      "oldPreviewLive": true,
+      "oldPreviewPlanned": true,
+      "oldPreviewHistory": false,
+      "oldLiveHistory": false
+    },
+    {
+      "name": "history-probe-resize",
+      "stage": "contract",
+      "draft": "",
+      "viewportRows": 7,
+      "historySize": 44,
+      "physicalStatus": 3,
+      "plannedStatus": 1,
+      "oldPreviewLive": true,
+      "oldPreviewPlanned": false,
+      "oldPreviewHistory": false,
+      "oldLiveHistory": false
+    },
+    {
+      "name": "history-probe-resize",
+      "stage": "assistant",
+      "draft": "",
+      "viewportRows": 10,
+      "historySize": 44,
+      "physicalStatus": 3,
+      "plannedStatus": 1,
+      "oldPreviewLive": true,
+      "oldPreviewPlanned": false,
+      "oldPreviewHistory": false,
+      "oldLiveHistory": false
+    },
+    {
+      "name": "history-probe-resize",
+      "stage": "scroll",
+      "draft": "",
+      "viewportRows": 2,
+      "historySize": 78,
+      "physicalStatus": 1,
+      "plannedStatus": 1,
+      "oldPreviewLive": false,
+      "oldPreviewPlanned": false,
+      "oldPreviewHistory": false,
+      "oldLiveHistory": false
+    },
+    {
+      "name": "history-cpr-control",
+      "stage": "initial",
+      "draft": "",
+      "viewportRows": 19,
+      "historySize": 44,
+      "physicalStatus": 1,
+      "plannedStatus": 1,
+      "oldPreviewLive": true,
+      "oldPreviewPlanned": true,
+      "oldPreviewHistory": false,
+      "oldLiveHistory": false
+    },
+    {
+      "name": "history-cpr-control",
+      "stage": "contract",
+      "draft": "",
+      "viewportRows": 7,
+      "historySize": 44,
+      "physicalStatus": 1,
+      "plannedStatus": 1,
+      "oldPreviewLive": false,
+      "oldPreviewPlanned": false,
+      "oldPreviewHistory": false,
+      "oldLiveHistory": false
+    },
+    {
+      "name": "history-cpr-control",
+      "stage": "assistant",
+      "draft": "",
+      "viewportRows": 10,
+      "historySize": 44,
+      "physicalStatus": 1,
+      "plannedStatus": 1,
+      "oldPreviewLive": false,
+      "oldPreviewPlanned": false,
+      "oldPreviewHistory": false,
+      "oldLiveHistory": false
+    },
+    {
+      "name": "history-cpr-control",
+      "stage": "scroll",
+      "draft": "",
+      "viewportRows": 2,
+      "historySize": 84,
+      "physicalStatus": 1,
+      "plannedStatus": 1,
+      "oldPreviewLive": false,
+      "oldPreviewPlanned": false,
+      "oldPreviewHistory": false,
+      "oldLiveHistory": false
+    },
+    {
+      "name": "history-cpr-resize",
+      "stage": "initial",
+      "draft": "",
+      "viewportRows": 19,
+      "historySize": 44,
+      "physicalStatus": 1,
+      "plannedStatus": 1,
+      "oldPreviewLive": true,
+      "oldPreviewPlanned": true,
+      "oldPreviewHistory": false,
+      "oldLiveHistory": false
+    },
+    {
+      "name": "history-cpr-resize",
+      "stage": "shrunk",
+      "draft": "",
+      "viewportRows": 19,
+      "historySize": 50,
+      "physicalStatus": 1,
+      "plannedStatus": 1,
+      "oldPreviewLive": true,
+      "oldPreviewPlanned": true,
+      "oldPreviewHistory": false,
+      "oldLiveHistory": false
+    },
+    {
+      "name": "history-cpr-resize",
+      "stage": "settled",
+      "draft": "",
+      "viewportRows": 19,
+      "historySize": 44,
+      "physicalStatus": 1,
+      "plannedStatus": 1,
+      "oldPreviewLive": true,
+      "oldPreviewPlanned": true,
+      "oldPreviewHistory": false,
+      "oldLiveHistory": false
+    },
+    {
+      "name": "history-cpr-resize",
+      "stage": "contract",
+      "draft": "",
+      "viewportRows": 7,
+      "historySize": 44,
+      "physicalStatus": 2,
+      "plannedStatus": 1,
+      "oldPreviewLive": true,
+      "oldPreviewPlanned": false,
+      "oldPreviewHistory": false,
+      "oldLiveHistory": false
+    },
+    {
+      "name": "history-cpr-resize",
+      "stage": "assistant",
+      "draft": "",
+      "viewportRows": 10,
+      "historySize": 44,
+      "physicalStatus": 2,
+      "plannedStatus": 1,
+      "oldPreviewLive": true,
+      "oldPreviewPlanned": false,
+      "oldPreviewHistory": false,
+      "oldLiveHistory": false
+    },
+    {
+      "name": "history-cpr-resize",
+      "stage": "scroll",
+      "draft": "",
+      "viewportRows": 2,
+      "historySize": 84,
+      "physicalStatus": 1,
+      "plannedStatus": 1,
+      "oldPreviewLive": false,
+      "oldPreviewPlanned": false,
+      "oldPreviewHistory": false,
+      "oldLiveHistory": false
+    }
+  ]
+}

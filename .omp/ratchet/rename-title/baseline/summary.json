@@ -1,0 +1,29 @@
+{
+  "rows": 120,
+  "titleModels": [
+    "openai-codex/gpt-6-luna"
+  ],
+  "judgeModels": [
+    "openai-codex/gpt-6.1-sol"
+  ],
+  "titleTokens": 445593,
+  "judgeTokens": 482692,
+  "medianTitleLatencySeconds": 2.073216313000001,
+  "baselineGate": {
+    "variant": "baseline",
+    "decision": "baseline",
+    "reasons": [
+      "test noise floor on quality: ±0.182"
+    ],
+    "warnings": [],
+    "deltas": {},
+    "best": {
+      "round": 0,
+      "variant": "baseline",
+      "test_score": 0.875
+    },
+    "plateau": false,
+    "done": false,
+    "table": "| round | variant | change | decision | train quality | test quality | train format | test format | train cost_usd | test cost_usd |\n|---|---|---|---|---|---|---|---|---|---|\n| 0 | baseline ★ | baseline | baseline | 0.965 ±0.041 | 0.875 ±0.182 | 0.944 ±0.079 | 0.958 ±0.061 | 0.0086 ±0.0020 | 0.0082 ±0.0015 |"
+  }
+}

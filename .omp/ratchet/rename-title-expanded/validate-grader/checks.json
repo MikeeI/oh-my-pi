@@ -1,0 +1,142 @@
+[
+  {
+    "prompt_id": "expanded-011",
+    "kind": "oracle",
+    "title": "DIY-Prompt Ziele und Verifikation präzisieren",
+    "quality": 1,
+    "explanation": "focus=1; recognizable=1"
+  },
+  {
+    "prompt_id": "expanded-011",
+    "kind": "empty",
+    "title": "",
+    "quality": 0,
+    "explanation": "focus=0; recognizable=0"
+  },
+  {
+    "prompt_id": "expanded-011",
+    "kind": "constant",
+    "title": "I don't know",
+    "quality": 0,
+    "explanation": "focus=0; recognizable=0"
+  },
+  {
+    "prompt_id": "expanded-011",
+    "kind": "wrong",
+    "title": "Banana bread baking instructions",
+    "quality": 0,
+    "explanation": "focus=0; recognizable=0"
+  },
+  {
+    "prompt_id": "expanded-003",
+    "kind": "oracle",
+    "title": "Gemeinsame Command-Verträge und Routing vereinheitlichen",
+    "quality": 1,
+    "explanation": "focus=1; recognizable=1"
+  },
+  {
+    "prompt_id": "expanded-003",
+    "kind": "empty",
+    "title": "",
+    "quality": 0,
+    "explanation": "focus=0; recognizable=0"
+  },
+  {
+    "prompt_id": "expanded-003",
+    "kind": "constant",
+    "title": "I don't know",
+    "quality": 0,
+    "explanation": "focus=0; recognizable=0"
+  },
+  {
+    "prompt_id": "expanded-003",
+    "kind": "wrong",
+    "title": "Banana bread baking instructions",
+    "quality": 0,
+    "explanation": "focus=0; recognizable=0"
+  },
+  {
+    "prompt_id": "expanded-006",
+    "kind": "oracle",
+    "title": "ast_grep Paginierungshinweise konsistent korrigieren",
+    "quality": 1,
+    "explanation": "focus=1; recognizable=1"
+  },
+  {
+    "prompt_id": "expanded-006",
+    "kind": "empty",
+    "title": "",
+    "quality": 0,
+    "explanation": "focus=0; recognizable=0"
+  },
+  {
+    "prompt_id": "expanded-006",
+    "kind": "constant",
+    "title": "I don't know",
+    "quality": 0,
+    "explanation": "focus=0; recognizable=0"
+  },
+  {
+    "prompt_id": "expanded-006",
+    "kind": "wrong",
+    "title": "Banana bread baking instructions",
+    "quality": 0,
+    "explanation": "focus=0; recognizable=0"
+  },
+  {
+    "prompt_id": "expanded-008",
+    "kind": "oracle",
+    "title": "Web-Search und LSP Prompts formatieren",
+    "quality": 1,
+    "explanation": "focus=1; recognizable=1"
+  },
+  {
+    "prompt_id": "expanded-008",
+    "kind": "empty",
+    "title": "",
+    "quality": 0,
+    "explanation": "focus=0; recognizable=0"
+  },
+  {
+    "prompt_id": "expanded-008",
+    "kind": "constant",
+    "title": "I don't know",
+    "quality": 0,
+    "explanation": "focus=0; recognizable=0"
+  },
+  {
+    "prompt_id": "expanded-008",
+    "kind": "wrong",
+    "title": "Banana bread baking instructions",
+    "quality": 0,
+    "explanation": "focus=0; recognizable=0"
+  },
+  {
+    "prompt_id": "expanded-012",
+    "kind": "oracle",
+    "title": "A1-Belegkette und Oktober-Match bereinigen",
+    "quality": 1,
+    "explanation": "focus=1; recognizable=1"
+  },
+  {
+    "prompt_id": "expanded-012",
+    "kind": "empty",
+    "title": "",
+    "quality": 0,
+    "explanation": "focus=0; recognizable=0"
+  },
+  {
+    "prompt_id": "expanded-012",
+    "kind": "constant",
+    "title": "I don't know",
+    "quality": 0,
+    "explanation": "focus=0; recognizable=0"
+  },
+  {
+    "prompt_id": "expanded-012",
+    "kind": "wrong",
+    "title": "Banana bread baking instructions",
+    "quality": 0,
+    "explanation": "focus=0; recognizable=0"
+  }
+]

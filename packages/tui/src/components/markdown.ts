@@ -34,6 +34,7 @@ import {
 } from "../render/extension-links";
 import type { SymbolTheme } from "../symbols";
 import { TERMINAL } from "../terminal-capabilities";
+import { colorToAnsi, FG_RESET } from "../theme/color";
 import { getSymbolTheme, getThemeEpoch } from "../theme/theme";
 import { canCacheMarkdownListItems } from "../theme/tui-adapters";
 import type { Component } from "../tui";
@@ -600,6 +601,10 @@ function createHtmlNormalizationState(): HtmlNormalizationState {
 
 const HTML_COMMENT_REGEX = /<!--[\s\S]*?-->/g;
 const HTML_TAG_REGEX = /<\/?(?:br|p|ol|ul|li|span|text|code|hr|blockquote)\b(?:\s[^>]*)?\s*\/?>/gi;
+// This is one foreground declaration, not a general CSS or HTML-attribute parser.
+const COLOR_SPAN_OPEN_REGEX = /^<span\s+style\s*=\s*(["'])\s*color\s*:\s*(#[0-9a-f]{6})\s*;?\s*\1\s*>$/i;
+const SPAN_OPEN_REGEX = /^<span(?:\s[^>]*)?>$/i;
+const SPAN_CLOSE_REGEX = /^<\/span\s*>$/i;
 // Block-level HTML that needs structural (not just textual) rendering: standalone
 // `<hr>` becomes a rule and balanced `<blockquote>…</blockquote>` renders with
 // quote styling. Group 1 captures blockquote inner content; it is undefined for hr.
@@ -1403,6 +1408,14 @@ function hasExtensionLink(tokens: readonly Token[]): boolean {
 	return false;
 }
 
+function inlineHasTextColor(tokens: readonly Token[]): boolean {
+	for (const token of tokens) {
+		if (token.type === "html" && COLOR_SPAN_OPEN_REGEX.test(token.raw.trim())) return true;
+		if ("tokens" in token && Array.isArray(token.tokens) && inlineHasTextColor(token.tokens)) return true;
+	}
+	return false;
+}
+
 /** Isolated inline lex of a same-line delta. A single-line delta has no block
  * structure, so the isolated inline pass equals the full lex's inline pass
  * (marked's paragraph tokens run the same `inlineTokens` entry point). */
@@ -1808,6 +1821,8 @@ export interface MarkdownTheme {
 	 * still render; omitted symbols fall back to the active theme's set.
 	 */
 	symbols?: SymbolTheme;
+	/** Opt-in foreground spans; absent keeps the existing HTML normalization. */
+	textColors?: boolean;
 }
 
 interface InlineStyleContext {
@@ -2440,7 +2455,7 @@ export class Markdown implements Component {
 	#activeRenderSignature?: RenderSignature;
 	#fastTail?: FastTailRecipe; // undefined = disarmed
 	// B+ capture plumbing: #renderContentLines records the last rendered paragraph row.
-	#lastTailCapture?: { kind: "paragraph"; open: boolean; rowInput: string; rowRaw: string };
+	#lastTailCapture?: { kind: "paragraph"; open: boolean; textColors: boolean; rowInput: string; rowRaw: string };
 	/** Top-level token index and running count of the extension links drawn in it; see `#renderContentLines`. */
 	#extensionLinkBlock = 0;
 	#extensionLinkOrdinal = 0;
@@ -2565,7 +2580,10 @@ export class Markdown implements Component {
 	 * same kind and key whose text extends the previous one, which the
 	 * reconciler sends as `text append`.
 	 */
-	describe(_cx: DescribeContext): NativeNode {
+	describe(_cx: DescribeContext): NativeNode | null {
+		// Native Markdown has its own dialect. Reuse the protocol's rendered-row
+		// fallback so enabling colors cannot advertise unsupported native CSS.
+		if (this.#theme.textColors) return null;
 		const stream = this.#transientRenderCache;
 		const cached = this.#native;
 		if (cached?.text === this.#text && cached.stream === stream) return cached.node;
@@ -3261,6 +3279,9 @@ export class Markdown implements Component {
 			// the all-cache-hit prefix path clears #lastTailCapture at its top.
 			this.#lastTailCapture !== undefined &&
 			this.#lastTailCapture.kind === "paragraph" &&
+			// The row splice carries no foreground-span scope. Only actual color
+			// tokens disarm it; ordinary spans and code examples stay eligible.
+			!this.#lastTailCapture.textColors &&
 			// Run-level default styling (color/bold/italic/strikethrough/
 			// underline) disarms: the splice yields two ANSI runs where a cold
 			// render yields one; bgColor is line-level and stays eligible.
@@ -3571,6 +3592,7 @@ export class Markdown implements Component {
 					rowInput: wrappedLast?.text ?? lastLine.text,
 					rowRaw: raw.slice(raw.lastIndexOf("\n") + 1),
 					open: inlineHasOpen(token.tokens ?? []),
+					textColors: this.#theme.textColors === true && inlineHasTextColor(token.tokens ?? []),
 				};
 			}
 		}
@@ -4224,13 +4246,22 @@ export class Markdown implements Component {
 		return this.#applyQuoteBorder(innerLines, width);
 	}
 
-	#renderInlineTokens(tokens: Token[], styleContext?: InlineStyleContext): string {
+	#renderInlineTokens(tokens: Token[], styleContext?: InlineStyleContext, spanForegrounds?: string[]): string {
 		let result = "";
 		const resolvedStyleContext = styleContext ?? this.#getDefaultInlineStyleContext();
 		const { applyText, stylePrefix } = resolvedStyleContext;
+		// Nested Markdown shares lexical scopes; a separate block starts fresh.
+		const foregrounds = spanForegrounds ?? [];
 		const applyTextWithNewlines = (text: string): string => {
 			const segments: string[] = text.split("\n");
-			return segments.map((segment: string) => (segment === "" ? "" : applyText(segment))).join("\n");
+			return segments
+				.map(segment => {
+					if (segment === "") return "";
+					const foreground = foregrounds.at(-1);
+					// Close emitted runs even while a streamed logical span is open.
+					return applyText(foreground ? `${foreground}${segment}${FG_RESET}` : segment);
+				})
+				.join("\n");
 		};
 		const swatchGlyph = this.#symbols.colorSwatch || DEFAULT_COLOR_SWATCH_GLYPH;
 		// Set by a line break: the next line's own leading whitespace is dropped.
@@ -4258,7 +4289,7 @@ export class Markdown implements Component {
 					if (token.tokens) markHtmlItemWhenContent(plainInlineTokens(token.tokens));
 					// Text tokens in list items can have nested tokens for inline formatting
 					if (token.tokens && token.tokens.length > 0) {
-						result += this.#renderInlineTokens(token.tokens, resolvedStyleContext);
+						result += this.#renderInlineTokens(token.tokens, resolvedStyleContext, foregrounds);
 					} else {
 						result += renderTextWithSwatches(text, applyTextWithNewlines, swatchGlyph);
 					}
@@ -4268,7 +4299,7 @@ export class Markdown implements Component {
 				case "paragraph":
 					// Paragraph tokens contain nested inline tokens
 					markHtmlItemWhenContent(plainInlineTokens(token.tokens || []));
-					result += this.#renderInlineTokens(token.tokens || [], resolvedStyleContext);
+					result += this.#renderInlineTokens(token.tokens || [], resolvedStyleContext, foregrounds);
 					break;
 
 				case "strong": {
@@ -4277,7 +4308,7 @@ export class Markdown implements Component {
 					const context = this.#theme.strong
 						? this.#proseFgExemptContext(resolvedStyleContext)
 						: resolvedStyleContext;
-					const content = this.#renderInlineTokens(token.tokens || [], context);
+					const content = this.#renderInlineTokens(token.tokens || [], context, foregrounds);
 					result += (this.#theme.strong ? this.#theme.strong(content) : this.#theme.bold(content)) + stylePrefix;
 					break;
 				}
@@ -4287,7 +4318,7 @@ export class Markdown implements Component {
 					const context = this.#theme.emphasis
 						? this.#proseFgExemptContext(resolvedStyleContext)
 						: resolvedStyleContext;
-					const content = this.#renderInlineTokens(token.tokens || [], context);
+					const content = this.#renderInlineTokens(token.tokens || [], context, foregrounds);
 					result +=
 						(this.#theme.emphasis ? this.#theme.emphasis(content) : this.#theme.italic(content)) + stylePrefix;
 					break;
@@ -4305,6 +4336,7 @@ export class Markdown implements Component {
 					const linkText = this.#renderInlineTokens(
 						token.tokens || [],
 						this.#proseFgExemptContext(resolvedStyleContext),
+						foregrounds,
 					);
 					const href = typeof token.href === "string" ? token.href : "";
 					// An extension owns this link: no suffix, and no hyperlink the terminal could open.
@@ -4340,7 +4372,7 @@ export class Markdown implements Component {
 					break;
 
 				case "del": {
-					const delContent = this.#renderInlineTokens(token.tokens || [], resolvedStyleContext);
+					const delContent = this.#renderInlineTokens(token.tokens || [], resolvedStyleContext, foregrounds);
 					markHtmlItemWhenContent(plainInlineTokens(token.tokens || []));
 					result += this.#theme.strikethrough(delContent) + stylePrefix;
 					break;
@@ -4348,6 +4380,27 @@ export class Markdown implements Component {
 
 				case "html":
 					if ("raw" in token && typeof token.raw === "string") {
+						if (this.#theme.textColors) {
+							const tag = token.raw.trim();
+							// Scope tags occupy no cells, so they must not consume upstream's
+							// pending hard-break whitespace trim before the next text token.
+							if (SPAN_OPEN_REGEX.test(tag) && !/\/\s*>$/.test(tag)) {
+								const color = COLOR_SPAN_OPEN_REGEX.exec(tag)?.[2];
+								// Unsupported or unstyled spans inherit their parent.
+								foregrounds.push(
+									color
+										? colorToAnsi(color, TERMINAL.trueColor ? "truecolor" : "256color")
+										: (foregrounds.at(-1) ?? ""),
+								);
+								trimLeadingWhitespace = lineStart;
+								break;
+							}
+							if (SPAN_CLOSE_REGEX.test(tag)) {
+								foregrounds.pop();
+								trimLeadingWhitespace = lineStart;
+								break;
+							}
+						}
 						const cleaned = normalizeHtmlForTerminal(token.raw, htmlState);
 						result += applyTextWithNewlines(cleaned);
 						if (cleaned.endsWith("\n")) {

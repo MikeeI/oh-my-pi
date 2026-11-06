@@ -270,8 +270,9 @@ export interface AgentLoopConfig extends SimpleStreamOptions {
 	 * Optional transform applied to the final provider context after conversion,
 	 * normalization, and append-only context handling, but before telemetry capture
 	 * and provider send.
+	 * `preview` prepares an unsent request: restore recorded context without committing new request-history state.
 	 */
-	transformProviderContext?: (context: Context, model: Model) => Context | Promise<Context>;
+	transformProviderContext?: (context: Context, model: Model, preview?: boolean) => Context | Promise<Context>;
 
 	/** Remembers sent tool definitions to fill {@link Context.inactiveTools}. */
 	sentToolDefinitions?: SentToolDefinitions;

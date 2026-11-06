@@ -2,6 +2,7 @@ import * as path from "node:path";
 import { STREAM_TITLE_MAX } from "@oh-my-pi/pi-wire";
 import { CliUsageError, Command, Flags } from "@oh-my-pi/pi-utils/cli";
 import { streamHelp as commandHelp } from "../cli/command-help";
+import { APP_DISPLAY_NAME } from "../app-version";
 import { Settings } from "../config/settings";
 import { StencilCredential } from "../stencil/credential";
 import { resolveStreamUrls, runStreamConsole, type StreamUrls } from "../stream/streamer";
@@ -18,9 +19,9 @@ export default class Stream extends Command {
 	};
 
 	static examples = [
-		"omp stream",
-		'omp stream --title "Building a parser"',
-		"omp stream --server https://live.example.com",
+		`${APP_DISPLAY_NAME} stream`,
+		`${APP_DISPLAY_NAME} stream --title "Building a parser"`,
+		`${APP_DISPLAY_NAME} stream --server https://live.example.com`,
 	];
 
 	async run(): Promise<void> {

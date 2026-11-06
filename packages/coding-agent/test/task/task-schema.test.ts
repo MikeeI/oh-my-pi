@@ -1,5 +1,6 @@
 import { afterEach, describe, expect, it, vi } from "bun:test";
 import { type } from "@oh-my-pi/omptype";
+import { type AgentTool, validateAgentToolArguments } from "@oh-my-pi/pi-agent-core";
 import type { Model } from "@oh-my-pi/pi-ai";
 import { createMockModel } from "@oh-my-pi/pi-ai/providers/mock";
 import { Settings } from "@oh-my-pi/pi-coding-agent/config/settings";
@@ -24,15 +25,19 @@ function createSession(
 		settings?: Record<string, unknown>;
 	} = {},
 ): ToolSession {
+	const cwd = `/tmp/task-schema-${process.pid}-${taskSchemaSessionIndex++}`;
+	const settings = Settings.isolated({
+		"task.isolation.enabled": false,
+		"task.batch": false,
+		"task.disabledAgents": options.disabledAgents ?? [],
+		...options.settings,
+	});
+	// These assertions exercise the bundled schema/prompt, not the operator's editable profile.
+	Object.defineProperty(settings, "getAgentDir", { value: () => cwd });
 	return {
-		cwd: `/tmp/task-schema-${taskSchemaSessionIndex++}`,
+		cwd,
 		hasUI: false,
-		settings: Settings.isolated({
-			"task.isolation.enabled": false,
-			"task.batch": false,
-			"task.disabledAgents": options.disabledAgents ?? [],
-			...options.settings,
-		}),
+		settings,
 		getSessionFile: () => null,
 		getSessionSpawns: () => options.parentSpawns ?? "*",
 		getPlanModeState: () => (options.planMode ? { enabled: true } : undefined),
@@ -41,8 +46,8 @@ function createSession(
 
 const bundledSeance = loadBundledAgents().find(agent => agent.name === "seance")!;
 // Contract: the single-spawn schema (`task.batch: false`; the exported
-// `taskSchema` instance) carries no batch fields while accepting a caller
-// `model`, `outputSchema`, and its validation mode. The batch shape (`tasks[]` + shared
+// `taskSchema` instance) carries no batch fields while accepting caller
+// `outputSchema` and its validation mode. The batch shape (`tasks[]` + shared
 // `context`) is gated by the `task.batch` setting (default on, covered by
 // test/task/task-batch.test.ts).
 
@@ -55,7 +60,13 @@ describe("task schema (single-spawn)", () => {
 	it.each([false, true])("advertises taskFile only while task.file is on (batch=%s)", batchEnabled => {
 		// Enabled first: the disabled schema must not reuse the enabled one from the cache.
 		for (const file of [true, false]) {
-			const schema = getTaskSchema({ batchEnabled, isolationEnabled: false, structured: false, file });
+			const schema = getTaskSchema({
+				batchEnabled,
+				isolationEnabled: false,
+				structured: false,
+				file,
+				perCallModelEnabled: true,
+			});
 			const item = {
 				taskFile: "local://assignment.md",
 				model: "mock/file-worker",
@@ -169,14 +180,16 @@ describe("task schema seance fields", () => {
 			}
 		}
 	});
-	it("omits seance fields when they are not enabled", () => {
+	it("advertises an ordinary model only while per-call selection is enabled", () => {
 		for (const batchEnabled of [false, true]) {
 			for (const isolationEnabled of [false, true]) {
-				const schema = getTaskSchema({ batchEnabled, isolationEnabled });
-				const wireSchema = JSON.stringify(schema.toJsonSchema());
-				expect(wireSchema).not.toContain('"sourceSession"');
-				// Only the per-call `model` remains: one string, never the seance selector list.
-				expect(wireSchema).toContain('"model":{"type":"string"}');
+				// Enabled first: an off schema must not reuse a cached model-enabled shape.
+				for (const perCallModelEnabled of [true, false]) {
+					const schema = getTaskSchema({ batchEnabled, isolationEnabled, perCallModelEnabled });
+					const wireSchema = JSON.stringify(schema.toJsonSchema());
+					expect(wireSchema).not.toContain('"sourceSession"');
+					expect(wireSchema.includes('"model":{"type":"string"}')).toBe(perCallModelEnabled);
+				}
 			}
 		}
 	});
@@ -225,7 +238,7 @@ Custom prompt.`,
 		const planSchema = JSON.stringify(planMode.parameters.toJsonSchema());
 		expect(planSchema).not.toContain('"sourceSession"');
 		expect(planSchema).not.toContain("seance");
-		expect(planSchema).toContain('"model":{"type":"string"}');
+		expect(planSchema).not.toContain('"model"');
 		expect(planMode.description).not.toContain("seance");
 		expect(planMode.description).not.toContain("Historical consults");
 
@@ -233,7 +246,7 @@ Custom prompt.`,
 		const ordinarySchema = JSON.stringify(ordinary.parameters.toJsonSchema());
 		expect(ordinarySchema).toContain('"sourceSession"');
 		expect(ordinarySchema).toContain('"model"');
-		expect(ordinary.description).toContain("`seance`");
+		expect(ordinary.description).toContain("sourceSession");
 		expect(ordinary.description).toContain("Historical consults");
 	});
 	afterEach(() => vi.restoreAllMocks());
@@ -262,22 +275,27 @@ describe("task spawn validation", () => {
 		const text = await executeText({ agent: "scout" });
 		expect(text).toContain("Missing `task`");
 	});
-	it("rejects a model override for an ordinary task while task.perCallModel is off", async () => {
-		const schema = getTaskSchema({
-			isolationEnabled: false,
-			batchEnabled: false,
-			seanceFields: seanceTaskSchemaFields,
-		});
-		const params = {
-			agent: "scout",
-			task: "Map the auth module.",
-			solutionSpace: "focused inspection",
-			model: "anthropic/claude-sonnet-4-5",
-		};
-		expect(schema(params) instanceof type.errors).toBe(false);
+	it("rejects forged model overrides after schema parsing while per-call selection is off", async () => {
 		const scout = loadBundledAgents().find(agent => agent.name === "scout");
 		if (!scout) throw new Error("Expected the bundled scout agent");
-		expect(await executeText(params, [bundledSeance, scout])).toContain("task.perCallModel: off");
+		for (const batch of [false, true]) {
+			vi.spyOn(discoveryModule, "discoverAgents").mockResolvedValue({ agents: [scout], projectAgentsDir: null });
+			const tool = await TaskTool.create(createSession({ settings: { "task.batch": batch } }));
+			const item = {
+				agent: "scout",
+				task: "Map the auth module.",
+				solutionSpace: "focused inspection",
+				model: "anthropic/claude-sonnet-4-5",
+			};
+			const params = validateAgentToolArguments(tool as unknown as AgentTool, {
+				type: "toolCall",
+				id: "forged-model",
+				name: "task",
+				arguments: batch ? { context: "shared", tasks: [item] } : item,
+			});
+			const result = await tool.execute("forged-model", params);
+			expect(result.content.find(part => part.type === "text")?.text).toContain("task.perCallModel: off");
+		}
 	});
 
 	it("advertises approved selectors only while task.perCallModel is on", async () => {
@@ -440,5 +458,45 @@ describe("task spawn validation", () => {
 		];
 		for (const text of texts) expect(text).not.toContain("invalid `model` value");
 		expect(seen).toEqual([selectors, selectors, selectors, selectors]);
+	});
+});
+
+describe("task effort description", () => {
+	afterEach(() => {
+		vi.restoreAllMocks();
+	});
+
+	async function renderDescription(batch: boolean, effortEnabled: boolean): Promise<string> {
+		vi.spyOn(discoveryModule, "discoverAgents").mockResolvedValue({ agents: [], projectAgentsDir: null });
+		const session = {
+			cwd: "/tmp",
+			hasUI: false,
+			settings: Settings.isolated({
+				"task.batch": batch,
+				"task.enableEffort": effortEnabled,
+			}),
+			getSessionFile: () => null,
+			getSessionSpawns: () => "*",
+		} as unknown as ToolSession;
+		const tool = await TaskTool.create(session);
+		return tool.description;
+	}
+
+	it.each([true, false])("renders model-relative effort semantics when batch=%s", async batch => {
+		const description = await renderDescription(batch, true);
+
+		expect(description).toContain("Optional model-relative reasoning override.");
+		expect(description).toContain("Omit it to keep the selected agent's configured thinking level.");
+		expect(description).toContain(
+			'`"lo"`, `"med"`, and `"hi"` select the target model\'s lowest, middle, or highest supported thinking level.',
+		);
+		expect(description).toContain("Selection remains subject to `task.maxEffort`.");
+		expect(description.match(/Optional model-relative reasoning override/g)).toHaveLength(1);
+	});
+
+	it("omits effort guidance when effort is disabled", async () => {
+		const description = await renderDescription(true, false);
+
+		expect(description).not.toContain("model-relative reasoning override");
 	});
 });

@@ -1,6 +1,6 @@
 import type { AgentMessage } from "@oh-my-pi/pi-agent-core";
 import { createCustomMessage } from "@oh-my-pi/pi-agent-core/compaction/messages";
-import type { ImageContent, MessageAttribution, TextContent } from "@oh-my-pi/pi-ai";
+import type { ImageContent, MessageAttribution, TextContent, UserMessage } from "@oh-my-pi/pi-ai";
 import {
 	type CustomMessage,
 	type CustomMessageContent,
@@ -84,11 +84,19 @@ export function recentTranscriptEntries(entries: TranscriptEntryLike[], limit = 
 	return entries;
 }
 
-/** Editable user request text, preserving skill invocation syntax. */
+/**
+ * Text a user message shows and restores: the typed file-command invocation
+ * when one expanded into the content, otherwise the content verbatim.
+ */
+export function userDisplayText(message: Pick<UserMessage, "content" | "commandInvocation">): string {
+	return message.commandInvocation || textContent(message.content);
+}
+
+/** Editable user request text, preserving skill and file-command invocation syntax. */
 export function userTurnDraft(entry: TranscriptEntryLike): string | undefined {
 	const message = transcriptEntryMessage(entry);
 	if (!message) return undefined;
-	if (message.role === "user") return textContent(message.content);
+	if (message.role === "user") return userDisplayText(message);
 	if (message.role !== "custom" || !isUserTurnInitiator(message)) return undefined;
 	return titleTextFromSkillPrompt(message) ?? textContent(message.content);
 }

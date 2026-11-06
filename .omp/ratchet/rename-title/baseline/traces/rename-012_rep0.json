@@ -1,0 +1,20 @@
+[
+  {
+    "role": "system",
+    "content": "Generate a concise title (3-7 words) for this coding session.\nThe title MUST be clear enough that the user recognizes the session in a list.\nUse sentence case: capitalize only the first word and proper nouns.\n\nThe recent conversation transcript is provided inside `<chat>` tags.\nIt contains up to the last 5 user messages and last 5 assistant messages, text only.\nTool calls, tool results, thinking, and code fences are omitted.\n\nPrioritize the user's intent.\nUse assistant text only as context for what was actually being solved.\n\nIgnore assistant follow-up questions unless a later user reply explicitly selects or answers them, for example `q1`, `q2`, `q1 ja`, or `1 and 3`.\nIn that case, use the selected question text as context for the user's short reply.\n\nIgnore verification chatter, command-output summaries, status updates, and incidental side-effects unless they are the actual topic.\n\nProduce only the title text.\nWhen the transcript carries no concrete task yet, use exactly \"none\".\n\nOutput only the title wrapped in `<title>` and `</title>` tags, with nothing before or after. When the message carries no concrete task yet (a bare greeting, acknowledgement, small talk, or a request too vague to title without context you cannot see, e.g. \"help\" or \"fix this\"), output exactly `<title>none</title>`."
+  },
+  {
+    "role": "user",
+    "content": "<chat>\n<user>\nkannst di programmatisch luna gpt 6 eine anfrage stellen\n</user>\n\n<assistant>\nJa. Ich habe gerade eine **echte programmatische Anfrage an `openai-codex/gpt-6-luna`** gestellt.\n\n- **Anfrage:** `Antworte exakt mit: Luna-Verbindung funktioniert.`\n- **Antwort:** `Luna-Verbindung funktioniert.`\n- **Dauer:** rund 8 Sekunden inklusive CLI-Start.\n- **Ausführung:** ohne Tools und ohne gespeicherte Sitzung.\n\nFür eigene Anfragen reicht:\n\n \n\n• **Q1** — Welche konkrete Frage möchtest\n</assistant>\n\n<user>\nich möchte speed eben wissen\n</user>\n\n<user>\neben tps token persecond\n</user>\n</chat>"
+  },
+  {
+    "role": "assistant",
+    "content": [
+      {
+        "type": "text",
+        "text": "<title>GPT-6 Luna Token-Geschwindigkeit messen</title>",
+        "textSignature": "{\"v\":1,\"id\":\"msg_03b2c64697dc887e016ada174ca67c8191ba400cdf35bb1f01\",\"phase\":\"final_answer\"}"
+      }
+    ]
+  }
+]

@@ -1,0 +1,53 @@
+{
+  "name": "history-probe-control",
+  "stage": "assistant",
+  "live": " PREFACE-22\n\n PREFACE-23\n\n PREFACE-24\n\n PREFACE-25\n\n PREFACE-26\n\n PREFACE-27\n\n PREFACE-28\n\n PREFACE-29\n\n PREFACE-30\n\n PREFACE-31\n\n╭─── ✎ Edit: 🗒 diagnostic.txt ⟦+2⟧ ───────────────────────────────────────────╮\n│  +1│FINAL-PREVIEW-0                                                         │\n│  +2│FINAL-PREVIEW-1                                                         │\n╰─────────────────────────────────────────────────────────────────────────────╯\n\n ASSISTANT-0\n\n ASSISTANT-1\n╭──AUDIT-STATUS───────────────────────────────────────────────────────────────╮\n╰─                                                                           ─╯\n\n\n\n\n\n\n\n\n\n",
+  "full": " PREFACE-0\n\n PREFACE-1\n\n PREFACE-2\n\n PREFACE-3\n\n PREFACE-4\n\n PREFACE-5\n\n PREFACE-6\n\n PREFACE-7\n\n PREFACE-8\n\n PREFACE-9\n\n PREFACE-10\n\n PREFACE-11\n\n PREFACE-12\n\n PREFACE-13\n\n PREFACE-14\n\n PREFACE-15\n\n PREFACE-16\n\n PREFACE-17\n\n PREFACE-18\n\n PREFACE-19\n\n PREFACE-20\n\n PREFACE-21\n\n PREFACE-22\n\n PREFACE-23\n\n PREFACE-24\n\n PREFACE-25\n\n PREFACE-26\n\n PREFACE-27\n\n PREFACE-28\n\n PREFACE-29\n\n PREFACE-30\n\n PREFACE-31\n\n╭─── ✎ Edit: 🗒 diagnostic.txt ⟦+2⟧ ───────────────────────────────────────────╮\n│  +1│FINAL-PREVIEW-0                                                         │\n│  +2│FINAL-PREVIEW-1                                                         │\n╰─────────────────────────────────────────────────────────────────────────────╯\n\n ASSISTANT-0\n\n ASSISTANT-1\n╭──AUDIT-STATUS───────────────────────────────────────────────────────────────╮\n╰─                                                                           ─╯\n\n\n\n\n\n\n\n\n\n",
+  "historySize": 44,
+  "history": " PREFACE-0\n\n PREFACE-1\n\n PREFACE-2\n\n PREFACE-3\n\n PREFACE-4\n\n PREFACE-5\n\n PREFACE-6\n\n PREFACE-7\n\n PREFACE-8\n\n PREFACE-9\n\n PREFACE-10\n\n PREFACE-11\n\n PREFACE-12\n\n PREFACE-13\n\n PREFACE-14\n\n PREFACE-15\n\n PREFACE-16\n\n PREFACE-17\n\n PREFACE-18\n\n PREFACE-19\n\n PREFACE-20\n\n PREFACE-21\n",
+  "paint": {
+    "t": 1790720101196,
+    "kind": "paint",
+    "stage": "assistant",
+    "paint": 6,
+    "history": [],
+    "viewport": [
+      "╭─── ✎ Edit: 🗒 diagnostic.txt ⟦+2⟧ ───────────────────────────────────────────╮",
+      "│  +1│FINAL-PREVIEW-0                                                         │",
+      "│  +2│FINAL-PREVIEW-1                                                         │",
+      "╰─────────────────────────────────────────────────────────────────────────────╯",
+      "",
+      " ASSISTANT-0                                                                   ",
+      "                                                                               ",
+      " ASSISTANT-1                                                                   ",
+      "╭──AUDIT-STATUS───────────────────────────────────────────────────────────────╮",
+      "╰─                                                                           ─╯"
+    ],
+    "reset": false,
+    "alt": false,
+    "columns": 79,
+    "rows": 39,
+    "draft": "",
+    "debug": {
+      "lines": [
+        "\u001b[48;2;22;26;31m\u001b[38;2;61;66;74m╭───\u001b[39m \u001b[38;2;254;188;56m✎\u001b[39m \u001b[38;2;254;188;56mEdit\u001b[39m: \u001b[38;2;119;125;136m\u001b[38;2;119;125;136m🗒\u001b[39m \u001b[38;2;254;188;56mdiagnostic.txt\u001b[39m\u001b[39m \u001b[38;2;95;102;115m⟦\u001b[39m\u001b[38;2;137;210;129m+2\u001b[39m\u001b[38;2;95;102;115m⟧\u001b[39m \u001b[38;2;61;66;74m───────────────────────────────────────────\u001b[39m\u001b[38;2;61;66;74m╮\u001b[39m\u001b[49m",
+        "\u001b[48;2;22;26;31m\u001b[38;2;61;66;74m│\u001b[39m\u001b[38;2;137;210;129m  +1│FINAL-PREVIEW-0\u001b[27m\u001b[39m                                                         \u001b[38;2;61;66;74m│\u001b[39m\u001b[49m",
+        "\u001b[48;2;22;26;31m\u001b[38;2;61;66;74m│\u001b[39m\u001b[38;2;137;210;129m  +2│FINAL-PREVIEW-1\u001b[27m\u001b[39m                                                         \u001b[38;2;61;66;74m│\u001b[39m\u001b[49m",
+        "\u001b[48;2;22;26;31m\u001b[38;2;61;66;74m╰───\u001b[39m\u001b[38;2;61;66;74m──────────────────────────────────────────────────────────────────────────\u001b[39m\u001b[38;2;61;66;74m╯\u001b[39m\u001b[49m",
+        "",
+        " ASSISTANT-0                                                                   ",
+        "                                                                               ",
+        " ASSISTANT-1                                                                   ",
+        "\u001b[38;2;61;66;74m╭──\u001b[39mAUDIT-STATUS\u001b[38;2;61;66;74m─────────────────────────────────────────────────────────────\u001b[39m\u001b[38;2;61;66;74m──╮\u001b[39m",
+        "\u001b[38;2;61;66;74m╰─ \u001b[39m\u001b[38;2;229;229;231m\u001b[39m                                                                         \u001b[38;2;61;66;74m ─╯\u001b[39m"
+      ],
+      "windowTop": 0,
+      "altScreen": false,
+      "cursor": {
+        "x": 3,
+        "y": 29,
+        "visible": true
+      }
+    }
+  }
+}

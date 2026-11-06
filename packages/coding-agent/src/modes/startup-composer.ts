@@ -8,6 +8,7 @@ import {
 } from "@oh-my-pi/pi-tui/prompt/composer-cache";
 import { setMagicKeywords } from "@oh-my-pi/pi-tui/prompt/magic-keywords";
 import { initThemeSync } from "@oh-my-pi/pi-tui/theme";
+import { APP_DISPLAY_NAME } from "../app-version";
 import { MAGIC_KEYWORDS } from "./magic-keywords";
 
 /** Inputs available at the CLI prepaint boundary before command modules load. */
@@ -75,6 +76,7 @@ export function beginStartupComposer(options: PrepaintComposerOptions = {}): voi
 	const preferences = { ...COMPOSER_DEFAULTS, ...cached.preferences, ...options.preferences };
 	const welcome: ComposerWelcomeUpdate = { version: options.version ?? "" };
 	const composer = new Composer({
+		appName: APP_DISPLAY_NAME,
 		terminal: options.terminal,
 		exit: options.exit,
 		now: options.now,

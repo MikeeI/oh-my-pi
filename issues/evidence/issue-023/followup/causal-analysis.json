@@ -1,0 +1,299 @@
+{
+  "source": "0fbe07008812a2c4fd2599b7091c3959541e5870",
+  "baselineRuntime": "45192b35f9f57ddf59f49415292aaf06c2580853",
+  "observations": [
+    {
+      "name": "tool-resize-contract",
+      "plannedRows": 7,
+      "physicalStatus": 2,
+      "historySize": 0,
+      "draft": "",
+      "visibleDraftCopies": 0,
+      "prefaceMarkers": []
+    },
+    {
+      "name": "tool-resize-assistant",
+      "plannedRows": 10,
+      "physicalStatus": 2,
+      "historySize": 0,
+      "draft": "",
+      "visibleDraftCopies": 0,
+      "prefaceMarkers": []
+    },
+    {
+      "name": "typing-resize-typed",
+      "plannedRows": 8,
+      "physicalStatus": 2,
+      "historySize": 0,
+      "draft": "INPUT-ONCE-alpha beta gamma delta epsilon zeta eta theta iota kappa lambda mu nu xi omicron pi rho sigma END-ONCE",
+      "visibleDraftCopies": 2,
+      "prefaceMarkers": []
+    },
+    {
+      "name": "typing-resize-cleared",
+      "plannedRows": 7,
+      "physicalStatus": 2,
+      "historySize": 0,
+      "draft": "",
+      "visibleDraftCopies": 2,
+      "prefaceMarkers": []
+    },
+    {
+      "name": "finalize-short-resize-contract",
+      "plannedRows": 12,
+      "physicalStatus": 1,
+      "historySize": 0,
+      "draft": "",
+      "visibleDraftCopies": 0,
+      "prefaceMarkers": []
+    },
+    {
+      "name": "history-probe-resize-settled",
+      "plannedRows": 19,
+      "physicalStatus": 2,
+      "historySize": 44,
+      "draft": "",
+      "visibleDraftCopies": 0,
+      "prefaceMarkers": [
+        0,
+        1,
+        2,
+        3,
+        4,
+        5,
+        6,
+        7,
+        8,
+        9,
+        10,
+        11,
+        12,
+        13,
+        14,
+        15,
+        16,
+        17,
+        18,
+        19,
+        20,
+        21,
+        22,
+        23,
+        24,
+        25,
+        26,
+        27,
+        28
+      ]
+    },
+    {
+      "name": "history-cpr-resize-settled",
+      "plannedRows": 19,
+      "physicalStatus": 1,
+      "historySize": 44,
+      "draft": "",
+      "visibleDraftCopies": 0,
+      "prefaceMarkers": [
+        0,
+        1,
+        2,
+        3,
+        4,
+        5,
+        6,
+        7,
+        8,
+        9,
+        10,
+        11,
+        12,
+        13,
+        14,
+        15,
+        16,
+        17,
+        18,
+        19,
+        20,
+        21,
+        22,
+        23,
+        24,
+        25,
+        26,
+        27,
+        28,
+        29,
+        30,
+        31
+      ]
+    },
+    {
+      "name": "history-cpr-resize-contract",
+      "plannedRows": 7,
+      "physicalStatus": 2,
+      "historySize": 44,
+      "draft": "",
+      "visibleDraftCopies": 0,
+      "prefaceMarkers": [
+        0,
+        1,
+        2,
+        3,
+        4,
+        5,
+        6,
+        7,
+        8,
+        9,
+        10,
+        11,
+        12,
+        13,
+        14,
+        15,
+        16,
+        17,
+        18,
+        19,
+        20,
+        21,
+        22,
+        23,
+        24,
+        25,
+        26,
+        27,
+        28,
+        29,
+        30,
+        31
+      ]
+    },
+    {
+      "name": "history-probe-resize",
+      "cursorReplies": [
+        {
+          "height": 33,
+          "raw": "\u001b[33;17R",
+          "delivered": "\u001b[33;17R"
+        },
+        {
+          "height": 39,
+          "raw": "\u001b[33;18R",
+          "delivered": "\u001b[33;18R"
+        }
+      ],
+      "resizes": [
+        {
+          "t": 1790720102462,
+          "kind": "resize",
+          "fromRows": 39,
+          "rows": 33,
+          "growth": 0
+        },
+        {
+          "t": 1790720102712,
+          "kind": "resize",
+          "fromRows": 33,
+          "rows": 39,
+          "growth": 6
+        }
+      ]
+    },
+    {
+      "name": "history-cpr-resize",
+      "cursorReplies": [
+        {
+          "height": 33,
+          "raw": "\u001b[33;17R",
+          "delivered": "\u001b[33;17R"
+        },
+        {
+          "height": 39,
+          "raw": "\u001b[33;18R",
+          "delivered": "\u001b[39;18R"
+        }
+      ],
+      "resizes": [
+        {
+          "t": 1790720106800,
+          "kind": "resize",
+          "fromRows": 39,
+          "rows": 33,
+          "growth": 0
+        },
+        {
+          "t": 1790720107051,
+          "kind": "resize",
+          "fromRows": 33,
+          "rows": 39,
+          "growth": 6
+        }
+      ]
+    },
+    {
+      "name": "history-cursor-observe-resize",
+      "cursorReplies": [
+        {
+          "height": 33,
+          "raw": "\u001b[33;4R",
+          "delivered": "\u001b[33;4R"
+        },
+        {
+          "height": 33,
+          "raw": "\u001b[33;4R",
+          "delivered": "\u001b[33;4R"
+        },
+        {
+          "height": 33,
+          "raw": "\u001b[33;17R",
+          "delivered": "\u001b[33;17R"
+        },
+        {
+          "height": 39,
+          "raw": "\u001b[33;4R",
+          "delivered": "\u001b[33;4R"
+        },
+        {
+          "height": 39,
+          "raw": "\u001b[33;4R",
+          "delivered": "\u001b[33;4R"
+        },
+        {
+          "height": 39,
+          "raw": "\u001b[33;18R",
+          "delivered": "\u001b[33;18R"
+        }
+      ],
+      "resizes": [
+        {
+          "t": 1790720176085,
+          "kind": "resize",
+          "fromRows": 39,
+          "rows": 33,
+          "growth": 0
+        },
+        {
+          "t": 1790720176335,
+          "kind": "resize",
+          "fromRows": 33,
+          "rows": 39,
+          "growth": 6
+        }
+      ]
+    },
+    {
+      "name": "history-probe-resize",
+      "firstNormalCUP": "15",
+      "hasED0": false,
+      "hasED3": false
+    },
+    {
+      "name": "history-cpr-resize",
+      "firstNormalCUP": "21",
+      "hasED0": false,
+      "hasED3": false
+    }
+  ]
+}

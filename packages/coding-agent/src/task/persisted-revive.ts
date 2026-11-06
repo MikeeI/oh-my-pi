@@ -22,7 +22,7 @@ import type { PersistedSubagentReviverFactory } from "../registry/agent-lifecycl
 import { type AgentRef, AgentRegistry, MAIN_AGENT_ID } from "../registry/agent-registry";
 import { createAgentSession } from "../sdk";
 import type { AgentSession } from "../session/agent-session";
-import type { AgentSessionHandle } from "../session/agent-session-handle";
+import { type AgentSessionHandle, isLocalAgentSession } from "../session/agent-session-handle";
 import type { ArtifactManagerApi } from "../session/artifacts";
 import type { CostGateApi } from "../session/cost-gate";
 import { installRetryFallbackRole } from "../session/retry-fallback-chains";
@@ -303,6 +303,10 @@ export async function revivePersistedSubagent(spec: PersistedReviveSpec, expecte
 									discoverySession.sessionManager.getCwd(),
 									undefined,
 									discoverySession.effectiveExtensionRoots,
+									(isLocalAgentSession(discoverySession)
+										? discoverySession.settings
+										: spec.settings
+									).getAgentDir(),
 								)
 							).agents,
 							...(parentSession?.getSessionAgents() ?? []),

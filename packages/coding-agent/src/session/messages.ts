@@ -184,14 +184,14 @@ export function buildReplanTitleContext(messages: AgentMessage[]): string {
 }
 
 /**
- * Title text of a message the operator wrote: a typed prompt, or a `/skill:`
- * invocation as its chip (never the expanded skill body). `undefined` for
+ * Title text of a message the operator wrote: a typed prompt, or a `/skill:` or
+ * file-command invocation as typed (never the expanded body). `undefined` for
  * agent-attributed and non-user messages, which automatic titles never name.
  */
 export function operatorTitleText(message: AgentMessage): string | undefined {
 	if (message.role === "custom") return titleTextFromSkillPrompt(message);
 	if (message.role !== "user" || message.attribution !== "user") return undefined;
-	return textFromContent(message.content) || undefined;
+	return message.commandInvocation?.trim() || textFromContent(message.content) || undefined;
 }
 
 /** One turn of the recent conversation the title-drift judge compares with the session title. */
@@ -303,7 +303,10 @@ function titleConversationTurnFromMessage(message: AgentMessage): TitleConversat
 		return { role: "user", text };
 	}
 	if (message.role !== "user" && message.role !== "assistant") return undefined;
-	const text = textFromContent(message.content);
+	const text =
+		message.role === "user" && message.commandInvocation
+			? message.commandInvocation.trim()
+			: textFromContent(message.content);
 	const thinking = message.role === "assistant" ? thinkingFromContent(message.content) : undefined;
 	if (!text && !thinking) return undefined;
 	return { role: message.role, ...(text ? { text } : {}), ...(thinking ? { thinking } : {}) };

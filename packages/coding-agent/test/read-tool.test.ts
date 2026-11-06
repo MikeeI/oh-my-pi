@@ -11,7 +11,7 @@ import { removeSyncWithRetries } from "@oh-my-pi/pi-utils";
 const TINY_PNG_BASE64 =
 	"iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8DwHwAFBQIAX8jx0gAAAABJRU5ErkJggg==";
 
-function createSession(cwd: string, sourcePath: string): ToolSession {
+function createSession(cwd: string, sourcePath: string, attachmentCount = 1): ToolSession {
 	const image: ImageContent = { type: "image", data: TINY_PNG_BASE64, mimeType: "image/png" };
 	return {
 		cwd,
@@ -19,7 +19,13 @@ function createSession(cwd: string, sourcePath: string): ToolSession {
 		getSessionFile: () => null,
 		getSessionSpawns: () => "*",
 		settings: Settings.isolated({ "images.autoResize": false }),
-		getImageAttachments: () => [{ label: "Image #1", uri: "attachment://1", image, sourcePath }],
+		getImageAttachments: () =>
+			Array.from({ length: attachmentCount }, (_, index) => ({
+				label: `Image #${index + 1}`,
+				uri: `attachment://${index + 1}`,
+				image,
+				sourcePath,
+			})),
 	};
 }
 
