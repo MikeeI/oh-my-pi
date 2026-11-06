@@ -1,0 +1,207 @@
+[
+  {
+    "id": "expanded-011",
+    "intent": "Den über Q1 ausgewählten Diff für Zielgewichtung und technische Verifikation im DIY-Workspace-Prompt vorschlagen.",
+    "title": "DIY-Prompt-Verbesserungen vorschlagen",
+    "grade": {
+      "quality": 1,
+      "format": 0
+    },
+    "explanation": "focus=1; recognizable=1",
+    "model": "openai-codex/gpt-6-luna",
+    "usage": {
+      "input": 3063,
+      "output": 19,
+      "cacheRead": 0,
+      "cacheWrite": 0,
+      "totalTokens": 3082,
+      "cost": {
+        "input": 0.0003063,
+        "output": 0.000009499999999999999,
+        "cacheRead": 0,
+        "cacheWrite": 0,
+        "total": 0.00031580000000000003
+      }
+    },
+    "judgeModel": "openai-codex/gpt-6.1-sol",
+    "judgeUsage": {
+      "input": 3412,
+      "output": 12,
+      "cacheRead": 0,
+      "cacheWrite": 0,
+      "totalTokens": 3424,
+      "cost": {
+        "input": 0.006823999999999999,
+        "output": 0.00012000000000000002,
+        "cacheRead": 0,
+        "cacheWrite": 0,
+        "total": 0.006944
+      }
+    },
+    "latency_s": 1.4983738350000004
+  },
+  {
+    "id": "expanded-008",
+    "intent": "Die klar erkennbare Arbeit am Formatieren der Web-Search- und LSP-Tool-Prompts benennen; aus der nicht auflösbaren letzten Eingabe we/ex kein neues Thema erfinden.",
+    "title": "Format web search and LSP prompts",
+    "grade": {
+      "quality": 1,
+      "format": 1
+    },
+    "explanation": "focus=1; recognizable=1",
+    "model": "openai-codex/gpt-6-luna",
+    "usage": {
+      "input": 2066,
+      "output": 16,
+      "cacheRead": 0,
+      "cacheWrite": 0,
+      "totalTokens": 2082,
+      "cost": {
+        "input": 0.0002066,
+        "output": 0.000008,
+        "cacheRead": 0,
+        "cacheWrite": 0,
+        "total": 0.0002146
+      }
+    },
+    "judgeModel": "openai-codex/gpt-6.1-sol",
+    "judgeUsage": {
+      "input": 2415,
+      "output": 12,
+      "cacheRead": 0,
+      "cacheWrite": 0,
+      "totalTokens": 2427,
+      "cost": {
+        "input": 0.00483,
+        "output": 0.00012000000000000002,
+        "cacheRead": 0,
+        "cacheWrite": 0,
+        "total": 0.00495
+      }
+    },
+    "latency_s": 1.553934413
+  },
+  {
+    "id": "expanded-006",
+    "intent": "Die Arbeit an korrekten ast_grep-Paginierungshinweisen samt Contract-Nachweis abschließen und sichern.",
+    "title": "Commit and push worktree changes",
+    "grade": {
+      "quality": 0,
+      "format": 1
+    },
+    "explanation": "focus=0; recognizable=0",
+    "model": "openai-codex/gpt-6-luna",
+    "usage": {
+      "input": 2408,
+      "output": 15,
+      "cacheRead": 0,
+      "cacheWrite": 0,
+      "totalTokens": 2423,
+      "cost": {
+        "input": 0.00024080000000000003,
+        "output": 0.000007499999999999999,
+        "cacheRead": 0,
+        "cacheWrite": 0,
+        "total": 0.0002483
+      }
+    },
+    "judgeModel": "openai-codex/gpt-6.1-sol",
+    "judgeUsage": {
+      "input": 2763,
+      "output": 12,
+      "cacheRead": 0,
+      "cacheWrite": 0,
+      "totalTokens": 2775,
+      "cost": {
+        "input": 0.005526,
+        "output": 0.00012000000000000002,
+        "cacheRead": 0,
+        "cacheWrite": 0,
+        "total": 0.005646
+      }
+    },
+    "latency_s": 1.2918257739999999
+  },
+  {
+    "id": "expanded-012",
+    "intent": "Die vorgeschlagenen nächsten Schritte für verschobene A1/XOXO-Belegzuordnungen und den unabhängigen Oktober-Match angehen.",
+    "title": "A1-Matchkorrekturmatrix erstellen",
+    "grade": {
+      "quality": 1,
+      "format": 0
+    },
+    "explanation": "focus=1; recognizable=1",
+    "model": "openai-codex/gpt-6-luna",
+    "usage": {
+      "input": 3351,
+      "output": 17,
+      "cacheRead": 0,
+      "cacheWrite": 0,
+      "totalTokens": 3368,
+      "cost": {
+        "input": 0.0003351,
+        "output": 0.0000085,
+        "cacheRead": 0,
+        "cacheWrite": 0,
+        "total": 0.0003436
+      }
+    },
+    "judgeModel": "openai-codex/gpt-6.1-sol",
+    "judgeUsage": {
+      "input": 3700,
+      "output": 12,
+      "cacheRead": 0,
+      "cacheWrite": 0,
+      "totalTokens": 3712,
+      "cost": {
+        "input": 0.0073999999999999995,
+        "output": 0.00012000000000000002,
+        "cacheRead": 0,
+        "cacheWrite": 0,
+        "total": 0.00752
+      }
+    },
+    "latency_s": 1.6718476680000003
+  },
+  {
+    "id": "expanded-003",
+    "intent": "Den vorgeschlagenen gemeinsamen Kontext-, Routing- und Ergebnisvertrag in den Command-Templates anwenden.",
+    "title": "Promptkorrekturen anwenden",
+    "grade": {
+      "quality": 0.5,
+      "format": 0
+    },
+    "explanation": "focus=1; recognizable=0",
+    "model": "openai-codex/gpt-6-luna",
+    "usage": {
+      "input": 3695,
+      "output": 37,
+      "cacheRead": 0,
+      "cacheWrite": 0,
+      "totalTokens": 3732,
+      "cost": {
+        "input": 0.00036950000000000004,
+        "output": 0.0000185,
+        "cacheRead": 0,
+        "cacheWrite": 0,
+        "total": 0.00038800000000000005
+      }
+    },
+    "judgeModel": "openai-codex/gpt-6.1-sol",
+    "judgeUsage": {
+      "input": 4045,
+      "output": 34,
+      "cacheRead": 0,
+      "cacheWrite": 0,
+      "totalTokens": 4079,
+      "cost": {
+        "input": 0.00809,
+        "output": 0.00034,
+        "cacheRead": 0,
+        "cacheWrite": 0,
+        "total": 0.00843
+      }
+    },
+    "latency_s": 3.379481525
+  }
+]

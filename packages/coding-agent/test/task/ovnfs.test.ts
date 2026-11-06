@@ -417,6 +417,7 @@ describe("ovnfs checkout recovery", () => {
 		};
 		vi.spyOn(executorModule, "runSubprocess").mockResolvedValue(succeeded);
 		const result = await isolationRunner.runIsolatedSubprocess({
+			agentDir: artifactsDir,
 			baseOptions: {
 				cwd: repo,
 				agent: { name: "task", description: "Task agent", systemPrompt: "test", source: "bundled" },

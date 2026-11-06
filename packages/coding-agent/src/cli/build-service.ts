@@ -33,6 +33,7 @@ import { Transform } from "node:stream";
 import { pipeline } from "node:stream/promises";
 import { $env, APP_NAME, isEnoent, isRecord, VERSION } from "@oh-my-pi/pi-utils";
 import { $ } from "bun";
+import { APP_DISPLAY_NAME } from "../app-version";
 import {
 	isTimeoutError,
 	isUnsupportedProxyError,
@@ -316,7 +317,7 @@ export async function fetchBuild(selector: BuildSelector, options: FetchBuildOpt
 	if (response.status === 404 && isRecord(body) && body.error === "no_build") {
 		const hint =
 			product === OMP_BUILD && "channel" in selector && selector.channel === "canary"
-				? ` Try \`${APP_NAME} update --stable\`.`
+				? ` Try \`${APP_DISPLAY_NAME} update --stable\`.`
 				: "";
 		throw new Error(`No ${what} is published on ${origin} yet.${hint}`);
 	}

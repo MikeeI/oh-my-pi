@@ -2,7 +2,7 @@
  * Log in to a model provider from the terminal.
  */
 
-import { APP_NAME } from "@oh-my-pi/pi-utils";
+import { APP_DISPLAY_NAME as APP_NAME } from "../app-version";
 import { Args, Command } from "@oh-my-pi/pi-utils/cli";
 import { loginHelp as commandHelp } from "../cli/command-help";
 import { runLoginCommand } from "../cli/login-cli";

@@ -23,6 +23,8 @@ import * as path from "node:path";
 import type * as natives from "@oh-my-pi/pi-natives";
 import * as vcs from "@oh-my-pi/pi-natives/vcs";
 import { postmortem, prompt } from "@oh-my-pi/pi-utils";
+import { APP_DISPLAY_NAME } from "../app-version";
+import { resolveUserToolPromptSource } from "../prompts/tool-prompt-source";
 import isolationErrorTemplate from "../prompts/tools/isolation-error.md" with { type: "text" };
 import isolationSummaryTemplate from "../prompts/tools/isolation-summary.md" with { type: "text" };
 import { AgentLifecycleManager } from "../registry/agent-lifecycle";
@@ -186,6 +188,8 @@ export interface IsolatedRunOptions {
 	 * else unchanged.
 	 */
 	baseOptions: ExecutorOptions;
+	/** Owning session profile; recovery prompts never resolve through a process-global profile. */
+	agentDir: string;
 	/** Context returned by {@link prepareIsolationContext}. */
 	context: IsolationContext;
 	/** Materialises the run's workspace: {@link nativeWorkspace} or `ovnfsWorkspace` (`./ovnfs`). */
@@ -452,8 +456,13 @@ interface IsolationErrorContext {
 	sidecarMissing?: boolean;
 }
 
-function renderIsolationError(context: IsolationErrorContext): string {
-	return prompt.render(isolationErrorTemplate, { ...context });
+function renderIsolationError(context: IsolationErrorContext, agentDir: string): string {
+	const source = resolveUserToolPromptSource({
+		agentDir,
+		toolName: "isolation-error",
+		bundledSource: isolationErrorTemplate,
+	});
+	return prompt.render(source, { ...context, appDisplayName: APP_DISPLAY_NAME });
 }
 
 /**
@@ -518,12 +527,15 @@ export async function runIsolatedSubprocess(opts: IsolatedRunOptions): Promise<S
 					retainWorkspace = true;
 					const retained = await workspace.retain();
 					throw new Error(
-						renderIsolationError({
-							kind: "patch-capture-failed",
-							message: captureErr instanceof Error ? captureErr.message : String(captureErr),
-							retainedDir: retained.dir,
-							sidecarMissing: !retained.sidecarOk,
-						}),
+						renderIsolationError(
+							{
+								kind: "patch-capture-failed",
+								message: captureErr instanceof Error ? captureErr.message : String(captureErr),
+								retainedDir: retained.dir,
+								sidecarMissing: !retained.sidecarOk,
+							},
+							opts.agentDir,
+						),
 					);
 				}
 				const patchResult = capture.artifacts;
@@ -629,21 +641,24 @@ export async function runIsolatedSubprocess(opts: IsolatedRunOptions): Promise<S
 					return rememberAgentArtifacts({
 						...result,
 						...capture.artifacts,
-						error: renderIsolationError({ kind: "merge-failed", message: msg, rescueBranch }),
+						error: renderIsolationError({ kind: "merge-failed", message: msg, rescueBranch }, opts.agentDir),
 					});
 				} catch (patchErr) {
 					retainWorkspace = true;
 					const retained = await workspace.retain();
 					return rememberAgentArtifacts({
 						...result,
-						error: renderIsolationError({
-							kind: "merge-failed",
-							message: msg,
-							captureError: patchErr instanceof Error ? patchErr.message : String(patchErr),
-							rescueBranch,
-							retainedDir: retained.dir,
-							sidecarMissing: !retained.sidecarOk,
-						}),
+						error: renderIsolationError(
+							{
+								kind: "merge-failed",
+								message: msg,
+								captureError: patchErr instanceof Error ? patchErr.message : String(patchErr),
+								rescueBranch,
+								retainedDir: retained.dir,
+								sidecarMissing: !retained.sidecarOk,
+							},
+							opts.agentDir,
+						),
 					});
 				}
 			}
@@ -671,12 +686,15 @@ export async function runIsolatedSubprocess(opts: IsolatedRunOptions): Promise<S
 					branchName: commitResult?.branchName,
 					branchBaseSha: commitResult?.baseSha,
 					nestedPatches: commitResult?.nestedPatches,
-					error: renderIsolationError({
-						kind: "nested-capture-failed",
-						message: persistErr instanceof Error ? persistErr.message : String(persistErr),
-						retainedDir: retained.dir,
-						sidecarMissing: !retained.sidecarOk,
-					}),
+					error: renderIsolationError(
+						{
+							kind: "nested-capture-failed",
+							message: persistErr instanceof Error ? persistErr.message : String(persistErr),
+							retainedDir: retained.dir,
+							sidecarMissing: !retained.sidecarOk,
+						},
+						opts.agentDir,
+					),
 				});
 			}
 		}
@@ -690,12 +708,15 @@ export async function runIsolatedSubprocess(opts: IsolatedRunOptions): Promise<S
 				const retained = await workspace.retain();
 				return rememberAgentArtifacts({
 					...result,
-					error: renderIsolationError({
-						kind: "patch-capture-failed",
-						message: patchErr instanceof Error ? patchErr.message : String(patchErr),
-						retainedDir: retained.dir,
-						sidecarMissing: !retained.sidecarOk,
-					}),
+					error: renderIsolationError(
+						{
+							kind: "patch-capture-failed",
+							message: patchErr instanceof Error ? patchErr.message : String(patchErr),
+							retainedDir: retained.dir,
+							sidecarMissing: !retained.sidecarOk,
+						},
+						opts.agentDir,
+					),
 				});
 			}
 		}

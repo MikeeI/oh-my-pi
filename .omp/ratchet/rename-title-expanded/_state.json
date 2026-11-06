@@ -1,0 +1,209 @@
+{
+  "version": 1,
+  "flow": "rename-title-expanded",
+  "cases_paths": [
+    ".omp/ratchet/rename-title-expanded/cases.json",
+    ".omp/ratchet/rename-title-expanded/selection.json"
+  ],
+  "harness_paths": [
+    ".omp/ratchet/rename-title-expanded/harness"
+  ],
+  "change_paths": [
+    "packages/coding-agent/src/prompts/system/title-transcript-system.md"
+  ],
+  "off_limits": [
+    "packages/coding-agent/src/utils/title-generator.ts",
+    "packages/coding-agent/src/session/agent-session.ts",
+    "MOMP_VERSION"
+  ],
+  "stop": {
+    "plateau": 3,
+    "rounds": 4
+  },
+  "train_ids": [
+    "expanded-003",
+    "expanded-006",
+    "expanded-008",
+    "expanded-009",
+    "expanded-010",
+    "expanded-011",
+    "expanded-012",
+    "expanded-014",
+    "expanded-015",
+    "expanded-016",
+    "expanded-017",
+    "expanded-021",
+    "expanded-022",
+    "expanded-023",
+    "expanded-024",
+    "expanded-025",
+    "expanded-026",
+    "expanded-027",
+    "expanded-030",
+    "expanded-031",
+    "expanded-032",
+    "expanded-033",
+    "expanded-034",
+    "expanded-035",
+    "expanded-037",
+    "expanded-039",
+    "expanded-040",
+    "expanded-041",
+    "expanded-042",
+    "expanded-043",
+    "expanded-044",
+    "expanded-048",
+    "expanded-052",
+    "expanded-054",
+    "expanded-056",
+    "expanded-057",
+    "expanded-062",
+    "expanded-063",
+    "expanded-066",
+    "expanded-067",
+    "expanded-069",
+    "expanded-070",
+    "expanded-074",
+    "expanded-076",
+    "expanded-077",
+    "expanded-078",
+    "expanded-079",
+    "expanded-080",
+    "expanded-082",
+    "expanded-083",
+    "expanded-085",
+    "expanded-089",
+    "expanded-090",
+    "expanded-091",
+    "expanded-092",
+    "expanded-093",
+    "expanded-095",
+    "expanded-096",
+    "expanded-098",
+    "expanded-100"
+  ],
+  "test_ids": [
+    "expanded-001",
+    "expanded-002",
+    "expanded-004",
+    "expanded-005",
+    "expanded-007",
+    "expanded-013",
+    "expanded-018",
+    "expanded-019",
+    "expanded-020",
+    "expanded-028",
+    "expanded-029",
+    "expanded-036",
+    "expanded-038",
+    "expanded-045",
+    "expanded-046",
+    "expanded-047",
+    "expanded-049",
+    "expanded-050",
+    "expanded-051",
+    "expanded-053",
+    "expanded-055",
+    "expanded-058",
+    "expanded-059",
+    "expanded-060",
+    "expanded-061",
+    "expanded-064",
+    "expanded-065",
+    "expanded-068",
+    "expanded-071",
+    "expanded-072",
+    "expanded-073",
+    "expanded-075",
+    "expanded-081",
+    "expanded-084",
+    "expanded-086",
+    "expanded-087",
+    "expanded-088",
+    "expanded-094",
+    "expanded-097",
+    "expanded-099"
+  ],
+  "approvals": {
+    "inputs": {
+      "sha": "a7e5015c6ed3bb5583f41de78c5347631c569b4db22f3c0f8391df69755a7c21",
+      "at": "2026-10-22T14:26:18.412Z"
+    },
+    "grader": {
+      "sha": "633bebf416b5bb4c29db773958fd9501deacf761676cfd51dfa9470705738b73",
+      "at": "2026-10-22T14:34:01.210Z"
+    },
+    "plan": {
+      "sha": "e227562f05bca266653d4332606b8ceb75ee84fc1ecccad8afdaa39caad068e0",
+      "at": "2026-10-22T14:34:06.886Z"
+    }
+  },
+  "rounds": [
+    {
+      "round": 0,
+      "variant": "baseline",
+      "change": "baseline",
+      "decision": "baseline",
+      "reasons": [
+        "test noise floor on quality: ±0.083"
+      ],
+      "train": {
+        "quality": {
+          "n": 60,
+          "mean": 0.9166666666666666,
+          "half": 0.048799653194614274
+        },
+        "format": {
+          "n": 60,
+          "mean": 0.861111111111111,
+          "half": 0.0716560744884213
+        },
+        "cost_usd": {
+          "n": 60,
+          "mean": 0.009575033333333339,
+          "half": 0.0013769634533689966
+        }
+      },
+      "test": {
+        "quality": {
+          "n": 40,
+          "mean": 0.8499999999999999,
+          "half": 0.08336607903639905
+        },
+        "format": {
+          "n": 40,
+          "mean": 0.875,
+          "half": 0.07281039263974118
+        },
+        "cost_usd": {
+          "n": 40,
+          "mean": 0.009226944166666667,
+          "half": 0.0016590262335931252
+        }
+      },
+      "errors": 2,
+      "truncated": 0,
+      "at": "2026-10-22T14:47:00.309Z"
+    }
+  ],
+  "current_round": 0,
+  "flat_rounds": 0,
+  "prices": {},
+  "split_seed": 20261022,
+  "goal": {
+    "target": "quality",
+    "direction": "higher",
+    "hold": [
+      "format"
+    ],
+    "directions": {}
+  },
+  "reps": 3,
+  "command": "bun .omp/ratchet/rename-title-expanded/harness/run.ts --mode run --variant {variant} --out {flow_dir}/{variant}",
+  "baseline_inputs_sha": "a7e5015c6ed3bb5583f41de78c5347631c569b4db22f3c0f8391df69755a7c21",
+  "best": {
+    "round": 0,
+    "variant": "baseline",
+    "test_score": 0.8499999999999999
+  }
+}

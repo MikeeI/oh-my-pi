@@ -1,0 +1,2711 @@
+{
+  "variant": "baseline",
+  "history": {
+    "expanded-003": {
+      "baseline": 0.6666666666666666
+    },
+    "expanded-006": {
+      "baseline": 0.3333333333333333
+    },
+    "expanded-008": {
+      "baseline": 0.8333333333333334
+    },
+    "expanded-009": {
+      "baseline": 1
+    },
+    "expanded-010": {
+      "baseline": 1
+    },
+    "expanded-011": {
+      "baseline": 1
+    },
+    "expanded-012": {
+      "baseline": 1
+    },
+    "expanded-014": {
+      "baseline": 0.5
+    },
+    "expanded-015": {
+      "baseline": 1
+    },
+    "expanded-016": {
+      "baseline": 1
+    },
+    "expanded-017": {
+      "baseline": 1
+    },
+    "expanded-021": {
+      "baseline": 1
+    },
+    "expanded-022": {
+      "baseline": 1
+    },
+    "expanded-023": {
+      "baseline": 1
+    },
+    "expanded-024": {
+      "baseline": 1
+    },
+    "expanded-025": {
+      "baseline": 1
+    },
+    "expanded-026": {
+      "baseline": 1
+    },
+    "expanded-027": {
+      "baseline": 1
+    },
+    "expanded-030": {
+      "baseline": 1
+    },
+    "expanded-031": {
+      "baseline": 0.8333333333333334
+    },
+    "expanded-032": {
+      "baseline": 1
+    },
+    "expanded-033": {
+      "baseline": 1
+    },
+    "expanded-034": {
+      "baseline": 1
+    },
+    "expanded-035": {
+      "baseline": 0.5
+    },
+    "expanded-037": {
+      "baseline": 1
+    },
+    "expanded-039": {
+      "baseline": 1
+    },
+    "expanded-040": {
+      "baseline": 0.8333333333333334
+    },
+    "expanded-041": {
+      "baseline": 1
+    },
+    "expanded-042": {
+      "baseline": 1
+    },
+    "expanded-043": {
+      "baseline": 0.8333333333333334
+    },
+    "expanded-044": {
+      "baseline": 1
+    },
+    "expanded-048": {
+      "baseline": 0
+    },
+    "expanded-052": {
+      "baseline": 0.8333333333333334
+    },
+    "expanded-054": {
+      "baseline": 0.6666666666666666
+    },
+    "expanded-056": {
+      "baseline": 1
+    },
+    "expanded-057": {
+      "baseline": 1
+    },
+    "expanded-062": {
+      "baseline": 1
+    },
+    "expanded-063": {
+      "baseline": 1
+    },
+    "expanded-066": {
+      "baseline": 0.8333333333333334
+    },
+    "expanded-067": {
+      "baseline": 1
+    },
+    "expanded-069": {
+      "baseline": 1
+    },
+    "expanded-070": {
+      "baseline": 1
+    },
+    "expanded-074": {
+      "baseline": 1
+    },
+    "expanded-076": {
+      "baseline": 1
+    },
+    "expanded-077": {
+      "baseline": 1
+    },
+    "expanded-078": {
+      "baseline": 1
+    },
+    "expanded-079": {
+      "baseline": 1
+    },
+    "expanded-080": {
+      "baseline": 1
+    },
+    "expanded-082": {
+      "baseline": 1
+    },
+    "expanded-083": {
+      "baseline": 1
+    },
+    "expanded-085": {
+      "baseline": 1
+    },
+    "expanded-089": {
+      "baseline": 0.5
+    },
+    "expanded-090": {
+      "baseline": 0.8333333333333334
+    },
+    "expanded-091": {
+      "baseline": 1
+    },
+    "expanded-092": {
+      "baseline": 1
+    },
+    "expanded-093": {
+      "baseline": 1
+    },
+    "expanded-095": {
+      "baseline": 1
+    },
+    "expanded-096": {
+      "baseline": 1
+    },
+    "expanded-098": {
+      "baseline": 1
+    },
+    "expanded-100": {
+      "baseline": 1
+    }
+  },
+  "rows": [
+    {
+      "prompt_id": "expanded-003",
+      "rep": 0,
+      "grade": {
+        "quality": 0.5,
+        "format": 0
+      },
+      "explanation": "focus=1; recognizable=0; strict_retry_failure=false",
+      "status": "ok",
+      "attempts": 1
+    },
+    {
+      "prompt_id": "expanded-003",
+      "rep": 1,
+      "grade": {
+        "quality": 1,
+        "format": 1
+      },
+      "explanation": "focus=1; recognizable=1; strict_retry_failure=false",
+      "status": "ok",
+      "attempts": 1
+    },
+    {
+      "prompt_id": "expanded-003",
+      "rep": 2,
+      "grade": {
+        "quality": 0.5,
+        "format": 1
+      },
+      "explanation": "focus=1; recognizable=0; strict_retry_failure=false",
+      "status": "ok",
+      "attempts": 1
+    },
+    {
+      "prompt_id": "expanded-006",
+      "rep": 2,
+      "grade": {
+        "quality": 0,
+        "format": 1
+      },
+      "explanation": "focus=0; recognizable=0; strict_retry_failure=false",
+      "status": "ok",
+      "attempts": 1
+    },
+    {
+      "prompt_id": "expanded-006",
+      "rep": 1,
+      "grade": {
+        "quality": 0,
+        "format": 1
+      },
+      "explanation": "focus=0; recognizable=0; strict_retry_failure=false",
+      "status": "ok",
+      "attempts": 1
+    },
+    {
+      "prompt_id": "expanded-006",
+      "rep": 0,
+      "grade": {
+        "quality": 1,
+        "format": 1
+      },
+      "explanation": "focus=1; recognizable=1; strict_retry_failure=false",
+      "status": "ok",
+      "attempts": 1
+    },
+    {
+      "prompt_id": "expanded-008",
+      "rep": 0,
+      "grade": {
+        "quality": 0.5,
+        "format": 1
+      },
+      "explanation": "focus=1; recognizable=0; strict_retry_failure=false",
+      "status": "ok",
+      "attempts": 1
+    },
+    {
+      "prompt_id": "expanded-008",
+      "rep": 2,
+      "grade": {
+        "quality": 1,
+        "format": 1
+      },
+      "explanation": "focus=1; recognizable=1; strict_retry_failure=false",
+      "status": "ok",
+      "attempts": 1
+    },
+    {
+      "prompt_id": "expanded-008",
+      "rep": 1,
+      "grade": {
+        "quality": 1,
+        "format": 1
+      },
+      "explanation": "focus=1; recognizable=1; strict_retry_failure=false",
+      "status": "ok",
+      "attempts": 1
+    },
+    {
+      "prompt_id": "expanded-009",
+      "rep": 0,
+      "grade": {
+        "quality": 1,
+        "format": 1
+      },
+      "explanation": "focus=1; recognizable=1; strict_retry_failure=false",
+      "status": "ok",
+      "attempts": 1
+    },
+    {
+      "prompt_id": "expanded-009",
+      "rep": 2,
+      "grade": {
+        "quality": 1,
+        "format": 1
+      },
+      "explanation": "focus=1; recognizable=1; strict_retry_failure=false",
+      "status": "ok",
+      "attempts": 1
+    },
+    {
+      "prompt_id": "expanded-009",
+      "rep": 1,
+      "grade": {
+        "quality": 1,
+        "format": 1
+      },
+      "explanation": "focus=1; recognizable=1; strict_retry_failure=false",
+      "status": "ok",
+      "attempts": 1
+    },
+    {
+      "prompt_id": "expanded-010",
+      "rep": 1,
+      "grade": {
+        "quality": 1,
+        "format": 0
+      },
+      "explanation": "focus=1; recognizable=1; strict_retry_failure=false",
+      "status": "ok",
+      "attempts": 1
+    },
+    {
+      "prompt_id": "expanded-011",
+      "rep": 0,
+      "grade": {
+        "quality": 1,
+        "format": 1
+      },
+      "explanation": "focus=1; recognizable=1; strict_retry_failure=false",
+      "status": "ok",
+      "attempts": 1
+    },
+    {
+      "prompt_id": "expanded-011",
+      "rep": 1,
+      "grade": {
+        "quality": 1,
+        "format": 1
+      },
+      "explanation": "focus=1; recognizable=1; strict_retry_failure=false",
+      "status": "ok",
+      "attempts": 1
+    },
+    {
+      "prompt_id": "expanded-010",
+      "rep": 2,
+      "grade": {
+        "quality": 1,
+        "format": 0
+      },
+      "explanation": "focus=1; recognizable=1; strict_retry_failure=false",
+      "status": "ok",
+      "attempts": 1
+    },
+    {
+      "prompt_id": "expanded-011",
+      "rep": 2,
+      "grade": {
+        "quality": 1,
+        "format": 0
+      },
+      "explanation": "focus=1; recognizable=1; strict_retry_failure=false",
+      "status": "ok",
+      "attempts": 1
+    },
+    {
+      "prompt_id": "expanded-012",
+      "rep": 0,
+      "grade": {
+        "quality": 1,
+        "format": 0
+      },
+      "explanation": "focus=1; recognizable=1; strict_retry_failure=false",
+      "status": "ok",
+      "attempts": 1
+    },
+    {
+      "prompt_id": "expanded-010",
+      "rep": 0,
+      "grade": {
+        "quality": 1,
+        "format": 0
+      },
+      "explanation": "focus=1; recognizable=1; strict_retry_failure=false",
+      "status": "ok",
+      "attempts": 1
+    },
+    {
+      "prompt_id": "expanded-012",
+      "rep": 1,
+      "grade": {
+        "quality": 1,
+        "format": 0
+      },
+      "explanation": "focus=1; recognizable=1; strict_retry_failure=false",
+      "status": "ok",
+      "attempts": 1
+    },
+    {
+      "prompt_id": "expanded-012",
+      "rep": 2,
+      "grade": {
+        "quality": 1,
+        "format": 1
+      },
+      "explanation": "focus=1; recognizable=1; strict_retry_failure=false",
+      "status": "ok",
+      "attempts": 1
+    },
+    {
+      "prompt_id": "expanded-014",
+      "rep": 0,
+      "grade": {
+        "quality": 0.5,
+        "format": 1
+      },
+      "explanation": "focus=1; recognizable=0; strict_retry_failure=false",
+      "status": "ok",
+      "attempts": 1
+    },
+    {
+      "prompt_id": "expanded-014",
+      "rep": 1,
+      "grade": {
+        "quality": 0.5,
+        "format": 1
+      },
+      "explanation": "focus=1; recognizable=0; strict_retry_failure=false",
+      "status": "ok",
+      "attempts": 1
+    },
+    {
+      "prompt_id": "expanded-015",
+      "rep": 0,
+      "grade": {
+        "quality": 1,
+        "format": 1
+      },
+      "explanation": "focus=1; recognizable=1; strict_retry_failure=false",
+      "status": "ok",
+      "attempts": 1
+    },
+    {
+      "prompt_id": "expanded-015",
+      "rep": 1,
+      "grade": {
+        "quality": 1,
+        "format": 1
+      },
+      "explanation": "focus=1; recognizable=1; strict_retry_failure=false",
+      "status": "ok",
+      "attempts": 1
+    },
+    {
+      "prompt_id": "expanded-014",
+      "rep": 2,
+      "grade": {
+        "quality": 0.5,
+        "format": 1
+      },
+      "explanation": "focus=1; recognizable=0; strict_retry_failure=false",
+      "status": "ok",
+      "attempts": 1
+    },
+    {
+      "prompt_id": "expanded-016",
+      "rep": 1,
+      "grade": {
+        "quality": 1,
+        "format": 1
+      },
+      "explanation": "focus=1; recognizable=1; strict_retry_failure=false",
+      "status": "ok",
+      "attempts": 1
+    },
+    {
+      "prompt_id": "expanded-015",
+      "rep": 2,
+      "grade": {
+        "quality": 1,
+        "format": 1
+      },
+      "explanation": "focus=1; recognizable=1; strict_retry_failure=false",
+      "status": "ok",
+      "attempts": 1
+    },
+    {
+      "prompt_id": "expanded-016",
+      "rep": 0,
+      "grade": {
+        "quality": 1,
+        "format": 0
+      },
+      "explanation": "focus=1; recognizable=1; strict_retry_failure=false",
+      "status": "ok",
+      "attempts": 1
+    },
+    {
+      "prompt_id": "expanded-016",
+      "rep": 2,
+      "grade": {
+        "quality": 1,
+        "format": 0
+      },
+      "explanation": "focus=1; recognizable=1; strict_retry_failure=false",
+      "status": "ok",
+      "attempts": 1
+    },
+    {
+      "prompt_id": "expanded-017",
+      "rep": 1,
+      "grade": {
+        "quality": 1,
+        "format": 1
+      },
+      "explanation": "focus=1; recognizable=1; strict_retry_failure=false",
+      "status": "ok",
+      "attempts": 1
+    },
+    {
+      "prompt_id": "expanded-017",
+      "rep": 0,
+      "grade": {
+        "quality": 1,
+        "format": 1
+      },
+      "explanation": "focus=1; recognizable=1; strict_retry_failure=false",
+      "status": "ok",
+      "attempts": 1
+    },
+    {
+      "prompt_id": "expanded-017",
+      "rep": 2,
+      "grade": {
+        "quality": 1,
+        "format": 1
+      },
+      "explanation": "focus=1; recognizable=1; strict_retry_failure=false",
+      "status": "ok",
+      "attempts": 1
+    },
+    {
+      "prompt_id": "expanded-021",
+      "rep": 0,
+      "grade": {
+        "quality": 1,
+        "format": 1
+      },
+      "explanation": "focus=1; recognizable=1; strict_retry_failure=false",
+      "status": "ok",
+      "attempts": 1
+    },
+    {
+      "prompt_id": "expanded-021",
+      "rep": 1,
+      "grade": {
+        "quality": 1,
+        "format": 1
+      },
+      "explanation": "focus=1; recognizable=1; strict_retry_failure=false",
+      "status": "ok",
+      "attempts": 1
+    },
+    {
+      "prompt_id": "expanded-021",
+      "rep": 2,
+      "grade": {
+        "quality": 1,
+        "format": 1
+      },
+      "explanation": "focus=1; recognizable=1; strict_retry_failure=false",
+      "status": "ok",
+      "attempts": 1
+    },
+    {
+      "prompt_id": "expanded-022",
+      "rep": 2,
+      "grade": {
+        "quality": 1,
+        "format": 1
+      },
+      "explanation": "focus=1; recognizable=1; strict_retry_failure=false",
+      "status": "ok",
+      "attempts": 1
+    },
+    {
+      "prompt_id": "expanded-022",
+      "rep": 1,
+      "grade": {
+        "quality": 1,
+        "format": 1
+      },
+      "explanation": "focus=1; recognizable=1; strict_retry_failure=false",
+      "status": "ok",
+      "attempts": 1
+    },
+    {
+      "prompt_id": "expanded-022",
+      "rep": 0,
+      "grade": {
+        "quality": 1,
+        "format": 1
+      },
+      "explanation": "focus=1; recognizable=1; strict_retry_failure=false",
+      "status": "ok",
+      "attempts": 1
+    },
+    {
+      "prompt_id": "expanded-023",
+      "rep": 0,
+      "grade": {
+        "quality": 1,
+        "format": 1
+      },
+      "explanation": "focus=1; recognizable=1; strict_retry_failure=false",
+      "status": "ok",
+      "attempts": 1
+    },
+    {
+      "prompt_id": "expanded-023",
+      "rep": 1,
+      "grade": {
+        "quality": 1,
+        "format": 1
+      },
+      "explanation": "focus=1; recognizable=1; strict_retry_failure=false",
+      "status": "ok",
+      "attempts": 1
+    },
+    {
+      "prompt_id": "expanded-024",
+      "rep": 0,
+      "grade": {
+        "quality": 1,
+        "format": 1
+      },
+      "explanation": "focus=1; recognizable=1; strict_retry_failure=false",
+      "status": "ok",
+      "attempts": 1
+    },
+    {
+      "prompt_id": "expanded-024",
+      "rep": 2,
+      "grade": {
+        "quality": 1,
+        "format": 1
+      },
+      "explanation": "focus=1; recognizable=1; strict_retry_failure=false",
+      "status": "ok",
+      "attempts": 1
+    },
+    {
+      "prompt_id": "expanded-023",
+      "rep": 2,
+      "grade": {
+        "quality": 1,
+        "format": 1
+      },
+      "explanation": "focus=1; recognizable=1; strict_retry_failure=false",
+      "status": "ok",
+      "attempts": 1
+    },
+    {
+      "prompt_id": "expanded-025",
+      "rep": 0,
+      "grade": {
+        "quality": 1,
+        "format": 1
+      },
+      "explanation": "focus=1; recognizable=1; strict_retry_failure=false",
+      "status": "ok",
+      "attempts": 1
+    },
+    {
+      "prompt_id": "expanded-024",
+      "rep": 1,
+      "grade": {
+        "quality": 1,
+        "format": 1
+      },
+      "explanation": "focus=1; recognizable=1; strict_retry_failure=false",
+      "status": "ok",
+      "attempts": 1
+    },
+    {
+      "prompt_id": "expanded-025",
+      "rep": 2,
+      "grade": {
+        "quality": 1,
+        "format": 1
+      },
+      "explanation": "focus=1; recognizable=1; strict_retry_failure=false",
+      "status": "ok",
+      "attempts": 1
+    },
+    {
+      "prompt_id": "expanded-025",
+      "rep": 1,
+      "grade": {
+        "quality": 1,
+        "format": 1
+      },
+      "explanation": "focus=1; recognizable=1; strict_retry_failure=false",
+      "status": "ok",
+      "attempts": 1
+    },
+    {
+      "prompt_id": "expanded-026",
+      "rep": 0,
+      "grade": {
+        "quality": 1,
+        "format": 1
+      },
+      "explanation": "focus=1; recognizable=1; strict_retry_failure=false",
+      "status": "ok",
+      "attempts": 1
+    },
+    {
+      "prompt_id": "expanded-026",
+      "rep": 1,
+      "grade": {
+        "quality": 1,
+        "format": 0
+      },
+      "explanation": "focus=1; recognizable=1; strict_retry_failure=false",
+      "status": "ok",
+      "attempts": 1
+    },
+    {
+      "prompt_id": "expanded-026",
+      "rep": 2,
+      "grade": {
+        "quality": 1,
+        "format": 1
+      },
+      "explanation": "focus=1; recognizable=1; strict_retry_failure=false",
+      "status": "ok",
+      "attempts": 1
+    },
+    {
+      "prompt_id": "expanded-027",
+      "rep": 0,
+      "grade": {
+        "quality": 1,
+        "format": 1
+      },
+      "explanation": "focus=1; recognizable=1; strict_retry_failure=false",
+      "status": "ok",
+      "attempts": 1
+    },
+    {
+      "prompt_id": "expanded-027",
+      "rep": 1,
+      "grade": {
+        "quality": 1,
+        "format": 1
+      },
+      "explanation": "focus=1; recognizable=1; strict_retry_failure=false",
+      "status": "ok",
+      "attempts": 1
+    },
+    {
+      "prompt_id": "expanded-027",
+      "rep": 2,
+      "grade": {
+        "quality": 1,
+        "format": 1
+      },
+      "explanation": "focus=1; recognizable=1; strict_retry_failure=false",
+      "status": "ok",
+      "attempts": 1
+    },
+    {
+      "prompt_id": "expanded-030",
+      "rep": 1,
+      "grade": {
+        "quality": 1,
+        "format": 1
+      },
+      "explanation": "focus=1; recognizable=1; strict_retry_failure=false",
+      "status": "ok",
+      "attempts": 1
+    },
+    {
+      "prompt_id": "expanded-030",
+      "rep": 0,
+      "grade": {
+        "quality": 1,
+        "format": 0
+      },
+      "explanation": "focus=1; recognizable=1; strict_retry_failure=false",
+      "status": "ok",
+      "attempts": 1
+    },
+    {
+      "prompt_id": "expanded-030",
+      "rep": 2,
+      "grade": {
+        "quality": 1,
+        "format": 1
+      },
+      "explanation": "focus=1; recognizable=1; strict_retry_failure=false",
+      "status": "ok",
+      "attempts": 1
+    },
+    {
+      "prompt_id": "expanded-031",
+      "rep": 2,
+      "grade": {
+        "quality": 1,
+        "format": 1
+      },
+      "explanation": "focus=1; recognizable=1; strict_retry_failure=false",
+      "status": "ok",
+      "attempts": 1
+    },
+    {
+      "prompt_id": "expanded-031",
+      "rep": 1,
+      "grade": {
+        "quality": 1,
+        "format": 1
+      },
+      "explanation": "focus=1; recognizable=1; strict_retry_failure=false",
+      "status": "ok",
+      "attempts": 1
+    },
+    {
+      "prompt_id": "expanded-032",
+      "rep": 0,
+      "grade": {
+        "quality": 1,
+        "format": 1
+      },
+      "explanation": "focus=1; recognizable=1; strict_retry_failure=false",
+      "status": "ok",
+      "attempts": 1
+    },
+    {
+      "prompt_id": "expanded-031",
+      "rep": 0,
+      "grade": {
+        "quality": 0.5,
+        "format": 1
+      },
+      "explanation": "focus=1; recognizable=0; strict_retry_failure=false",
+      "status": "ok",
+      "attempts": 1
+    },
+    {
+      "prompt_id": "expanded-032",
+      "rep": 2,
+      "grade": {
+        "quality": 1,
+        "format": 1
+      },
+      "explanation": "focus=1; recognizable=1; strict_retry_failure=false",
+      "status": "ok",
+      "attempts": 1
+    },
+    {
+      "prompt_id": "expanded-033",
+      "rep": 1,
+      "grade": {
+        "quality": 1,
+        "format": 0
+      },
+      "explanation": "focus=1; recognizable=1; strict_retry_failure=false",
+      "status": "ok",
+      "attempts": 1
+    },
+    {
+      "prompt_id": "expanded-033",
+      "rep": 0,
+      "grade": {
+        "quality": 1,
+        "format": 0
+      },
+      "explanation": "focus=1; recognizable=1; strict_retry_failure=false",
+      "status": "ok",
+      "attempts": 1
+    },
+    {
+      "prompt_id": "expanded-032",
+      "rep": 1,
+      "grade": {
+        "quality": 1,
+        "format": 1
+      },
+      "explanation": "focus=1; recognizable=1; strict_retry_failure=false",
+      "status": "ok",
+      "attempts": 1
+    },
+    {
+      "prompt_id": "expanded-033",
+      "rep": 2,
+      "grade": {
+        "quality": 1,
+        "format": 1
+      },
+      "explanation": "focus=1; recognizable=1; strict_retry_failure=false",
+      "status": "ok",
+      "attempts": 1
+    },
+    {
+      "prompt_id": "expanded-034",
+      "rep": 0,
+      "grade": {
+        "quality": 1,
+        "format": 1
+      },
+      "explanation": "focus=1; recognizable=1; strict_retry_failure=false",
+      "status": "ok",
+      "attempts": 1
+    },
+    {
+      "prompt_id": "expanded-034",
+      "rep": 1,
+      "grade": {
+        "quality": 1,
+        "format": 1
+      },
+      "explanation": "focus=1; recognizable=1; strict_retry_failure=false",
+      "status": "ok",
+      "attempts": 1
+    },
+    {
+      "prompt_id": "expanded-035",
+      "rep": 0,
+      "grade": {
+        "quality": 0.5,
+        "format": 1
+      },
+      "explanation": "focus=1; recognizable=0; strict_retry_failure=false",
+      "status": "ok",
+      "attempts": 1
+    },
+    {
+      "prompt_id": "expanded-034",
+      "rep": 2,
+      "grade": {
+        "quality": 1,
+        "format": 1
+      },
+      "explanation": "focus=1; recognizable=1; strict_retry_failure=false",
+      "status": "ok",
+      "attempts": 1
+    },
+    {
+      "prompt_id": "expanded-035",
+      "rep": 1,
+      "grade": {
+        "quality": 0.5,
+        "format": 1
+      },
+      "explanation": "focus=1; recognizable=0; strict_retry_failure=false",
+      "status": "ok",
+      "attempts": 1
+    },
+    {
+      "prompt_id": "expanded-037",
+      "rep": 1,
+      "grade": {
+        "quality": 1,
+        "format": 1
+      },
+      "explanation": "focus=1; recognizable=1; strict_retry_failure=false",
+      "status": "ok",
+      "attempts": 1
+    },
+    {
+      "prompt_id": "expanded-037",
+      "rep": 0,
+      "grade": {
+        "quality": 1,
+        "format": 1
+      },
+      "explanation": "focus=1; recognizable=1; strict_retry_failure=false",
+      "status": "ok",
+      "attempts": 1
+    },
+    {
+      "prompt_id": "expanded-037",
+      "rep": 2,
+      "grade": {
+        "quality": 1,
+        "format": 1
+      },
+      "explanation": "focus=1; recognizable=1; strict_retry_failure=false",
+      "status": "ok",
+      "attempts": 1
+    },
+    {
+      "prompt_id": "expanded-035",
+      "rep": 2,
+      "grade": {
+        "quality": 0.5,
+        "format": 1
+      },
+      "explanation": "focus=1; recognizable=0; strict_retry_failure=false",
+      "status": "ok",
+      "attempts": 1
+    },
+    {
+      "prompt_id": "expanded-039",
+      "rep": 0,
+      "grade": {
+        "quality": 1,
+        "format": 1
+      },
+      "explanation": "focus=1; recognizable=1; strict_retry_failure=false",
+      "status": "ok",
+      "attempts": 1
+    },
+    {
+      "prompt_id": "expanded-039",
+      "rep": 1,
+      "grade": {
+        "quality": 1,
+        "format": 1
+      },
+      "explanation": "focus=1; recognizable=1; strict_retry_failure=false",
+      "status": "ok",
+      "attempts": 1
+    },
+    {
+      "prompt_id": "expanded-039",
+      "rep": 2,
+      "grade": {
+        "quality": 1,
+        "format": 1
+      },
+      "explanation": "focus=1; recognizable=1; strict_retry_failure=false",
+      "status": "ok",
+      "attempts": 1
+    },
+    {
+      "prompt_id": "expanded-040",
+      "rep": 1,
+      "grade": {
+        "quality": 1,
+        "format": 1
+      },
+      "explanation": "focus=1; recognizable=1; strict_retry_failure=false",
+      "status": "ok",
+      "attempts": 1
+    },
+    {
+      "prompt_id": "expanded-041",
+      "rep": 0,
+      "grade": {
+        "quality": 1,
+        "format": 1
+      },
+      "explanation": "focus=1; recognizable=1; strict_retry_failure=false",
+      "status": "ok",
+      "attempts": 1
+    },
+    {
+      "prompt_id": "expanded-040",
+      "rep": 0,
+      "grade": {
+        "quality": 1,
+        "format": 1
+      },
+      "explanation": "focus=1; recognizable=1; strict_retry_failure=false",
+      "status": "ok",
+      "attempts": 1
+    },
+    {
+      "prompt_id": "expanded-041",
+      "rep": 1,
+      "grade": {
+        "quality": 1,
+        "format": 1
+      },
+      "explanation": "focus=1; recognizable=1; strict_retry_failure=false",
+      "status": "ok",
+      "attempts": 1
+    },
+    {
+      "prompt_id": "expanded-040",
+      "rep": 2,
+      "grade": {
+        "quality": 0.5,
+        "format": 1
+      },
+      "explanation": "focus=0; recognizable=1; strict_retry_failure=false",
+      "status": "ok",
+      "attempts": 1
+    },
+    {
+      "prompt_id": "expanded-042",
+      "rep": 0,
+      "grade": {
+        "quality": 1,
+        "format": 1
+      },
+      "explanation": "focus=1; recognizable=1; strict_retry_failure=false",
+      "status": "ok",
+      "attempts": 1
+    },
+    {
+      "prompt_id": "expanded-042",
+      "rep": 1,
+      "grade": {
+        "quality": 1,
+        "format": 1
+      },
+      "explanation": "focus=1; recognizable=1; strict_retry_failure=false",
+      "status": "ok",
+      "attempts": 1
+    },
+    {
+      "prompt_id": "expanded-042",
+      "rep": 2,
+      "grade": {
+        "quality": 1,
+        "format": 1
+      },
+      "explanation": "focus=1; recognizable=1; strict_retry_failure=false",
+      "status": "ok",
+      "attempts": 1
+    },
+    {
+      "prompt_id": "expanded-041",
+      "rep": 2,
+      "grade": {
+        "quality": 1,
+        "format": 1
+      },
+      "explanation": "focus=1; recognizable=1; strict_retry_failure=false",
+      "status": "ok",
+      "attempts": 1
+    },
+    {
+      "prompt_id": "expanded-043",
+      "rep": 0,
+      "grade": {
+        "quality": 1,
+        "format": 1
+      },
+      "explanation": "focus=1; recognizable=1; strict_retry_failure=false",
+      "status": "ok",
+      "attempts": 1
+    },
+    {
+      "prompt_id": "expanded-044",
+      "rep": 0,
+      "grade": {
+        "quality": 1,
+        "format": 1
+      },
+      "explanation": "focus=1; recognizable=1; strict_retry_failure=false",
+      "status": "ok",
+      "attempts": 1
+    },
+    {
+      "prompt_id": "expanded-043",
+      "rep": 1,
+      "grade": {
+        "quality": 1,
+        "format": 1
+      },
+      "explanation": "focus=1; recognizable=1; strict_retry_failure=false",
+      "status": "ok",
+      "attempts": 1
+    },
+    {
+      "prompt_id": "expanded-043",
+      "rep": 2,
+      "grade": {
+        "quality": 0.5,
+        "format": 1
+      },
+      "explanation": "focus=1; recognizable=0; strict_retry_failure=false",
+      "status": "ok",
+      "attempts": 1
+    },
+    {
+      "prompt_id": "expanded-044",
+      "rep": 1,
+      "grade": {
+        "quality": 1,
+        "format": 1
+      },
+      "explanation": "focus=1; recognizable=1; strict_retry_failure=false",
+      "status": "ok",
+      "attempts": 1
+    },
+    {
+      "prompt_id": "expanded-044",
+      "rep": 2,
+      "grade": {
+        "quality": 1,
+        "format": 1
+      },
+      "explanation": "focus=1; recognizable=1; strict_retry_failure=false",
+      "status": "ok",
+      "attempts": 1
+    },
+    {
+      "prompt_id": "expanded-048",
+      "rep": 1,
+      "grade": {
+        "quality": 0,
+        "format": 1
+      },
+      "explanation": "focus=0; recognizable=0; strict_retry_failure=false",
+      "status": "ok",
+      "attempts": 1
+    },
+    {
+      "prompt_id": "expanded-048",
+      "rep": 2,
+      "grade": {
+        "quality": 0,
+        "format": 1
+      },
+      "explanation": "focus=0; recognizable=0; strict_retry_failure=false",
+      "status": "ok",
+      "attempts": 1
+    },
+    {
+      "prompt_id": "expanded-048",
+      "rep": 0,
+      "grade": {
+        "quality": 0,
+        "format": 1
+      },
+      "explanation": "focus=0; recognizable=0; strict_retry_failure=false",
+      "status": "ok",
+      "attempts": 1
+    },
+    {
+      "prompt_id": "expanded-052",
+      "rep": 0,
+      "grade": {
+        "quality": 0.5,
+        "format": 1
+      },
+      "explanation": "focus=1; recognizable=0; strict_retry_failure=false",
+      "status": "ok",
+      "attempts": 1
+    },
+    {
+      "prompt_id": "expanded-052",
+      "rep": 1,
+      "grade": {
+        "quality": 1,
+        "format": 1
+      },
+      "explanation": "focus=1; recognizable=1; strict_retry_failure=false",
+      "status": "ok",
+      "attempts": 1
+    },
+    {
+      "prompt_id": "expanded-052",
+      "rep": 2,
+      "grade": {
+        "quality": 1,
+        "format": 1
+      },
+      "explanation": "focus=1; recognizable=1; strict_retry_failure=false",
+      "status": "ok",
+      "attempts": 1
+    },
+    {
+      "prompt_id": "expanded-054",
+      "rep": 0,
+      "grade": {
+        "quality": 1,
+        "format": 1
+      },
+      "explanation": "focus=1; recognizable=1; strict_retry_failure=false",
+      "status": "ok",
+      "attempts": 1
+    },
+    {
+      "prompt_id": "expanded-054",
+      "rep": 1,
+      "grade": {
+        "quality": 0,
+        "format": 1
+      },
+      "explanation": "focus=0; recognizable=0; strict_retry_failure=false",
+      "status": "ok",
+      "attempts": 1
+    },
+    {
+      "prompt_id": "expanded-054",
+      "rep": 2,
+      "grade": {
+        "quality": 1,
+        "format": 1
+      },
+      "explanation": "focus=1; recognizable=1; strict_retry_failure=false",
+      "status": "ok",
+      "attempts": 1
+    },
+    {
+      "prompt_id": "expanded-056",
+      "rep": 0,
+      "grade": {
+        "quality": 1,
+        "format": 1
+      },
+      "explanation": "focus=1; recognizable=1; strict_retry_failure=false",
+      "status": "ok",
+      "attempts": 1
+    },
+    {
+      "prompt_id": "expanded-057",
+      "rep": 0,
+      "grade": {
+        "quality": 1,
+        "format": 1
+      },
+      "explanation": "focus=1; recognizable=1; strict_retry_failure=false",
+      "status": "ok",
+      "attempts": 1
+    },
+    {
+      "prompt_id": "expanded-056",
+      "rep": 1,
+      "grade": {
+        "quality": 1,
+        "format": 1
+      },
+      "explanation": "focus=1; recognizable=1; strict_retry_failure=false",
+      "status": "ok",
+      "attempts": 1
+    },
+    {
+      "prompt_id": "expanded-056",
+      "rep": 2,
+      "grade": {
+        "quality": 1,
+        "format": 1
+      },
+      "explanation": "focus=1; recognizable=1; strict_retry_failure=false",
+      "status": "ok",
+      "attempts": 1
+    },
+    {
+      "prompt_id": "expanded-057",
+      "rep": 1,
+      "grade": {
+        "quality": 1,
+        "format": 1
+      },
+      "explanation": "focus=1; recognizable=1; strict_retry_failure=false",
+      "status": "ok",
+      "attempts": 1
+    },
+    {
+      "prompt_id": "expanded-057",
+      "rep": 2,
+      "grade": {
+        "quality": 1,
+        "format": 1
+      },
+      "explanation": "focus=1; recognizable=1; strict_retry_failure=false",
+      "status": "ok",
+      "attempts": 1
+    },
+    {
+      "prompt_id": "expanded-062",
+      "rep": 0,
+      "grade": {
+        "quality": 1,
+        "format": 1
+      },
+      "explanation": "focus=1; recognizable=1; strict_retry_failure=false",
+      "status": "ok",
+      "attempts": 1
+    },
+    {
+      "prompt_id": "expanded-062",
+      "rep": 2,
+      "grade": {
+        "quality": 1,
+        "format": 1
+      },
+      "explanation": "focus=1; recognizable=1; strict_retry_failure=false",
+      "status": "ok",
+      "attempts": 1
+    },
+    {
+      "prompt_id": "expanded-062",
+      "rep": 1,
+      "grade": {
+        "quality": 1,
+        "format": 1
+      },
+      "explanation": "focus=1; recognizable=1; strict_retry_failure=false",
+      "status": "ok",
+      "attempts": 1
+    },
+    {
+      "prompt_id": "expanded-063",
+      "rep": 1,
+      "grade": {
+        "quality": 1,
+        "format": 1
+      },
+      "explanation": "focus=1; recognizable=1; strict_retry_failure=false",
+      "status": "ok",
+      "attempts": 1
+    },
+    {
+      "prompt_id": "expanded-063",
+      "rep": 0,
+      "grade": {
+        "quality": 1,
+        "format": 1
+      },
+      "explanation": "focus=1; recognizable=1; strict_retry_failure=false",
+      "status": "ok",
+      "attempts": 1
+    },
+    {
+      "prompt_id": "expanded-063",
+      "rep": 2,
+      "grade": {
+        "quality": 1,
+        "format": 1
+      },
+      "explanation": "focus=1; recognizable=1; strict_retry_failure=false",
+      "status": "ok",
+      "attempts": 1
+    },
+    {
+      "prompt_id": "expanded-066",
+      "rep": 1,
+      "grade": {
+        "quality": 1,
+        "format": 1
+      },
+      "explanation": "focus=1; recognizable=1; strict_retry_failure=false",
+      "status": "ok",
+      "attempts": 1
+    },
+    {
+      "prompt_id": "expanded-066",
+      "rep": 0,
+      "grade": {
+        "quality": 0.5,
+        "format": 1
+      },
+      "explanation": "focus=1; recognizable=0; strict_retry_failure=false",
+      "status": "ok",
+      "attempts": 1
+    },
+    {
+      "prompt_id": "expanded-066",
+      "rep": 2,
+      "grade": {
+        "quality": 1,
+        "format": 1
+      },
+      "explanation": "focus=1; recognizable=1; strict_retry_failure=false",
+      "status": "ok",
+      "attempts": 1
+    },
+    {
+      "prompt_id": "expanded-067",
+      "rep": 1,
+      "grade": {
+        "quality": 1,
+        "format": 1
+      },
+      "explanation": "focus=1; recognizable=1; strict_retry_failure=false",
+      "status": "ok",
+      "attempts": 1
+    },
+    {
+      "prompt_id": "expanded-067",
+      "rep": 0,
+      "grade": {
+        "quality": 1,
+        "format": 1
+      },
+      "explanation": "focus=1; recognizable=1; strict_retry_failure=false",
+      "status": "ok",
+      "attempts": 1
+    },
+    {
+      "prompt_id": "expanded-067",
+      "rep": 2,
+      "grade": {
+        "quality": 1,
+        "format": 1
+      },
+      "explanation": "focus=1; recognizable=1; strict_retry_failure=false",
+      "status": "ok",
+      "attempts": 1
+    },
+    {
+      "prompt_id": "expanded-069",
+      "rep": 1,
+      "grade": {
+        "quality": 1,
+        "format": 1
+      },
+      "explanation": "focus=1; recognizable=1; strict_retry_failure=false",
+      "status": "ok",
+      "attempts": 1
+    },
+    {
+      "prompt_id": "expanded-070",
+      "rep": 1,
+      "grade": {
+        "quality": 1,
+        "format": 1
+      },
+      "explanation": "focus=1; recognizable=1; strict_retry_failure=false",
+      "status": "ok",
+      "attempts": 1
+    },
+    {
+      "prompt_id": "expanded-069",
+      "rep": 2,
+      "grade": {
+        "quality": 1,
+        "format": 0
+      },
+      "explanation": "focus=1; recognizable=1; strict_retry_failure=false",
+      "status": "ok",
+      "attempts": 1
+    },
+    {
+      "prompt_id": "expanded-070",
+      "rep": 0,
+      "grade": {
+        "quality": 1,
+        "format": 1
+      },
+      "explanation": "focus=1; recognizable=1; strict_retry_failure=false",
+      "status": "ok",
+      "attempts": 1
+    },
+    {
+      "prompt_id": "expanded-069",
+      "rep": 0,
+      "grade": {
+        "quality": 1,
+        "format": 1
+      },
+      "explanation": "focus=1; recognizable=1; strict_retry_failure=false",
+      "status": "ok",
+      "attempts": 1
+    },
+    {
+      "prompt_id": "expanded-070",
+      "rep": 2,
+      "grade": {
+        "quality": 1,
+        "format": 1
+      },
+      "explanation": "focus=1; recognizable=1; strict_retry_failure=false",
+      "status": "ok",
+      "attempts": 1
+    },
+    {
+      "prompt_id": "expanded-074",
+      "rep": 0,
+      "grade": {
+        "quality": 1,
+        "format": 0
+      },
+      "explanation": "focus=1; recognizable=1; strict_retry_failure=false",
+      "status": "ok",
+      "attempts": 1
+    },
+    {
+      "prompt_id": "expanded-074",
+      "rep": 1,
+      "grade": {
+        "quality": 1,
+        "format": 0
+      },
+      "explanation": "focus=1; recognizable=1; strict_retry_failure=false",
+      "status": "ok",
+      "attempts": 1
+    },
+    {
+      "prompt_id": "expanded-074",
+      "rep": 2,
+      "grade": {
+        "quality": 1,
+        "format": 0
+      },
+      "explanation": "focus=1; recognizable=1; strict_retry_failure=false",
+      "status": "ok",
+      "attempts": 1
+    },
+    {
+      "prompt_id": "expanded-076",
+      "rep": 0,
+      "grade": {
+        "quality": 1,
+        "format": 0
+      },
+      "explanation": "focus=1; recognizable=1; strict_retry_failure=false",
+      "status": "ok",
+      "attempts": 1
+    },
+    {
+      "prompt_id": "expanded-076",
+      "rep": 1,
+      "grade": {
+        "quality": 1,
+        "format": 0
+      },
+      "explanation": "focus=1; recognizable=1; strict_retry_failure=false",
+      "status": "ok",
+      "attempts": 1
+    },
+    {
+      "prompt_id": "expanded-076",
+      "rep": 2,
+      "grade": {
+        "quality": 1,
+        "format": 0
+      },
+      "explanation": "focus=1; recognizable=1; strict_retry_failure=false",
+      "status": "ok",
+      "attempts": 1
+    },
+    {
+      "prompt_id": "expanded-077",
+      "rep": 0,
+      "grade": {
+        "quality": 1,
+        "format": 1
+      },
+      "explanation": "focus=1; recognizable=1; strict_retry_failure=false",
+      "status": "ok",
+      "attempts": 1
+    },
+    {
+      "prompt_id": "expanded-078",
+      "rep": 0,
+      "grade": {
+        "quality": 1,
+        "format": 1
+      },
+      "explanation": "focus=1; recognizable=1; strict_retry_failure=false",
+      "status": "ok",
+      "attempts": 1
+    },
+    {
+      "prompt_id": "expanded-078",
+      "rep": 1,
+      "grade": {
+        "quality": 1,
+        "format": 1
+      },
+      "explanation": "focus=1; recognizable=1; strict_retry_failure=false",
+      "status": "ok",
+      "attempts": 1
+    },
+    {
+      "prompt_id": "expanded-077",
+      "rep": 1,
+      "grade": {
+        "quality": 1,
+        "format": 1
+      },
+      "explanation": "focus=1; recognizable=1; strict_retry_failure=false",
+      "status": "ok",
+      "attempts": 1
+    },
+    {
+      "prompt_id": "expanded-077",
+      "rep": 2,
+      "grade": {
+        "quality": 1,
+        "format": 1
+      },
+      "explanation": "focus=1; recognizable=1; strict_retry_failure=false",
+      "status": "ok",
+      "attempts": 1
+    },
+    {
+      "prompt_id": "expanded-078",
+      "rep": 2,
+      "grade": {
+        "quality": 1,
+        "format": 1
+      },
+      "explanation": "focus=1; recognizable=1; strict_retry_failure=false",
+      "status": "ok",
+      "attempts": 1
+    },
+    {
+      "prompt_id": "expanded-080",
+      "rep": 0,
+      "grade": {
+        "quality": 1,
+        "format": 1
+      },
+      "explanation": "focus=1; recognizable=1; strict_retry_failure=false",
+      "status": "ok",
+      "attempts": 1
+    },
+    {
+      "prompt_id": "expanded-079",
+      "rep": 0,
+      "grade": {
+        "quality": 1,
+        "format": 1
+      },
+      "explanation": "focus=1; recognizable=1; strict_retry_failure=false",
+      "status": "ok",
+      "attempts": 1
+    },
+    {
+      "prompt_id": "expanded-079",
+      "rep": 1,
+      "grade": {
+        "quality": 1,
+        "format": 1
+      },
+      "explanation": "focus=1; recognizable=1; strict_retry_failure=false",
+      "status": "ok",
+      "attempts": 1
+    },
+    {
+      "prompt_id": "expanded-079",
+      "rep": 2,
+      "grade": {
+        "quality": 1,
+        "format": 1
+      },
+      "explanation": "focus=1; recognizable=1; strict_retry_failure=false",
+      "status": "ok",
+      "attempts": 1
+    },
+    {
+      "prompt_id": "expanded-080",
+      "rep": 2,
+      "grade": {
+        "quality": 1,
+        "format": 1
+      },
+      "explanation": "focus=1; recognizable=1; strict_retry_failure=false",
+      "status": "ok",
+      "attempts": 1
+    },
+    {
+      "prompt_id": "expanded-080",
+      "rep": 1,
+      "grade": {
+        "quality": 1,
+        "format": 1
+      },
+      "explanation": "focus=1; recognizable=1; strict_retry_failure=false",
+      "status": "ok",
+      "attempts": 1
+    },
+    {
+      "prompt_id": "expanded-082",
+      "rep": 1,
+      "grade": {
+        "quality": 1,
+        "format": 1
+      },
+      "explanation": "focus=1; recognizable=1; strict_retry_failure=false",
+      "status": "ok",
+      "attempts": 1
+    },
+    {
+      "prompt_id": "expanded-082",
+      "rep": 0,
+      "grade": {
+        "quality": 1,
+        "format": 1
+      },
+      "explanation": "focus=1; recognizable=1; strict_retry_failure=false",
+      "status": "ok",
+      "attempts": 1
+    },
+    {
+      "prompt_id": "expanded-083",
+      "rep": 0,
+      "grade": {
+        "quality": 1,
+        "format": 1
+      },
+      "explanation": "focus=1; recognizable=1; strict_retry_failure=false",
+      "status": "ok",
+      "attempts": 1
+    },
+    {
+      "prompt_id": "expanded-082",
+      "rep": 2,
+      "grade": {
+        "quality": 1,
+        "format": 1
+      },
+      "explanation": "focus=1; recognizable=1; strict_retry_failure=false",
+      "status": "ok",
+      "attempts": 1
+    },
+    {
+      "prompt_id": "expanded-083",
+      "rep": 2,
+      "grade": {
+        "quality": 1,
+        "format": 1
+      },
+      "explanation": "focus=1; recognizable=1; strict_retry_failure=false",
+      "status": "ok",
+      "attempts": 1
+    },
+    {
+      "prompt_id": "expanded-083",
+      "rep": 1,
+      "grade": {
+        "quality": 1,
+        "format": 1
+      },
+      "explanation": "focus=1; recognizable=1; strict_retry_failure=false",
+      "status": "ok",
+      "attempts": 1
+    },
+    {
+      "prompt_id": "expanded-085",
+      "rep": 0,
+      "grade": {
+        "quality": 1,
+        "format": 1
+      },
+      "explanation": "focus=1; recognizable=1; strict_retry_failure=false",
+      "status": "ok",
+      "attempts": 1
+    },
+    {
+      "prompt_id": "expanded-085",
+      "rep": 2,
+      "grade": {
+        "quality": 1,
+        "format": 1
+      },
+      "explanation": "focus=1; recognizable=1; strict_retry_failure=false",
+      "status": "ok",
+      "attempts": 1
+    },
+    {
+      "prompt_id": "expanded-085",
+      "rep": 1,
+      "grade": {
+        "quality": 1,
+        "format": 1
+      },
+      "explanation": "focus=1; recognizable=1; strict_retry_failure=false",
+      "status": "ok",
+      "attempts": 1
+    },
+    {
+      "prompt_id": "expanded-089",
+      "rep": 0,
+      "grade": {
+        "quality": 0.5,
+        "format": 1
+      },
+      "explanation": "focus=1; recognizable=0; strict_retry_failure=false",
+      "status": "ok",
+      "attempts": 1
+    },
+    {
+      "prompt_id": "expanded-089",
+      "rep": 1,
+      "grade": {
+        "quality": 0.5,
+        "format": 1
+      },
+      "explanation": "focus=1; recognizable=0; strict_retry_failure=false",
+      "status": "ok",
+      "attempts": 1
+    },
+    {
+      "prompt_id": "expanded-090",
+      "rep": 0,
+      "grade": {
+        "quality": 1,
+        "format": 0
+      },
+      "explanation": "focus=1; recognizable=1; strict_retry_failure=false",
+      "status": "ok",
+      "attempts": 1
+    },
+    {
+      "prompt_id": "expanded-090",
+      "rep": 1,
+      "grade": {
+        "quality": 1,
+        "format": 0
+      },
+      "explanation": "focus=1; recognizable=1; strict_retry_failure=false",
+      "status": "ok",
+      "attempts": 1
+    },
+    {
+      "prompt_id": "expanded-091",
+      "rep": 1,
+      "grade": {
+        "quality": 1,
+        "format": 1
+      },
+      "explanation": "focus=1; recognizable=1; strict_retry_failure=false",
+      "status": "ok",
+      "attempts": 1
+    },
+    {
+      "prompt_id": "expanded-091",
+      "rep": 0,
+      "grade": {
+        "quality": 1,
+        "format": 1
+      },
+      "explanation": "focus=1; recognizable=1; strict_retry_failure=false",
+      "status": "ok",
+      "attempts": 1
+    },
+    {
+      "prompt_id": "expanded-090",
+      "rep": 2,
+      "grade": {
+        "quality": 0.5,
+        "format": 1
+      },
+      "explanation": "focus=0; recognizable=1; strict_retry_failure=false",
+      "status": "ok",
+      "attempts": 1
+    },
+    {
+      "prompt_id": "expanded-092",
+      "rep": 0,
+      "grade": {
+        "quality": 1,
+        "format": 0
+      },
+      "explanation": "focus=1; recognizable=1; strict_retry_failure=false",
+      "status": "ok",
+      "attempts": 1
+    },
+    {
+      "prompt_id": "expanded-092",
+      "rep": 1,
+      "grade": {
+        "quality": 1,
+        "format": 1
+      },
+      "explanation": "focus=1; recognizable=1; strict_retry_failure=false",
+      "status": "ok",
+      "attempts": 1
+    },
+    {
+      "prompt_id": "expanded-091",
+      "rep": 2,
+      "grade": {
+        "quality": 1,
+        "format": 1
+      },
+      "explanation": "focus=1; recognizable=1; strict_retry_failure=false",
+      "status": "ok",
+      "attempts": 1
+    },
+    {
+      "prompt_id": "expanded-093",
+      "rep": 0,
+      "grade": {
+        "quality": 1,
+        "format": 1
+      },
+      "explanation": "focus=1; recognizable=1; strict_retry_failure=false",
+      "status": "ok",
+      "attempts": 1
+    },
+    {
+      "prompt_id": "expanded-093",
+      "rep": 2,
+      "grade": {
+        "quality": 1,
+        "format": 1
+      },
+      "explanation": "focus=1; recognizable=1; strict_retry_failure=false",
+      "status": "ok",
+      "attempts": 1
+    },
+    {
+      "prompt_id": "expanded-093",
+      "rep": 1,
+      "grade": {
+        "quality": 1,
+        "format": 1
+      },
+      "explanation": "focus=1; recognizable=1; strict_retry_failure=false",
+      "status": "ok",
+      "attempts": 1
+    },
+    {
+      "prompt_id": "expanded-095",
+      "rep": 0,
+      "grade": {
+        "quality": 1,
+        "format": 1
+      },
+      "explanation": "focus=1; recognizable=1; strict_retry_failure=false",
+      "status": "ok",
+      "attempts": 1
+    },
+    {
+      "prompt_id": "expanded-092",
+      "rep": 2,
+      "grade": {
+        "quality": 1,
+        "format": 1
+      },
+      "explanation": "focus=1; recognizable=1; strict_retry_failure=false",
+      "status": "ok",
+      "attempts": 1
+    },
+    {
+      "prompt_id": "expanded-095",
+      "rep": 2,
+      "grade": {
+        "quality": 1,
+        "format": 1
+      },
+      "explanation": "focus=1; recognizable=1; strict_retry_failure=false",
+      "status": "ok",
+      "attempts": 1
+    },
+    {
+      "prompt_id": "expanded-095",
+      "rep": 1,
+      "grade": {
+        "quality": 1,
+        "format": 1
+      },
+      "explanation": "focus=1; recognizable=1; strict_retry_failure=false",
+      "status": "ok",
+      "attempts": 1
+    },
+    {
+      "prompt_id": "expanded-096",
+      "rep": 0,
+      "grade": {
+        "quality": 1,
+        "format": 1
+      },
+      "explanation": "focus=1; recognizable=1; strict_retry_failure=false",
+      "status": "ok",
+      "attempts": 1
+    },
+    {
+      "prompt_id": "expanded-096",
+      "rep": 2,
+      "grade": {
+        "quality": 1,
+        "format": 1
+      },
+      "explanation": "focus=1; recognizable=1; strict_retry_failure=false",
+      "status": "ok",
+      "attempts": 1
+    },
+    {
+      "prompt_id": "expanded-096",
+      "rep": 1,
+      "grade": {
+        "quality": 1,
+        "format": 1
+      },
+      "explanation": "focus=1; recognizable=1; strict_retry_failure=false",
+      "status": "ok",
+      "attempts": 1
+    },
+    {
+      "prompt_id": "expanded-098",
+      "rep": 0,
+      "grade": {
+        "quality": 1,
+        "format": 1
+      },
+      "explanation": "focus=1; recognizable=1; strict_retry_failure=false",
+      "status": "ok",
+      "attempts": 1
+    },
+    {
+      "prompt_id": "expanded-098",
+      "rep": 1,
+      "grade": {
+        "quality": 1,
+        "format": 1
+      },
+      "explanation": "focus=1; recognizable=1; strict_retry_failure=false",
+      "status": "ok",
+      "attempts": 1
+    },
+    {
+      "prompt_id": "expanded-098",
+      "rep": 2,
+      "grade": {
+        "quality": 1,
+        "format": 1
+      },
+      "explanation": "focus=1; recognizable=1; strict_retry_failure=false",
+      "status": "ok",
+      "attempts": 1
+    },
+    {
+      "prompt_id": "expanded-100",
+      "rep": 0,
+      "grade": {
+        "quality": 1,
+        "format": 0
+      },
+      "explanation": "focus=1; recognizable=1; strict_retry_failure=false",
+      "status": "ok",
+      "attempts": 1
+    },
+    {
+      "prompt_id": "expanded-100",
+      "rep": 1,
+      "grade": {
+        "quality": 1,
+        "format": 1
+      },
+      "explanation": "focus=1; recognizable=1; strict_retry_failure=false",
+      "status": "ok",
+      "attempts": 1
+    },
+    {
+      "prompt_id": "expanded-100",
+      "rep": 2,
+      "grade": {
+        "quality": 1,
+        "format": 0
+      },
+      "explanation": "focus=1; recognizable=1; strict_retry_failure=false",
+      "status": "ok",
+      "attempts": 1
+    },
+    {
+      "prompt_id": "expanded-089",
+      "rep": 2,
+      "grade": {
+        "quality": 0.5,
+        "format": 1
+      },
+      "explanation": "focus=1; recognizable=0; strict_retry_failure=false",
+      "status": "ok",
+      "attempts": 1
+    }
+  ],
+  "traces": [
+    ".omp/ratchet/rename-title-expanded/baseline/traces/expanded-077_rep1.json",
+    ".omp/ratchet/rename-title-expanded/baseline/traces/expanded-057_rep2.json",
+    ".omp/ratchet/rename-title-expanded/baseline/traces/expanded-008_rep0.json",
+    ".omp/ratchet/rename-title-expanded/baseline/traces/expanded-070_rep1.json",
+    ".omp/ratchet/rename-title-expanded/baseline/traces/expanded-096_rep0.json",
+    ".omp/ratchet/rename-title-expanded/baseline/traces/expanded-027_rep0.json",
+    ".omp/ratchet/rename-title-expanded/baseline/traces/expanded-089_rep0.json",
+    ".omp/ratchet/rename-title-expanded/baseline/traces/expanded-054_rep0.json",
+    ".omp/ratchet/rename-title-expanded/baseline/traces/expanded-023_rep2.json",
+    ".omp/ratchet/rename-title-expanded/baseline/traces/expanded-093_rep2.json",
+    ".omp/ratchet/rename-title-expanded/baseline/traces/expanded-008_rep2.json",
+    ".omp/ratchet/rename-title-expanded/baseline/traces/expanded-070_rep2.json",
+    ".omp/ratchet/rename-title-expanded/baseline/traces/expanded-010_rep2.json",
+    ".omp/ratchet/rename-title-expanded/baseline/traces/expanded-035_rep2.json",
+    ".omp/ratchet/rename-title-expanded/baseline/traces/expanded-063_rep0.json",
+    ".omp/ratchet/rename-title-expanded/baseline/traces/expanded-026_rep2.json",
+    ".omp/ratchet/rename-title-expanded/baseline/traces/expanded-078_rep1.json",
+    ".omp/ratchet/rename-title-expanded/baseline/traces/expanded-003_rep2.json",
+    ".omp/ratchet/rename-title-expanded/baseline/traces/expanded-052_rep0.json",
+    ".omp/ratchet/rename-title-expanded/baseline/traces/expanded-090_rep0.json",
+    ".omp/ratchet/rename-title-expanded/baseline/traces/expanded-076_rep0.json",
+    ".omp/ratchet/rename-title-expanded/baseline/traces/expanded-023_rep0.json",
+    ".omp/ratchet/rename-title-expanded/baseline/traces/expanded-032_rep0.json",
+    ".omp/ratchet/rename-title-expanded/baseline/traces/expanded-062_rep0.json",
+    ".omp/ratchet/rename-title-expanded/baseline/traces/expanded-039_rep1.json",
+    ".omp/ratchet/rename-title-expanded/baseline/traces/expanded-085_rep1.json",
+    ".omp/ratchet/rename-title-expanded/baseline/traces/expanded-008_rep1.json",
+    ".omp/ratchet/rename-title-expanded/baseline/traces/expanded-074_rep1.json",
+    ".omp/ratchet/rename-title-expanded/baseline/traces/expanded-080_rep1.json",
+    ".omp/ratchet/rename-title-expanded/baseline/traces/expanded-044_rep2.json",
+    ".omp/ratchet/rename-title-expanded/baseline/traces/expanded-089_rep1.json",
+    ".omp/ratchet/rename-title-expanded/baseline/traces/expanded-016_rep0.json",
+    ".omp/ratchet/rename-title-expanded/baseline/traces/expanded-012_rep2.json",
+    ".omp/ratchet/rename-title-expanded/baseline/traces/expanded-022_rep1.json",
+    ".omp/ratchet/rename-title-expanded/baseline/traces/expanded-043_rep1.json",
+    ".omp/ratchet/rename-title-expanded/baseline/traces/expanded-052_rep1.json",
+    ".omp/ratchet/rename-title-expanded/baseline/traces/expanded-092_rep2.json",
+    ".omp/ratchet/rename-title-expanded/baseline/traces/expanded-054_rep1.json",
+    ".omp/ratchet/rename-title-expanded/baseline/traces/expanded-034_rep1.json",
+    ".omp/ratchet/rename-title-expanded/baseline/traces/expanded-011_rep1.json",
+    ".omp/ratchet/rename-title-expanded/baseline/traces/expanded-074_rep2.json",
+    ".omp/ratchet/rename-title-expanded/baseline/traces/expanded-080_rep0.json",
+    ".omp/ratchet/rename-title-expanded/baseline/traces/expanded-063_rep2.json",
+    ".omp/ratchet/rename-title-expanded/baseline/traces/expanded-078_rep0.json",
+    ".omp/ratchet/rename-title-expanded/baseline/traces/expanded-031_rep2.json",
+    ".omp/ratchet/rename-title-expanded/baseline/traces/expanded-067_rep1.json",
+    ".omp/ratchet/rename-title-expanded/baseline/traces/expanded-024_rep0.json",
+    ".omp/ratchet/rename-title-expanded/baseline/traces/expanded-092_rep1.json",
+    ".omp/ratchet/rename-title-expanded/baseline/traces/expanded-078_rep2.json",
+    ".omp/ratchet/rename-title-expanded/baseline/traces/expanded-021_rep0.json",
+    ".omp/ratchet/rename-title-expanded/baseline/traces/expanded-030_rep2.json",
+    ".omp/ratchet/rename-title-expanded/baseline/traces/expanded-083_rep2.json",
+    ".omp/ratchet/rename-title-expanded/baseline/traces/expanded-052_rep2.json",
+    ".omp/ratchet/rename-title-expanded/baseline/traces/expanded-096_rep2.json",
+    ".omp/ratchet/rename-title-expanded/baseline/traces/expanded-062_rep1.json",
+    ".omp/ratchet/rename-title-expanded/baseline/traces/expanded-080_rep2.json",
+    ".omp/ratchet/rename-title-expanded/baseline/traces/expanded-015_rep0.json",
+    ".omp/ratchet/rename-title-expanded/baseline/traces/expanded-066_rep1.json",
+    ".omp/ratchet/rename-title-expanded/baseline/traces/expanded-069_rep1.json",
+    ".omp/ratchet/rename-title-expanded/baseline/traces/expanded-033_rep2.json",
+    ".omp/ratchet/rename-title-expanded/baseline/traces/expanded-015_rep2.json",
+    ".omp/ratchet/rename-title-expanded/baseline/traces/expanded-027_rep2.json",
+    ".omp/ratchet/rename-title-expanded/baseline/traces/expanded-035_rep1.json",
+    ".omp/ratchet/rename-title-expanded/baseline/traces/expanded-042_rep2.json",
+    ".omp/ratchet/rename-title-expanded/baseline/traces/expanded-017_rep1.json",
+    ".omp/ratchet/rename-title-expanded/baseline/traces/expanded-069_rep0.json",
+    ".omp/ratchet/rename-title-expanded/baseline/traces/expanded-043_rep2.json",
+    ".omp/ratchet/rename-title-expanded/baseline/traces/expanded-021_rep2.json",
+    ".omp/ratchet/rename-title-expanded/baseline/traces/expanded-079_rep1.json",
+    ".omp/ratchet/rename-title-expanded/baseline/traces/expanded-037_rep2.json",
+    ".omp/ratchet/rename-title-expanded/baseline/traces/expanded-085_rep0.json",
+    ".omp/ratchet/rename-title-expanded/baseline/traces/expanded-014_rep0.json",
+    ".omp/ratchet/rename-title-expanded/baseline/traces/expanded-066_rep2.json",
+    ".omp/ratchet/rename-title-expanded/baseline/traces/expanded-006_rep1.json",
+    ".omp/ratchet/rename-title-expanded/baseline/traces/expanded-085_rep2.json",
+    ".omp/ratchet/rename-title-expanded/baseline/traces/expanded-056_rep0.json",
+    ".omp/ratchet/rename-title-expanded/baseline/traces/expanded-095_rep0.json",
+    ".omp/ratchet/rename-title-expanded/baseline/traces/expanded-079_rep2.json",
+    ".omp/ratchet/rename-title-expanded/baseline/traces/expanded-016_rep1.json",
+    ".omp/ratchet/rename-title-expanded/baseline/traces/expanded-039_rep0.json",
+    ".omp/ratchet/rename-title-expanded/baseline/traces/expanded-011_rep0.json",
+    ".omp/ratchet/rename-title-expanded/baseline/traces/expanded-010_rep1.json",
+    ".omp/ratchet/rename-title-expanded/baseline/traces/expanded-012_rep1.json",
+    ".omp/ratchet/rename-title-expanded/baseline/traces/expanded-014_rep2.json",
+    ".omp/ratchet/rename-title-expanded/baseline/traces/expanded-025_rep0.json",
+    ".omp/ratchet/rename-title-expanded/baseline/traces/expanded-009_rep0.json",
+    ".omp/ratchet/rename-title-expanded/baseline/traces/expanded-093_rep0.json",
+    ".omp/ratchet/rename-title-expanded/baseline/traces/expanded-092_rep0.json",
+    ".omp/ratchet/rename-title-expanded/baseline/traces/expanded-026_rep1.json",
+    ".omp/ratchet/rename-title-expanded/baseline/traces/expanded-041_rep1.json",
+    ".omp/ratchet/rename-title-expanded/baseline/traces/expanded-074_rep0.json",
+    ".omp/ratchet/rename-title-expanded/baseline/traces/expanded-089_rep2.json",
+    ".omp/ratchet/rename-title-expanded/baseline/traces/expanded-030_rep1.json",
+    ".omp/ratchet/rename-title-expanded/baseline/traces/expanded-043_rep0.json",
+    ".omp/ratchet/rename-title-expanded/baseline/traces/expanded-091_rep0.json",
+    ".omp/ratchet/rename-title-expanded/baseline/traces/expanded-003_rep1.json",
+    ".omp/ratchet/rename-title-expanded/baseline/traces/expanded-067_rep2.json",
+    ".omp/ratchet/rename-title-expanded/baseline/traces/expanded-009_rep1.json",
+    ".omp/ratchet/rename-title-expanded/baseline/traces/expanded-082_rep0.json",
+    ".omp/ratchet/rename-title-expanded/baseline/traces/expanded-093_rep1.json",
+    ".omp/ratchet/rename-title-expanded/baseline/traces/expanded-100_rep0.json",
+    ".omp/ratchet/rename-title-expanded/baseline/traces/expanded-079_rep0.json",
+    ".omp/ratchet/rename-title-expanded/baseline/traces/expanded-096_rep1.json",
+    ".omp/ratchet/rename-title-expanded/baseline/traces/expanded-033_rep1.json",
+    ".omp/ratchet/rename-title-expanded/baseline/traces/expanded-095_rep1.json",
+    ".omp/ratchet/rename-title-expanded/baseline/traces/expanded-025_rep1.json",
+    ".omp/ratchet/rename-title-expanded/baseline/traces/expanded-034_rep2.json",
+    ".omp/ratchet/rename-title-expanded/baseline/traces/expanded-090_rep1.json",
+    ".omp/ratchet/rename-title-expanded/baseline/traces/expanded-066_rep0.json",
+    ".omp/ratchet/rename-title-expanded/baseline/traces/expanded-056_rep2.json",
+    ".omp/ratchet/rename-title-expanded/baseline/traces/expanded-042_rep0.json",
+    ".omp/ratchet/rename-title-expanded/baseline/traces/expanded-062_rep2.json",
+    ".omp/ratchet/rename-title-expanded/baseline/traces/expanded-057_rep1.json",
+    ".omp/ratchet/rename-title-expanded/baseline/traces/expanded-006_rep0.json",
+    ".omp/ratchet/rename-title-expanded/baseline/traces/expanded-017_rep2.json",
+    ".omp/ratchet/rename-title-expanded/baseline/traces/expanded-048_rep0.json",
+    ".omp/ratchet/rename-title-expanded/baseline/traces/expanded-015_rep1.json",
+    ".omp/ratchet/rename-title-expanded/baseline/traces/expanded-048_rep1.json",
+    ".omp/ratchet/rename-title-expanded/baseline/traces/expanded-044_rep1.json",
+    ".omp/ratchet/rename-title-expanded/baseline/traces/expanded-067_rep0.json",
+    ".omp/ratchet/rename-title-expanded/baseline/traces/expanded-025_rep2.json",
+    ".omp/ratchet/rename-title-expanded/baseline/traces/expanded-009_rep2.json",
+    ".omp/ratchet/rename-title-expanded/baseline/traces/expanded-098_rep2.json",
+    ".omp/ratchet/rename-title-expanded/baseline/traces/expanded-057_rep0.json",
+    ".omp/ratchet/rename-title-expanded/baseline/traces/expanded-027_rep1.json",
+    ".omp/ratchet/rename-title-expanded/baseline/traces/expanded-023_rep1.json",
+    ".omp/ratchet/rename-title-expanded/baseline/traces/expanded-022_rep2.json",
+    ".omp/ratchet/rename-title-expanded/baseline/traces/expanded-024_rep2.json",
+    ".omp/ratchet/rename-title-expanded/baseline/traces/expanded-100_rep1.json",
+    ".omp/ratchet/rename-title-expanded/baseline/traces/expanded-095_rep2.json",
+    ".omp/ratchet/rename-title-expanded/baseline/traces/expanded-033_rep0.json",
+    ".omp/ratchet/rename-title-expanded/baseline/traces/expanded-006_rep2.json",
+    ".omp/ratchet/rename-title-expanded/baseline/traces/expanded-100_rep2.json",
+    ".omp/ratchet/rename-title-expanded/baseline/traces/expanded-030_rep0.json",
+    ".omp/ratchet/rename-title-expanded/baseline/traces/expanded-011_rep2.json",
+    ".omp/ratchet/rename-title-expanded/baseline/traces/expanded-041_rep0.json",
+    ".omp/ratchet/rename-title-expanded/baseline/traces/expanded-032_rep1.json",
+    ".omp/ratchet/rename-title-expanded/baseline/traces/expanded-037_rep1.json",
+    ".omp/ratchet/rename-title-expanded/baseline/traces/expanded-003_rep0.json",
+    ".omp/ratchet/rename-title-expanded/baseline/traces/expanded-098_rep0.json",
+    ".omp/ratchet/rename-title-expanded/baseline/traces/expanded-082_rep2.json",
+    ".omp/ratchet/rename-title-expanded/baseline/traces/expanded-091_rep1.json",
+    ".omp/ratchet/rename-title-expanded/baseline/traces/expanded-091_rep2.json",
+    ".omp/ratchet/rename-title-expanded/baseline/traces/expanded-083_rep1.json",
+    ".omp/ratchet/rename-title-expanded/baseline/traces/expanded-034_rep0.json",
+    ".omp/ratchet/rename-title-expanded/baseline/traces/expanded-040_rep2.json",
+    ".omp/ratchet/rename-title-expanded/baseline/traces/expanded-077_rep2.json",
+    ".omp/ratchet/rename-title-expanded/baseline/traces/expanded-032_rep2.json",
+    ".omp/ratchet/rename-title-expanded/baseline/traces/expanded-083_rep0.json",
+    ".omp/ratchet/rename-title-expanded/baseline/traces/expanded-098_rep1.json",
+    ".omp/ratchet/rename-title-expanded/baseline/traces/expanded-037_rep0.json",
+    ".omp/ratchet/rename-title-expanded/baseline/traces/expanded-056_rep1.json",
+    ".omp/ratchet/rename-title-expanded/baseline/traces/expanded-022_rep0.json",
+    ".omp/ratchet/rename-title-expanded/baseline/traces/expanded-070_rep0.json",
+    ".omp/ratchet/rename-title-expanded/baseline/traces/expanded-014_rep1.json",
+    ".omp/ratchet/rename-title-expanded/baseline/traces/expanded-082_rep1.json",
+    ".omp/ratchet/rename-title-expanded/baseline/traces/expanded-031_rep1.json",
+    ".omp/ratchet/rename-title-expanded/baseline/traces/expanded-042_rep1.json",
+    ".omp/ratchet/rename-title-expanded/baseline/traces/expanded-040_rep1.json",
+    ".omp/ratchet/rename-title-expanded/baseline/traces/expanded-010_rep0.json",
+    ".omp/ratchet/rename-title-expanded/baseline/traces/expanded-077_rep0.json",
+    ".omp/ratchet/rename-title-expanded/baseline/traces/expanded-076_rep1.json",
+    ".omp/ratchet/rename-title-expanded/baseline/traces/expanded-035_rep0.json",
+    ".omp/ratchet/rename-title-expanded/baseline/traces/expanded-021_rep1.json",
+    ".omp/ratchet/rename-title-expanded/baseline/traces/expanded-041_rep2.json",
+    ".omp/ratchet/rename-title-expanded/baseline/traces/expanded-090_rep2.json",
+    ".omp/ratchet/rename-title-expanded/baseline/traces/expanded-024_rep1.json",
+    ".omp/ratchet/rename-title-expanded/baseline/traces/expanded-031_rep0.json",
+    ".omp/ratchet/rename-title-expanded/baseline/traces/expanded-039_rep2.json",
+    ".omp/ratchet/rename-title-expanded/baseline/traces/expanded-016_rep2.json",
+    ".omp/ratchet/rename-title-expanded/baseline/traces/expanded-069_rep2.json",
+    ".omp/ratchet/rename-title-expanded/baseline/traces/expanded-063_rep1.json",
+    ".omp/ratchet/rename-title-expanded/baseline/traces/expanded-017_rep0.json",
+    ".omp/ratchet/rename-title-expanded/baseline/traces/expanded-054_rep2.json",
+    ".omp/ratchet/rename-title-expanded/baseline/traces/expanded-076_rep2.json",
+    ".omp/ratchet/rename-title-expanded/baseline/traces/expanded-012_rep0.json",
+    ".omp/ratchet/rename-title-expanded/baseline/traces/expanded-044_rep0.json",
+    ".omp/ratchet/rename-title-expanded/baseline/traces/expanded-048_rep2.json",
+    ".omp/ratchet/rename-title-expanded/baseline/traces/expanded-040_rep0.json",
+    ".omp/ratchet/rename-title-expanded/baseline/traces/expanded-026_rep0.json"
+  ],
+  "expectations": [
+    {
+      "id": "expanded-003",
+      "intent": "Den vorgeschlagenen gemeinsamen Kontext-, Routing- und Ergebnisvertrag in den Command-Templates anwenden.",
+      "oracle": "Gemeinsame Command-Verträge und Routing vereinheitlichen",
+      "tag": "continuation"
+    },
+    {
+      "id": "expanded-006",
+      "intent": "Die Arbeit an korrekten ast_grep-Paginierungshinweisen samt Contract-Nachweis abschließen und sichern.",
+      "oracle": "ast_grep Paginierungshinweise konsistent korrigieren",
+      "tag": "command-wrapper"
+    },
+    {
+      "id": "expanded-008",
+      "intent": "Die klar erkennbare Arbeit am Formatieren der Web-Search- und LSP-Tool-Prompts benennen; aus der nicht auflösbaren letzten Eingabe we/ex kein neues Thema erfinden.",
+      "oracle": "Web-Search und LSP Prompts formatieren",
+      "tag": "explicit-task"
+    },
+    {
+      "id": "expanded-009",
+      "intent": "Einen minimalen Diff für sinnvolle Regeln aus dem archivierten Systemprompt vorschlagen, insbesondere Skill-Ladung und API-Referenzprüfung.",
+      "oracle": "Systemprompt Skill-Ladung und API-Prüfung schärfen",
+      "tag": "explicit-task"
+    },
+    {
+      "id": "expanded-010",
+      "intent": "Einen konkreten Diff zur Verbesserung des Scout-Prompts und seiner Rechercheverträge vorschlagen.",
+      "oracle": "Scout-Prompt Evidenz und Werkzeuge verbessern",
+      "tag": "explicit-task"
+    },
+    {
+      "id": "expanded-011",
+      "intent": "Den über Q1 ausgewählten Diff für Zielgewichtung und technische Verifikation im DIY-Workspace-Prompt vorschlagen.",
+      "oracle": "DIY-Prompt Ziele und Verifikation präzisieren",
+      "tag": "q-reference"
+    },
+    {
+      "id": "expanded-012",
+      "intent": "Die vorgeschlagenen nächsten Schritte für verschobene A1/XOXO-Belegzuordnungen und den unabhängigen Oktober-Match angehen.",
+      "oracle": "A1-Belegkette und Oktober-Match bereinigen",
+      "tag": "continuation"
+    },
+    {
+      "id": "expanded-014",
+      "intent": "Die verbliebenen Probleme und Datenunsicherheiten im Investment-CLI und Radar untersuchen und beheben.",
+      "oracle": "Investment-CLI und Radar Restprobleme beheben",
+      "tag": "explicit-task"
+    },
+    {
+      "id": "expanded-015",
+      "intent": "Prüfen, ob die Reddit-CLI-Referenz nach dem neuen Publishing- und Flair-Workflow aktuell ist.",
+      "oracle": "Reddit CLI-Dokumentation auf Aktualität prüfen",
+      "tag": "explicit-task"
+    },
+    {
+      "id": "expanded-016",
+      "intent": "Den über Q2 ausgewählten offenen Vales-Referenzkonflikt in den Belegzuordnungen untersuchen.",
+      "oracle": "Offenen Vales-Referenzkonflikt genauer untersuchen",
+      "tag": "q-reference"
+    },
+    {
+      "id": "expanded-017",
+      "intent": "Nach den Moderationsblockaden eine Bildvariante mit Kleid und Strumpfhose versuchen und das Kleid als Latex oder Vinyl gestalten.",
+      "oracle": "Bildvariante mit Latexkleid und Strumpfhose",
+      "tag": "continuation"
+    },
+    {
+      "id": "expanded-021",
+      "intent": "Den Steuerberater-Export 2025 als möglichst gut komprimierte ZIP-Datei unter dem gewünschten Namen erstellen.",
+      "oracle": "Jahresabschluss-Export 2025 als ZIP erstellen",
+      "tag": "explicit-task"
+    },
+    {
+      "id": "expanded-022",
+      "intent": "Die neue globale Zuordnung von projects und project-* zu $HOME/projects kritisch prüfen.",
+      "oracle": "Globale Projektpfad-Regel kritisch prüfen",
+      "tag": "command-wrapper"
+    },
+    {
+      "id": "expanded-023",
+      "intent": "Die tatsächliche Aussagekraft der Jev-Versuche und des beobachteten A-/Reihenfolgeeffekts ungeschönt einordnen.",
+      "oracle": "Jev Reihenfolgeeffekt ehrlich einordnen",
+      "tag": "explicit-task"
+    },
+    {
+      "id": "expanded-024",
+      "intent": "Die als nutzlos identifizierten Auth-Smoke-Dateien und Altartefakte entfernen, ohne den sinnvollen Auth-Test mit ihnen zu verwechseln.",
+      "oracle": "Nutzlose Auth-Smoke Altdateien entfernen",
+      "tag": "explicit-task"
+    },
+    {
+      "id": "expanded-025",
+      "intent": "Eine einheitliche Task-Auftragsvorlage für alle Child-Aufträge statt begrifflich getrennter Spezialvorlagen haben.",
+      "oracle": "Einheitliche Task-Vorlage für alle Aufträge",
+      "tag": "explicit-task"
+    },
+    {
+      "id": "expanded-026",
+      "intent": "Die zuletzt vorgeschlagenen Korrekturen am Commenting-Skill zu Tool-Direktiven, TODO-Konventionen und Quellen anwenden.",
+      "oracle": "Commenting-Skill Direktiven und TODO-Regeln korrigieren",
+      "tag": "continuation"
+    },
+    {
+      "id": "expanded-027",
+      "intent": "Den über Q1 ausgewählten Bildlauf von Prompt 011 mit der Referenz kohlenberger10 ausführen.",
+      "oracle": "Prompt 011 mit kohlenberger10 ausführen",
+      "tag": "q-reference"
+    },
+    {
+      "id": "expanded-030",
+      "intent": "Die gewünschten Investment-Rechercheziele und den Bedarf an zusammengeführten Daten in REPORT.md festhalten.",
+      "oracle": "Investment-Datenziele in REPORT.md dokumentieren",
+      "tag": "explicit-task"
+    },
+    {
+      "id": "expanded-031",
+      "intent": "Die Dotfiles-Bereitstellung und den behobenen archive.sh-Loginfehler kritisch auf verbleibende Probleme prüfen.",
+      "oracle": "Dotfiles Shell-Bereitstellung kritisch überprüfen",
+      "tag": "command-wrapper"
+    },
+    {
+      "id": "expanded-032",
+      "intent": "Die Modellkonfiguration auf den gewählten DeepSeek-Provider und ein 300k-Limit umstellen und die Änderungen sichern.",
+      "oracle": "DeepSeek-Routing und 300k-Limit konfigurieren",
+      "tag": "command-wrapper"
+    },
+    {
+      "id": "expanded-033",
+      "intent": "Die geprüften Twitter-CLI-Vereinfachungen für Thread-Spaltenauswahl und kompakte TSV-Zeitstempel implementieren.",
+      "oracle": "Twitter-Threads mit Spaltenauswahl tokenärmer ausgeben",
+      "tag": "continuation"
+    },
+    {
+      "id": "expanded-034",
+      "intent": "Alle betroffenen Forschungsdokumente an die korrigierten Annahmen zu CWS-Sperren, Cookie-Zugriff und Session-Relay anpassen.",
+      "oracle": "CWS-Dokumentation zu Cookie-Zugriff korrigieren",
+      "tag": "explicit-task"
+    },
+    {
+      "id": "expanded-035",
+      "intent": "Die vorangegangenen Verbesserungsvorschläge für Investment-Snapshots, Reviews und CLI-Workflows kritisch überprüfen.",
+      "oracle": "Investment-CLI Verbesserungsvorschläge kritisch überprüfen",
+      "tag": "command-wrapper"
+    },
+    {
+      "id": "expanded-037",
+      "intent": "Die angeforderten Bildprompt-Läufe für die genannten Identitäten parallel ausführen, zuletzt P4621 mit jac05.",
+      "oracle": "Bildprompt-Serien parallel mit Referenzidentitäten erzeugen",
+      "tag": "explicit-task"
+    },
+    {
+      "id": "expanded-039",
+      "intent": "Die im besprochenen Extension-Vault-Konflikt bestehenden Git-Projektionen beziehungsweise Tags überschreiben statt den Konflikt weiter zu untersuchen.",
+      "oracle": "Extension-Vault Git-Projektionen und Tags überschreiben",
+      "tag": "explicit-task"
+    },
+    {
+      "id": "expanded-040",
+      "intent": "Die überprüfte Restic-Performanceanalyse und ihre Umsetzung in das Issue-Ledger kritisch hinterfragen.",
+      "oracle": "Restic Performance-Ledger kritisch überprüfen",
+      "tag": "command-wrapper"
+    },
+    {
+      "id": "expanded-041",
+      "intent": "Den aktuellen Ghostery-V2-Code nach Änderungen anderer Agents neu bewerten und frühere Aussagen zu Produktumfang, DNR-Evidenz und Cutover überprüfen.",
+      "oracle": "Ghostery V2 Status erneut bewerten",
+      "tag": "explicit-task"
+    },
+    {
+      "id": "expanded-042",
+      "intent": "Alle OMP-Interaktionen und Datensendungen an herstellereigene Domains einschließlich möglicher Metrikübertragung auflisten.",
+      "oracle": "OMP Datenverkehr zu Herstellerdomains untersuchen",
+      "tag": "explicit-task"
+    },
+    {
+      "id": "expanded-043",
+      "intent": "Die sinnvollsten nächsten Schritte nach den Fclones-Performanceuntersuchungen vorschlagen, ohne sie auszuführen.",
+      "oracle": "Nächste Schritte für Fclones-Performance priorisieren",
+      "tag": "command-wrapper"
+    },
+    {
+      "id": "expanded-044",
+      "intent": "Die überprüften Präzisierungen der Go-Guidance zu JSON v2, Streaming und Bibliotheksauswahl umsetzen.",
+      "oracle": "Go JSON-v2 und Streaming-Guidance korrigieren",
+      "tag": "continuation"
+    },
+    {
+      "id": "expanded-048",
+      "intent": "Die Arbeit an den Webstore-Tracker-Korrekturen samt Daten-, Ausgabe- und Konfigurationsverträgen abschließen und sichern.",
+      "oracle": "Webstore-Tracker Zustands- und Schnittstellenfehler beheben",
+      "tag": "command-wrapper"
+    },
+    {
+      "id": "expanded-052",
+      "intent": "Die geprüften Coverage- und Hilfetextprobleme der Sourcegraph-Suche beheben.",
+      "oracle": "Sourcegraph-Coverage und CLI-Hilfe korrigieren",
+      "tag": "continuation"
+    },
+    {
+      "id": "expanded-054",
+      "intent": "Betragsentscheidungen zentralisieren und redundante Relationsabfragen in Matchlisten beseitigen.",
+      "oracle": "Betragspolitik und Matchlisten sinnvoll konsolidieren",
+      "tag": "continuation"
+    },
+    {
+      "id": "expanded-056",
+      "intent": "Den vorgeschlagenen Ausbau der V2-Telemetrie einschließlich Server- und Betriebsgrundlagen umsetzen.",
+      "oracle": "V2-Telemetrie und Betriebsgrundlagen vollständig umsetzen",
+      "tag": "continuation"
+    },
+    {
+      "id": "expanded-057",
+      "intent": "Das Versionsmodell und den abgebrochenen Bestandsaudit des Extension-Vaults kritisch hinterfragen.",
+      "oracle": "Versionsmodell und Bestandsaudit kritisch hinterfragen",
+      "tag": "command-wrapper"
+    },
+    {
+      "id": "expanded-062",
+      "intent": "Die bestbelegten vorgeschlagenen Belegmatches für Mai anwenden.",
+      "oracle": "Beste Mai-Belegmatches gezielt anwenden",
+      "tag": "continuation"
+    },
+    {
+      "id": "expanded-063",
+      "intent": "Die Promptgen-Abweichung beim Hackernews-Skill untersuchen und beheben.",
+      "oracle": "Hackernews-Skill mit Promptgen synchronisieren",
+      "tag": "q-reference"
+    },
+    {
+      "id": "expanded-066",
+      "intent": "Die fehlerhaften Randklammern in den Kategoriepfad-IDs des Willhaben-Search-Mappers korrigieren.",
+      "oracle": "Willhaben-Kategoriepfad-IDs im Search-Mapper korrigieren",
+      "tag": "continuation"
+    },
+    {
+      "id": "expanded-067",
+      "intent": "Den verbindlichen Markdown-Vertrag samt interner Formatprüfung im Systemtemplate präzisieren und anwenden.",
+      "oracle": "Interne Markdown-Prüfung im Systemprompt verankern",
+      "tag": "continuation"
+    },
+    {
+      "id": "expanded-069",
+      "intent": "Die überarbeiteten Evidenz- und Analyseverträge des Performance-Skills anwenden.",
+      "oracle": "Performance-Skill mit präziseren Evidenzregeln aktualisieren",
+      "tag": "continuation"
+    },
+    {
+      "id": "expanded-070",
+      "intent": "Die Generated-Markierungen in .gitattributes mit den GitHub-Linguist-Kategorien abgleichen.",
+      "oracle": "Generated-Markierungen mit GitHub Linguist abgleichen",
+      "tag": "q-reference"
+    },
+    {
+      "id": "expanded-074",
+      "intent": "Das neu angelegte db2-3-Wiederherstellungsprojekt strukturieren.",
+      "oracle": "db2-3-Wiederherstellungsprojekt sinnvoll strukturieren und vorbereiten",
+      "tag": "q-reference"
+    },
+    {
+      "id": "expanded-076",
+      "intent": "Die noch offenen Probleme und den neuen SSR-Aktivzustandsfehler im Svelte-shadcn-Skill beheben.",
+      "oracle": "Svelte-shadcn-Skill und SSR-Beispiele korrigieren",
+      "tag": "continuation"
+    },
+    {
+      "id": "expanded-077",
+      "intent": "Ratchets Implementierung praktisch mit DSPy und einer manuellen Eval-Schleife vergleichen.",
+      "oracle": "Ratchet mit DSPy und Eval-Schleifen vergleichen",
+      "tag": "q-reference"
+    },
+    {
+      "id": "expanded-078",
+      "intent": "Den Befund einer Quelldateilöschung vor dem Datenbank-Commit und seine vorgeschlagene Korrektur kritisch überprüfen.",
+      "oracle": "Quelldateilöschung vor Datenbank-Commit kritisch prüfen",
+      "tag": "command-wrapper"
+    },
+    {
+      "id": "expanded-079",
+      "intent": "Einen ausführbaren Feynman-Skill für Erklärungen anhand des aktuellen Gesprächskontexts erstellen.",
+      "oracle": "Feynman-Skill für kontextbezogene Erklärungen erstellen",
+      "tag": "continuation"
+    },
+    {
+      "id": "expanded-080",
+      "intent": "Den Prettier-Befund eines erfolgreichen Check-Exitcodes trotz stdin-Syntaxfehlers kritisch überprüfen.",
+      "oracle": "Prettier-Check-Exitcode bei stdin-Syntaxfehlern überprüfen",
+      "tag": "command-wrapper"
+    },
+    {
+      "id": "expanded-082",
+      "intent": "Die sinnvollsten nächsten Schritte für verlustfreie uBlock-Lite-Regelkompression und den belegten Minifier-Defekt vorschlagen.",
+      "oracle": "Nächste Schritte zur Filterkompression priorisieren",
+      "tag": "command-wrapper"
+    },
+    {
+      "id": "expanded-083",
+      "intent": "Neue, belegbare Verbesserungen mit hohem Nutzen relativ zu ihren Kosten für fclones vorschlagen.",
+      "oracle": "Wertvolle neue Verbesserungen für fclones finden",
+      "tag": "command-wrapper"
+    },
+    {
+      "id": "expanded-085",
+      "intent": "Nur die internen Duplikate im verbliebenen WhatsApp-Ingrid-Verzeichnis entfernen.",
+      "oracle": "Interne Duplikate im WhatsApp-Ingrid-Baum entfernen",
+      "tag": "q-reference"
+    },
+    {
+      "id": "expanded-089",
+      "intent": "Die Vereinfachungsvorschläge für V2-Buildgraph, Statusdokument und Reportvalidierung kritisch überprüfen.",
+      "oracle": "V2-Buildgraph und Vereinfachungsvorschläge kritisch prüfen",
+      "tag": "command-wrapper"
+    },
+    {
+      "id": "expanded-090",
+      "intent": "Nach der shadcn-Komponentenkonsolidierung die sinnvollsten noch offenen nächsten Schritte vorschlagen.",
+      "oracle": "Nächste Schritte nach shadcn-Konsolidierung priorisieren",
+      "tag": "command-wrapper"
+    },
+    {
+      "id": "expanded-091",
+      "intent": "Die SSH-Verbindung zum neu installierten Hetzner-Server nach Klärung des geänderten Hostkeys weiterführen.",
+      "oracle": "SSH-Zugang zum neu installierten Hetzner-Server herstellen",
+      "tag": "q-reference"
+    },
+    {
+      "id": "expanded-092",
+      "intent": "Die Projektregel ändern, die einen agentengestarteten Transfer der Tumblr-Daten aufs NAS verhindert.",
+      "oracle": "Agentenstarts für Tumblr-NAS-Transfer erlauben",
+      "tag": "q-reference"
+    },
+    {
+      "id": "expanded-093",
+      "intent": "Weitere hochwertige Bluesky-Accounts zu KI, Skills und verwandten praktischen Themen recherchieren.",
+      "oracle": "Hochwertige Bluesky-Accounts zu KI-Skills finden",
+      "tag": "q-reference"
+    },
+    {
+      "id": "expanded-095",
+      "intent": "Die zwei leeren, falsch unter projects abgelegten Prompt-Verzeichnisse entfernen.",
+      "oracle": "Leere falsch platzierte Prompt-Verzeichnisse entfernen",
+      "tag": "q-reference"
+    },
+    {
+      "id": "expanded-096",
+      "intent": "Die Einzelfallmessung auch für Paket-Browsertests aktivieren.",
+      "oracle": "Einzelfallmessung für Paket-Browsertests aktivieren",
+      "tag": "q-reference"
+    },
+    {
+      "id": "expanded-098",
+      "intent": "Die tatsächlichen bezahlten KI-Aufrufe nach Anlass aufschlüsseln und im Refactoring-Plan dokumentieren.",
+      "oracle": "Paid-Aufrufe analysieren und im Refactoring-Plan dokumentieren",
+      "tag": "q-reference"
+    },
+    {
+      "id": "expanded-100",
+      "intent": "Die vollständige Makefile-Angleichung über den Setup-Upgrade-Runner aufgreifen.",
+      "oracle": "Makefile durch vollständigen Setup-Upgrade-Runner angleichen",
+      "tag": "q-reference"
+    }
+  ]
+}

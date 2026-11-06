@@ -232,7 +232,9 @@ interface ReviveOwnerOptions {
 }
 
 function createFactory(cwd: string, eventBus?: EventBus, owner: ReviveOwnerOptions = {}) {
+	const settings = owner.settings ?? Settings.isolated();
 	const parentSession = {
+		settings,
 		sessionManager: {
 			getCwd: () => cwd,
 			getArtifactManager: () => undefined,
@@ -259,7 +261,7 @@ function createFactory(cwd: string, eventBus?: EventBus, owner: ReviveOwnerOptio
 		session: parentSession,
 		authStorage: owner.authStorage ?? ({} as never),
 		modelRegistry: owner.modelRegistry ?? ({ authStorage: {} } as ModelRegistry),
-		settings: owner.settings ?? Settings.isolated(),
+		settings,
 		enableLsp: true,
 		eventBus,
 	});
@@ -938,6 +940,7 @@ describe("persisted subagent revival", () => {
 		const models = [target, parentModel, rootMentionModel];
 		const modelRegistry = stubRegistry(models);
 		const parentMentions = new ModelMentionRegistry({
+			agentDir: parentCwd,
 			sessionManager: SessionManager.inMemory(parentCwd),
 			modelRegistry,
 			scopedModels: () => models,
@@ -945,6 +948,8 @@ describe("persisted subagent revival", () => {
 		parentMentions.syncFromBranch();
 		parentMentions.expandMentions("^mock/mentioned");
 		const parentAgents = parentMentions.sessionAgents();
+		const parentSettings = Settings.isolated();
+		Object.defineProperty(parentSettings, "getAgentDir", { value: () => parentCwd });
 		const parentRoots: EffectiveExtensionRoots = {
 			explicit: [parentCwd],
 			mode: "explicit-only",
@@ -982,6 +987,7 @@ describe("persisted subagent revival", () => {
 			status: "idle",
 			sessionFile: null,
 			session: {
+				settings: parentSettings,
 				model: parentModel,
 				sessionManager: { getCwd: () => parentCwd },
 				effectiveExtensionRoots: parentRoots,
@@ -1004,7 +1010,7 @@ describe("persisted subagent revival", () => {
 		);
 		try {
 			expect((await lifecycle.ensureLive(childId)).model).toBe(target);
-			expect(discover).toHaveBeenCalledWith(parentCwd, undefined, parentRoots);
+			expect(discover).toHaveBeenCalledWith(parentCwd, undefined, parentRoots, parentCwd);
 			expect(options?.assertDispatchModel).toBeDefined();
 			expect(options!.assertDispatchModel!(target)).toBeUndefined();
 			expect(() => options!.assertDispatchModel!(rootMentionModel)).toThrow(/not approved/);
@@ -1024,6 +1030,7 @@ describe("persisted subagent revival", () => {
 			const models = [target, parentModel];
 			const modelRegistry = stubRegistry(models);
 			const mentions = new ModelMentionRegistry({
+				agentDir: cwd,
 				sessionManager: SessionManager.inMemory(cwd),
 				modelRegistry,
 				scopedModels: () => models,
@@ -1092,6 +1099,7 @@ describe("persisted subagent revival", () => {
 					status: "idle",
 					sessionFile: null,
 					session: {
+						settings: Settings.isolated(),
 						model: parentModel,
 						sessionManager: { getCwd: () => cwd },
 						effectiveExtensionRoots: { explicit: [], mode: "merge", configured: [], configuredLevel: "user" },
@@ -1161,6 +1169,7 @@ describe("persisted subagent revival", () => {
 		const target = perCallModelFixture("mentioned");
 		const modelRegistry = stubRegistry([target]);
 		const mentions = new ModelMentionRegistry({
+			agentDir: cwd,
 			sessionManager: SessionManager.inMemory(cwd),
 			modelRegistry,
 			scopedModels: () => [target],
@@ -1217,8 +1226,10 @@ describe("persisted subagent revival", () => {
 				perCallThinkingLevel: Effort.Low,
 			});
 			const ref = { ...createRef(sessionFile), parentId: parent };
+			const settings = Settings.isolated();
 			const factory = createPersistedSubagentReviverFactory({
 				session: {
+					settings,
 					sessionManager: { getCwd: () => cwd, getArtifactManager: () => undefined },
 					effectiveExtensionRoots: { explicit: [], mode: "merge", configured: [], configuredLevel: "user" },
 					getSessionAgents: () => [],
@@ -1226,7 +1237,7 @@ describe("persisted subagent revival", () => {
 				} as unknown as AgentSession,
 				authStorage: {} as never,
 				modelRegistry: stubRegistry([parentModel, rootModel]),
-				settings: Settings.isolated(),
+				settings,
 				enableLsp: true,
 			});
 			const reviver = await factory(ref);
@@ -1243,6 +1254,7 @@ describe("persisted subagent revival", () => {
 			kind: "sub",
 			parentId: "Main",
 			session: {
+				settings: Settings.isolated(),
 				model: parentModel,
 				sessionManager: { getCwd: () => "/tmp" },
 				effectiveExtensionRoots: { explicit: [], mode: "merge", configured: [], configuredLevel: "user" },
@@ -2147,11 +2159,18 @@ describe("cold revival replays the system prompt the last request sent", () => {
 		expect(warm.toolRequests.at(-1)).toBe(spawned.toolRequests.at(-1)!);
 	});
 
-	/** The executor's own subagent prompt over a default block listing the active tools. */
+	/** The executor's own subagent prompt over a default block listing the active tools, composed as the SDK does. */
 	function subagentPrompt(toolNames: string[], options?: CreateAgentSessionOptions): string[] {
+		const transform = options?.systemPromptTransform;
+		if (!transform) throw new Error("Expected a subagent system prompt transform");
+		const transformed = transform({
+			systemPrompt: [`default: ${toolNames.join(",")}`],
+			dynamicParts: [],
+		}).systemPrompt;
 		const build = options?.systemPrompt;
+		if (build === undefined) return transformed;
 		if (typeof build !== "function") throw new Error("Expected a system prompt builder");
-		return [build([`default: ${toolNames.join(",")}`])].flat();
+		return [build(transformed)].flat();
 	}
 
 	function registerPeer(): void {
@@ -2192,8 +2211,13 @@ describe("cold revival replays the system prompt the last request sent", () => {
 
 	it("warm-revives with the system prompt it was sent with after a peer joins, and keeps it on rebuild", async () => {
 		const cwd = makeTempDir("@pi-revive-warm-roster-");
+		// Operator templates own empty-roster wording; pin this case to a selected wrapper with explicit IRC branches.
+		await Bun.write(
+			path.join(cwd, ".omp", "SUBAGENT-SYSTEM.template.md"),
+			"{{#if ircSelfId}}ROSTER:{{#each ircPeers}}{{id}};{{else}}EMPTY{{/each}}{{else}}IRC:DISABLED{{/if}}",
+		);
 		const spawned = await spawn(cwd, subagentPrompt, spawnResponses());
-		expect(spawned.requests.at(-1)!.join("\n")).toContain("(no other agents)");
+		expect(spawned.requests.at(-1)!.join("\n")).toContain("ROSTER:EMPTY");
 		const { live, warm } = await parkAndRevive(registerPeer);
 		expect(warm.requests[0]).toEqual(spawned.requests.at(-1)!);
 		// A rebuild after the revive keeps the roster too: a live one would rewrite the cached conversation.

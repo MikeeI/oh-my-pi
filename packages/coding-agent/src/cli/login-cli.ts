@@ -8,7 +8,8 @@
  */
 import * as readline from "node:readline";
 import { getOAuthProviders } from "@oh-my-pi/pi-ai";
-import { APP_NAME, getAgentDbPath, getProjectDir } from "@oh-my-pi/pi-utils";
+import { getAgentDbPath, getProjectDir } from "@oh-my-pi/pi-utils";
+import { APP_DISPLAY_NAME as APP_NAME } from "../app-version";
 import chalk from "@oh-my-pi/pi-utils/chalk";
 import { ModelRegistry } from "../config/model-registry";
 import { Settings } from "../config/settings";

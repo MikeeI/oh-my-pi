@@ -37,7 +37,7 @@ describe("omp stats --summary", () => {
 		tempDir.removeSync();
 	});
 
-	it("prints unpriced subscription usage as N/A, not a zero-dollar charge", async () => {
+	it("preserves rolling totals, unpriced costs, and folder ranking beyond the dashboard cap", async () => {
 		const dir = path.join(getSessionsDir(), "--tmp--summary--");
 		await fs.mkdir(dir, { recursive: true });
 		const timestamp = Date.now() - 60_000;
@@ -63,23 +63,75 @@ describe("omp stats --summary", () => {
 				},
 			},
 		};
-		await Bun.write(path.join(dir, "session.jsonl"), `${JSON.stringify(entry)}\n`);
+		// Distinct rolling windows exercise the totals-only loader through real ingestion.
+		const records = [
+			entry,
+			...[3, 14].map(days => {
+				const olderTimestamp = timestamp - days * 24 * 60 * 60 * 1000;
+				return {
+					...entry,
+					id: `older-${days}`,
+					timestamp: new Date(olderTimestamp).toISOString(),
+					message: { ...entry.message, timestamp: olderTimestamp },
+				};
+			}),
+		];
+		await Bun.write(path.join(dir, "session.jsonl"), `${records.map(record => JSON.stringify(record)).join("\n")}\n`);
 
-		const lines: string[] = [];
-		const log = spyOn(console, "log").mockImplementation((...args: unknown[]) => {
-			lines.push(args.map(String).join(" "));
-		});
-		const stderr = spyOn(process.stderr, "write").mockImplementation(() => true);
-		try {
-			await runStatsCommand({ port: 0, host: "127.0.0.1", json: false, summary: true });
-		} finally {
-			log.mockRestore();
-			stderr.mockRestore();
+		async function summaryOutput(): Promise<string> {
+			const lines: string[] = [];
+			const log = spyOn(console, "log").mockImplementation((...args: unknown[]) => {
+				lines.push(args.map(String).join(" "));
+			});
+			const stderr = spyOn(process.stderr, "write").mockImplementation(() => true);
+			try {
+				await runStatsCommand({ port: 0, host: "127.0.0.1", json: false, summary: true });
+			} finally {
+				log.mockRestore();
+				stderr.mockRestore();
+			}
+			return Bun.stripANSI(lines.join("\n"));
 		}
+		const output = await summaryOutput();
+		const ranges = output.split("DETAILS (rolling 24h)")[0];
+		expect(ranges).toMatch(/24h\n\s+Requests\s+1[\s\S]*7d\n\s+Requests\s+2[\s\S]*30d\n\s+Requests\s+3/);
+		expect(output).toMatch(/\bCost\s+N\/A/);
+		expect(output).toMatch(/\bUnpriced requests\s+1/);
+		expect(output).not.toContain("$0.0000");
+		expect(output).toContain("xai-oauth/test-supergrok-without-reference-price");
+		expect(output).toContain("/tmp/summary/");
 
-		const output = Bun.stripANSI(lines.join("\n"));
-		expect(output).toContain("API-equivalent estimate: N/A");
-		expect(output).toContain("test-supergrok-without-reference-price: 1 reqs, N/A,");
-		expect(output).toContain("/tmp/summary/: 1 reqs, N/A");
-	});
+		// More requests put these low-token folders ahead of the dominant folder
+		// in the dashboard's capped SQL result, not in the summary's token ranking.
+		await Promise.all(
+			Array.from({ length: 2_000 }, async (_, index) => {
+				const folder = path.join(getSessionsDir(), `--tmp--busy-${String(index).padStart(4, "0")}--`);
+				const records = [0, 1].map(slot => ({
+					...entry,
+					id: `busy-${index}-${slot}`,
+					message: { ...entry.message, provider: "summary-ranking-fixture" },
+				}));
+				await Bun.write(
+					path.join(folder, "session.jsonl"),
+					`${records.map(record => JSON.stringify(record)).join("\n")}\n`,
+				);
+			}),
+		);
+		const dominant = {
+			...entry,
+			id: "dominant-folder",
+			message: {
+				...entry.message,
+				provider: "summary-ranking-fixture",
+				usage: { ...entry.message.usage, input: 1_000_000, totalTokens: 1_000_020 },
+			},
+		};
+		await Bun.write(
+			path.join(getSessionsDir(), "--tmp--dominant-summary--", "session.jsonl"),
+			`${JSON.stringify(dominant)}\n`,
+		);
+		const ranked = await summaryOutput();
+		expect(ranked).toContain("1. /tmp/dominant-summary/");
+		expect(ranked).toContain("1997 more folders;");
+	}, 30_000);
 });

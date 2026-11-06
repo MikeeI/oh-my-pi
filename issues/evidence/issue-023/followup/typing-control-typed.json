@@ -1,0 +1,49 @@
+{
+  "name": "typing-control",
+  "stage": "typed",
+  "live": "╭─── Edit: 🗒 diagnostic.txt ──────────────────────────────────────────────────╮\n│  +1│TICK-19-0                                                               │\n│  +2│TICK-19-1                                                               │\n│⣯                                                                            │\n╰─────────────────────────────────────────────────────────────────────────────╯\n╭──AUDIT-STATUS───────────────────────────────────────────────────────────────╮\n│  INPUT-ONCE-alpha beta gamma delta epsilon zeta eta theta iota kappa        │\n╰─ lambda mu nu xi omicron pi rho sigma END-ONCE                             ─╯\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n",
+  "full": "╭─── Edit: 🗒 diagnostic.txt ──────────────────────────────────────────────────╮\n│  +1│TICK-19-0                                                               │\n│  +2│TICK-19-1                                                               │\n│⣯                                                                            │\n╰─────────────────────────────────────────────────────────────────────────────╯\n╭──AUDIT-STATUS───────────────────────────────────────────────────────────────╮\n│  INPUT-ONCE-alpha beta gamma delta epsilon zeta eta theta iota kappa        │\n╰─ lambda mu nu xi omicron pi rho sigma END-ONCE                             ─╯\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n",
+  "historySize": 0,
+  "history": "",
+  "paint": {
+    "t": 1790719661574,
+    "kind": "paint",
+    "stage": "typed",
+    "paint": 27,
+    "history": [],
+    "viewport": [
+      "╭─── Edit: 🗒 diagnostic.txt ──────────────────────────────────────────────────╮",
+      "│  +1│TICK-19-0                                                               │",
+      "│  +2│TICK-19-1                                                               │",
+      "│⣯                                                                            │",
+      "╰─────────────────────────────────────────────────────────────────────────────╯",
+      "╭──AUDIT-STATUS───────────────────────────────────────────────────────────────╮",
+      "│  INPUT-ONCE-alpha beta gamma delta epsilon zeta eta theta iota kappa        │",
+      "╰─ lambda mu nu xi omicron pi rho sigma END-ONCE                             ─╯"
+    ],
+    "reset": false,
+    "alt": false,
+    "columns": 79,
+    "rows": 39,
+    "draft": "INPUT-ONCE-alpha beta gamma delta epsilon zeta eta theta iota kappa lambda mu nu xi omicron pi rho sigma END-ONCE",
+    "debug": {
+      "lines": [
+        "\u001b[48;2;29;33;41m\u001b[38;2;61;66;74m╭───\u001b[39m \u001b[38;2;254;188;56mEdit\u001b[39m: \u001b[38;2;119;125;136m\u001b[38;2;119;125;136m🗒\u001b[39m \u001b[38;2;254;188;56mdiagnostic.txt\u001b[39m\u001b[39m \u001b[38;2;61;66;74m──────────────────────────────────────────────────\u001b[39m\u001b[38;2;61;66;74m╮\u001b[39m\u001b[49m",
+        "\u001b[48;2;29;33;41m\u001b[38;2;61;66;74m│\u001b[39m\u001b[38;2;137;210;129m  +1│TICK-19-0\u001b[39m                                                               \u001b[38;2;61;66;74m│\u001b[39m\u001b[49m",
+        "\u001b[48;2;29;33;41m\u001b[38;2;61;66;74m│\u001b[39m\u001b[38;2;137;210;129m  +2│TICK-19-1\u001b[39m                                                               \u001b[38;2;61;66;74m│\u001b[39m\u001b[49m",
+        "\u001b[48;2;29;33;41m\u001b[38;2;61;66;74m│\u001b[39m⣯                                                                            \u001b[38;2;61;66;74m│\u001b[39m\u001b[49m",
+        "\u001b[48;2;29;33;41m\u001b[38;2;61;66;74m╰───\u001b[39m\u001b[38;2;61;66;74m──────────────────────────────────────────────────────────────────────────\u001b[39m\u001b[38;2;61;66;74m╯\u001b[39m\u001b[49m",
+        "\u001b[38;2;61;66;74m╭──\u001b[39mAUDIT-STATUS\u001b[38;2;61;66;74m─────────────────────────────────────────────────────────────\u001b[39m\u001b[38;2;61;66;74m──╮\u001b[39m",
+        "\u001b[38;2;61;66;74m│  \u001b[39m\u001b[38;2;229;229;231mINPUT-ONCE-alpha beta gamma delta epsilon zeta eta theta iota kappa\u001b[39m      \u001b[38;2;61;66;74m  │\u001b[39m",
+        "\u001b[38;2;61;66;74m╰─ \u001b[39m\u001b[38;2;229;229;231mlambda mu nu xi omicron pi rho sigma END-ONCE\u001b[39m                            \u001b[38;2;61;66;74m ─╯\u001b[39m"
+      ],
+      "windowTop": 0,
+      "altScreen": false,
+      "cursor": {
+        "x": 48,
+        "y": 7,
+        "visible": true
+      }
+    }
+  }
+}

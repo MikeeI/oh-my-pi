@@ -201,6 +201,7 @@ const cacheableMarkdownThemes = new WeakMap<
 const linkTargetSnapshots = new WeakMap<ReadonlyMap<string, string>, ReadonlyMap<string, string>>();
 let markdownMermaidRendering = true;
 let markdownColorful = true;
+let markdownTextColors: boolean | undefined;
 
 function ownFields(object: object): ReadonlyArray<readonly [PropertyKey, unknown]> {
 	return Reflect.ownKeys(object).map(key => [key, Object.getOwnPropertyDescriptor(object, key)?.value]);
@@ -293,6 +294,11 @@ const colorfulMarkdownRoles = {
 	emphasis: (text: string) => theme.ansiFg("magenta", theme.italic(text)),
 	tableHeader: (text: string) => theme.ansiFg("yellow", theme.bold(text)),
 } satisfies Partial<MarkdownTheme>;
+export function setMarkdownTextColors(enabled: boolean): void {
+	if (markdownTextColors === enabled) return;
+	markdownTextColors = enabled;
+	cachedMarkdownTheme = undefined;
+}
 
 export function getMarkdownTheme(): MarkdownTheme {
 	ensureThemeSync();
@@ -317,6 +323,7 @@ export function getMarkdownTheme(): MarkdownTheme {
 			})()
 		: undefined;
 	const markdownTheme: MarkdownTheme = {
+		textColors: markdownTextColors,
 		heading: (text: string) => theme.fg("mdHeading", text),
 		code: (text: string) => theme.fg("mdCode", text),
 		...(markdownColorful ? colorfulMarkdownRoles : {}),

@@ -112,6 +112,17 @@ describe("session title source persistence", () => {
 		await session.close();
 	});
 
+	it("adds the AUTO marker only to generated blank manual renames", async () => {
+		const session = SessionManager.inMemory(cwd);
+
+		await session.setSessionName("Generated title", "auto", "rename");
+		expect(session.getSessionName()).toBe("AUTO: Generated title");
+		expect(session.titleSource).toBe("auto");
+
+		await session.setSessionName("Refreshed title", "auto", "replan");
+		expect(session.getSessionName()).toBe("Refreshed title");
+	});
+
 	it("loads legacy slotless files with header titles", async () => {
 		const sessionDir = SessionManager.getDefaultSessionDir(cwd);
 		fs.mkdirSync(sessionDir, { recursive: true });

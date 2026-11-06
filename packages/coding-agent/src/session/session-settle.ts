@@ -8,7 +8,7 @@ import type { AgentSession } from "./agent-session";
 /** Session surface the settle predicate reads. */
 export type SessionSettleState = Pick<
 	AgentSession,
-	"isStreaming" | "hasAdmittedSubmission" | "queuedMessageCount" | "hasPendingAsyncWork"
+	"isStreaming" | "isRunningRoutine" | "hasAdmittedSubmission" | "queuedMessageCount" | "hasPendingAsyncWork"
 >;
 
 /** {@link SessionSettleState} plus the owner-scoped background drain. */
@@ -22,6 +22,7 @@ export type SessionSettleHost = SessionSettleState & Pick<AgentSession, "settleA
 export function isSessionSettled(session: SessionSettleState, scheduledTurn?: () => boolean): boolean {
 	return (
 		!session.isStreaming &&
+		!session.isRunningRoutine &&
 		!session.hasAdmittedSubmission &&
 		session.queuedMessageCount === 0 &&
 		!session.hasPendingAsyncWork() &&
@@ -41,7 +42,13 @@ export async function waitForSessionSettlement(
 	options: { isCurrent: () => boolean; scheduledTurn?: () => boolean },
 ): Promise<boolean> {
 	const { isCurrent, scheduledTurn } = options;
-	while (isCurrent() && !session.isStreaming && !session.hasAdmittedSubmission && session.hasPendingAsyncWork()) {
+	while (
+		isCurrent() &&
+		!session.isStreaming &&
+		!session.isRunningRoutine &&
+		!session.hasAdmittedSubmission &&
+		session.hasPendingAsyncWork()
+	) {
 		await session.settleAsyncWork();
 	}
 	return isCurrent() && isSessionSettled(session, scheduledTurn);

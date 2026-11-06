@@ -15,6 +15,7 @@ import {
 } from "../collab/registry";
 import { sanitizeDisplayLine } from "@oh-my-pi/pi-tui/overlays/extensions/display-text";
 import { shortenPath } from "@oh-my-pi/pi-tui/render/render-utils";
+import { APP_DISPLAY_NAME } from "../app-version";
 
 export interface CollabListCommandArgs {
 	/** Emit deterministic machine-readable JSON. */
@@ -83,7 +84,7 @@ export async function runCollabListCommand(
 		print(`${host.instanceId}  ${session}  ${chalk.dim(cwd)}`);
 		print(`  ${chalk.dim(details.join(" · "))}`);
 	}
-	print(chalk.dim("Get a link: omp collab link <instanceId|pid> [--view]"));
+	print(chalk.dim(`Get a link: ${APP_DISPLAY_NAME} collab link <instanceId|pid> [--view]`));
 }
 
 export async function runCollabLinkCommand(

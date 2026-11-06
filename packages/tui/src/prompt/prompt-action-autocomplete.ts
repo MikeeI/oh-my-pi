@@ -140,27 +140,45 @@ export class PromptActionAutocompleteProvider implements AutocompleteProvider {
 	): Promise<{ items: AutocompleteItem[]; prefix: string } | null> {
 		if (signal?.aborted) return null;
 		const textBeforeCursor = (lines[cursorLine] || "").slice(0, cursorCol);
+		let baseProviderChecked = false;
 		if (!this.#outranksModelMention(lines, cursorLine, textBeforeCursor)) {
 			const modelMention = getModelMentionSuggestions(textBeforeCursor, this.#modelMentions);
 			if (modelMention.kind === "matched") return modelMention.suggestions;
 		}
-		if (this.#isInSlashCommandArguments(lines, cursorLine, textBeforeCursor)) {
-			const argumentSuggestions = await this.#baseProvider.getSuggestions(
-				lines,
-				cursorLine,
-				cursorCol,
-				signal,
-				onPartial,
-			);
-			if (argumentSuggestions) return argumentSuggestions;
-			const modelMention = getModelMentionSuggestions(textBeforeCursor, this.#modelMentions);
-			if (modelMention.kind === "matched") return modelMention.suggestions;
-			// No slash-argument completion for this input: preserve numeric
-			// GitHub references and internal URLs while keeping prompt-action
-			// tokens such as `#copy` literal.
-			const githubRefSuggestions = getGithubRefSuggestions(textBeforeCursor);
-			if (githubRefSuggestions) return githubRefSuggestions;
-			return getInternalUrlSuggestions(textBeforeCursor, undefined, signal, this.#internalUrlCaller);
+		const leadingSlashStart = findLeadingSlashCommandStart(textBeforeCursor);
+		const hasPromptTextBeforeCursorLine = lines.slice(0, cursorLine).some(line => (line || "").trim() !== "");
+		const commandText =
+			leadingSlashStart !== null && !hasPromptTextBeforeCursorLine
+				? textBeforeCursor.slice(leadingSlashStart)
+				: null;
+		const spaceIndex = commandText?.indexOf(" ") ?? -1;
+		if (commandText !== null && spaceIndex !== -1) {
+			const commandName = commandText.slice(1, spaceIndex);
+			const command = this.#commands.find(cmd => cmd.name === commandName || cmd.aliases?.includes(commandName));
+			if (command && (!("allowArgs" in command) || command.allowArgs !== false)) {
+				baseProviderChecked = true;
+				const argumentSuggestions = await this.#baseProvider.getSuggestions(
+					lines,
+					cursorLine,
+					cursorCol,
+					signal,
+					onPartial,
+				);
+				if (argumentSuggestions) return argumentSuggestions;
+				if (command.argumentCompletionMode === "exclusive") return null;
+				const modelMention = getModelMentionSuggestions(textBeforeCursor, this.#modelMentions);
+				if (modelMention.kind === "matched") return modelMention.suggestions;
+				// Command-specific results win; non-exclusive arguments retain ordinary prompt completion.
+				const githubRefSuggestions = getGithubRefSuggestions(textBeforeCursor);
+				if (githubRefSuggestions) return githubRefSuggestions;
+				const internalUrlSuggestions = await getInternalUrlSuggestions(
+					textBeforeCursor,
+					undefined,
+					signal,
+					this.#internalUrlCaller,
+				);
+				if (internalUrlSuggestions) return internalUrlSuggestions;
+			}
 		}
 
 		const githubRefSuggestions = getGithubRefSuggestions(textBeforeCursor);
@@ -202,7 +220,9 @@ export class PromptActionAutocompleteProvider implements AutocompleteProvider {
 			if (emojiSuggestions) return emojiSuggestions;
 		}
 
-		return this.#baseProvider.getSuggestions(lines, cursorLine, cursorCol, signal, onPartial);
+		return baseProviderChecked
+			? null
+			: this.#baseProvider.getSuggestions(lines, cursorLine, cursorCol, signal, onPartial);
 	}
 
 	#isInSlashCommandArguments(lines: string[], cursorLine: number, textBeforeCursor: string): boolean {

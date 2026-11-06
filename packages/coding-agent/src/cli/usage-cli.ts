@@ -64,6 +64,7 @@ import {
 } from "../slash-commands/helpers/usage-accounts";
 
 import { cfgRetryUsageReservePct } from "../session/settings";
+import { APP_DISPLAY_NAME } from "../app-version";
 
 const BAR_WIDTH = 28;
 
@@ -768,9 +769,9 @@ function formatExpiringResets(warning: ResetExpiryWarning, nowMs: number): strin
 function formatResetSpendVerdict(verdict: ResetSpendVerdict): string {
 	const outcome =
 		verdict.kind === "auto"
-			? "an open interactive omp session spends it by its last 5 min if eligible then"
+			? `an open interactive ${APP_DISPLAY_NAME} session spends it by its last 5 min if eligible then`
 			: verdict.kind === "ask"
-				? "an open interactive omp session asks before spending it"
+				? `an open interactive ${APP_DISPLAY_NAME} session asks before spending it`
 				: "not spent automatically";
 	return `→ ${outcome}  (${verdict.setting}: ${verdict.mode})${verdict.eligibleNow ? "" : " · not eligible now"}`;
 }
@@ -1304,7 +1305,7 @@ function formatOAuthIdentityKeys(rows: readonly OAuthIdentityKeyRow[]): string {
 	return lines.join("\n");
 }
 
-const RESET_COMMAND = "omp usage reset";
+const RESET_COMMAND = `${APP_DISPLAY_NAME} usage reset`;
 
 function failUsageReset(message: string): void {
 	process.stderr.write(chalk.red(`${message}\n`));
@@ -1496,7 +1497,7 @@ async function runUsageResetCommand(
 		const ago = formatDuration(Date.now() - result.atMs);
 		failUsageReset(
 			result.state === "reset"
-				? `${who}: another omp process spent a saved reset on this account ${ago} ago, so this one was not spent. Check \`omp usage\` before spending another.`
+				? `${who}: another omp process spent a saved reset on this account ${ago} ago, so this one was not spent. Check \`${APP_DISPLAY_NAME} usage\` before spending another.`
 				: `${who}: another omp process started spending a saved reset on this account ${ago} ago, so nothing was spent. Try again in a minute.`,
 		);
 		return;
@@ -1541,7 +1542,7 @@ export async function runUsageCommand(cmd: UsageCommandArgs): Promise<void> {
 			if (cmd.redact) {
 				process.stderr.write(
 					chalk.red(
-						"`omp usage accounts` prints identity keys verbatim for configuration; --redact does not apply.\n",
+						`\`${APP_DISPLAY_NAME} usage accounts\` prints identity keys verbatim for configuration; --redact does not apply.\n`,
 					),
 				);
 				process.exitCode = 1;
@@ -1628,7 +1629,7 @@ export async function runUsageCommand(cmd: UsageCommandArgs): Promise<void> {
 				const scope = cmd.provider ? ` for provider "${cmd.provider}"` : "";
 				process.stderr.write(
 					chalk.yellow(
-						`No usage history recorded${scope} yet. Snapshots accumulate whenever usage is fetched (TUI footer, /usage, omp usage).\n`,
+						`No usage history recorded${scope} yet. Snapshots accumulate whenever usage is fetched (TUI footer, /usage, ${APP_DISPLAY_NAME} usage).\n`,
 					),
 				);
 				process.exitCode = 1;

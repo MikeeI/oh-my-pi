@@ -21,6 +21,7 @@ import {
 import { getAgentDbPath, isEnoent, isRecord } from "@oh-my-pi/pi-utils";
 import chalk from "@oh-my-pi/pi-utils/chalk";
 import { Args, CliUsageError, Command } from "@oh-my-pi/pi-utils/cli";
+import { APP_DISPLAY_NAME } from "../app-version";
 import { authHelp as commandHelp } from "../cli/command-help";
 import { resolveAuthBrokerConfig } from "../session/auth-broker-config";
 
@@ -104,10 +105,11 @@ export function parseAuthExport(text: string, source = "credential file"): AuthE
 	} catch {
 		throw new AuthTransferError(`${source} is not valid JSON.`);
 	}
-	if (!isRecord(value)) throw new AuthTransferError(`${source} is not an \`omp auth export\` document.`);
+	if (!isRecord(value))
+		throw new AuthTransferError(`${source} is not an \`${APP_DISPLAY_NAME} auth export\` document.`);
 	if (value.version !== AUTH_EXPORT_VERSION) {
 		throw new AuthTransferError(
-			`${source} has export version ${JSON.stringify(value.version)}; this omp reads version ${AUTH_EXPORT_VERSION}.`,
+			`${source} has export version ${JSON.stringify(value.version)}; this ${APP_DISPLAY_NAME} reads version ${AUTH_EXPORT_VERSION}.`,
 		);
 	}
 	if (!Array.isArray(value.credentials)) throw new AuthTransferError(`${source} has no credentials array.`);
@@ -174,35 +176,35 @@ export default class Auth extends Command {
 			options: ["export", "import"],
 		}),
 		file: Args.string({
-			description: "File written by `omp auth export`, or - for stdin (import)",
+			description: `File written by \`${APP_DISPLAY_NAME} auth export\`, or - for stdin (import)`,
 			required: false,
 		}),
 	};
 
 	static examples = [
-		"# Write every stored credential to a file (keep it secret)\n  omp auth export > credentials.json",
-		"# Merge them into this machine's credential store\n  omp auth import credentials.json",
-		"# Copy credentials to another machine over SSH\n  omp auth export | ssh host omp auth import -",
+		`# Write every stored credential to a file (keep it secret)\n  ${APP_DISPLAY_NAME} auth export > credentials.json`,
+		`# Merge them into this machine's credential store\n  ${APP_DISPLAY_NAME} auth import credentials.json`,
+		`# Copy credentials to another machine over SSH\n  ${APP_DISPLAY_NAME} auth export | ssh host ${APP_DISPLAY_NAME} auth import -`,
 	];
 
 	async run(): Promise<void> {
 		const { args, argv } = await this.parse(Auth);
 		const action = args.action;
 		if (action === "export" && argv.length > 1) {
-			throw new CliUsageError(`Unexpected argument "${argv[1]}". Usage: omp auth export`);
+			throw new CliUsageError(`Unexpected argument "${argv[1]}". Usage: ${APP_DISPLAY_NAME} auth export`);
 		}
 		if (action === "import" && !args.file) {
-			throw new CliUsageError("Missing credential file. Usage: omp auth import <file|->");
+			throw new CliUsageError(`Missing credential file. Usage: ${APP_DISPLAY_NAME} auth import <file|->`);
 		}
 		if (action === "import" && argv.length > 2) {
-			throw new CliUsageError(`Unexpected argument "${argv[2]}". Usage: omp auth import <file|->`);
+			throw new CliUsageError(`Unexpected argument "${argv[2]}". Usage: ${APP_DISPLAY_NAME} auth import <file|->`);
 		}
 
 		const broker = await resolveAuthBrokerConfig();
 		if (broker) {
 			process.stderr.write(
-				`${chalk.red(`error: omp uses the auth broker at ${broker.url}; credentials live there, not in this machine's agent.db.`)}\n` +
-					"Run this on the broker host, or disable the broker (`omp config reset auth.broker.url`) first.\n",
+				`${chalk.red(`error: ${APP_DISPLAY_NAME} uses the auth broker at ${broker.url}; credentials live there, not in this machine's agent.db.`)}\n` +
+					`Run this on the broker host, or disable the broker (\`${APP_DISPLAY_NAME} config reset auth.broker.url\`) first.\n`,
 			);
 			process.exitCode = 1;
 			return;

@@ -14,6 +14,7 @@
  *   whole window every call.
  */
 import { VERSION } from "@oh-my-pi/pi-utils/dirs";
+import { APP_DISPLAY_NAME } from "../../../app-version";
 import { throwIfAborted } from "../../tool-errors";
 import { probeCdpResponse } from "../attach";
 import type { RelayUnavailableInfo } from "./server";
@@ -146,7 +147,7 @@ export async function waitForRelayExtension(cdpUrl: string, signal?: AbortSignal
 }
 
 /** The steps that replace an out-of-date relay extension. */
-export const UPDATE_RELAY_EXTENSION = "Run `omp browser-relay install` and reload the extension in Chrome.";
+export const UPDATE_RELAY_EXTENSION = `Run \`${APP_DISPLAY_NAME} browser-relay install\` and reload the extension in Chrome.`;
 
 /**
  * Notice for an open through a ready relay where a connected extension was

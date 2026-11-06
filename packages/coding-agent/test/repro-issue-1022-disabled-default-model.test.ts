@@ -70,7 +70,7 @@ describe("issue #1022 — path-scoped enabledModels respected by default fallbac
 		const modelRegistry = new ModelRegistry(authStorage, path.join(testDir, "models.yml"));
 
 		try {
-			const { session, modelFallbackMessage } = await createAgentSession({
+			const startup = createAgentSession({
 				cwd,
 				agentDir,
 				authStorage,
@@ -88,16 +88,16 @@ describe("issue #1022 — path-scoped enabledModels respected by default fallbac
 			});
 
 			try {
-				// Bug: omp falls back to anthropic Haiku here, ignoring the
-				// path-scoped enabledModels allow-list.
-				expect(session.model?.provider).not.toBe("anthropic");
-				expect(session.model?.provider).not.toBe("github-copilot");
-				// No openai-codex creds set → nothing in the allow-list is
-				// usable. Expect no model and a fallback message.
-				expect(session.model).toBeUndefined();
-				expect(modelFallbackMessage).toBeDefined();
+				// A disabled configured default cannot escape the path-scoped
+				// allow-list by selecting Anthropic or Copilot from stored credentials.
+				await expect(startup).rejects.toThrow(
+					'Configured default model "github-copilot/gpt-5.5" could not be resolved after discovery',
+				);
 			} finally {
-				await session.dispose();
+				await startup.then(
+					result => result.session.dispose(),
+					() => undefined,
+				);
 			}
 		} finally {
 			authStorage.close();

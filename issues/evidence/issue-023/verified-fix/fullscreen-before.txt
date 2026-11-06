@@ -1,0 +1,23 @@
+bun test v1.4.2 (744846f84)
+
+packages/tui/test/resize-multiplexer-anchor.test.ts:
+188 | 		terminal.sendInput("\x1b[12;19R");
+189 | 		expect(terminal.getScrollBuffer().join("\n")).toContain("accepted-retained");
+190 | 		expect(terminal.getViewport()[11], JSON.stringify({
+191 | 			grid: terminal.getViewport(),
+192 | 			probes: writes.filter(write => write.includes("\x1b[6n")),
+193 | 		})).toBe("live-0");
+            ^
+error: {"grid":["live-6","live-7","live-0","live-0","live-1","live-2","live-3","live-4","live-5","live-6","live-7","","","","","","","","","","","","","","",""],"probes":["\u001b[17G\u001b[6n\u001b[1G","\u001b[18G\u001b[6n\u001b[1G","\u001b[19G\u001b[6n\u001b[1G"]}
+
+Expected: "live-0"
+Received: ""
+
+      at <anonymous> (/root/projects/project-oh-my-pi-fork/packages/tui/test/resize-multiplexer-anchor.test.ts:193:7)
+(fail) resize anchoring inside a terminal multiplexer > rejects pre-fullscreen cursor replies after covered resize epochs [15.18ms]
+
+ 0 pass
+ 27 filtered out
+ 1 fail
+ 3 expect() calls
+Ran 1 test across 1 file. [99.00ms]

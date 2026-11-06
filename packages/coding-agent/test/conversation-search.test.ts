@@ -1,0 +1,531 @@
+import { describe, expect, it, vi } from "bun:test";
+import { validateAgentToolArguments } from "@oh-my-pi/pi-agent-core";
+import * as fs from "node:fs/promises";
+import { Settings } from "@oh-my-pi/pi-coding-agent/config/settings";
+import { CURRENT_SESSION_VERSION } from "@oh-my-pi/pi-coding-agent/session/session-entries";
+import {
+	listSessionsModifiedSince,
+	type SessionDiscoveryFailure,
+} from "@oh-my-pi/pi-coding-agent/session/session-listing";
+import { ConversationSearchTool, createTools, type ToolSession } from "@oh-my-pi/pi-coding-agent/tools";
+import { isRecord, TempDir } from "@oh-my-pi/pi-utils";
+
+interface FixtureMessage {
+	role: string;
+	content: unknown;
+	timestamp: number;
+	synthetic?: boolean;
+	attribution?: string;
+	commandInvocation?: string;
+}
+
+async function writeSession(
+	file: string,
+	id: string,
+	cwd: string,
+	title: string,
+	messages: FixtureMessage[],
+	modifiedMs: number,
+): Promise<void> {
+	const records: Record<string, unknown>[] = [
+		{
+			type: "session",
+			version: CURRENT_SESSION_VERSION,
+			id,
+			title,
+			timestamp: new Date(messages[0]?.timestamp ?? modifiedMs).toISOString(),
+			cwd,
+		},
+	];
+	let parentId: string | null = null;
+	for (let index = 0; index < messages.length; index++) {
+		const message = messages[index];
+		const entryId = `${id}-${index}`;
+		records.push({
+			type: "message",
+			id: entryId,
+			parentId,
+			timestamp: new Date(message.timestamp).toISOString(),
+			message,
+		});
+		parentId = entryId;
+	}
+	await Bun.write(file, `${records.map(record => JSON.stringify(record)).join("\n")}\n`);
+	const modified = new Date(modifiedMs);
+	await fs.utimes(file, modified, modified);
+}
+
+function makeToolSession(cwd: string, activeSessionFile: string, taskDepth = 0): ToolSession {
+	return {
+		cwd,
+		hasUI: false,
+		getSessionFile: () => activeSessionFile,
+		getSessionSpawns: () => null,
+		settings: Settings.isolated(),
+		taskDepth,
+	};
+}
+
+describe("conversation_search", () => {
+	it("searches the last 10 days of visible user and assistant text without model-derived noise", async () => {
+		using tempDir = TempDir.createSync("@omp-conversation-search-");
+		const cwd = tempDir.path();
+		const sessionDir = tempDir.join("sessions");
+		const now = Date.now();
+		const recentFile = `${sessionDir}/recent.jsonl`;
+		const oldFile = `${sessionDir}/old.jsonl`;
+		const activeFile = `${sessionDir}/active.jsonl`;
+		await Promise.all([
+			writeSession(
+				recentFile,
+				"recent-session",
+				cwd,
+				"Visible result",
+				[
+					{ role: "user", content: "Needle alpha from the user", timestamp: now - 2 * 86_400_000 },
+					{
+						role: "assistant",
+						content: [
+							{ type: "text", text: "The Assistant kept the beta needle answer." },
+							{ type: "toolCall", id: "call-1", name: "read", arguments: {} },
+						],
+						timestamp: now - 86_400_000,
+					},
+					{
+						role: "toolResult",
+						content: [{ type: "text", text: "needle only in tool output" }],
+						timestamp: now - 80_000_000,
+					},
+					{
+						role: "assistant",
+						content: [{ type: "thinking", thinking: "needle only in thinking" }],
+						timestamp: now - 70_000_000,
+					},
+					{
+						role: "user",
+						content: "needle only in a hidden synthetic input",
+						timestamp: now - 60_000_000,
+						synthetic: true,
+					},
+					{
+						role: "developer",
+						content: "needle only in a developer directive",
+						timestamp: now - 50_000_000,
+					},
+				],
+				now - 40_000_000,
+			),
+			writeSession(
+				oldFile,
+				"old-session",
+				cwd,
+				"Old result",
+				[{ role: "user", content: "needle older than the default window", timestamp: now - 11 * 86_400_000 }],
+				now - 30_000_000,
+			),
+			writeSession(
+				activeFile,
+				"active-session",
+				cwd,
+				"Current conversation",
+				[{ role: "user", content: "needle from the active conversation", timestamp: now - 10_000 }],
+				now,
+			),
+		]);
+
+		const tool = new ConversationSearchTool(makeToolSession(cwd, activeFile));
+		const textResult = await tool.execute("text-search", { query: "needle" });
+		const text = textResult.content.find(part => part.type === "text")?.text ?? "";
+		expect(text).toContain("matches=2/2");
+		expect(text).toContain("Needle alpha from the user");
+		expect(text).toContain("beta needle answer");
+		expect(text).not.toContain("tool output");
+		expect(text).not.toContain("thinking");
+		expect(text).not.toContain("synthetic input");
+		expect(text).not.toContain("developer directive");
+		expect(text).not.toContain("older than the default window");
+		expect(text).not.toContain("active conversation");
+		expect(textResult.details).toMatchObject({
+			days: 10,
+			scope: "project",
+			role: "both",
+			match: "all",
+			format: "text",
+			complete: true,
+			candidateSessions: 2,
+			searchedSessions: 2,
+			matchedSessions: 1,
+			totalMatches: 2,
+			returnedMatches: 2,
+		});
+
+		const jsonResult = await tool.execute("json-search", {
+			query: "assistant needle",
+			role: "assistant",
+			format: "json",
+		});
+		const jsonText = jsonResult.content.find(part => part.type === "text")?.text ?? "";
+		const parsed: unknown = JSON.parse(jsonText);
+		expect(parsed).toMatchObject({ total_matches: 1, matched_sessions: 1, complete: true });
+		if (!isRecord(parsed) || !Array.isArray(parsed.hits)) throw new Error("Expected JSON conversation hits.");
+		expect(parsed.hits).toHaveLength(1);
+		expect(parsed.hits[0]).toMatchObject({
+			session_id: "recent-session",
+			role: "assistant",
+		});
+	});
+
+	it("searches confirmed file-command invocations instead of their hidden expansions", async () => {
+		using tempDir = TempDir.createSync("@omp-conversation-command-");
+		const cwd = tempDir.path();
+		const now = Date.now();
+		const activeFile = tempDir.join("sessions", "active.jsonl");
+		await writeSession(activeFile, "active", cwd, "Active", [], now);
+		await writeSession(
+			tempDir.join("sessions", "command.jsonl"),
+			"command",
+			cwd,
+			"Command",
+			[
+				{
+					role: "user",
+					content: "hidden-expansion-token",
+					commandInvocation: "/review typed-argument",
+					timestamp: now,
+				},
+				{ role: "user", content: "/unknown literal-argument", timestamp: now + 1 },
+			],
+			now,
+		);
+		const tool = new ConversationSearchTool(makeToolSession(cwd, activeFile));
+		const invocation = await tool.execute("invocation", { query: "typed-argument" });
+		expect(invocation.details).toMatchObject({ totalMatches: 1 });
+		expect(invocation.content).toContainEqual(
+			expect.objectContaining({ text: expect.stringContaining("/review typed-argument") }),
+		);
+		const hidden = await tool.execute("hidden", { query: "hidden-expansion-token" });
+		expect(hidden.details).toMatchObject({ totalMatches: 0 });
+		const literal = await tool.execute("literal", { query: "/unknown literal-argument" });
+		expect(literal.details).toMatchObject({ totalMatches: 1 });
+	});
+
+	it("excludes active continuation copies without hiding divergent messages or changing limit prefixes", async () => {
+		using tempDir = TempDir.createSync("@omp-conversation-continuation-");
+		const cwd = tempDir.path();
+		const activeFile = tempDir.join("sessions/active.jsonl");
+		const now = Date.now();
+		const shared = {
+			type: "message",
+			id: "shared-entry",
+			parentId: null,
+			timestamp: new Date(now - 3_000).toISOString(),
+			message: { role: "user", content: "needle active copy", timestamp: now - 3_000 },
+		};
+		const parentOnly = {
+			...shared,
+			id: "parent-only",
+			parentId: shared.id,
+			timestamp: new Date(now - 2_000).toISOString(),
+			message: { role: "assistant", content: "needle original branch detail", timestamp: now - 2_000 },
+		};
+		const siblingOnly = {
+			...shared,
+			id: "sibling-only",
+			parentId: shared.id,
+			timestamp: new Date(now - 1_000).toISOString(),
+			message: { role: "assistant", content: "needle sibling branch detail", timestamp: now - 1_000 },
+		};
+		for (const fixture of [
+			{
+				file: tempDir.join("sessions/parent.jsonl"),
+				id: "parent",
+				continuationOf: undefined,
+				messages: [shared, parentOnly],
+			},
+			{ file: activeFile, id: "active", continuationOf: "parent", messages: [shared] },
+			{
+				file: tempDir.join("sessions/sibling.jsonl"),
+				id: "sibling",
+				continuationOf: "parent",
+				messages: [
+					{ ...shared, message: { ...shared.message, content: "needle changed on other branch" } },
+					siblingOnly,
+				],
+			},
+		]) {
+			await Bun.write(
+				fixture.file,
+				[
+					{
+						type: "session",
+						version: CURRENT_SESSION_VERSION,
+						id: fixture.id,
+						continuationOf: fixture.continuationOf,
+						cwd,
+						timestamp: new Date(now).toISOString(),
+					},
+					...fixture.messages,
+				]
+					.map(record => JSON.stringify(record))
+					.join("\n") + "\n",
+			);
+		}
+		const tool = new ConversationSearchTool(makeToolSession(cwd, activeFile));
+		const search = async (limit: number) => {
+			const result = await tool.execute(`continuation-${limit}`, { query: "needle", format: "json", limit });
+			const body: unknown = JSON.parse(result.content.find(part => part.type === "text")?.text ?? "");
+			if (!isRecord(body) || !Array.isArray(body.hits)) throw new Error("Expected conversation-search JSON hits.");
+			const hits: unknown[] = body.hits;
+			return { body, hits };
+		};
+		const large = await search(3);
+		expect(large.body).toMatchObject({ complete: true, total_matches: 3, matched_sessions: 2 });
+		expect(
+			large.hits
+				.map(hit => {
+					if (!isRecord(hit) || typeof hit.text !== "string") throw new Error("Expected a text hit.");
+					return hit.text;
+				})
+				.sort(),
+		).toEqual(["needle changed on other branch", "needle original branch detail", "needle sibling branch detail"]);
+		const small = await search(1);
+		expect(small.body.total_matches).toBe(3);
+		expect(small.hits).toEqual(large.hits.slice(0, 1));
+	});
+
+	it("preserves exact phrases and includes their match after length-changing Unicode lowercase", async () => {
+		using tempDir = TempDir.createSync("@omp-conversation-search-phrase-");
+		const cwd = tempDir.path();
+		const activeFile = tempDir.join("sessions/active.jsonl");
+		const now = Date.now();
+		await writeSession(
+			tempDir.join("sessions/phrase.jsonl"),
+			"phrase-session",
+			cwd,
+			"Exact phrase",
+			[
+				{
+					role: "user",
+					content: `${"İ".repeat(3_000)} Alpha  beta\ngamma ${"tail ".repeat(2_000)}`,
+					timestamp: now,
+				},
+			],
+			now,
+		);
+		const tool = new ConversationSearchTool(makeToolSession(cwd, activeFile));
+		const exact = await tool.execute("exact-phrase", {
+			query: " alpha  beta\ngamma ",
+			match: "phrase",
+			format: "json",
+		});
+		const text = exact.content.find(part => part.type === "text")?.text ?? "";
+		expect(JSON.parse(text)).toMatchObject({
+			query: "alpha  beta\ngamma",
+			complete: true,
+			total_matches: 1,
+			hits: [{ entry_id: "phrase-session-0" }],
+		});
+		expect(text).toContain("Alpha  beta\\ngamma");
+		const collapsed = await tool.execute("collapsed-phrase", {
+			query: "alpha beta gamma",
+			match: "phrase",
+		});
+		expect(collapsed.details).toMatchObject({ complete: true, totalMatches: 0 });
+		const terms = await tool.execute("all-terms", { query: "alpha beta gamma", match: "all" });
+		expect(terms.details).toMatchObject({ complete: true, totalMatches: 1 });
+		expect(terms.content.find(part => part.type === "text")?.text).toContain("Alpha beta gamma");
+	});
+
+	it("returns the same leading hits at smaller limits when message timestamps tie", async () => {
+		using tempDir = TempDir.createSync("@omp-conversation-search-ranking-");
+		const cwd = tempDir.path();
+		const activeFile = tempDir.join("sessions/active.jsonl");
+		const now = Date.now();
+		await writeSession(
+			tempDir.join("sessions/tie.jsonl"),
+			"tie",
+			cwd,
+			"Tied timestamps",
+			Array.from({ length: 12 }, (_, index) => ({
+				role: "user",
+				content: `needle ${index}`,
+				timestamp: now,
+			})),
+			now,
+		);
+		const tool = new ConversationSearchTool(makeToolSession(cwd, activeFile));
+		const smallResult = await tool.execute("small-limit", { query: "needle", limit: 3, format: "json" });
+		const largeResult = await tool.execute("large-limit", { query: "needle", limit: 12, format: "json" });
+		const small: unknown = JSON.parse(smallResult.content.find(part => part.type === "text")?.text ?? "");
+		const large: unknown = JSON.parse(largeResult.content.find(part => part.type === "text")?.text ?? "");
+		if (!isRecord(small) || !isRecord(large) || !Array.isArray(small.hits) || !Array.isArray(large.hits)) {
+			throw new Error("Expected JSON conversation hits.");
+		}
+		expect(small).toMatchObject({ complete: true, total_matches: 12 });
+		expect(small.hits).toHaveLength(3);
+		expect(large.hits).toHaveLength(12);
+		expect(small.hits).toEqual(large.hits.slice(0, 3));
+	});
+
+	it("reports excluded malformed journals on repeated discovery, but accepts a missing root", async () => {
+		using tempDir = TempDir.createSync("@omp-conversation-search-coverage-");
+		const activeFile = tempDir.join("sessions/active.jsonl");
+		await Bun.write(tempDir.join("sessions/broken.jsonl"), '{"type":"message"}\n');
+		const tool = new ConversationSearchTool(makeToolSession(tempDir.path(), activeFile));
+		// The second read exercises the shared negative header cache.
+		for (let attempt = 0; attempt < 2; attempt++) {
+			const result = await tool.execute("coverage", { query: "needle", format: "json" });
+			const text = result.content.find(part => part.type === "text")?.text ?? "";
+			expect(JSON.parse(text)).toMatchObject({
+				complete: false,
+				discovery_failures: 1,
+				candidate_sessions: 0,
+				hits: [],
+			});
+		}
+		const emptyTool = new ConversationSearchTool(
+			makeToolSession(tempDir.path(), tempDir.join("missing/active.jsonl")),
+		);
+		const empty = await emptyTool.execute("empty", { query: "needle" });
+		expect(empty.details).toMatchObject({ complete: true, candidateSessions: 0 });
+	});
+
+	it("reports a failed enumerated bucket while retaining its yielded files and the remaining buckets", async () => {
+		using tempDir = TempDir.createSync("@omp-conversation-bucket-coverage-");
+		const partialBucket = tempDir.join("a-partial");
+		const now = Date.now();
+		await writeSession(
+			tempDir.join("a-partial/partial.jsonl"),
+			"partial",
+			tempDir.path(),
+			"Partial",
+			[{ role: "user", content: "needle partial", timestamp: now }],
+			now,
+		);
+		await writeSession(
+			tempDir.join("b-readable/readable.jsonl"),
+			"readable",
+			tempDir.path(),
+			"Readable",
+			[{ role: "user", content: "needle readable", timestamp: now }],
+			now,
+		);
+		const failure = Object.assign(new Error("bucket vanished after yielding"), { code: "ENOENT" });
+		const scan = Bun.Glob.prototype.scan;
+		const spy = vi.spyOn(Bun.Glob.prototype, "scan").mockImplementation(async function* (this: Bun.Glob, options) {
+			if (typeof options === "object" && options.cwd === partialBucket) {
+				yield "partial.jsonl";
+				throw failure;
+			}
+			yield* scan.call(this, options);
+		});
+		try {
+			const failures: SessionDiscoveryFailure[] = [];
+			const sessions = await listSessionsModifiedSince(
+				{ sessionsRoot: tempDir.path(), modifiedSinceMs: 0 },
+				report => failures.push(report),
+			);
+			expect(sessions.map(session => session.id).sort()).toEqual(["partial", "readable"]);
+			expect(failures).toEqual([{ path: partialBucket, stage: "enumeration", error: failure }]);
+		} finally {
+			spy.mockRestore();
+		}
+	});
+
+	it("does not inspect or count journals last modified before the lookback window", async () => {
+		using tempDir = TempDir.createSync("@omp-conversation-search-window-");
+		const staleFile = tempDir.join("sessions/stale-broken.jsonl");
+		await Bun.write(staleFile, '{"type":"message"}\n');
+		const staleSeconds = (Date.now() - 30 * 86_400_000) / 1000;
+		await fs.utimes(staleFile, staleSeconds, staleSeconds);
+		const tool = new ConversationSearchTool(makeToolSession(tempDir.path(), tempDir.join("sessions/active.jsonl")));
+		const result = await tool.execute("window", { query: "needle", days: 10 });
+		expect(result.details).toMatchObject({ complete: true, discoveryFailures: 0, candidateSessions: 0 });
+	});
+
+	it("reuses parsed transcripts only while the journal prefix is unchanged", async () => {
+		using tempDir = TempDir.createSync("@omp-conversation-search-cache-");
+		const cwd = tempDir.path();
+		const file = tempDir.join("sessions/cached.jsonl");
+		const now = Date.now();
+		const record = (index: number, text: string) =>
+			JSON.stringify({
+				type: "message",
+				id: `appended-${index}`,
+				parentId: null,
+				timestamp: new Date(now - 60_000 + index).toISOString(),
+				message: { role: "user", content: `marker ${text}`, timestamp: now - 60_000 + index },
+			});
+		const marker = (text: string): FixtureMessage[] => [
+			{ role: "user", content: `marker ${text}`, timestamp: now - 120_000 },
+		];
+		await writeSession(file, "cached-session", cwd, "Cache", marker("alpha"), now);
+		const tool = new ConversationSearchTool(makeToolSession(cwd, tempDir.join("sessions/active.jsonl")));
+		const search = async () => {
+			const result = await tool.execute("cache", { query: "marker", format: "json" });
+			const report = JSON.parse(result.content.find(part => part.type === "text")?.text ?? "");
+			const texts: string[] = report.hits.map((hit: { text: string }) => hit.text);
+			return { complete: report.complete, texts: texts.sort() };
+		};
+
+		expect(await search()).toEqual({ complete: true, texts: ["marker alpha"] });
+		// A half-written line counts as malformed now, but must not enter the
+		// cached prefix, or completing it would leave a malformed remainder.
+		const bravo = record(1, "bravo");
+		await fs.appendFile(file, bravo.slice(0, 40));
+		expect(await search()).toEqual({ complete: false, texts: ["marker alpha"] });
+		await fs.appendFile(file, `${bravo.slice(40)}\n${record(2, "charlie")}\n`);
+		expect(await search()).toEqual({ complete: true, texts: ["marker alpha", "marker bravo", "marker charlie"] });
+		// Atomic replacement yields a new inode that shares nothing with the cached prefix.
+		const replacement = tempDir.join("sessions/replacement.tmp");
+		await writeSession(replacement, "cached-session", cwd, "Cache", marker("delta"), now);
+		await fs.rename(replacement, file);
+		expect(await search()).toEqual({ complete: true, texts: ["marker delta"] });
+
+		// Keep the header and changed visible text outside the projection's tail digest.
+		await fs.appendFile(file, `${JSON.stringify({ type: "custom", data: "x".repeat(8192) })}\n`);
+		await fs.utimes(file, new Date(now), new Date(now));
+		expect(await search()).toEqual({ complete: true, texts: ["marker delta"] });
+		let previousId = "cached-session";
+		let previousText = "delta";
+		for (const next of [
+			{ id: "newest-session", text: "bravo", atomic: false },
+			{ id: "latest-session", text: "alpha", atomic: true },
+		]) {
+			const content = (await Bun.file(file).text())
+				.replace(`"id":"${previousId}"`, `"id":"${next.id}"`)
+				.replace(`marker ${previousText}`, `marker ${next.text}`);
+			const target = next.atomic ? replacement : file;
+			await Bun.write(target, content);
+			await fs.utimes(target, new Date(now), new Date(now));
+			if (next.atomic) await fs.rename(target, file);
+			expect(await search()).toEqual({ complete: true, texts: [`marker ${next.text}`] });
+			previousId = next.id;
+			previousText = next.text;
+		}
+	});
+
+	it("rejects an empty query with an explicit empty-string reason instead of its length", async () => {
+		using tempDir = TempDir.createSync("@omp-conversation-search-empty-");
+		const [tool] = await createTools(makeToolSession(tempDir.path(), tempDir.join("active.jsonl")), [
+			"conversation_search",
+		]);
+		expect(() =>
+			validateAgentToolArguments(tool, {
+				type: "toolCall",
+				id: "empty-query",
+				name: "conversation_search",
+				arguments: { query: "" },
+			}),
+		).toThrow("query must be non-empty literal text or whitespace-separated terms (was an empty string)");
+	});
+
+	it("is available to Main but absent from child tool registries", async () => {
+		using tempDir = TempDir.createSync("@omp-conversation-search-gate-");
+		const activeFile = tempDir.join("active.jsonl");
+		const main = await createTools(makeToolSession(tempDir.path(), activeFile), ["conversation_search"]);
+		const child = await createTools(makeToolSession(tempDir.path(), activeFile, 1), ["conversation_search"]);
+		expect(main.map(tool => tool.name)).toEqual(["conversation_search"]);
+		expect(child.map(tool => tool.name)).toEqual([]);
+	});
+});

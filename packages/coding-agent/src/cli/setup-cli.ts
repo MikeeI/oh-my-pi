@@ -4,7 +4,8 @@
  * Handles `omp setup` for onboarding and `omp setup <component>` for optional dependencies.
  */
 import * as path from "node:path";
-import { APP_NAME, getProjectDir, getPythonEnvDir } from "@oh-my-pi/pi-utils";
+import { getProjectDir, getPythonEnvDir } from "@oh-my-pi/pi-utils";
+import { APP_DISPLAY_NAME as APP_NAME } from "../app-version";
 import chalk from "@oh-my-pi/pi-utils/chalk";
 import { formatKeyHint } from "@oh-my-pi/pi-tui/key-hint-format";
 import { Settings } from "../config/settings";

@@ -28,8 +28,10 @@ import { cfgMagicKeyword, cfgMagicKeywordsEnabled } from "@oh-my-pi/pi-coding-ag
 import { AgentSession } from "@oh-my-pi/pi-coding-agent/session/agent-session";
 import { AuthStorage } from "@oh-my-pi/pi-coding-agent/session/auth-storage";
 import { convertToLlm, type CustomMessage, USER_INTERRUPT_LABEL } from "@oh-my-pi/pi-coding-agent/session/messages";
+import type { SessionMessageEntry } from "@oh-my-pi/pi-coding-agent/session/session-entries";
 import { SessionManager } from "@oh-my-pi/pi-coding-agent/session/session-manager";
 import { tagImageAttachmentSource } from "@oh-my-pi/pi-tui/prompt/image-source";
+import { userDisplayText, userTurnDraft } from "@oh-my-pi/pi-tui/chat/transcript-entry";
 import { removeSyncWithRetries, Snowflake, withTimeout } from "@oh-my-pi/pi-utils";
 import manualContinuePrompt from "../src/prompts/system/manual-continue.md" with { type: "text" };
 import { createInteractiveModeContext } from "./helpers/interactive-mode-context";
@@ -344,6 +346,37 @@ describe("AgentSession queued steer delivery", () => {
 
 		expect(mock.calls.length).toBe(2);
 		expect(session.agent.hasQueuedMessages()).toBe(false);
+	});
+
+	it("shows the typed file-command invocation while the model receives its expansion", async () => {
+		const { session, sessionManager, mock } = await createSession([{ content: ["ok"] }]);
+		session.setSlashCommands([{ name: "cmd", description: "Test", content: "Expanded $1", source: "(test)" }]);
+
+		await session.prompt("/cmd idle");
+		expect(JSON.stringify(mock.calls[0].context.messages)).toContain("Expanded idle");
+		// Rewind and transcript rebuild read the persisted entry, so the invocation must survive there.
+		const entry = sessionManager
+			.getEntries()
+			.find((e): e is SessionMessageEntry => e.type === "message" && e.message.role === "user");
+		expect(entry && userTurnDraft(entry)).toBe("/cmd idle");
+
+		session.agent.state.isStreaming = true;
+		try {
+			await session.prompt("/cmd queued", { streamingBehavior: "followUp" });
+			const queued = session.agent.peekFollowUpQueue().find(message => message.role === "user");
+			expect(queued?.role === "user" && userDisplayText(queued)).toBe("/cmd queued");
+			session.setSlashCommands([{ name: "same", description: "Test", content: "/same", source: "(test)" }]);
+			await session.prompt("/same", { streamingBehavior: "followUp" });
+			const unchanged = session.agent.peekFollowUpQueue().findLast(message => message.role === "user");
+			expect(unchanged?.role === "user" && unchanged.commandInvocation).toBe("/same");
+			expect(unchanged?.role === "user" && unchanged.content).toEqual([{ type: "text", text: "/same" }]);
+
+			await session.prompt("/unknown", { streamingBehavior: "followUp" });
+			const unknown = session.agent.peekFollowUpQueue().findLast(message => message.role === "user");
+			expect(unknown?.role === "user" && unknown.commandInvocation).toBeUndefined();
+		} finally {
+			session.agent.state.isStreaming = false;
+		}
 	});
 
 	it("drains steering left after aborting an auto-continued queued turn", async () => {

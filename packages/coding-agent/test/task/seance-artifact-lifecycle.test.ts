@@ -166,7 +166,7 @@ describe("seance artifact lifecycle", () => {
 		const eventBus = new EventBus();
 		const previousAgentDir = getAgentDir();
 		setAgentDir(path.join(tempDir.path(), "agent"));
-		const agent = getBundledAgent("seance");
+		const agent = getBundledAgent("seance", getAgentDir());
 		if (!agent) throw new Error("Expected the bundled seance agent");
 		let lifecycle = AgentLifecycleManager.global();
 
@@ -285,7 +285,7 @@ describe("seance artifact lifecycle", () => {
 		const eventBus = new EventBus();
 		const previousAgentDir = getAgentDir();
 		setAgentDir(path.join(tempDir.path(), "agent"));
-		const agent = getBundledAgent("seance");
+		const agent = getBundledAgent("seance", getAgentDir());
 		if (!agent) throw new Error("Expected the bundled seance agent");
 		let lifecycle = AgentLifecycleManager.global();
 
@@ -459,7 +459,7 @@ describe("seance artifact lifecycle", () => {
 		});
 		const previousAgentDir = getAgentDir();
 		setAgentDir(path.join(tempDir.path(), "agent"));
-		const agent = getBundledAgent("seance");
+		const agent = getBundledAgent("seance", getAgentDir());
 		if (!agent) throw new Error("Expected the bundled seance agent");
 
 		try {

@@ -1,0 +1,802 @@
+[
+  {
+    "id": "expanded-001",
+    "intent": "Die vorgeschlagene Auslagerung der Electron-Extraktion und Recon-Scans in Skill-Skripte umsetzen.",
+    "oracle": "Electron-Skill mit Extraktionsskripten vereinfachen",
+    "evidence_quote": "## Änderung 2: Recon-Suchen als Skript",
+    "needs_review": false,
+    "review_reason": ""
+  },
+  {
+    "id": "expanded-002",
+    "intent": "Die zuvor belegten Design- und Korrektheitsprobleme des Svelte-Linters beheben.",
+    "oracle": "Svelte-Linter Resolver und Architektur korrigieren",
+    "evidence_quote": "Wrapper Resolution erhält eine explizite Fixed-Point- und Ambiguitätssemantik.",
+    "needs_review": false,
+    "review_reason": ""
+  },
+  {
+    "id": "expanded-003",
+    "intent": "Den vorgeschlagenen gemeinsamen Kontext-, Routing- und Ergebnisvertrag in den Command-Templates anwenden.",
+    "oracle": "Gemeinsame Command-Verträge und Routing vereinheitlichen",
+    "evidence_quote": "Zwei gemeinsame Parts: Kontextverarbeitung, bedingte Adoptionsprüfung und eindeutige Ergebniszustandsauswahl.",
+    "needs_review": false,
+    "review_reason": ""
+  },
+  {
+    "id": "expanded-004",
+    "intent": "Den Markdown-Formatierungscommand auch auf Markdown-Templates mit .md.tmpl-Endung anwenden lassen.",
+    "oracle": "Markdown-Formatierung auf md.tmpl erweitern",
+    "evidence_quote": "@data/promptgen/commands/format-markdown.md.tmpl das muss auch dür md .tmpl gelten!",
+    "needs_review": false,
+    "review_reason": ""
+  },
+  {
+    "id": "expanded-005",
+    "intent": "Das redundante normalisierte Search-Optionsmodell im Wayback-CLI durch die vorgeschlagene Wertkopie ersetzen.",
+    "oracle": "Wayback Search-Optionsmodell durch Wertkopie vereinfachen",
+    "evidence_quote": "`normalizedSearchOptions` und den Kopierblock durch eine Wertkopie von `SearchCmd` ersetzen.",
+    "needs_review": false,
+    "review_reason": ""
+  },
+  {
+    "id": "expanded-006",
+    "intent": "Die Arbeit an korrekten ast_grep-Paginierungshinweisen samt Contract-Nachweis abschließen und sichern.",
+    "oracle": "ast_grep Paginierungshinweise konsistent korrigieren",
+    "evidence_quote": "LLM-Ausgabe und TUI verwenden denselben Wert; alte TUI-Ergebnisse ohne diese Metadaten empfehlen nur, `path` einzugrenzen.",
+    "needs_review": false,
+    "review_reason": ""
+  },
+  {
+    "id": "expanded-007",
+    "intent": "Die überprüften semantischen Restic-Fehler in einem ISSUES.md-Ledger dokumentieren.",
+    "oracle": "Restic Logikfehler in ISSUES.md erfassen",
+    "evidence_quote": "erstelle nun @ISSUES.md",
+    "needs_review": false,
+    "review_reason": ""
+  },
+  {
+    "id": "expanded-008",
+    "intent": "Vorläufig die Markdown-Formatierung der Web-Search- und LSP-Tool-Prompts als bisherigen Gegenstand beibehalten; die letzte Eingabe ist nicht auflösbar.",
+    "oracle": "Web-Search und LSP Prompts formatieren",
+    "evidence_quote": "data/sync/agent/prompts/tools/lsp.md: formatiert.",
+    "needs_review": true,
+    "review_reason": "Die exakte Produktionseingabe endet mit „we/ex“ ohne erkennbare Bedeutung; sie bestätigt weder Fortsetzung noch einen bestimmten neuen Auftrag."
+  },
+  {
+    "id": "expanded-009",
+    "intent": "Einen minimalen Diff für sinnvolle Regeln aus dem archivierten Systemprompt vorschlagen, insbesondere Skill-Ladung und API-Referenzprüfung.",
+    "oracle": "Systemprompt Skill-Ladung und API-Prüfung schärfen",
+    "evidence_quote": "Mein Rat: eine gezielte Skill-Regel prüfen, allenfalls die API-Vorabprüfung ergänzen",
+    "needs_review": false,
+    "review_reason": ""
+  },
+  {
+    "id": "expanded-010",
+    "intent": "Einen konkreten Diff zur Verbesserung des Scout-Prompts und seiner Rechercheverträge vorschlagen.",
+    "oracle": "Scout-Prompt Evidenz und Werkzeuge verbessern",
+    "evidence_quote": "Für Codebeziehungen würde ich Scout gezielt LSP und AST-Suche zugänglich machen",
+    "needs_review": false,
+    "review_reason": ""
+  },
+  {
+    "id": "expanded-011",
+    "intent": "Den über Q1 ausgewählten Diff für Zielgewichtung und technische Verifikation im DIY-Workspace-Prompt vorschlagen.",
+    "oracle": "DIY-Prompt Ziele und Verifikation präzisieren",
+    "evidence_quote": "Soll ich diese zwei Verbesserungen als Diff vorschlagen?",
+    "needs_review": false,
+    "review_reason": ""
+  },
+  {
+    "id": "expanded-012",
+    "intent": "Die vorgeschlagenen nächsten Schritte für verschobene A1/XOXO-Belegzuordnungen und den unabhängigen Oktober-Match angehen.",
+    "oracle": "A1-Belegkette und Oktober-Match bereinigen",
+    "evidence_quote": "Eine schreibgeschützte Korrekturmatrix für die zwölf 2024er Matchgruppen und den offenen Jännereinzug 2025 erstellen",
+    "needs_review": false,
+    "review_reason": ""
+  },
+  {
+    "id": "expanded-013",
+    "intent": "Prüfen, ob der Ansatz mit Hooks und gefälschten Tool-Ergebnissen vom Scope der besprochenen bezahlten Programme gedeckt ist.",
+    "oracle": "Bounty-Scope für gefälschte Tool-Ergebnisse prüfen",
+    "evidence_quote": "aber ist mein ansatz von hooks und fake tool ergebnisse überhauot im scope",
+    "needs_review": false,
+    "review_reason": ""
+  },
+  {
+    "id": "expanded-014",
+    "intent": "Die verbliebenen Probleme und Datenunsicherheiten im Investment-CLI und Radar untersuchen und beheben.",
+    "oracle": "Investment-CLI und Radar Restprobleme beheben",
+    "evidence_quote": "investigate und fix alles",
+    "needs_review": false,
+    "review_reason": ""
+  },
+  {
+    "id": "expanded-015",
+    "intent": "Prüfen, ob die Reddit-CLI-Referenz nach dem neuen Publishing- und Flair-Workflow aktuell ist.",
+    "oracle": "Reddit CLI-Dokumentation auf Aktualität prüfen",
+    "evidence_quote": "ist @context/context_cli.md up2date",
+    "needs_review": false,
+    "review_reason": ""
+  },
+  {
+    "id": "expanded-016",
+    "intent": "Den über Q2 ausgewählten offenen Vales-Referenzkonflikt in den Belegzuordnungen untersuchen.",
+    "oracle": "Offenen Vales-Referenzkonflikt genauer untersuchen",
+    "evidence_quote": "Soll ich den offenen Vales-Referenzkonflikt genauer untersuchen?",
+    "needs_review": false,
+    "review_reason": ""
+  },
+  {
+    "id": "expanded-017",
+    "intent": "Nach den Moderationsblockaden eine Bildvariante mit Kleid und Strumpfhose versuchen und das Kleid als Latex oder Vinyl gestalten.",
+    "oracle": "Bildvariante mit Latexkleid und Strumpfhose",
+    "evidence_quote": "mach das kleid latex vinyl",
+    "needs_review": false,
+    "review_reason": ""
+  },
+  {
+    "id": "expanded-018",
+    "intent": "Im neu angelegten Restic-Fork einen personal-Branch erstellen.",
+    "oracle": "Personal-Branch im Restic-Fork erstellen",
+    "evidence_quote": "erstelle eben personal branch",
+    "needs_review": false,
+    "review_reason": ""
+  },
+  {
+    "id": "expanded-019",
+    "intent": "Beurteilen, ob der aus Anthropic-Material abgeleitete Prompt-Audit-Command auch in OMP funktioniert oder Claude-spezifisch ist.",
+    "oracle": "Prompt-Audit auf OMP-Kompatibilität prüfen",
+    "evidence_quote": "ist dises prompt cöaude spezifisch oder funktioiert es hoer in omp auch",
+    "needs_review": false,
+    "review_reason": ""
+  },
+  {
+    "id": "expanded-020",
+    "intent": "Schnelle CLI-artige Browser und ihre Eignung für Agentenbedienung erkunden.",
+    "oracle": "Schnelle CLI-Browser für Agenten vergleichen",
+    "evidence_quote": "andere browser die so art cli sind un irrssenig schnrll",
+    "needs_review": false,
+    "review_reason": ""
+  },
+  {
+    "id": "expanded-021",
+    "intent": "Den Steuerberater-Export 2025 als möglichst gut komprimierte ZIP-Datei unter dem gewünschten Namen erstellen.",
+    "oracle": "Jahresabschluss-Export 2025 als ZIP erstellen",
+    "evidence_quote": "dateinamen Jahresabschluss-Export-INPX-Marketing-2025.zip",
+    "needs_review": false,
+    "review_reason": ""
+  },
+  {
+    "id": "expanded-022",
+    "intent": "Die neue globale Zuordnung von projects und project-* zu $HOME/projects kritisch prüfen.",
+    "oracle": "Globale Projektpfad-Regel kritisch prüfen",
+    "evidence_quote": "Wenn du `projects` oder ein `project-*`-Repository erwähnst, schaue ich normalerweise zuerst unter `$HOME/projects/` nach.",
+    "needs_review": false,
+    "review_reason": ""
+  },
+  {
+    "id": "expanded-023",
+    "intent": "Die tatsächliche Aussagekraft der Jev-Versuche und des beobachteten A-/Reihenfolgeeffekts ungeschönt einordnen.",
+    "oracle": "Jev Reihenfolgeeffekt ehrlich einordnen",
+    "evidence_quote": "In allen 40 Antworten wurde **Kind A** gewählt",
+    "needs_review": false,
+    "review_reason": ""
+  },
+  {
+    "id": "expanded-024",
+    "intent": "Die als nutzlos identifizierten Auth-Smoke-Dateien und Altartefakte entfernen, ohne den sinnvollen Auth-Test mit ihnen zu verwechseln.",
+    "oracle": "Nutzlose Auth-Smoke Altdateien entfernen",
+    "evidence_quote": "ich will diese cheiss dateien weghaben die uselss sind",
+    "needs_review": false,
+    "review_reason": ""
+  },
+  {
+    "id": "expanded-025",
+    "intent": "Eine einheitliche Task-Auftragsvorlage für alle Child-Aufträge statt begrifflich getrennter Spezialvorlagen haben.",
+    "oracle": "Einheitliche Task-Vorlage für alle Aufträge",
+    "evidence_quote": "ich will eines dür alle",
+    "needs_review": false,
+    "review_reason": ""
+  },
+  {
+    "id": "expanded-026",
+    "intent": "Die zuletzt vorgeschlagenen Korrekturen am Commenting-Skill zu Tool-Direktiven, TODO-Konventionen und Quellen anwenden.",
+    "oracle": "Commenting-Skill Direktiven und TODO-Regeln korrigieren",
+    "evidence_quote": "Review-Filter für Tool-Direktiven korrigieren",
+    "needs_review": false,
+    "review_reason": ""
+  },
+  {
+    "id": "expanded-027",
+    "intent": "Den über Q1 ausgewählten Bildlauf von Prompt 011 mit der Referenz kohlenberger10 ausführen.",
+    "oracle": "Prompt 011 mit kohlenberger10 ausführen",
+    "evidence_quote": "Prompt 011 mit kohlenberger10 jetzt laufen lassen",
+    "needs_review": false,
+    "review_reason": ""
+  },
+  {
+    "id": "expanded-028",
+    "intent": "Die ursprüngliche technische Codebasis jedes zuvor untersuchten Adblockers bestimmen.",
+    "oracle": "Ursprüngliche Codebasen der Adblocker ermitteln",
+    "evidence_quote": "finde heraus worauf jeder dieser adblocker ueoünglich aufbaut",
+    "needs_review": false,
+    "review_reason": ""
+  },
+  {
+    "id": "expanded-029",
+    "intent": "Das auf Fotos wiedererkannte Staatspreis-Event identifizieren und die Vermutung einer Gala von 2023 prüfen.",
+    "oracle": "Staatspreis-Foto der Gala 2023 zuordnen",
+    "evidence_quote": "aber wahrshceinkichmdie 2023 gala",
+    "needs_review": false,
+    "review_reason": ""
+  },
+  {
+    "id": "expanded-030",
+    "intent": "Die gewünschten Investment-Rechercheziele und den Bedarf an zusammengeführten Daten in REPORT.md festhalten.",
+    "oracle": "Investment-Datenziele in REPORT.md dokumentieren",
+    "evidence_quote": "welche daten klnnten noch zusqmmengwführt werden damit ein gesamtbild entste",
+    "needs_review": false,
+    "review_reason": ""
+  },
+  {
+    "id": "expanded-031",
+    "intent": "Die Dotfiles-Bereitstellung und den behobenen archive.sh-Loginfehler kritisch auf verbleibende Probleme prüfen.",
+    "oracle": "Dotfiles Shell-Bereitstellung kritisch überprüfen",
+    "evidence_quote": "Die neue `archive.sh` war im Repository vorhanden, aber noch nicht nach `/root/.shell-config/` gestowt.",
+    "needs_review": false,
+    "review_reason": ""
+  },
+  {
+    "id": "expanded-032",
+    "intent": "Die Modellkonfiguration auf den gewählten DeepSeek-Provider und ein 300k-Limit umstellen und die Änderungen sichern.",
+    "oracle": "DeepSeek-Routing und 300k-Limit konfigurieren",
+    "evidence_quote": "update confug models und auch 300k limit",
+    "needs_review": false,
+    "review_reason": ""
+  },
+  {
+    "id": "expanded-033",
+    "intent": "Die geprüften Twitter-CLI-Vereinfachungen für Thread-Spaltenauswahl und kompakte TSV-Zeitstempel implementieren.",
+    "oracle": "Twitter-Threads mit Spaltenauswahl tokenärmer ausgeben",
+    "evidence_quote": "`--columns` nur auf `tweet thread`",
+    "needs_review": false,
+    "review_reason": ""
+  },
+  {
+    "id": "expanded-034",
+    "intent": "Alle betroffenen Forschungsdokumente an die korrigierten Annahmen zu CWS-Sperren, Cookie-Zugriff und Session-Relay anpassen.",
+    "oracle": "CWS-Dokumentation zu Cookie-Zugriff korrigieren",
+    "evidence_quote": "ich qill dass du eben alle dokumente aktualisieet damit die annahmen dort eben richtig sknd",
+    "needs_review": false,
+    "review_reason": ""
+  },
+  {
+    "id": "expanded-035",
+    "intent": "Die vorangegangenen Verbesserungsvorschläge für Investment-Snapshots, Reviews und CLI-Workflows kritisch überprüfen.",
+    "oracle": "Investment-CLI Verbesserungsvorschläge kritisch überprüfen",
+    "evidence_quote": "Review and critically analyze your previous response",
+    "needs_review": false,
+    "review_reason": ""
+  },
+  {
+    "id": "expanded-036",
+    "intent": "Den ausgearbeiteten Vorschlag für reale V2-Website- und YouTube-Tests in der verlangten Markdown-Datei dokumentieren.",
+    "oracle": "V2 Website- und YouTube-Testvorschlag dokumentieren",
+    "evidence_quote": "schreibe das jetzt alles in eine VORSCHLAG-REWRITE-TESTS-2.md",
+    "needs_review": false,
+    "review_reason": ""
+  },
+  {
+    "id": "expanded-037",
+    "intent": "Die angeforderten Bildprompt-Läufe für die genannten Identitäten parallel ausführen, zuletzt P4621 mit jac05.",
+    "oracle": "Bildprompt-Serien parallel mit Referenzidentitäten erzeugen",
+    "evidence_quote": "4621 jac05",
+    "needs_review": false,
+    "review_reason": ""
+  },
+  {
+    "id": "expanded-038",
+    "intent": "Einen Online-Dienst finden, der die einzelne öffentliche GitHub-Datei system-prompt.md zwischen zwei Versionen direkt grafisch vergleicht.",
+    "oracle": "Online-Dateidiff für GitHub Systemprompt finden",
+    "evidence_quote": "ich möchte nur system prompt md sehen",
+    "needs_review": false,
+    "review_reason": ""
+  },
+  {
+    "id": "expanded-039",
+    "intent": "Die im besprochenen Extension-Vault-Konflikt bestehenden Git-Projektionen beziehungsweise Tags überschreiben statt den Konflikt weiter zu untersuchen.",
+    "oracle": "Extension-Vault Git-Projektionen und Tags überschreiben",
+    "evidence_quote": "einfach überschreiben",
+    "needs_review": false,
+    "review_reason": ""
+  },
+  {
+    "id": "expanded-040",
+    "intent": "Die überprüfte Restic-Performanceanalyse und ihre Umsetzung in das Issue-Ledger kritisch hinterfragen.",
+    "oracle": "Restic Performance-Ledger kritisch überprüfen",
+    "evidence_quote": "12 neue Befunde:",
+    "needs_review": false,
+    "review_reason": ""
+  },
+  {
+    "id": "expanded-041",
+    "intent": "Den aktuellen Ghostery-V2-Code nach Änderungen anderer Agents neu bewerten und frühere Aussagen zu Produktumfang, DNR-Evidenz und Cutover überprüfen.",
+    "oracle": "Ghostery V2 Status erneut bewerten",
+    "evidence_quote": "Check its current state and reassess whether your prior claims or similar statements still hold.",
+    "needs_review": false,
+    "review_reason": ""
+  },
+  {
+    "id": "expanded-042",
+    "intent": "Alle OMP-Interaktionen und Datensendungen an herstellereigene Domains einschließlich möglicher Metrikübertragung auflisten.",
+    "oracle": "OMP Datenverkehr zu Herstellerdomains untersuchen",
+    "evidence_quote": "welche anderen interaktionnen oder datensendungen mit stencil.co oder anderen vom hertseller von omp besessenen domains gibt es. listw mir alles auf",
+    "needs_review": false,
+    "review_reason": ""
+  },
+  {
+    "id": "expanded-043",
+    "intent": "Die sinnvollsten nächsten Schritte nach den Fclones-Performanceuntersuchungen vorschlagen, ohne sie auszuführen.",
+    "oracle": "Nächste Schritte für Fclones-Performance priorisieren",
+    "evidence_quote": "Ein belastbarer Gesamt-Walltime-Speedup ist dagegen nicht nachgewiesen",
+    "needs_review": false,
+    "review_reason": ""
+  },
+  {
+    "id": "expanded-044",
+    "intent": "Die überprüften Präzisierungen der Go-Guidance zu JSON v2, Streaming und Bibliotheksauswahl umsetzen.",
+    "oracle": "Go JSON-v2 und Streaming-Guidance korrigieren",
+    "evidence_quote": "Kein grundlegendes JSON-v2-Update nötig; wenige Präzisierungen und eine neue stdlib-Auswahloption sind sinnvoll.",
+    "needs_review": false,
+    "review_reason": ""
+  },
+  {
+    "id": "expanded-045",
+    "intent": "Die LiteLLM-Konfiguration auf einen Worker umstellen; die zusätzliche Angabe 7m ist ohne sichtbare Erklärung nicht eindeutig.",
+    "oracle": "LiteLLM auf einen Worker umstellen",
+    "evidence_quote": "stelle auf einen worker 7m",
+    "needs_review": true,
+    "review_reason": "Im exakten Produktionsinput fehlt ein Worker- oder Timeout-Kontext; insbesondere ist nicht auflösbar, welche Einstellung „7m“ bezeichnet."
+  },
+  {
+    "id": "expanded-046",
+    "intent": "Die über Q1 ausgewählten verwaisten registry-template-Dateien im shadcn-svelte-Fork löschen.",
+    "oracle": "Verwaistes registry-template im Svelte-Fork entfernen",
+    "evidence_quote": "Soll ich `registry-template/` jetzt löschen?",
+    "needs_review": false,
+    "review_reason": ""
+  },
+  {
+    "id": "expanded-047",
+    "intent": "Erklären, was mit der in Q1 angebotenen nächsten Extraktionsstufe bei den New-Colossus-Ressourcen gemeint war.",
+    "oracle": "New-Colossus Extraktionsstufen verständlich erklären",
+    "evidence_quote": "Welche Extraktionsstufe interessiert dich als Nächstes?",
+    "needs_review": false,
+    "review_reason": ""
+  },
+  {
+    "id": "expanded-048",
+    "intent": "Die Arbeit an den Webstore-Tracker-Korrekturen samt Daten-, Ausgabe- und Konfigurationsverträgen abschließen und sichern.",
+    "oracle": "Webstore-Tracker Zustands- und Schnittstellenfehler beheben",
+    "evidence_quote": "The changes prevent delayed metadata from recreating deleted extensions",
+    "needs_review": false,
+    "review_reason": ""
+  },
+  {
+    "id": "expanded-049",
+    "intent": "Die über Q1 ausgewählte Einarbeitung der neuen Erkenntnisse zu Review-Autorisierung und Missbrauchsgrenzen in CWS-REVIEWS.md vornehmen.",
+    "oracle": "CWS-Reviews Autorisierung und Evidenzgrenzen aktualisieren",
+    "evidence_quote": "Soll ich diese neuen Befunde in CWS-REVIEWS.md einarbeiten?",
+    "needs_review": false,
+    "review_reason": ""
+  },
+  {
+    "id": "expanded-050",
+    "intent": "Die geprüften Fehlerkorrekturen und die sinnvolle Kompression des Go-Kong-Skills umsetzen.",
+    "oracle": "Go-Kong-Skill korrigieren und gezielt komprimieren",
+    "evidence_quote": "@data/promptgen/skills/skill-go-kong/SKILL.md.tmpl und auch ob wir kompressionspotential haben",
+    "needs_review": false,
+    "review_reason": ""
+  },
+  {
+    "id": "expanded-051",
+    "intent": "Künftige Bildprompts um leichte Schambehaarung ergänzen.",
+    "oracle": "Bildprompts um leichte Schambehaarung ergänzen",
+    "evidence_quote": "lass uns bei zukümftugen üromopts es so machen das sie leichte schaahare hat",
+    "needs_review": false,
+    "review_reason": ""
+  },
+  {
+    "id": "expanded-052",
+    "intent": "Die geprüften Coverage- und Hilfetextprobleme der Sourcegraph-Suche beheben.",
+    "oracle": "Sourcegraph-Coverage und CLI-Hilfe korrigieren",
+    "evidence_quote": "CoverageUnknown = \"unknown\" im bestehenden App-Modell definieren und beide Coverage-Zuweisungen darauf umstellen",
+    "needs_review": false,
+    "review_reason": ""
+  },
+  {
+    "id": "expanded-053",
+    "intent": "Die Produktziele für ein Investment-CLI zur konsolidierten Agentenrecherche festhalten und die verbleibenden Änderungen veröffentlichen.",
+    "oracle": "Investment-CLI-Ziele für konsolidierte Recherche festhalten",
+    "evidence_quote": "wie können wir meine wünsch kompakt als goals in @AGENTS.md definieren",
+    "needs_review": false,
+    "review_reason": ""
+  },
+  {
+    "id": "expanded-054",
+    "intent": "Betragsentscheidungen zentralisieren und redundante Relationsabfragen in Matchlisten beseitigen.",
+    "oracle": "Betragspolitik und Matchlisten sinnvoll konsolidieren",
+    "evidence_quote": "Betragsentscheidung mit korrekter Toleranzsemantik zentralisieren.",
+    "needs_review": false,
+    "review_reason": ""
+  },
+  {
+    "id": "expanded-055",
+    "intent": "Prüfen, ob der echte Bot dem veröffentlichten Undo-Issue inzwischen das Slop-Label gegeben hat.",
+    "oracle": "Slop-Label des veröffentlichten Undo-Issues prüfen",
+    "evidence_quote": "Q1** — Hat der echte Bot inzwischen Slop vergeben?",
+    "needs_review": false,
+    "review_reason": ""
+  },
+  {
+    "id": "expanded-056",
+    "intent": "Den vorgeschlagenen Ausbau der V2-Telemetrie einschließlich Server- und Betriebsgrundlagen umsetzen.",
+    "oracle": "V2-Telemetrie und Betriebsgrundlagen vollständig umsetzen",
+    "evidence_quote": "Jeder Slice ändert Contracts, API, Extension und Site gemeinsam, denn alle Schemas sind `strictObject`.",
+    "needs_review": false,
+    "review_reason": ""
+  },
+  {
+    "id": "expanded-057",
+    "intent": "Das Versionsmodell und den abgebrochenen Bestandsaudit des Extension-Vaults kritisch hinterfragen.",
+    "oracle": "Versionsmodell und Bestandsaudit kritisch hinterfragen",
+    "evidence_quote": "Der Gesamtaudit ist **nicht abgeschlossen**.",
+    "needs_review": false,
+    "review_reason": ""
+  },
+  {
+    "id": "expanded-058",
+    "intent": "Für Februar nach potenziellen Belegmatches zu ungematchten Transaktionen suchen.",
+    "oracle": "Februar auf offene Belegmatches untersuchen",
+    "evidence_quote": "Einen Februar-Auftrag mit dem Prompt zur Suche nach potenziellen Matches bei ungematchten Transaktionen habe ich nicht gefunden.",
+    "needs_review": false,
+    "review_reason": ""
+  },
+  {
+    "id": "expanded-059",
+    "intent": "Die Verbesserungen am Release- und Inspect-Workflow des MOMP-Upgraders abschließen und veröffentlichen.",
+    "oracle": "Release-Workflow und Inspect-Diagnostik verbessern",
+    "evidence_quote": "Die vollständige Ausgabe jedes fehlgeschlagenen Kommandos landet in `<releaseStateDir>/inspect-diagnostics/<group>.log`.",
+    "needs_review": false,
+    "review_reason": ""
+  },
+  {
+    "id": "expanded-060",
+    "intent": "Die vorgeschlagenen Verbesserungen am WXT-Standards-Skill anwenden.",
+    "oracle": "WXT-Standards-Skill nach Promptaudit aktualisieren",
+    "evidence_quote": "@data/promptgen/skills/skill-wxt-standards/SKILL.md.tmpl",
+    "needs_review": false,
+    "review_reason": ""
+  },
+  {
+    "id": "expanded-061",
+    "intent": "Die dauerhafte UV-Cache-Sperre des Tracking-Dienstes behandeln, einschließlich angefordertem Stoppen und Neustarten.",
+    "oracle": "UV-Cache-Sperre des Tracking-Dienstes lösen",
+    "evidence_quote": "q1 stop and restart",
+    "needs_review": false,
+    "review_reason": ""
+  },
+  {
+    "id": "expanded-062",
+    "intent": "Die bestbelegten vorgeschlagenen Belegmatches für Mai anwenden.",
+    "oracle": "Beste Mai-Belegmatches gezielt anwenden",
+    "evidence_quote": "Von **17 ungematchten, exportfähigen Buchungen** habe ich **7 konkrete Belegpaare** gefunden.",
+    "needs_review": false,
+    "review_reason": ""
+  },
+  {
+    "id": "expanded-063",
+    "intent": "Die Promptgen-Abweichung beim Hackernews-Skill untersuchen und beheben.",
+    "oracle": "Hackernews-Skill mit Promptgen synchronisieren",
+    "evidence_quote": "Q5** — Soll ich die promptgen-Abweichung bei skill-hackernews-cli jetzt untersuchen, damit `quality.sh` wieder grün durchläuft?",
+    "needs_review": false,
+    "review_reason": ""
+  },
+  {
+    "id": "expanded-064",
+    "intent": "Den vorgeschlagenen modernisierten ADR-Skill mit eindeutigen Metadaten- und Lifecycle-Verträgen anwenden.",
+    "oracle": "ADR-Skill mit modernen Verträgen aktualisieren",
+    "evidence_quote": "Der Patch ist read-only und ändert nichts. Er enthält die Priorität-0-Korrekturen sowie die risikoarmen Priorität-1-Erweiterungen.",
+    "needs_review": false,
+    "review_reason": ""
+  },
+  {
+    "id": "expanded-065",
+    "intent": "Die vorgeschlagene Migration destruktiver Ablehnungsaktionen auf AlertDialog aufgreifen.",
+    "oracle": "Destruktive Ablehnungen auf AlertDialog umstellen",
+    "evidence_quote": "Q2** — Soll ich destruktive Ablehnungen separat auf AlertDialog migrieren?",
+    "needs_review": false,
+    "review_reason": ""
+  },
+  {
+    "id": "expanded-066",
+    "intent": "Die fehlerhaften Randklammern in den Kategoriepfad-IDs des Willhaben-Search-Mappers korrigieren.",
+    "oracle": "Willhaben-Kategoriepfad-IDs im Search-Mapper korrigieren",
+    "evidence_quote": "Nur ein **vollständiges äußeres Klammerpaar** entfernen.",
+    "needs_review": false,
+    "review_reason": ""
+  },
+  {
+    "id": "expanded-067",
+    "intent": "Den verbindlichen Markdown-Vertrag samt interner Formatprüfung im Systemtemplate präzisieren und anwenden.",
+    "oracle": "Interne Markdown-Prüfung im Systemprompt verankern",
+    "evidence_quote": "als interne Prüfung beim Denken und Formulieren – kein zusätzlicher Tool-Aufruf, kein sichtbarer Prüfbericht.",
+    "needs_review": false,
+    "review_reason": ""
+  },
+  {
+    "id": "expanded-068",
+    "intent": "Den Mess- und Optimierungsansatz für den kosmetischen Filter-Kaltpfad von uBlock Lite kritisch prüfen.",
+    "oracle": "uBlock-Lite-Kaltpfad und Messstrategie kritisch prüfen",
+    "evidence_quote": "Der Kaltpfad wartet auf Storage-APIs; Host-Matching und Selector-Aufbau sind hier kaum CPU-Arbeit.",
+    "needs_review": false,
+    "review_reason": ""
+  },
+  {
+    "id": "expanded-069",
+    "intent": "Die überarbeiteten Evidenz- und Analyseverträge des Performance-Skills anwenden.",
+    "oracle": "Performance-Skill mit präziseren Evidenzregeln aktualisieren",
+    "evidence_quote": "Die geänderten Blöcke in `data/sync/agent/skills/skill-performance/SKILL.md`",
+    "needs_review": false,
+    "review_reason": ""
+  },
+  {
+    "id": "expanded-070",
+    "intent": "Die Generated-Markierungen in .gitattributes mit den GitHub-Linguist-Kategorien abgleichen.",
+    "oracle": "Generated-Markierungen mit GitHub Linguist abgleichen",
+    "evidence_quote": "Q2** — Soll ich die Markierungen mit GitHub Linguist-Kategorien abgleichen?",
+    "needs_review": false,
+    "review_reason": ""
+  },
+  {
+    "id": "expanded-071",
+    "intent": "Den Vorschlag kritisch prüfen, bei Prettier-Cachetreffern unnötige Dateilesezugriffe zu vermeiden.",
+    "oracle": "Prettier-Cacheoptimierung auf unnötige Dateizugriffe prüfen",
+    "evidence_quote": "P1 — Skip Cached File Reads During Check And Write",
+    "needs_review": false,
+    "review_reason": ""
+  },
+  {
+    "id": "expanded-072",
+    "intent": "Erklären, wann der SQL-Schemasnapshot hilfreicher ist als das Drizzle-Schema.",
+    "oracle": "SQL-Snapshot und Drizzle-Schema sinnvoll vergleichen",
+    "evidence_quote": "Q1** — Wann ist der SQL-Snapshot hilfreicher als das Drizzle-Schema?",
+    "needs_review": false,
+    "review_reason": ""
+  },
+  {
+    "id": "expanded-073",
+    "intent": "Die geprüften Verbesserungen am Paperless-Classifier umsetzen, insbesondere Gemini-Dateiwiederverwendung und die kleinen Vertragskorrekturen.",
+    "oracle": "Paperless-Classifier nach geprüften Vorschlägen verbessern",
+    "evidence_quote": "Implementiere den konten- und SHA-256-gebundenen, vor Ablauf bereinigten Gemini-URI-Cache",
+    "needs_review": false,
+    "review_reason": ""
+  },
+  {
+    "id": "expanded-074",
+    "intent": "Das neu angelegte db2-3-Wiederherstellungsprojekt strukturieren.",
+    "oracle": "db2-3-Wiederherstellungsprojekt sinnvoll strukturieren und vorbereiten",
+    "evidence_quote": "Q1** — Soll ich als Nächstes das Wiederherstellungsprojekt strukturieren?",
+    "needs_review": false,
+    "review_reason": ""
+  },
+  {
+    "id": "expanded-075",
+    "intent": "Ausschließlich den vorgeschlagenen ausdrücklichen Vorrang der OCR-Policy im Klassifikationsprompt anwenden.",
+    "oracle": "OCR-Policy gegenüber Few-Shots priorisieren",
+    "evidence_quote": "1. Vorrang der OCR-Policy ausdrücklich machen",
+    "needs_review": false,
+    "review_reason": ""
+  },
+  {
+    "id": "expanded-076",
+    "intent": "Die noch offenen Probleme und den neuen SSR-Aktivzustandsfehler im Svelte-shadcn-Skill beheben.",
+    "oracle": "Svelte-shadcn-Skill und SSR-Beispiele korrigieren",
+    "evidence_quote": "Nicht den alten Patch nachholen, sondern nur die verbleibenden Punkte und den neuen SSR-Fehler bearbeiten.",
+    "needs_review": false,
+    "review_reason": ""
+  },
+  {
+    "id": "expanded-077",
+    "intent": "Ratchets Implementierung praktisch mit DSPy und einer manuellen Eval-Schleife vergleichen.",
+    "oracle": "Ratchet mit DSPy und Eval-Schleifen vergleichen",
+    "evidence_quote": "Q5** — Worin unterscheidet sich diese Implementierung praktisch von DSPy und einer einfachen manuellen Eval-Schleife?",
+    "needs_review": false,
+    "review_reason": ""
+  },
+  {
+    "id": "expanded-078",
+    "intent": "Den Befund einer Quelldateilöschung vor dem Datenbank-Commit und seine vorgeschlagene Korrektur kritisch überprüfen.",
+    "oracle": "Quelldateilöschung vor Datenbank-Commit kritisch prüfen",
+    "evidence_quote": "E1 — Quelldatei wird vor dem Datenbank-Commit gelöscht",
+    "needs_review": false,
+    "review_reason": ""
+  },
+  {
+    "id": "expanded-079",
+    "intent": "Einen ausführbaren Feynman-Skill für Erklärungen anhand des aktuellen Gesprächskontexts erstellen.",
+    "oracle": "Feynman-Skill für kontextbezogene Erklärungen erstellen",
+    "evidence_quote": "ja feynman eratellen damit cines ausführen kann und es soll eben dann skill zum erkläre nutzen für den geapeüchs kontext",
+    "needs_review": false,
+    "review_reason": ""
+  },
+  {
+    "id": "expanded-080",
+    "intent": "Den Prettier-Befund eines erfolgreichen Check-Exitcodes trotz stdin-Syntaxfehlers kritisch überprüfen.",
+    "oracle": "Prettier-Check-Exitcode bei stdin-Syntaxfehlern überprüfen",
+    "evidence_quote": "Bei fehlerhaftem Code über stdin kann `prettier --check` mit Exit-Code `0` enden",
+    "needs_review": false,
+    "review_reason": ""
+  },
+  {
+    "id": "expanded-081",
+    "intent": "Praktische Möglichkeiten bewerten, ohne großes Kontaktnetz mit dem KI-Hype Geld zu verdienen.",
+    "oracle": "Mit KI ohne Kontaktnetz Geld verdienen",
+    "evidence_quote": "andere ideen wie man dben als normal sterblicher ohne massive konektions eben mit ai hype geld machen kann",
+    "needs_review": false,
+    "review_reason": ""
+  },
+  {
+    "id": "expanded-082",
+    "intent": "Die sinnvollsten nächsten Schritte für verlustfreie uBlock-Lite-Regelkompression und den belegten Minifier-Defekt vorschlagen.",
+    "oracle": "Nächste Schritte zur Filterkompression priorisieren",
+    "evidence_quote": "Erst den belegten Ausnahmeverlust beheben, danach Strictblock-Referenzen als isolierten Kompressionsversuch bewerten.",
+    "needs_review": false,
+    "review_reason": ""
+  },
+  {
+    "id": "expanded-083",
+    "intent": "Neue, belegbare Verbesserungen mit hohem Nutzen relativ zu ihren Kosten für fclones vorschlagen.",
+    "oracle": "Wertvolle neue Verbesserungen für fclones finden",
+    "evidence_quote": "für fclones",
+    "needs_review": false,
+    "review_reason": ""
+  },
+  {
+    "id": "expanded-084",
+    "intent": "Die Vorschläge für hilfreiche Komponenten einer Buchhaltungs- und Matching-Oberfläche kritisch überprüfen.",
+    "oracle": "Buchhaltungs-Komponentenvorschläge für Matching kritisch überprüfen",
+    "evidence_quote": "bei einer buchhaltungssoftware obline lösung mit matching transactions zur invohces",
+    "needs_review": true,
+    "review_reason": "Das Thema ist eindeutig, aber die zitierte Passage lautet im sichtbaren Input tatsächlich anders; vor Übernahme des Belegzitats und der engeren Review-Zuordnung ist eine direkte Prüfung des Vollinputs erforderlich."
+  },
+  {
+    "id": "expanded-085",
+    "intent": "Nur die internen Duplikate im verbliebenen WhatsApp-Ingrid-Verzeichnis entfernen.",
+    "oracle": "Interne Duplikate im WhatsApp-Ingrid-Baum entfernen",
+    "evidence_quote": "Q1** — Soll ich nur interne Duplikate aus `WhatsApp/Mac/Users/ingrid` entfernen?",
+    "needs_review": false,
+    "review_reason": ""
+  },
+  {
+    "id": "expanded-086",
+    "intent": "Den Befund zur verletzten Groß-/Kleinschreibungsfreiheit von Workflow-Pfadfiltern kritisch überprüfen.",
+    "oracle": "Workflow-Pfadfilter auf Großschreibungsfehler überprüfen",
+    "evidence_quote": "E1 — Konsum-Workflow-Pfadfilter ignoriert zugesicherte Groß-/Kleinschreibungsfreiheit",
+    "needs_review": false,
+    "review_reason": ""
+  },
+  {
+    "id": "expanded-087",
+    "intent": "Die Schmerzpunktanalyse des shadcn-svelte-Fork-Beitragsworkflows und Ledgers kritisch überprüfen.",
+    "oracle": "Fork-Beitragsworkflow und Ledger-Schmerzpunkte kritisch prüfen",
+    "evidence_quote": "Kontext: Fork-Beitragsworkflow und Ledger von `project-shacdn-svelte-fork`",
+    "needs_review": false,
+    "review_reason": ""
+  },
+  {
+    "id": "expanded-088",
+    "intent": "Die Scout-Standardregel für delegierte Read-only-Arbeit und ihre Ausnahmen kritisch prüfen.",
+    "oracle": "Scout-Standard für Read-only-Delegation kritisch prüfen",
+    "evidence_quote": "Delegierte Read-only-Arbeit geht in `task.md` standardmäßig an `scout`",
+    "needs_review": false,
+    "review_reason": ""
+  },
+  {
+    "id": "expanded-089",
+    "intent": "Die Vereinfachungsvorschläge für V2-Buildgraph, Statusdokument und Reportvalidierung kritisch überprüfen.",
+    "oracle": "V2-Buildgraph und Vereinfachungsvorschläge kritisch prüfen",
+    "evidence_quote": "Die deutlichste Vereinfachung ist, den V2-Buildgraph einmalig zu definieren",
+    "needs_review": false,
+    "review_reason": ""
+  },
+  {
+    "id": "expanded-090",
+    "intent": "Nach der shadcn-Komponentenkonsolidierung die sinnvollsten noch offenen nächsten Schritte vorschlagen.",
+    "oracle": "Nächste Schritte nach shadcn-Konsolidierung priorisieren",
+    "evidence_quote": "Der Nutzen ist ein einziger Ort für Select-Logik und Fehlerverdrahtung.",
+    "needs_review": false,
+    "review_reason": ""
+  },
+  {
+    "id": "expanded-091",
+    "intent": "Die SSH-Verbindung zum neu installierten Hetzner-Server nach Klärung des geänderten Hostkeys weiterführen.",
+    "oracle": "SSH-Zugang zum neu installierten Hetzner-Server herstellen",
+    "evidence_quote": "q1 neu installiert",
+    "needs_review": false,
+    "review_reason": ""
+  },
+  {
+    "id": "expanded-092",
+    "intent": "Die Projektregel ändern, die einen agentengestarteten Transfer der Tumblr-Daten aufs NAS verhindert.",
+    "oracle": "Agentenstarts für Tumblr-NAS-Transfer erlauben",
+    "evidence_quote": "Q1** — Soll ich die Projektregel für Agentenstarts ändern?",
+    "needs_review": false,
+    "review_reason": ""
+  },
+  {
+    "id": "expanded-093",
+    "intent": "Weitere hochwertige Bluesky-Accounts zu KI, Skills und verwandten praktischen Themen recherchieren.",
+    "oracle": "Hochwertige Bluesky-Accounts zu KI-Skills finden",
+    "evidence_quote": "q1 und eben sllgmein ai skills etc",
+    "needs_review": false,
+    "review_reason": ""
+  },
+  {
+    "id": "expanded-094",
+    "intent": "Die Hetzner-Rechnung im Original-PDF prüfen, den Paperless-Betrag gegebenenfalls korrigieren und die Zahlung zuordnen.",
+    "oracle": "Hetzner-Rechnungsbetrag prüfen und Zahlung zuordnen",
+    "evidence_quote": "Q1** — Soll ich die Gesamtsumme im Hetzner-Original-PDF prüfen?",
+    "needs_review": false,
+    "review_reason": ""
+  },
+  {
+    "id": "expanded-095",
+    "intent": "Die zwei leeren, falsch unter projects abgelegten Prompt-Verzeichnisse entfernen.",
+    "oracle": "Leere falsch platzierte Prompt-Verzeichnisse entfernen",
+    "evidence_quote": "Q1** — Soll ich genau diese zwei leeren Ordner entfernen?",
+    "needs_review": false,
+    "review_reason": ""
+  },
+  {
+    "id": "expanded-096",
+    "intent": "Die Einzelfallmessung auch für Paket-Browsertests aktivieren.",
+    "oracle": "Einzelfallmessung für Paket-Browsertests aktivieren",
+    "evidence_quote": "Q1** — Soll ich dieselbe Einzelfallmessung auch für Paket-Browsertests aktivieren?",
+    "needs_review": false,
+    "review_reason": ""
+  },
+  {
+    "id": "expanded-097",
+    "intent": "Die vier noch offenen Fragen zur onvista-Derivateintegration durch gezielte API-Proben klären.",
+    "oracle": "Offene onvista-Derivatefragen durch API-Proben klären",
+    "evidence_quote": "Q1** — Soll ich die vier offenen Punkte jetzt noch per Probe klären?",
+    "needs_review": false,
+    "review_reason": ""
+  },
+  {
+    "id": "expanded-098",
+    "intent": "Die tatsächlichen bezahlten KI-Aufrufe nach Anlass aufschlüsseln und im Refactoring-Plan dokumentieren.",
+    "oracle": "Paid-Aufrufe analysieren und im Refactoring-Plan dokumentieren",
+    "evidence_quote": "q1 und schribe es in REFACTORING-PLAN.md",
+    "needs_review": false,
+    "review_reason": ""
+  },
+  {
+    "id": "expanded-099",
+    "intent": "Den Academicsearch-Promptgen-SSOT-Drift beheben, ohne neuere Runtime-Verträge zu verlieren.",
+    "oracle": "Academicsearch-Promptgen mit aktuellen Runtime-Verträgen synchronisieren",
+    "evidence_quote": "Q1** — Soll ich diesen Academicsearch-SSOT-Fix jetzt anwenden?",
+    "needs_review": false,
+    "review_reason": ""
+  },
+  {
+    "id": "expanded-100",
+    "intent": "Die vollständige Makefile-Angleichung über den Setup-Upgrade-Runner aufgreifen.",
+    "oracle": "Makefile durch vollständigen Setup-Upgrade-Runner angleichen",
+    "evidence_quote": "Q1** — Soll der volle Setup-Upgrade-Runner das Makefile jetzt angleichen?",
+    "needs_review": false,
+    "review_reason": ""
+  }
+]

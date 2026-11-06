@@ -108,8 +108,8 @@ _GOAL_STATUS_VALUES: Final[frozenset[str]] = frozenset({"active", "paused", "bud
 _decode_goal_status = cast("Decoder[GoalStatus]", literal(_GOAL_STATUS_VALUES))
 
 
-SlashCommandSource: TypeAlias = Literal["builtin", "skill", "extension", "custom", "mcp_prompt", "file"]
-_SLASH_COMMAND_SOURCE_VALUES: Final[frozenset[str]] = frozenset({"builtin", "skill", "extension", "custom", "mcp_prompt", "file"})
+SlashCommandSource: TypeAlias = Literal["builtin", "skill", "extension", "custom", "mcp_prompt", "file", "routine"]
+_SLASH_COMMAND_SOURCE_VALUES: Final[frozenset[str]] = frozenset({"builtin", "skill", "extension", "custom", "mcp_prompt", "file", "routine"})
 _decode_slash_command_source = cast("Decoder[SlashCommandSource]", literal(_SLASH_COMMAND_SOURCE_VALUES))
 
 
@@ -289,6 +289,7 @@ class UserMessage(TypedDict):
     synthetic: NotRequired[bool]
     steering: NotRequired[bool]
     liveSteered: NotRequired[bool]
+    commandInvocation: NotRequired[str]
     historyRewriteAt: NotRequired[float]
     attribution: NotRequired[Attribution]
     providerPayload: NotRequired[JsonObject]
@@ -697,6 +698,12 @@ class BashResult:
     """Bytes dropped from the middle of `output`, which keeps the head and tail."""
     elided_lines: int | None = None
     """Lines dropped from the middle of `output`."""
+    head_lines: int | None = None
+    """Exact displayed head lines when inline output maps to the artifact."""
+    tail_lines: int | None = None
+    """Exact displayed tail lines when inline output maps to the artifact."""
+    elided_line_range: LineRange | None = None
+    """Artifact lines containing every elided byte; absent for substituted output."""
     column_dropped_bytes: int | None = None
     """Bytes the per-line column cap cut from `output`, across all lines."""
     column_truncated_lines: int | None = None
@@ -2092,6 +2099,9 @@ def parse_bash_result(value: object, path: str = "BashResult") -> BashResult:
         artifact_elided_bytes=optional(payload, "artifactElidedBytes", decode_int, path),
         elided_bytes=optional(payload, "elidedBytes", decode_int, path),
         elided_lines=optional(payload, "elidedLines", decode_int, path),
+        head_lines=optional(payload, "headLines", decode_int, path),
+        tail_lines=optional(payload, "tailLines", decode_int, path),
+        elided_line_range=optional(payload, "elidedLineRange", parse_line_range, path),
         column_dropped_bytes=optional(payload, "columnDroppedBytes", decode_int, path),
         column_truncated_lines=optional(payload, "columnTruncatedLines", decode_int, path),
         column_truncated_range=optional(payload, "columnTruncatedRange", parse_line_range, path),

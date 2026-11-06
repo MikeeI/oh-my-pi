@@ -24,15 +24,19 @@ function createSession(
 		settings?: Record<string, unknown>;
 	} = {},
 ): ToolSession {
+	const cwd = `/tmp/task-schema-${process.pid}-${taskSchemaSessionIndex++}`;
+	const settings = Settings.isolated({
+		"task.isolation.enabled": false,
+		"task.batch": false,
+		"task.disabledAgents": options.disabledAgents ?? [],
+		...options.settings,
+	});
+	// These assertions exercise the bundled schema/prompt, not the operator's editable profile.
+	Object.defineProperty(settings, "getAgentDir", { value: () => cwd });
 	return {
-		cwd: `/tmp/task-schema-${taskSchemaSessionIndex++}`,
+		cwd,
 		hasUI: false,
-		settings: Settings.isolated({
-			"task.isolation.enabled": false,
-			"task.batch": false,
-			"task.disabledAgents": options.disabledAgents ?? [],
-			...options.settings,
-		}),
+		settings,
 		getSessionFile: () => null,
 		getSessionSpawns: () => options.parentSpawns ?? "*",
 		getPlanModeState: () => (options.planMode ? { enabled: true } : undefined),

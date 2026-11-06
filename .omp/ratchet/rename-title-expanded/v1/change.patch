@@ -1,0 +1,16 @@
+diff --git a/packages/coding-agent/src/prompts/system/title-transcript-system.md b/packages/coding-agent/src/prompts/system/title-transcript-system.md
+index e9cdaf8722..c5a27128d0 100644
+--- a/packages/coding-agent/src/prompts/system/title-transcript-system.md
++++ b/packages/coding-agent/src/prompts/system/title-transcript-system.md
+@@ -8,8 +8,10 @@
+ 
+ Prioritize the user's intent.
+ Use assistant text only as context for what was actually being solved.
++For generic review, apply, or commit requests, name the concrete subject they act on.
+ 
+-Ignore assistant follow-up questions unless a later user reply explicitly selects or answers them, for example `q1`, `q2`, `q1 ja`, or `1 and 3`.
++Ignore assistant follow-up questions unless a later user reply explicitly selects or answers them.
++Examples include `q1`, `q2`, `q1 ja`, or `1 and 3`.
+ In that case, use the selected question text as context for the user's short reply.
+ 
+ Ignore verification chatter, command-output summaries, status updates, and incidental side-effects unless they are the actual topic.

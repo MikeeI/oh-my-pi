@@ -614,6 +614,12 @@
 - Out-of-credit provider errors now fail immediately instead of retrying for long periods; Retry works promptly once the account is funded.
 - DeepSeek-style `*** End` and `*** End Patch` markers are no longer written into files or truncate later edits
 - Composer prediction ghost text no longer vanishes when advisor messages arrive
+### Fixed
+
+- Empty raw system-prompt overrides no longer select a discovered template.
+- Provider-context previews no longer journal reminders for requests that were never sent.
+- Rejected routine steps no longer replace the user's editor draft with internal instructions.
+- Conversation search and generated titles use visible file-command invocations instead of hidden expansions.
 
 ## [18.16.0] - 2026-11-02
 

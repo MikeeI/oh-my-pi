@@ -1,0 +1,142 @@
+[
+  {
+    "prompt_id": "rename-001",
+    "kind": "oracle",
+    "title": "Flaky Runtime-Audit gezielt untersuchen",
+    "quality": 1,
+    "explanation": "focus=1; recognizable=1"
+  },
+  {
+    "prompt_id": "rename-001",
+    "kind": "empty",
+    "title": "",
+    "quality": 0,
+    "explanation": "focus=0; recognizable=0"
+  },
+  {
+    "prompt_id": "rename-001",
+    "kind": "constant",
+    "title": "I don't know",
+    "quality": 0,
+    "explanation": "focus=0; recognizable=0"
+  },
+  {
+    "prompt_id": "rename-001",
+    "kind": "wrong",
+    "title": "Banana bread baking instructions",
+    "quality": 0,
+    "explanation": "focus=0; recognizable=0"
+  },
+  {
+    "prompt_id": "rename-012",
+    "kind": "oracle",
+    "title": "GPT-6 Luna Tokens pro Sekunde messen",
+    "quality": 1,
+    "explanation": "focus=1; recognizable=1"
+  },
+  {
+    "prompt_id": "rename-012",
+    "kind": "empty",
+    "title": "",
+    "quality": 0,
+    "explanation": "focus=0; recognizable=0"
+  },
+  {
+    "prompt_id": "rename-012",
+    "kind": "constant",
+    "title": "I don't know",
+    "quality": 0,
+    "explanation": "focus=0; recognizable=0"
+  },
+  {
+    "prompt_id": "rename-012",
+    "kind": "wrong",
+    "title": "Banana bread baking instructions",
+    "quality": 0,
+    "explanation": "focus=0; recognizable=0"
+  },
+  {
+    "prompt_id": "rename-016",
+    "kind": "oracle",
+    "title": "Sol-Kontextbudget auf 400000 Tokens setzen",
+    "quality": 1,
+    "explanation": "focus=1; recognizable=1"
+  },
+  {
+    "prompt_id": "rename-016",
+    "kind": "empty",
+    "title": "",
+    "quality": 0,
+    "explanation": "focus=0; recognizable=0"
+  },
+  {
+    "prompt_id": "rename-016",
+    "kind": "constant",
+    "title": "I don't know",
+    "quality": 0,
+    "explanation": "focus=0; recognizable=0"
+  },
+  {
+    "prompt_id": "rename-016",
+    "kind": "wrong",
+    "title": "Banana bread baking instructions",
+    "quality": 0,
+    "explanation": "focus=0; recognizable=0"
+  },
+  {
+    "prompt_id": "rename-019",
+    "kind": "oracle",
+    "title": "Leeren Web-Fallback-Override entfernen",
+    "quality": 1,
+    "explanation": "focus=1; recognizable=1"
+  },
+  {
+    "prompt_id": "rename-019",
+    "kind": "empty",
+    "title": "",
+    "quality": 0,
+    "explanation": "focus=0; recognizable=0"
+  },
+  {
+    "prompt_id": "rename-019",
+    "kind": "constant",
+    "title": "I don't know",
+    "quality": 0,
+    "explanation": "focus=0; recognizable=0"
+  },
+  {
+    "prompt_id": "rename-019",
+    "kind": "wrong",
+    "title": "Banana bread baking instructions",
+    "quality": 0,
+    "explanation": "focus=0; recognizable=0"
+  },
+  {
+    "prompt_id": "rename-031",
+    "kind": "oracle",
+    "title": "Dracula-Antwortfarben an Findings demonstrieren",
+    "quality": 1,
+    "explanation": "focus=1; recognizable=1"
+  },
+  {
+    "prompt_id": "rename-031",
+    "kind": "empty",
+    "title": "",
+    "quality": 0,
+    "explanation": "focus=0; recognizable=0"
+  },
+  {
+    "prompt_id": "rename-031",
+    "kind": "constant",
+    "title": "I don't know",
+    "quality": 0,
+    "explanation": "focus=0; recognizable=0"
+  },
+  {
+    "prompt_id": "rename-031",
+    "kind": "wrong",
+    "title": "Banana bread baking instructions",
+    "quality": 0,
+    "explanation": "focus=0; recognizable=0"
+  }
+]

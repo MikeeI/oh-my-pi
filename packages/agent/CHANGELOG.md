@@ -36,6 +36,9 @@
 
 - Added `Agent.queuedMessageGate` to filter queued messages before delivery and observe claimed messages returned undelivered.
 - Added `wireToolsFingerprint()`, returning a hash of the tool specs sent with a request.
+### Fixed
+
+- Provider-context transforms can distinguish unsent previews from live requests before recording request history.
 
 ## [18.16.0] - 2026-11-02
 

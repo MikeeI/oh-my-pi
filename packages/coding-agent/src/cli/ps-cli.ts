@@ -32,6 +32,7 @@ import {
 import { runPsTop, type PsTopHost } from "@oh-my-pi/pi-tui/apps/ps-top";
 import { isSharedBrowserDaemonName, restartSharedBrowser } from "../tools/browser/shared-daemon";
 import { collectReports, KILL_GRACE_MS, scopeClient } from "./ps-data";
+import { APP_DISPLAY_NAME } from "../app-version";
 
 export type PsAction = "list" | "info" | "logs" | "stop" | "kill" | "restart";
 
@@ -139,7 +140,9 @@ export async function runPsCommand(cmd: PsCommandArgs): Promise<void> {
 			return;
 		}
 		if (!cmd.name) {
-			console.error(chalk.red(`${cmd.action} requires a process name. Run \`omp ps\` to list processes.`));
+			console.error(
+				chalk.red(`${cmd.action} requires a process name. Run \`${APP_DISPLAY_NAME} ps\` to list processes.`),
+			);
 			process.exitCode = 1;
 			return;
 		}

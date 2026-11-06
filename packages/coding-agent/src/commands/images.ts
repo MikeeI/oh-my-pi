@@ -2,6 +2,7 @@
 
 import { Args, Command, Flags } from "@oh-my-pi/pi-utils/cli";
 import { imagesHelp as commandHelp } from "../cli/command-help";
+import { APP_DISPLAY_NAME } from "../app-version";
 import { IMAGES_ACTIONS, type ImagesAction, type ImagesCommandArgs, runImagesCommand } from "../cli/images-cli";
 
 export default class Images extends Command {
@@ -22,12 +23,12 @@ export default class Images extends Command {
 		timeout: Flags.integer({ description: "External health probe timeout in seconds" }),
 	};
 	static examples = [
-		"omp images",
-		"omp images status --json",
-		"omp images doctor",
-		"omp images probe --timeout 15",
-		"omp images purge",
-		"omp images purge --all --apply",
+		`${APP_DISPLAY_NAME} images`,
+		`${APP_DISPLAY_NAME} images status --json`,
+		`${APP_DISPLAY_NAME} images doctor`,
+		`${APP_DISPLAY_NAME} images probe --timeout 15`,
+		`${APP_DISPLAY_NAME} images purge`,
+		`${APP_DISPLAY_NAME} images purge --all --apply`,
 	];
 
 	async run(): Promise<void> {

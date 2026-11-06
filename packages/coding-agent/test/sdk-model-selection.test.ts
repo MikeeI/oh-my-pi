@@ -34,7 +34,7 @@ import { getRestorableSessionModels } from "@oh-my-pi/pi-coding-agent/session/se
 import { EPHEMERAL_MODEL_CHANGE_ROLE } from "@oh-my-pi/pi-coding-agent/session/session-entries";
 import { TurnRecovery, type TurnRecoveryHost } from "@oh-my-pi/pi-coding-agent/session/turn-recovery";
 import type { AgentDefinition } from "@oh-my-pi/pi-coding-agent/task/types";
-import { removeSyncWithRetries, Snowflake } from "@oh-my-pi/pi-utils";
+import { getAgentDir, removeSyncWithRetries, Snowflake } from "@oh-my-pi/pi-utils";
 import { createInMemoryAuthStorage } from "./helpers/agent-session-setup";
 
 import {
@@ -42,6 +42,9 @@ import {
 	cfgCompactionModelThresholdsEnabled,
 } from "@oh-my-pi/pi-coding-agent/session/context-settings";
 import { cfgRetryFallbackChains } from "@oh-my-pi/pi-coding-agent/session/settings";
+
+// Keep this fixture discovery-only when upstream adds production Codex models to the bundled catalog.
+const COLD_DEFAULT_MODEL_ID = "gpt-6.1-sol-cold-discovery-fixture";
 
 describe("createAgentSession deferred model pattern resolution", () => {
 	let tempDir: string;
@@ -131,7 +134,7 @@ describe("createAgentSession deferred model pattern resolution", () => {
 		pi.registerProvider("runtime-provider", dynamicOnlyProviderConfig);
 	};
 
-	function buildSessionOptions(modelPattern: string | string[]) {
+	function buildSessionOptions(modelPattern?: string | string[]) {
 		// Reuse one empty registry across these model-only cases. Opening a fresh
 		// AuthStorage runs the full SQLite schema setup, while every session here
 		// registers and removes the same inline provider on its own lifecycle.
@@ -175,7 +178,7 @@ describe("createAgentSession deferred model pattern resolution", () => {
 	});
 
 	test("lets a child task spawn a model agent inherited from its parent", async () => {
-		const bundledTask = getBundledAgent("task");
+		const bundledTask = getBundledAgent("task", getAgentDir());
 		if (!bundledTask) throw new Error("Expected bundled task agent");
 		const modelAgent: AgentDefinition = {
 			...bundledTask,
@@ -476,6 +479,72 @@ describe("createAgentSession deferred model pattern resolution", () => {
 			expect(modelRegistry.find("deferred-runtime-provider", "deferred-runtime-model")).toBeDefined();
 		} finally {
 			await result.session.dispose();
+		}
+	});
+
+	// Built-in account discovery is not part of getDiscoverableProviders().
+	// A cold configured default must still beat a competing authenticated model.
+	function builtinDefaultOptions(discoveredModels: string[]) {
+		const authStorage = createInMemoryAuthStorage();
+		authStoragesToClose.push(authStorage);
+		authStorage.keys.setRuntime("openai-codex", "codex-test-token");
+		authStorage.keys.setRuntime("deepseek", "deepseek-test-key");
+		const settings = Settings.isolated({
+			modelRoles: { default: `openai-codex/${COLD_DEFAULT_MODEL_ID}:xhigh` },
+			enabledModels: [`openai-codex/${COLD_DEFAULT_MODEL_ID}`, "deepseek/deepseek-v4-pro"],
+			disabledProviders: ["ollama", "lm-studio", "llama.cpp"],
+			"retry.modelFallback": false,
+		});
+		const discoveryFetch: FetchImpl = async input => {
+			const url = new URL(String(input));
+			if (url.hostname === "chatgpt.com" && url.pathname.endsWith("/models")) {
+				return Response.json({
+					models: discoveredModels.map(slug => ({
+						slug,
+						supported_in_api: true,
+						default_reasoning_level: "high",
+						supported_reasoning_levels: ["low", "medium", "high", "xhigh"],
+					})),
+				});
+			}
+			return new Response("not found", { status: 404 });
+		};
+		const modelRegistry = new ModelRegistry(authStorage, path.join(tempDir, "models.yml"), {
+			settings,
+			fetch: discoveryFetch,
+		});
+		return {
+			...buildSessionOptions(),
+			authStorage,
+			modelRegistry,
+			settings,
+			extensions: [],
+			hasUI: true,
+		};
+	}
+
+	test("awaits cold built-in default discovery instead of starting on another provider", async () => {
+		const { session } = await createAgentSession(builtinDefaultOptions([COLD_DEFAULT_MODEL_ID]));
+		try {
+			expect(session.model?.provider).toBe("openai-codex");
+			expect(session.model?.id).toBe(COLD_DEFAULT_MODEL_ID);
+			expect(session.thinkingLevel).toBe(Effort.XHigh);
+		} finally {
+			await session.dispose();
+		}
+	});
+
+	test("rejects an unresolved configured default instead of using another authenticated provider", async () => {
+		const startup = createAgentSession(builtinDefaultOptions([]));
+		try {
+			await expect(startup).rejects.toThrow(
+				`Configured default model "openai-codex/${COLD_DEFAULT_MODEL_ID}:xhigh" could not be resolved after discovery`,
+			);
+		} finally {
+			await startup.then(
+				result => result.session.dispose(),
+				() => undefined,
+			);
 		}
 	});
 
@@ -1570,12 +1639,12 @@ describe("createAgentSession deferred model pattern resolution", () => {
 
 	test.each([
 		// Not in the catalog at all.
-		["anthropic/claude-sonnet-9-9", "not found"],
+		"anthropic/claude-sonnet-9-9",
 		// In the catalog, but its provider has no credentials here.
-		["google/gemini-2.5-pro", "is unavailable (no credentials, or not in enabledModels)"],
+		"google/gemini-2.5-pro",
 	] as const)(
-		"names a configured default %s that does not resolve instead of switching silently",
-		async (configured, reason) => {
+		"rejects configured default %s after discovery instead of choosing an unrelated model",
+		async configured => {
 			const authStorage = createInMemoryAuthStorage();
 			authStorage.keys.setRuntime("anthropic", "test-key");
 			const modelRegistry = new ModelRegistry(authStorage, path.join(tempDir, "models.yml"));
@@ -1583,33 +1652,27 @@ describe("createAgentSession deferred model pattern resolution", () => {
 			settings.setModelRole("default", configured);
 
 			try {
-				const { session, modelFallbackMessage } = await createAgentSession({
-					cwd: tempDir,
-					agentDir: tempDir,
-					authStorage,
-					modelRegistry,
-					settings,
-					sessionManager: SessionManager.inMemory(),
-					disableExtensionDiscovery: true,
-					skills: [],
-					contextFiles: [],
-					promptTemplates: [],
-					slashCommands: [],
-					enableMCP: false,
-					enableLsp: false,
-					skipPythonPreflight: true,
-					rules: [],
-					preloadedCustomToolPaths: [],
-					toolNames: ["read"],
-				});
-
-				try {
-					expect(session.model).toBeDefined();
-					expect(modelFallbackMessage).toContain(`Default model ${configured} ${reason}`);
-					expect(modelFallbackMessage).toContain(`${session.model?.provider}/${session.model?.id}`);
-				} finally {
-					await session.dispose();
-				}
+				await expect(
+					createAgentSession({
+						cwd: tempDir,
+						agentDir: tempDir,
+						authStorage,
+						modelRegistry,
+						settings,
+						sessionManager: SessionManager.inMemory(),
+						disableExtensionDiscovery: true,
+						skills: [],
+						contextFiles: [],
+						promptTemplates: [],
+						slashCommands: [],
+						enableMCP: false,
+						enableLsp: false,
+						skipPythonPreflight: true,
+						rules: [],
+						preloadedCustomToolPaths: [],
+						toolNames: ["read"],
+					}),
+				).rejects.toThrow(`Configured default model "${configured}" could not be resolved after discovery`);
 			} finally {
 				authStorage.close();
 			}
@@ -1824,19 +1887,14 @@ describe("createAgentSession deferred model pattern resolution", () => {
 		}
 	});
 
-	test("keeps the restore failure when the settings default is also stale on interactive resume", async () => {
-		const { session, modelFallbackMessage } = await createAgentSession({
-			...buildResumeOptions(),
-			hasUI: true,
-			settings: Settings.isolated({ modelRoles: { default: "anthropic/claude-sonnet-9-9" } }),
-		});
-		try {
-			expect(session.model).toBeDefined();
-			expect(modelFallbackMessage).toContain("Could not restore model missing-provider/missing-model");
-			expect(modelFallbackMessage).toContain("Default model anthropic/claude-sonnet-9-9 not found");
-		} finally {
-			await session.dispose();
-		}
+	test("rejects interactive resume when both the saved model and configured default are unavailable", async () => {
+		await expect(
+			createAgentSession({
+				...buildResumeOptions(),
+				hasUI: true,
+				settings: Settings.isolated({ modelRoles: { default: "anthropic/claude-sonnet-9-9" } }),
+			}),
+		).rejects.toThrow('Configured default model "anthropic/claude-sonnet-9-9" could not be resolved');
 	});
 
 	test.each(["model", "modelPattern"] as const)(

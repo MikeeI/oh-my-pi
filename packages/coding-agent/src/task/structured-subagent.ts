@@ -478,8 +478,8 @@ function preflightPerCallModel(
 }
 
 /**
- * In-flight agent discovery, keyed by resolved cwd, the effective extension
- * roots and the provider/source toggles `discoverAgents` consults. Concurrent
+ * In-flight agent discovery, keyed by resolved cwd, the active profile, the
+ * effective extension roots and the provider/source toggles `discoverAgents` consults. Concurrent
  * preflights (task batch items, eval `agent()` fan-out) share one disk scan;
  * the entry is dropped when the scan settles, so any later call rescans and
  * policy resolution stays as fresh as before. A toggle flipped mid-scan changes
@@ -489,7 +489,11 @@ function preflightPerCallModel(
  */
 const inflightDiscovery = new Map<string, { fn: typeof discoverAgents; promise: Promise<DiscoveryResult> }>();
 
-function discoverAgentsShared(cwd: string, extensionRoots?: EffectiveExtensionRoots): Promise<DiscoveryResult> {
+function discoverAgentsShared(
+	cwd: string,
+	agentDir: string,
+	extensionRoots?: EffectiveExtensionRoots,
+): Promise<DiscoveryResult> {
 	const fn = discoverAgents;
 	const policy = [
 		isProviderEnabled("omp-plugins"),
@@ -497,10 +501,11 @@ function discoverAgentsShared(cwd: string, extensionRoots?: EffectiveExtensionRo
 		isUserSourceEnabled("claude-plugins"),
 		isUserSourceEnabled("claude"),
 	].join(",");
-	const key = `${path.resolve(cwd)}\0${policy}\0${JSON.stringify(extensionRoots ?? null)}`;
+	const resolvedAgentDir = path.resolve(agentDir);
+	const key = `${path.resolve(cwd)}\0${resolvedAgentDir}\0${policy}\0${JSON.stringify(extensionRoots ?? null)}`;
 	const existing = inflightDiscovery.get(key);
 	if (existing && existing.fn === fn) return existing.promise;
-	const promise = fn(cwd, undefined, extensionRoots);
+	const promise = fn(cwd, undefined, extensionRoots, resolvedAgentDir);
 	const entry = { fn, promise };
 	inflightDiscovery.set(key, entry);
 	const clear = () => {
@@ -528,7 +533,11 @@ export async function resolveEffectiveSubagentPolicy(
 	if (agentName !== SEANCE_AGENT_NAME) assertPlanControlsAllowed(request, planMode);
 	assertDepthAndSpawnAllowed(request, agentName);
 
-	const discovery = await discoverAgentsShared(request.session.cwd, request.session.effectiveExtensionRoots?.());
+	const discovery = await discoverAgentsShared(
+		request.session.cwd,
+		request.session.settings.getAgentDir(),
+		request.session.effectiveExtensionRoots?.(),
+	);
 	const sessionAgents = request.session.getSessionAgents?.() ?? [];
 	const agents = [...discovery.agents, ...sessionAgents];
 	const agent = getAgent(agents, agentName);
@@ -1098,6 +1107,7 @@ export async function runStructuredSubagent(request: StructuredSubagentRequest):
 				onSubprocessResult?.(result);
 			} else {
 				result = await runIsolatedSubprocess({
+					agentDir: request.session.settings.getAgentDir(),
 					baseOptions,
 					context: isolationContext,
 					openWorkspace: openIsolatedWorkspace(request.session.settings),

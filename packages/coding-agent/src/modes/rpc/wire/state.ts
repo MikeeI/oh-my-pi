@@ -22,7 +22,7 @@ export const stateDefs = {
 	TodoStatus: "'pending' | 'in_progress' | 'completed' | 'abandoned'",
 	GoalOp: "'get' | 'create' | 'resume' | 'pause' | 'drop'",
 	GoalStatus: "'active' | 'paused' | 'budget-limited' | 'complete' | 'dropped'",
-	SlashCommandSource: "'builtin' | 'skill' | 'extension' | 'custom' | 'mcp_prompt' | 'file'",
+	SlashCommandSource: "'builtin' | 'skill' | 'extension' | 'custom' | 'mcp_prompt' | 'file' | 'routine'",
 	SubagentSubscriptionLevel: doc(
 		"'off' | 'progress' | 'events'",
 		"Forwarded subagent frames: none, lifecycle and progress, or also raw session events.",
@@ -161,6 +161,12 @@ export const stateDefs = {
 			"Bytes dropped from the middle of `output`, which keeps the head and tail.",
 		),
 		"elidedLines?": doc("number.integer", "Lines dropped from the middle of `output`."),
+		"headLines?": doc("number.integer", "Exact displayed head lines when inline output maps to the artifact."),
+		"tailLines?": doc("number.integer", "Exact displayed tail lines when inline output maps to the artifact."),
+		"elidedLineRange?": doc(
+			"LineRange",
+			"Artifact lines containing every elided byte; absent for substituted output.",
+		),
 		"columnDroppedBytes?": doc(
 			"number.integer",
 			"Bytes the per-line column cap cut from `output`, across all lines.",
