@@ -33,7 +33,7 @@ Next finding ID: ISSUE-031
 | [ISSUE-027](issues/ISSUE-027.md) | Prompt discovery: user templates ignore `PI_CODING_AGENT_DIR` | Investigating | Not-Selected | Not-Selected | Medium | Await fork fix authorization | Not published. |
 | [ISSUE-028](issues/ISSUE-028.md) | Anthropic prompt cache: every new session re-writes the unanchored `<project-context>` block | Submitted | Research-and-Reporting | Existing-issue-comment | Medium | Await maintainer decision | https://github.com/can1357/oh-my-pi/issues/16883#issuecomment-6387558568 |
 | [ISSUE-029](issues/ISSUE-029.md) | Codex prompt cache: sibling affinity follows the session headers, so sharing `prompt_cache_key` has no effect | Submitted | Research-and-Reporting | Existing-issue-comment | Low | Await maintainer decision | https://github.com/can1357/oh-my-pi/issues/16884#issuecomment-6387558727 |
-| [ISSUE-030](issues/ISSUE-030.md) | Status line: Mistral Vibe login keys bill a subscription but render as metered spend | PR-Ready | Pull-Request-Implementation | New-pull-request | Medium | Await PR publication approval | Not published. |
+| [ISSUE-030](issues/ISSUE-030.md) | Status line: Mistral Vibe login keys bill a subscription but render as metered spend | Submitted | Research-and-Reporting | New-issue | Medium | Await maintainer decision | https://github.com/can1357/oh-my-pi/issues/18374 |
 
 ## Archived-Findings
 

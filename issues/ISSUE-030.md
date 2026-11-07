@@ -1,9 +1,9 @@
 # ISSUE-030 — Status line: Mistral Vibe login keys bill a subscription but render as metered spend
 
-State: PR-Ready
-Authorized-Work: Pull-Request-Implementation
-Publication-Target: New-pull-request
-External-Reference: Not published.
+State: Submitted
+Authorized-Work: Research-and-Reporting
+Publication-Target: New-issue
+External-Reference: https://github.com/can1357/oh-my-pi/issues/18374
 Contribution-Priority: Medium
 Root-Cause-Confidence: High
 Finding-Category: UI
@@ -68,7 +68,7 @@ Proposal-Status: Not implemented.
 - [S] Expose it through the thread auth RPC (`auth-protocol.ts`, `auth.ts`, `auth-remote.ts`) for worker sessions.
 - [S] Use it for billing decisions only: status line cost (`footer.ts`, `segments.ts`, startup cache), and advisor attribution.
 - [S] Keep `hasOAuth` for OAuth semantics: `/provider` auth mode, Anthropic OAuth cache tier (`agent-session.ts:6226`), and Gemini web search.
-- Upstream PR (minimal, selected 2026-11-07): the fork delta without renaming `ModelRegistry.isUsingOAuth`; the rename is left to maintainer review.
+- Upstream (issue with proposed fix, selected 2026-11-07): report the defect and link the verified reference implementation; no pull request.
 - Fork interim (implemented on `personal`, contract `MOMP-SUBSCRIPTION-BILLING`): all of the above, keeping the `isUsingOAuth` name.
 
 ## Scope-and-Constraints
@@ -92,64 +92,73 @@ Migration: None.
 - `packages/ai/test/auth-storage-subscription.test.ts` (fork): Vibe login key subscribes; console key and login keys on unflagged providers stay metered.
 - `packages/coding-agent/test/advisor-toggle.test.ts`: restored advisor attribution follows `hasSubscription`.
 - Live [O]: a broker-client TUI on `mistral/zai-glm-5-3` renders `(sub)` (Bug-Reproduction).
-
-## Pull-Request-Implementation
-
-Branch: `fix/issue-030`
-Base: `upstream/main@f2b795ba747b23d42052184d822b41e3d01357cc`
-Scope: `personal@956d2e0d6e` source and tests without `AGENTS.md`; regenerated `rules.json`; upstream-neutral `isUsingOAuth` doc comment; `packages/coding-agent/CHANGELOG.md` Fixed entry.
-Commit: `ad6dda05cd`
-Push: `origin/fix/issue-030`
-Checks:
-- Clean `f2b795ba74` source CLI, `--model mistral/zai-glm-5-3`, broker Vibe credential → `◫ 4.5%/450K ⟲ ───` (no billing segment).
-- Same setup on `ad6dda05cd` → `◫ 4.5%/450K ⟲   (sub) ───`.
-- `bun run check:ts` → exit 0; no Rust-affecting changes.
-- `bun test` on `auth-storage-subscription`, `advisor-toggle`, `compat-compile`, `status-line-cost-segment`, `auth-hooks-registry` → 94 pass, 0 fail.
+- Reference implementation: `MikeeI/oh-my-pi@ad6dda05cd650508e0932ebd071b08605029755c` (`fix/issue-030`, base `f2b795ba74`, 15 files, +91/−12, no fork-only files).
+- [O] Clean `f2b795ba74` source CLI, same setup → `◫ 4.5%/450K ⟲ ───` (no billing segment); `ad6dda05cd` → `◫ 4.5%/450K ⟲   (sub) ───`.
+- [O] On `ad6dda05cd`: `bun run check:ts` exit 0; 94 tests across `auth-storage-subscription`, `advisor-toggle`, `compat-compile`, `status-line-cost-segment`, `auth-hooks-registry` pass.
 
 ## Publication-Draft
 
-Title: `fix(auth): show Mistral Vibe sign-in usage as subscription spend`
+Target: `can1357/oh-my-pi`, Bug Report form.
+Title: `Mistral Vibe sign-in usage renders as pay-as-you-go spend, or no cost segment, instead of subscription`
+
+Description:
 
 ```markdown
-## What
+`/login mistral` (Mistral Vibe browser sign-in, #17672) stores the minted key as a plain `api_key` with `source: "login"`. As #17672 states, usage of that key "is billed against the plan's Vibe Code quota, not pay-as-you-go API credits".
 
-Mistral Vibe quotas are nice.
+The status line disagrees. Every billing-class decision asks `credentials.hasOAuth(provider)`, which only accepts `type: "oauth"`:
 
-`/login mistral` (Mistral Vibe sign-in, #17672) stores the minted key as `{ type: "api_key", source: "login" }`, but every billing-class decision asks `credentials.hasOAuth(provider)`, which only accepts OAuth credentials. Vibe usage therefore renders as pay-as-you-go spend, and when the catalog row has no price (or before the first priced turn) the cost segment disappears entirely, because `formatBillingSummary` has nothing to show.
+- [`pool.ts#L662`](https://github.com/can1357/oh-my-pi/blob/f2b795ba747b23d42052184d822b41e3d01357cc/packages/ai/src/auth/pool.ts#L662): `hasOAuth` is `type === "oauth"`.
+- [`model-registry.ts#L3783`](https://github.com/can1357/oh-my-pi/blob/f2b795ba747b23d42052184d822b41e3d01357cc/packages/coding-agent/src/config/model-registry.ts#L3783): `isUsingOAuth(model)` delegates to it.
+- [`footer.ts#L201`](https://github.com/can1357/oh-my-pi/blob/f2b795ba747b23d42052184d822b41e3d01357cc/packages/tui/src/status-line/footer.ts#L201), [`segments.ts#L807`](https://github.com/can1357/oh-my-pi/blob/f2b795ba747b23d42052184d822b41e3d01357cc/packages/tui/src/status-line/segments.ts#L807): `usingSubscription` comes from `isUsingOAuth`.
+- [`metrics.ts#L63-L72`](https://github.com/can1357/oh-my-pi/blob/f2b795ba747b23d42052184d822b41e3d01357cc/packages/tui/src/status-line/metrics.ts#L63-L72): no cost and no subscription render no billing segment.
 
-This PR adds an auth axis and a billing predicate:
+So Vibe usage shows catalog list prices as if it were metered spend. When the cost is zero (before the first priced turn, or on a zero-priced catalog row) the billing segment disappears entirely. Advisor spend on Mistral is attributed as metered too ([`session-advisors.ts#L857`](https://github.com/can1357/oh-my-pi/blob/f2b795ba747b23d42052184d822b41e3d01357cc/packages/coding-agent/src/session/session-advisors.ts#L857)).
+```
 
-- `login-subscription #true` on `auth/mistral.kdl`, compiled to `CompiledAuthProvider.loginSubscription`.
-- `credentials.hasSubscription(provider)`: any OAuth credential, or an `api_key` with `source: "login"` on a `login-subscription` provider. It is also exposed through the thread auth RPC for worker sessions.
-- Billing callers use it: `ModelRegistry.isUsingOAuth` (status line, advisors) and restored advisor attribution.
+Steps to Reproduce:
 
-Unchanged: `hasOAuth` keeps its OAuth-only meaning (`/provider` auth mode, Gemini search, Anthropic cache tier); `MISTRAL_API_KEY` and pasted keys stay metered; no credential schema, broker, or migration change, since existing Vibe logins already carry `source: "login"`.
+```markdown
+1. `/login mistral` and complete the Mistral Vibe browser sign-in.
+2. Start `omp --model mistral/zai-glm-5-3` (a source build at `f2b795ba74` reproduces it).
+3. Look at the status line before sending a prompt:
+   `╭── ⬢ GLM-5.3 · ◑ med   🗑 /tmp   ◫ 4.5%/450K ⟲ ───…╮` (no billing segment)
+```
 
-`isUsingOAuth` keeps its name to keep this diff small; happy to rename it to `isUsingSubscription` across callers and fixtures if you prefer.
+Expected Behavior:
 
-## Why
+```markdown
+The subscription marker, as for OAuth plans:
+`╭── ⬢ GLM-5.3 · ◑ med   🗑 /tmp   ◫ 4.5%/450K ⟲   (sub) ───…╮`
 
-#17672 states the minted key "is billed against the plan's Vibe Code quota, not pay-as-you-go API credits", but the status line contradicts it.
+`MISTRAL_API_KEY` and pasted Mistral keys should stay metered.
+```
 
-- [`pool.ts#hasOAuth`](https://github.com/can1357/oh-my-pi/blob/f2b795ba747b23d42052184d822b41e3d01357cc/packages/ai/src/auth/pool.ts#L662): only `type === "oauth"` counts.
-- [`footer.ts`](https://github.com/can1357/oh-my-pi/blob/f2b795ba747b23d42052184d822b41e3d01357cc/packages/tui/src/status-line/footer.ts#L201) and [`segments.ts`](https://github.com/can1357/oh-my-pi/blob/f2b795ba747b23d42052184d822b41e3d01357cc/packages/tui/src/status-line/segments.ts#L807): `usingSubscription` comes from `isUsingOAuth`.
-- [`metrics.ts`](https://github.com/can1357/oh-my-pi/blob/f2b795ba747b23d42052184d822b41e3d01357cc/packages/tui/src/status-line/metrics.ts#L63-L72): no cost and no subscription render no billing segment.
+Platform: `Linux`
+omp version: `18.18.0 (source build at f2b795ba74)`
+Bun version: `1.4.4`
+Provider: `Other`
+Area: `TUI / Display`
 
-Related but distinct: #8247 asks for per-message subscription/direct totals; this PR only fixes how a credential is classified.
+Additional context:
 
-## Testing
+```markdown
+## Proposed fix
 
-- Reproduction on a source build at `f2b795ba74`, `--model mistral/zai-glm-5-3`, credential from the Vibe sign-in, before any prompt:
-  - before: `╭── ⬢ GLM-5.3 · ◑ med   🗑 /tmp   ◫ 4.5%/450K ⟲ ───…╮` (no billing segment)
-  - after: `╭── ⬢ GLM-5.3 · ◑ med   🗑 /tmp   ◫ 4.5%/450K ⟲   (sub) ───…╮`
-- `bun test packages/ai/test/auth-storage-subscription.test.ts packages/coding-agent/test/advisor-toggle.test.ts packages/catalog/test/compat-compile.test.ts packages/tui/test/status-line-cost-segment.test.ts packages/ai/test/auth-hooks-registry.test.ts`: 94 pass, 0 fail.
-- `bun run check:ts`: passes; the change touches no Rust.
+The credential already carries the needed signal (`source: "login"`), and it already survives SQLite and the auth broker (`wire-schemas.ts` carries `source?: 'login'`), so no schema, broker, or migration change is needed:
 
----
+- Add an auth axis `login-subscription #true` to `auth/mistral.kdl`, compiled to `CompiledAuthProvider.loginSubscription` next to `orgScopedIdentity`. Only the Vibe sign-in stores `source: "login"` for `mistral`.
+- Add `credentials.hasSubscription(provider)`: any OAuth credential, or an `api_key` with `source: "login"` on a `login-subscription` provider. Expose it through the thread auth RPC for worker sessions.
+- Use it for billing decisions only: `ModelRegistry.isUsingOAuth` (status line, live advisors) and restored advisor attribution. Keep `hasOAuth` OAuth-only for `/provider`, Gemini search, and the Anthropic cache tier.
+- Optionally rename `isUsingOAuth` to `isUsingSubscription`; I left it out to keep the change small.
 
-- [x] `bun check` passes
-- [x] Tested locally
-- [x] CHANGELOG updated with the required attribution (if user-facing; internal issue fixes use issue links, external contributions add the PR link and contributor credit after creation)
+A verified reference implementation is on my fork: https://github.com/MikeeI/oh-my-pi/commit/ad6dda05cd650508e0932ebd071b08605029755c (15 files, +91/−12, based on `f2b795ba74`). With it, the same reproduction renders `(sub)`; `bun run check:ts` passes, and the focused tests (`auth-storage-subscription`, `advisor-toggle`, `compat-compile`, `status-line-cost-segment`, `auth-hooks-registry`) pass, including a new regression test for the credential classification.
+
+Related but distinct: #8247 asks for per-message subscription/direct cost totals; this issue is only about how a credential is classified.
+
+I checked the relevant issues, pull requests, and #17672; this report is not a duplicate.
+
+I am reporting this finding only and am not currently proposing a pull request.
 
 ### Disclosure
 
@@ -164,13 +173,10 @@ Thank you for your work.
 
 ## Publication-Blockers
 
-- After creation, the CHANGELOG entry needs the PR link and contributor credit, per the upstream template.
-- `CONTRIBUTING.md` asks for Discord discussion before changes spanning several packages; this touches `catalog`, `ai`, and `coding-agent`.
-- The submitter's sentence ("Mistral Vibe quotas are nice.") is present but does not explain what changed and why, which `CONTRIBUTING.md` asks of it.
-- Publication requires approval of the exact final draft and target.
+None.
 
 ## Next-Action
-
-Summary: Await PR publication approval
-Action: Show the user the exact final PR draft and target `can1357/oh-my-pi` ← `MikeeI:fix/issue-030`, and resolve the Discord and own-sentence blockers.
-Done-When: The user approves publication of that exact draft and target, or declines.
+Summary: Await maintainer decision
+Action: Check #18374 for maintainer or robomp activity and respond only with new evidence or requested answers.
+Done-When: A fix lands upstream, the issue is closed, or a maintainer question needs an answer.
+Done-When: The issue URL is recorded in External-Reference, or the user declines.
