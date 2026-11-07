@@ -1,3 +1,4 @@
+import { authPolicyFor } from "@oh-my-pi/pi-catalog/compat/auth";
 import { logger } from "@oh-my-pi/pi-utils";
 import { resolveCredentialIdentityKey, serializeCredential } from "./sqlite-credential-store";
 import type { BlockStoreHealth } from "./blocks";
@@ -661,6 +662,19 @@ export class CredentialPool implements CredentialsApi {
 	 */
 	hasOAuth(provider: string): boolean {
 		return this.credentials(provider).some(credential => credential.type === "oauth");
+	}
+
+	/**
+	 * Check if a stored credential bills a subscription rather than metered usage:
+	 * any OAuth login, or a `/login`-minted API key on a `login-subscription` provider.
+	 */
+	hasSubscription(provider: string): boolean {
+		const loginKeysSubscribe = authPolicyFor(provider)?.loginSubscription === true;
+		return this.credentials(provider).some(
+			credential =>
+				credential.type === "oauth" ||
+				(loginKeysSubscribe && credential.type === "api_key" && credential.source === "login"),
+		);
 	}
 
 	/**

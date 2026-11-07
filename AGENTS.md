@@ -806,6 +806,26 @@ The upgrader validates these IDs against its executable and manual proof mapping
 - Proof: `packages/tui/test/cache-invalidation-marker.test.ts`.
 - Proof: render the real marker in a TUI and inspect its foreground and unchanged geometry.
 
+#### `MOMP-SUBSCRIPTION-BILLING` — Login-minted subscription keys
+
+- Disposition: `UPSTREAM-INTEGRIERT`.
+- Contract: an API key stored by `/login` (`source: "login"`) on a `login-subscription` provider bills a subscription.
+- Contract: Mistral Vibe sign-in keys render the status-line subscription marker, including models with zero catalog cost.
+- Contract: `MISTRAL_API_KEY`, pasted, and imported Mistral keys stay metered.
+- Contract: advisor spend on such a provider is attributed as subscription spend, live and after resume.
+- Contract: `hasOAuth` keeps OAuth-only meaning for `/provider` auth mode, Gemini search, and OAuth transport decisions.
+- Contract: broker-delivered credentials and worker sessions answer the same as local storage.
+- Owner: `packages/catalog/src/compat/rules/auth/mistral.kdl` declares `login-subscription #true`; `compile-auth.ts` compiles it.
+- Owner: `packages/ai/src/auth/pool.ts#AuthCredentialPool.hasSubscription` owns the billing-class predicate.
+- Owner: `src/thread/services/auth-protocol.ts`, `auth.ts`, and `auth-remote.ts` carry `credentials.hasSubscription` to workers.
+- Owner: `src/config/model-registry.ts#isUsingOAuth` and `src/session/session-advisors.ts#deriveSubscriptionSlugs` consume it.
+- Implementation constraint: `isUsingOAuth` keeps its upstream name to limit rebase surface; its only non-billing caller gates on `anthropic-messages`.
+- Reason: upstream stores Vibe keys as plain `api_key` and classifies billing only by OAuth credential type.
+- Evidence: `issues/ISSUE-030.md`.
+- Required action: replace this delta with the upstream owner once upstream classifies login-minted subscription keys.
+- Proof: `packages/ai/test/auth-storage-subscription.test.ts`.
+- Proof: a broker-client TUI on a Mistral model shows the subscription marker in the status line.
+
 #### `MOMP-RUNTIME-AUDIT` — Repeatable local performance evidence
 
 - Disposition: `MOMP-EIGEN`.

@@ -3794,10 +3794,13 @@ export class ModelRegistry {
 	}
 
 	/**
-	 * Check if a model is using OAuth credentials (subscription).
+	 * Check if a model's spend bills a subscription: OAuth, or a `/login` key on a
+	 * `login-subscription` provider such as Mistral Vibe. Billing callers (status line,
+	 * advisors) consume this. MOMP keeps the upstream name to limit rebase surface;
+	 * the Anthropic cache-tier caller gates on `anthropic-messages`, where both answers match.
 	 */
 	isUsingOAuth(model: Model<Api>): boolean {
-		return this.authStorage.credentials.hasOAuth(model.provider);
+		return this.authStorage.credentials.hasSubscription(model.provider);
 	}
 
 	#clearRuntimeProviderState(providerName: string): void {

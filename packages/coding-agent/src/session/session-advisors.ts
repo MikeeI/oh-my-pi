@@ -840,8 +840,8 @@ export class SessionAdvisors {
 	}
 
 	/**
-	 * Slugs whose restored spend ran on a provider that currently authenticates
-	 * via OAuth — the persisted-spend equivalent of the live {@link isUsingSubscription}
+	 * Slugs whose restored spend ran on a provider that currently bills a
+	 * subscription — the persisted-spend equivalent of the live {@link isUsingSubscription}
 	 * check, so resumed sessions attribute subscription usage without a catalog scan.
 	 */
 	#deriveSubscriptionSlugs(
@@ -854,7 +854,7 @@ export class SessionAdvisors {
 		for (const [slug, providers] of providersBySlug) {
 			if ((costs.get(slug) ?? 0) <= 0) continue;
 			for (const provider of providers) {
-				if (auth.credentials.hasOAuth(provider)) {
+				if (auth.credentials.hasSubscription(provider)) {
 					slugs.add(slug);
 					break;
 				}

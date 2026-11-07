@@ -891,6 +891,10 @@ export interface CredentialsApi {
 	 */
 	hasOAuth(provider: string): boolean;
 	/**
+	 * Check if a stored credential bills a subscription: OAuth, or a `/login` key on a `login-subscription` provider.
+	 */
+	hasSubscription(provider: string): boolean;
+	/**
 	 * Get OAuth credentials for a provider.
 	 */
 	getOAuth(provider: string): OAuthCredential | undefined;
