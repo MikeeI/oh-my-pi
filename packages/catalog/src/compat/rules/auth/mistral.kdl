@@ -4,4 +4,6 @@ auth "mistral" {
 	name "Mistral"
 	env "MISTRAL_API_KEY"
 	login "custom" hook="mistral-vibe-sign-in"
+	// Only the Vibe sign-in stores `source: "login"`; MISTRAL_API_KEY and pasted keys stay metered.
+	login-subscription #true
 }

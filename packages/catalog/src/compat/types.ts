@@ -574,6 +574,8 @@ export interface CompiledAuthProvider {
 	allowsMissingApiKey?: boolean;
 	/** Qualify credential and usage-report identity by org when an email may have multiple subscriptions. */
 	orgScopedIdentity?: boolean;
+	/** API keys minted by `/login` bill a subscription; env and pasted keys stay metered. */
+	loginSubscription?: boolean;
 	/** Environment variables carrying this provider's own OAuth bearer, excluding borrowed API-key aliases. */
 	oauthTokenEnv?: string[];
 	/** APIs whose provider transport resolves credentials without a stored account. */
