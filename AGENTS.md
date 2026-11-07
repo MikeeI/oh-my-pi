@@ -1,6 +1,6 @@
-# Development Rules
+# Repository Guidelines
 
-## Fork Identity
+## Project Overview
 
 MOMP is an opinionated personal fork of Oh My Pi.
 It adds deliberate workflow and behavior changes while staying as close as practical to `can1357/oh-my-pi`.
@@ -1295,12 +1295,10 @@ Fork-maintenance completion evidence:
 - Prove upstream restoration against current `upstream/main`, not memory or an old commit.
 - NEVER report a cutover complete while orphaned closure elements remain.
 
-## Fork and Upstream Contribution Intent
+## Fork & Upstream Contribution Intent
 
 - Identity: official upstream is [can1357/oh-my-pi](https://github.com/can1357/oh-my-pi).
 - Identity: this checkout is the [MikeeI/oh-my-pi](https://github.com/MikeeI/oh-my-pi) fork.
-- Branches: `personal` owns fork-only agent context, the MOMP patchstack, and durable contribution tracking.
-- Branches: base clean upstream contribution branches on current `upstream/main`.
 - Boundary: keep `AGENTS.md`, `FORMAT.md`, `ISSUES.md`, `issues/`, and other fork-only state out of upstream diffs.
 
 Contribution selection:
@@ -1328,6 +1326,13 @@ Required skills and authorization:
 - `Pull-Request-Implementation` authorizes only the recorded scope.
 - It MAY implement that scope only after research resolves failure boundaries.
 - External publication follows `### External Publication Approval`; local tracking NEVER authorizes an external write.
+
+## Branch Roles
+
+- The canonical upstream branch is `main`; `main` mirrors `upstream/main` and stays free of MOMP-only changes.
+- `personal` owns fork-only agent context, the MOMP patchstack, and durable contribution tracking.
+- Upstream-ready source work uses separate `feat/issue-NNN`, `fix/issue-NNN`, or `chore/issue-NNN` branches off current `upstream/main`.
+- Remotes: `origin` is the personal fork `MikeeI/oh-my-pi`; `upstream` is `can1357/oh-my-pi`.
 
 ## Finding and Contribution Ledger
 
