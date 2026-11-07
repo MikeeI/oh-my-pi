@@ -176,7 +176,7 @@ Thank you for your work.
 None.
 
 ## Next-Action
+
 Summary: Await maintainer decision
 Action: Check #18374 for maintainer or robomp activity and respond only with new evidence or requested answers.
 Done-When: A fix lands upstream, the issue is closed, or a maintainer question needs an answer.
-Done-When: The issue URL is recorded in External-Reference, or the user declines.
