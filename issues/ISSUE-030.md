@@ -20,12 +20,12 @@ Root-Cause [S]: Every billing-class decision uses `AuthCredentialPool.hasOAuth(p
 
 Reach [S]: Every `mistral` model while the provider's credentials come from the Vibe browser sign-in; `MISTRAL_API_KEY` and pasted keys are correctly metered.
 Impact [S]: The cost segment never shows the subscription marker for Vibe; it shows catalog list-price dollars as if pay-as-you-go spend.
-Impact [S]: For catalog rows with zero cost, `formatBillingSummary` returns `undefined`, so the cost segment disappears entirely.
+Impact [O]: For catalog rows with zero cost, and before the first priced turn, the cost segment disappears entirely (see Bug-Reproduction).
 Impact [O]: The operator's Vibe sessions persist list-price costs (`zai-glm-5-3` ≈ $0.037–0.042 per turn; `deepseek-v4-1-flash-1017` ≈ $0.001–0.004 per turn).
 Impact [O]: The local Mistral catalog cache lists zero-cost rows including `mistral-vibe-cli-latest`, `mistral-vibe-cli-fast`, `mistral-vibe-cli-with-tools`, and `mistral-medium-3-5`.
 Impact [S]: Advisor spend on Mistral is attributed as metered (`session-advisors.ts:857`, `:1949`, `:2947`).
 Boundary: Display and attribution only; persisted `usage.cost` and request routing are unaffected.
-Boundary: The missing or dollar-only footer has not yet been reproduced in a rendered TUI.
+Boundary: Reproduced on MOMP, whose pre-fix billing path matched upstream; not yet rendered from an upstream build.
 
 ## Evidence
 
@@ -52,6 +52,14 @@ Gaps: Upstream Discord not searched.
 
 Contribution fit: A focused upstream pull request; no existing thread owns credential billing classification.
 
+## Bug-Reproduction
+
+Environment: installed MOMP `18.18.0-mikeei-1` (upstream `18.18.0` base, no fork delta in the billing path), auth broker client, `mistral` credential `{ type: "api_key", source: "login" }`, default status line.
+Reproduction: `momp --model mistral/zai-glm-5-3` in a 160×40 tmux pane; capture the status line before sending a prompt.
+Actual [O]: `╭── ⬢ GLM-5.3 · ◑ med   🗑 /tmp   ◫ 5.5%/450K ⟲ ───…╮` — no billing segment.
+Expected: The subscription marker, as for OAuth plans: `… ⟲   (sub) ───…╮`.
+Fix [O]: The MOMP interim patch renders `╭── ⬢ GLM-5.3 · ◑ med   🗑 /tmp   ◫ 5.5%/450K ⟲   (sub) ───…╮` in the same setup (source CLI, 2026-11-07).
+
 ## Proposed-Change
 
 Proposal-Status: Not implemented.
@@ -61,7 +69,7 @@ Proposal-Status: Not implemented.
 - [S] Use it for billing decisions only: status line cost (`footer.ts`, `segments.ts`, startup cache), and advisor attribution.
 - [S] Keep `hasOAuth` for OAuth semantics: `/provider` auth mode, Anthropic OAuth cache tier (`agent-session.ts:6226`), and Gemini web search.
 - Upstream PR: rename `ModelRegistry.isUsingOAuth` to `isUsingSubscription` across callers and fixtures.
-- Fork interim, if authorized: change the `isUsingOAuth` body and `session-advisors.ts:857` only, to keep the rebase surface to about six files.
+- Fork interim (implemented on `personal`, contract `MOMP-SUBSCRIPTION-BILLING`): all of the above, keeping the `isUsingOAuth` name.
 
 ## Scope-and-Constraints
 
@@ -81,17 +89,18 @@ Migration: None.
 ## Verification
 
 - `bun run gen:compat`, then `packages/catalog/test/compat-compile.test.ts` covers the new axis.
-- `packages/tui/test/status-line-cost-segment.test.ts`: a Mistral `api_key` with `source: "login"` and zero cost renders the subscription marker; the same key without `source` renders no segment.
-- Live: on a broker client, a Mistral model shows the subscription marker in the TUI footer.
+- `packages/ai/test/auth-storage-subscription.test.ts` (fork): Vibe login key subscribes; console key and login keys on unflagged providers stay metered.
+- `packages/coding-agent/test/advisor-toggle.test.ts`: restored advisor attribution follows `hasSubscription`.
+- Live [O]: a broker-client TUI on `mistral/zai-glm-5-3` renders `(sub)` (Bug-Reproduction).
 
 ## Publication-Blockers
 
-- Footer behavior not yet reproduced in a rendered TUI; the impact claims are `[S]`.
+- Footer not yet rendered from an upstream build; the MOMP reproduction stands in for it.
 - The user has not selected Authorized-Work or Publication-Target.
 - Current upstream contribution guide and PR template not yet read for this finding.
 
 ## Next-Action
 
-Summary: Reproduce Vibe footer rendering
-Action: Render the status line cost segment for a Mistral model with the broker-delivered Vibe credential on current upstream.
-Done-When: The observed footer output is recorded as `[O]` under Bug-Reproduction.
+Summary: Await upstream contribution decision
+Action: Ask the user to select Authorized-Work and Publication-Target for the upstream fix.
+Done-When: The user selects both or declines upstream contribution.
