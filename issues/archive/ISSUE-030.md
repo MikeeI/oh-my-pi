@@ -1,6 +1,6 @@
 # ISSUE-030 — Status line: Mistral Vibe login keys bill a subscription but render as metered spend
 
-State: Submitted
+State: Archived
 Authorized-Work: Research-and-Reporting
 Publication-Target: New-issue
 External-Reference: https://github.com/can1357/oh-my-pi/issues/18374
@@ -8,7 +8,7 @@ Contribution-Priority: Medium
 Root-Cause-Confidence: High
 Finding-Category: UI
 Created: 2026-11-07
-Updated: 2026-11-07
+Updated: 2026-11-08
 Source: `upstream/main@f2b795ba747b23d42052184d822b41e3d01357cc`
 
 ## Root-Cause
@@ -69,7 +69,7 @@ Proposal-Status: Not implemented.
 - [S] Use it for billing decisions only: status line cost (`footer.ts`, `segments.ts`, startup cache), and advisor attribution.
 - [S] Keep `hasOAuth` for OAuth semantics: `/provider` auth mode, Anthropic OAuth cache tier (`agent-session.ts:6226`), and Gemini web search.
 - Upstream (issue with proposed fix, selected 2026-11-07): report the defect and link the verified reference implementation; no pull request.
-- Fork interim (implemented on `personal`, contract `MOMP-SUBSCRIPTION-BILLING`): all of the above, keeping the `isUsingOAuth` name.
+- Fork interim (contract `MOMP-SUBSCRIPTION-BILLING`) was removed once upstream v18.18.1 shipped the same classification.
 
 ## Scope-and-Constraints
 
@@ -177,6 +177,13 @@ None.
 
 ## Next-Action
 
-Summary: Await maintainer decision
-Action: Check #18374 for maintainer or robomp activity and respond only with new evidence or requested answers.
-Done-When: A fix lands upstream, the issue is closed, or a maintainer question needs an answer.
+Summary: —
+Action: None.
+Done-When: None.
+
+## Archive
+
+Archive-Reason: Fixed-Elsewhere
+Detail: None.
+Evidence: https://github.com/can1357/oh-my-pi/pull/18378 — PR state `MERGED` at 2026-11-07T12:19:26Z; #18374 closed at 2026-11-07T12:19:28Z; present in v18.18.1 as `AuthCredentialPool.hasSubscription`, `login-subscription #true` and `ModelRegistry.isUsingSubscription`; the fork interim was removed during the 18.18.1 upgrade.
+Checked: 2026-11-08
