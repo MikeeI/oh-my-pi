@@ -33,7 +33,7 @@ Next finding ID: ISSUE-032
 | [ISSUE-027](issues/ISSUE-027.md) | Prompt discovery: user templates ignore `PI_CODING_AGENT_DIR` | Investigating | Not-Selected | Not-Selected | Medium | Await fork fix authorization | Not published. |
 | [ISSUE-028](issues/ISSUE-028.md) | Anthropic prompt cache: every new session re-writes the unanchored `<project-context>` block | Submitted | Research-and-Reporting | Existing-issue-comment | Medium | Await maintainer decision | https://github.com/can1357/oh-my-pi/issues/16883#issuecomment-6387558568 |
 | [ISSUE-029](issues/ISSUE-029.md) | Codex prompt cache: sibling affinity follows the session headers, so sharing `prompt_cache_key` has no effect | Submitted | Research-and-Reporting | Existing-issue-comment | Low | Await maintainer decision | https://github.com/can1357/oh-my-pi/issues/16884#issuecomment-6387558727 |
-| [ISSUE-031](issues/ISSUE-031.md) | Prompt cache: a role edit in one instance rewrites every live session's task tool description | Draft-Ready | Research-and-Reporting | New-issue | High | Approve upstream issue draft | Not published. |
+| [ISSUE-031](issues/ISSUE-031.md) | Prompt cache: a role edit in one instance rewrites every live session's task tool description | Submitted | Research-and-Reporting | New-issue | High | Await maintainer decision | https://github.com/can1357/oh-my-pi/issues/18716 |
 
 ## Archived-Findings
 

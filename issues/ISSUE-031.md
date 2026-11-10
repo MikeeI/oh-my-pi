@@ -1,9 +1,9 @@
 # ISSUE-031 — Prompt cache: a role edit in one instance rewrites every live session's task tool description
 
-State: Draft-Ready
+State: Submitted
 Authorized-Work: Research-and-Reporting
 Publication-Target: New-issue
-External-Reference: Not published.
+External-Reference: https://github.com/can1357/oh-my-pi/issues/18716
 Contribution-Priority: High
 Root-Cause-Confidence: High
 Finding-Category: Performance
@@ -73,13 +73,13 @@ None.
 
 ## Next-Action
 
-Summary: Approve upstream issue draft
-Action: Show the exact title, body, and target to the user and publish only after explicit approval.
-Done-When: The user approves and the upstream issue URL is recorded, or the user rejects the draft.
+Summary: Await maintainer decision
+Action: Re-read #18716 for a maintainer decision on holding the advertisement per session versus resolving roles at dispatch.
+Done-When: A maintainer accepts, rejects, or reshapes the proposal, or the issue closes.
 
 ## Publication-Draft
 
-Target: can1357/oh-my-pi, New-issue, template `bug_report.yml`, label `bug`.
+Target: can1357/oh-my-pi, New-issue, template `bug_report.yml`; the `bug` label was not applied at submission.
 Title: Role edit in one omp instance rewrites the task tool description of every running session and busts its prompt cache (task.perCallModel)
 
 Body: [`evidence/issue-031/issue-body.md`](evidence/issue-031/issue-body.md); it lives outside this record because its literal placeholders read as unresolved to the ledger validator.
