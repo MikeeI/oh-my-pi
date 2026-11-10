@@ -53,8 +53,9 @@ Contribution fit: New-issue.
 
 ## Proposed-Change
 
-[S] Hold the per-call advertisement per session and refresh it only at cache-cold boundaries (compaction, idle past TTL, the session's own model change), mirroring #18400's held roster.
-[S] Alternative for maintainers: keep role values out of the tool description and resolve them at dispatch.
+[S] Preferred: accept configured role names as per-call selectors, resolve them at dispatch, and advertise only role names; the description stays stable and authorization stays live.
+[S] Rejected: holding only the advertisement per session drifts from live dispatch approval (`model-approval.ts:272-288`), so a held selector can be refused at preflight; holding grants too would put authorization on stale state.
+Workaround [O]: MOMP set `task.perCallModel: "off"` in `project-settings-omp` commit `dfcd7a45`.
 
 ## Scope-and-Constraints
 
@@ -83,3 +84,8 @@ Target: can1357/oh-my-pi, New-issue, template `bug_report.yml`; the `bug` label 
 Title: Role edit in one omp instance rewrites the task tool description of every running session and busts its prompt cache (task.perCallModel)
 
 Body: [`evidence/issue-031/issue-body.md`](evidence/issue-031/issue-body.md); it lives outside this record because its literal placeholders read as unresolved to the ledger validator.
+
+## Submitted-Text
+
+Follow-up comment: https://github.com/can1357/oh-my-pi/issues/18716#issuecomment-6769158671 — exact text in [`evidence/issue-031/comment-role-names.md`](evidence/issue-031/comment-role-names.md).
+Maintainer-bot (roboomp) reproduced the issue on 2026-11-10 and deferred the fix choice to maintainers.
