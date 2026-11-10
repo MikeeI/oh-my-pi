@@ -1,9 +1,9 @@
 # ISSUE-032 — Usage: Mistral Vibe Code budget is not reported
 
-State: Implementing
+State: Submitted
 Authorized-Work: Pull-Request-Implementation
 Publication-Target: New-pull-request
-External-Reference: Not published.
+External-Reference: https://github.com/can1357/oh-my-pi/pull/18723
 Contribution-Priority: Medium
 Root-Cause-Confidence: High
 Finding-Category: API
@@ -63,14 +63,13 @@ A 401 throws `ProviderHttpError` for credential health checks; 403, 404, other f
 
 ## Publication-Blockers
 
-- Upstream policy requires one contributor-authored sentence explaining the change in the user's own words.
-- External publication requires approval of the exact target and draft after that sentence is added.
+None.
 
 ## Next-Action
 
-Summary: Approve Mistral usage PR
-Action: Add the contributor-authored sentence, then approve the exact target and draft.
-Done-When: The sentence exists and the user explicitly approves the exact target and draft.
+Summary: Await maintainer review
+Action: Respond to review feedback on https://github.com/can1357/oh-my-pi/pull/18723.
+Done-When: The pull request is merged or closed and the record is archived.
 
 ## Pull-Request-Implementation
 
@@ -96,7 +95,7 @@ Body:
 ````markdown
 ## What
 
-[Required before publication: one sentence in the contributor's own words.]
+Vibe Quotas would be nice
 
 Adds a `mistral` usage provider. It reads `GET /v1/billing/budget`, the endpoint the Vibe Code CLI uses for its footer usage gauge ([`vibe/app_server/_billing.py`](https://github.com/mistralai/mistral-vibe/blob/main/vibe/app_server/_billing.py)), and maps `vibe_budget` and `api_budget` to monthly percent limits with their reset date and budget amount.
 
