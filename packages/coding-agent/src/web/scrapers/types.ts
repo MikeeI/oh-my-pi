@@ -204,7 +204,6 @@ export async function loadPage(url: string, options: LoadPageOptions = {}): Prom
 			const contentType = rawContentType.split(";")[0]?.trim().toLowerCase() ?? "";
 			const finalUrl = response.url;
 
-
 			if (response.status === 429 && !retried429) {
 				// Honor the rate limit before changing identity; otherwise a transient
 				// throttle needlessly invalidates the site's current client identity.

@@ -4325,11 +4325,7 @@ async function createAgentSessionScoped(options: CreateAgentSessionOptions): Pro
 			return new Map([...own, ...hosted].sort(([left], [right]) => (left < right ? -1 : left > right ? 1 : 0)));
 		};
 		// The inspection owner needs the full structured result, so keep it rather than widening.
-		const rebuildSystemPrompt = (async (
-			toolNames,
-			tools,
-			xdev,
-		): Promise<BuildSystemPromptResult> => {
+		const rebuildSystemPrompt = (async (toolNames, tools, xdev): Promise<BuildSystemPromptResult> => {
 			const promptCwd = sessionManager.getCwd();
 			let activeRepoContext = initialActiveRepoContext;
 			// Re-discover rules and context files from disk on every session-scoped

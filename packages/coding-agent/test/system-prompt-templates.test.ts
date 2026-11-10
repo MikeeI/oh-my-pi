@@ -247,10 +247,10 @@ describe("system Handlebars prompt templates", () => {
 			assignment: "Do the task.",
 		});
 
-		expect(subagentSystem).toContain("§ Context\nShared task background");
-		expect(subagentSystem).toContain("§ Role\nYou are a task agent.");
+		expect(subagentSystem).toContain("⁂ Context\nShared task background");
+		expect(subagentSystem).toContain("⁂ Role\nYou are a task agent.");
 		expect(subagentUser).toContain("Do the task.");
-		expect(subagentUser).not.toContain("§ Context");
+		expect(subagentUser).not.toContain("⁂ Context");
 		expect(subagentUser).not.toContain("Shared task background");
 	});
 

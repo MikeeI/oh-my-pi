@@ -391,6 +391,9 @@ The upgrader validates these IDs against its executable and manual proof mapping
 - Contract: GPT-5.6 default mode requires user, `AGENTS.md`, or skill authorization before delegation.
 - Contract: GPT-5.6 eager mode allows proactive delegation.
 - Contract: GPT-6 and newer models retain upstream restrained delegation; eager mode follows the upstream policy.
+- Coverage: upstream v18.18.6 resolves models without a delegation rule to `balanced`.
+- Coverage: its Main template renders `delegationTier`; `delegationBias` is no longer a render input.
+- Required action: managed Main templates branch on `delegationTier` for gated, restrained, balanced, and eager policy.
 - Contract: fan-out, concurrency, IRC, and peer-coordination instructions render from current upstream template inputs.
 - Coverage: upstream requires task `solutionSpace` to describe design openness rather than work volume.
 - Coverage: upstream maps task `effort` values to the target model's lowest, middle, and highest levels.
@@ -416,8 +419,9 @@ The upgrader validates these IDs against its executable and manual proof mapping
 - Coverage: upstream v18.14.2 adds `task.perCallModel`, defaulting to `off`, with operator-owned model approval.
 - Owner: upstream `src/task/settings.ts#perCallModelEnabled` and `src/task/model-approval.ts` own runtime permission.
 - Contract: disabled ordinary per-call selection does not advertise `model` without a spawnable bundled Seance.
-- Owner: `src/task/types.ts#getTaskSchema` retains that conditional wire shape and preserves forged selectors for refusal.
-- Owner: `docs/tools/task.md` and `docs/task-agent-discovery.md` document MOMP's conditional model field.
+- Coverage: upstream v18.18.6 owns that wire shape in `src/task/types.ts#getTaskSchema`.
+- Coverage: its preflight refuses forged ordinary selectors.
+- Required action: retain no fork schema, Task-tool, or documentation delta for the conditional `model` field.
 - Required action: reuse upstream approval, dispatch, and revival guards rather than adding a second deny policy.
 - Required action: preserve the operator's configured per-call mode and its Settings-owned model-selection guidance.
 - Required action: keep the bundled Task prompt byte-identical to upstream.
@@ -435,7 +439,8 @@ The upgrader validates these IDs against its executable and manual proof mapping
 - Proof: managed and effective `task.structured: true` with global provenance through Source `Settings.loadReadOnly`.
 - Proof: candidate prompt rendering through `momp system-prompt inspect`.
 - Proof: `test/system-prompt-templates.test.ts`.
-- Proof: effort guidance, seance capability visibility, and ordinary override rejection in `test/task/task-schema.test.ts`.
+- Proof: effort guidance and Seance capability visibility in `test/task/task-schema.test.ts` with the profile isolated.
+- Proof: forged ordinary `model` refusal in upstream `test/task/task-batch.test.ts`.
 - Proof: disabled-effort dispatch in upstream `test/task/task-batch.test.ts`.
 - Proof: server-side request-budget cases in `test/task/task-guards.test.ts`.
 
@@ -535,7 +540,9 @@ The upgrader validates these IDs against its executable and manual proof mapping
 - Contract: recognized bot blocks and transport failures advance to the next identity.
 - Contract: HTTP 429 retries retain the current identity.
 - Owner: `src/web/scrapers/types.ts#loadPage` owns request identity and fallback order.
+- Coverage: upstream v18.18.6 records bot-wall refusals and challenge pages while rotating identities.
 - Required action: retain the minimal identity-order delta at the current upstream fetch owner.
+- Required action: capture upstream header walls only after the same-identity 429 retry.
 - Proof: `test/web-scraper-user-agent.test.ts`.
 - Source: https://developers.google.com/crawling/docs/crawlers-fetchers/google-common-crawlers
 - Source: Chrome Stable 156.0.8078.47, verified 2026-10-21: https://googlechromelabs.github.io/chrome-for-testing/last-known-good-versions.json
@@ -621,6 +628,7 @@ The upgrader validates these IDs against its executable and manual proof mapping
 - Owner: `src/session/agent-session.ts#setCommandCatalog` validates and atomically commits file and routine catalogs.
 - Contract: routine submission consumes only its submitted draft; input entered while it runs remains intact.
 - Contract: rejected internal routine steps never restore their expanded instructions into the user's draft.
+- Required action: route routine-step drops through upstream `#reportDroppedPrompt` as synthetic so prompt follow-ups still return.
 - Owner: `src/modes/rpc/rpc-mode.ts` serializes command refreshes and retains the last validated advertisement.
 - Owner: upstream `src/session/agent-session.ts#isBusyForSnapshot` owns the shared snapshot busy decision.
 - Owner: upstream `src/modes/rpc/wire/state.ts#stateDefs` owns the command-source enum for every generated RPC SDK.
@@ -686,6 +694,7 @@ The upgrader validates these IDs against its executable and manual proof mapping
 - Contract: unknown commands keep their literal text and record no invocation.
 - Contract: rewind drafts and automatic titles use the typed invocation, never the expanded body.
 - Owner: `src/session/agent-session.ts#dispatchPrompt` records the invocation at expansion for idle and queued prompts.
+- Owner: upstream `src/session/agent-session.ts#pushQueuedUserMessage` carries the display-only field onto queued messages.
 - Owner: `src/extensibility/slash-commands.ts#expandSlashCommand` returns confirmed invocation provenance even when expansion leaves the bytes unchanged.
 - Owner: upstream `packages/ai/src/types.ts#UserMessage` carries the display-only field beside `liveSteered`.
 - Owner: `packages/tui/src/chat/transcript-entry.ts#userDisplayText` selects displayed and restored text.
@@ -1047,6 +1056,13 @@ The upgrader validates these IDs against its executable and manual proof mapping
 - Coverage: upstream v18.17.0 packs compact transcript runs and tracks separator ownership through `historyEnd`.
 - Required action: capture accepted row boundaries after compact separators and preserve separator-only offers.
 - Proof: upstream `packages/tui/test/transcript-compact-packing.test.ts` and native compact-run tests.
+- Coverage: upstream v18.18.6 commits streaming rows under `tui.completeScrollback` through `headEmittedEnd` commit offers.
+- Required action: capture those streaming-head rows as accepted tape parts in both offer composition and frame recomposition.
+- Coverage: upstream v18.18.6 moves rows with DL/IL instead of repainting on terminals without synchronized output.
+- Required action: keep that absolute-row path off cursor-relative multiplexer frames and preserved resize tails.
+- Owner: upstream `packages/tui/src/tui.ts#emitPlanFrame` gates `#movedRowsSequence`.
+- Proof: preserved-suffix contraction in `packages/tui/test/resize-multiplexer-anchor.test.ts`.
+- Proof: upstream `packages/tui/test/unsynchronized-row-moves.test.ts`.
 
 #### `MOMP-TMUX-PAGEUP` — Native tmux history access
 

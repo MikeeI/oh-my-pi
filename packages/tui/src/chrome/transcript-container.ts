@@ -1030,9 +1030,7 @@ export class TranscriptContainer extends Container {
 				if (isRowPrefix(before, after)) {
 					const offset = rows.length;
 					rows = [...rows, ...after.slice(before.length)];
-					parts.push(
-						this.#capturePart(streaming, offset, rows.length, streaming.emitted, offered.headEmittedEnd),
-					);
+					parts.push(this.#capturePart(streaming, offset, rows.length, streaming.emitted, offered.headEmittedEnd));
 					offered.historyEnd = undefined;
 				} else {
 					offered.headEmittedEnd = undefined;

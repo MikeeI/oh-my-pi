@@ -76,11 +76,11 @@ describe("profile-scoped tool prompts", () => {
 	it("refreshes a memoized Glob override and rejects a selected source that becomes empty", async () => {
 		using tempDir = TempDir.createSync("@omp-glob-prompt-");
 		const source = tempDir.join("prompts", "tools", "glob.md");
-		await Bun.write(source, "CUSTOM_GLOB {{#if eagerDelegation}}eager{{/if}}");
+		await Bun.write(source, "CUSTOM_GLOB {{#if scoutAvailable}}scout{{/if}}");
 		const tool = new GlobTool(createSession(tempDir.path()));
-		expect(tool.description).toBe("CUSTOM_GLOB eager");
-		await Bun.write(source, "UPDATED_GLOB {{#if eagerDelegation}}eager{{/if}}");
-		expect(tool.description).toBe("UPDATED_GLOB eager");
+		expect(tool.description).toBe("CUSTOM_GLOB scout");
+		await Bun.write(source, "UPDATED_GLOB {{#if scoutAvailable}}scout{{/if}}");
+		expect(tool.description).toBe("UPDATED_GLOB scout");
 		await Bun.write(source, " \n");
 		expect(() => tool.description).toThrow("glob tool prompt must not be empty");
 		expect(new GlobTool(createSession()).description).toContain("Glob files/dirs");

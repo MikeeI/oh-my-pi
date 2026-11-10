@@ -176,7 +176,7 @@ describe("subagent system prompt templates", () => {
 			const { promptResult, systemPromptTemplate } = await executeAndCaptureSystemPrompt(projectDir);
 			expect(promptResult.systemPrompt[0]).toBe("base-block");
 			expect(promptResult.systemPrompt[1]).toBe("project-block");
-			expect(promptResult.systemPrompt[2]).toContain("§ Coop");
+			expect(promptResult.systemPrompt[2]).toContain("⁂ Coop");
 			expect(promptResult.systemPrompt[2]).toContain("Rendered scout role");
 			expect(promptResult.dynamicParts.map(part => part.id)).toEqual([
 				"base-part",

@@ -3954,9 +3954,14 @@ export class TUI extends Container {
 		for (const sequence of this.#imageBudget.takeTransmits()) append(sequence);
 		// Without synchronized output the terminal may show any prefix of this
 		// write, so move surviving rows instead of repainting through them.
+		// The move model addresses absolute rows and treats rows below the window
+		// as blank, so it must not run on cursor-relative multiplexer frames or
+		// over accepted history a preserve-mode resize pulled below the viewport.
 		const moved =
 			!this.#synchronizedOutputEnabled &&
 			geometryStable &&
+			!relativeRows &&
+			!this.#preservedResizeGridTail &&
 			!destructiveReset &&
 			history?.kind !== "replay" &&
 			!this.#forceViewportRepaintOnNextRender &&
