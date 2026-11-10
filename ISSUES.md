@@ -8,7 +8,7 @@ This file owns `Next-Finding-ID` and projects current issue-file state.
 When a row disagrees with its issue file, correct the row from the issue file in the same task.
 ISSUE-020, ISSUE-023, and ISSUE-024 are paused at the user's request; their lifecycle states do not authorize investigation.
 
-Next finding ID: ISSUE-031
+Next finding ID: ISSUE-032
 
 ## Open-Findings
 
@@ -33,6 +33,7 @@ Next finding ID: ISSUE-031
 | [ISSUE-027](issues/ISSUE-027.md) | Prompt discovery: user templates ignore `PI_CODING_AGENT_DIR` | Investigating | Not-Selected | Not-Selected | Medium | Await fork fix authorization | Not published. |
 | [ISSUE-028](issues/ISSUE-028.md) | Anthropic prompt cache: every new session re-writes the unanchored `<project-context>` block | Submitted | Research-and-Reporting | Existing-issue-comment | Medium | Await maintainer decision | https://github.com/can1357/oh-my-pi/issues/16883#issuecomment-6387558568 |
 | [ISSUE-029](issues/ISSUE-029.md) | Codex prompt cache: sibling affinity follows the session headers, so sharing `prompt_cache_key` has no effect | Submitted | Research-and-Reporting | Existing-issue-comment | Low | Await maintainer decision | https://github.com/can1357/oh-my-pi/issues/16884#issuecomment-6387558727 |
+| [ISSUE-031](issues/ISSUE-031.md) | Prompt cache: a role edit in one instance rewrites every live session's task tool description | Draft-Ready | Research-and-Reporting | New-issue | High | Approve upstream issue draft | Not published. |
 
 ## Archived-Findings
 
