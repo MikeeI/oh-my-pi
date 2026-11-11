@@ -932,6 +932,21 @@ The upgrader validates these IDs against its executable and manual proof mapping
 - Proof: header omission and corrupt-provenance cleanup in `packages/ai/test/model-cache.test.ts`.
 - Proof: materialized round trips and schema rejection in `packages/catalog/test/build.test.ts`.
 
+#### `MOMP-MISTRAL-USAGE` — Mistral Vibe budget reporting
+
+- Disposition: `UPSTREAM-INTEGRIERT`.
+- Contract: `momp usage` shows the monthly Vibe Code and API budgets of `mistral` api-key credentials.
+- Contract: each budget shows its usage percentage, reset date, and budget amount.
+- Contract: the budgets occupy separate capacity buckets.
+- Contract: a 401 marks the key invalid; 403, 404, other failures, and budget-less payloads report no usage.
+- Owner: `packages/ai/src/usage/mistral.ts#mistralUsageProvider`, registered in upstream `src/usage/registry.ts#DEFAULT_USAGE_PROVIDERS`.
+- Reason: current upstream registers no Mistral usage provider.
+- Upstream: https://github.com/can1357/oh-my-pi/pull/18723 (ISSUE-032) carries the identical closure.
+- Required action: remove this delta once upstream merges an equivalent provider.
+- Implementation constraint: broker clients receive usage from the broker host, so it needs a release with this provider.
+- Proof: `packages/ai/test/mistral-usage.test.ts`.
+- Proof: `momp usage` with a Vibe sign-in key renders both budgets.
+
 #### `MOMP-STATS-SUMMARY` — Multi-range CLI usage overview
 
 - Disposition: `MOMP-EIGEN`.
