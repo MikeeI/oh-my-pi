@@ -121,6 +121,10 @@ async function withTempDir(run: (dir: string) => Promise<void>): Promise<void> {
 	} finally {
 		setProjectDir(originalProjectDir);
 		await fs.rm(dir, { recursive: true, force: true });
+		// Tests derive `PI_CONFIG_DIR` from this dir's name; session startup writes registry
+		// markers and terminal breadcrumbs under that home config dir even when a test
+		// creates no user files there, so the owner of the name removes it.
+		await fs.rm(path.join(os.homedir(), `.omp-test-${path.basename(dir)}`), { recursive: true, force: true });
 	}
 }
 
