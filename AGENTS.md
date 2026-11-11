@@ -109,6 +109,8 @@ The upgrader validates these IDs against its executable and manual proof mapping
 - Contract: runtime tool-registry rebuilds preserve the selected sources while refreshing dynamic tool state.
 - Owner: `src/system-prompt.ts` owns source discovery, precedence, loading, and rendering.
 - Owner: `src/config.ts#findConfigFileWithMeta` preserves dangling entries for mandatory prompt discovery.
+- Coverage: upstream v18.18.8 resolves the OMP user config base through `getAgentDir()` (#18684).
+- Contract: user-level Main and Child prompt sources therefore follow `PI_CODING_AGENT_DIR` for the default profile.
 - Owner: upstream `src/discovery/builtin.ts#findNearestProjectConfigDir` owns the nearest project `.omp` walk-up.
 - Owner: `src/main.ts` maps discovered sources into Main-session construction.
 - Owner: `src/capability/system-prompt.ts#systemPromptCapability` owns raw `SYSTEM.md` capability metadata.
@@ -286,6 +288,7 @@ The upgrader validates these IDs against its executable and manual proof mapping
 - Owner: upstream `src/tools/ast-grep.ts#AstGrepTool` owns pagination and model-visible output.
 - Owner: upstream `packages/tui/src/tools/ast-grep.ts#astGrepToolRenderer` owns TUI rendering and the result metadata type.
 - Coverage: upstream v18.11.1 replaces the `limit` advice with generic `skip` advice but exposes no next offset.
+- Coverage: upstream v18.18.8 renders zero-match results as one `0 matches` line; paged results keep the MOMP offset.
 - Reason: without the computed offset, neither the model nor the TUI can request the next page directly.
 - Required action: retain the minimal upstream-owner delta until upstream gives both consumers actionable pagination guidance.
 - Proof: the model-and-TUI pagination contract in `test/tools/ast-grep.test.ts`.
@@ -1078,6 +1081,8 @@ The upgrader validates these IDs against its executable and manual proof mapping
 - Owner: upstream `packages/tui/src/tui.ts#emitPlanFrame` gates `#movedRowsSequence`.
 - Proof: preserved-suffix contraction in `packages/tui/test/resize-multiplexer-anchor.test.ts`.
 - Proof: upstream `packages/tui/test/unsynchronized-row-moves.test.ts`.
+- Coverage: upstream v18.18.8 reuses live-tail entry wrappers across each frame's readers (#18705).
+- Required action: keep accepted-tape state beside that cache in `TranscriptContainer`.
 
 #### `MOMP-TMUX-PAGEUP` — Native tmux history access
 
