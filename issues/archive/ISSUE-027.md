@@ -1,6 +1,6 @@
 # ISSUE-027 — Prompt discovery: user templates ignore `PI_CODING_AGENT_DIR`
 
-State: Investigating
+State: Archived
 Authorized-Work: Not-Selected
 Publication-Target: Not-Selected
 External-Reference: Not published.
@@ -8,7 +8,7 @@ Contribution-Priority: Medium
 Root-Cause-Confidence: High
 Finding-Category: Correctness
 Created: 2026-10-24
-Updated: 2026-10-24
+Updated: 2026-11-11
 Source: `upstream/main@0b5c27ab24719c86a5986b95ee55f4e75bc1aaa0`
 
 ## Root-Cause
@@ -78,6 +78,13 @@ Proposal-Status: Not implemented.
 
 ## Next-Action
 
-Summary: Await fork fix authorization
-Action: Ask the user to authorize fixing user prompt discovery on `personal`.
-Done-When: The user authorizes or declines the MOMP source fix.
+Summary: —
+Action: None.
+Done-When: None.
+
+## Archive
+
+Archive-Reason: Fixed-Elsewhere
+Detail: None.
+Evidence: Upstream v18.18.8 (#18684, https://github.com/can1357/oh-my-pi/issues/18684) resolves `USER_CONFIG_BASES` through `getAgentDir()` in `packages/coding-agent/src/config.ts`; on rebased `personal`, the Bug-Reproduction renders `TMP_USER_TEMPLATE`, then `TMP_USER_RAW`, and Child discovery returns the overridden agent directory's templates.
+Checked: 2026-11-11
