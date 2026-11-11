@@ -11,7 +11,7 @@ import {
 	discoverSubagentBaseSystemPromptTemplate,
 	discoverSubagentSystemPromptTemplate,
 } from "@oh-my-pi/pi-coding-agent/system-prompt";
-import { getProjectDir, prompt, setProjectDir } from "@oh-my-pi/pi-utils";
+import { __resetDirsFromEnvForTests, getProjectDir, prompt, setProjectDir } from "@oh-my-pi/pi-utils";
 import { INTENT_FIELD } from "@oh-my-pi/pi-wire";
 import type { Args } from "../src/cli/args";
 import { inspectSystemPrompt } from "../src/commands/system-prompt";
@@ -140,7 +140,11 @@ async function captureRootCommandOptions(
 	configDirName?: string,
 ): Promise<{ options: CreateAgentSessionOptions; stderr: string }> {
 	const originalConfigDir = process.env.PI_CONFIG_DIR;
-	if (configDirName) process.env.PI_CONFIG_DIR = configDirName;
+	// User discovery resolves through the cached `getAgentDir()`, so env changes need a resolver refresh.
+	if (configDirName) {
+		process.env.PI_CONFIG_DIR = configDirName;
+		__resetDirsFromEnvForTests();
+	}
 	const authStorage = await AuthStorage.create(path.join(dir, "auth.db"));
 	const stopError = new Error("stop after capturing session options");
 	let captured: CreateAgentSessionOptions | undefined;
@@ -188,6 +192,7 @@ async function captureRootCommandOptions(
 			} else {
 				process.env.PI_CONFIG_DIR = originalConfigDir;
 			}
+			__resetDirsFromEnvForTests();
 		}
 	}
 	if (!captured) throw new Error("Expected createAgentSession to receive options");
@@ -622,6 +627,7 @@ describe("system Handlebars prompt templates", () => {
 			const originalConfigDir = process.env.PI_CONFIG_DIR;
 			const configDirName = `.omp-test-${path.basename(dir)}`;
 			process.env.PI_CONFIG_DIR = configDirName;
+			__resetDirsFromEnvForTests();
 			try {
 				expect(await discoverSubagentSystemPromptTemplate(dir)).toBeUndefined();
 				expect(await discoverSubagentBaseSystemPromptTemplate(dir)).toBeUndefined();
@@ -631,6 +637,7 @@ describe("system Handlebars prompt templates", () => {
 				} else {
 					process.env.PI_CONFIG_DIR = originalConfigDir;
 				}
+				__resetDirsFromEnvForTests();
 			}
 		});
 	});
@@ -643,6 +650,7 @@ describe("system Handlebars prompt templates", () => {
 			const wrapperTemplatePath = path.join(userConfigDir, "SUBAGENT-SYSTEM.template.md");
 			const baseTemplatePath = path.join(userConfigDir, "SYSTEM.template.md");
 			process.env.PI_CONFIG_DIR = configDirName;
+			__resetDirsFromEnvForTests();
 			try {
 				await fs.mkdir(userConfigDir, { recursive: true });
 				await fs.writeFile(wrapperTemplatePath, "User child wrapper");
@@ -656,6 +664,7 @@ describe("system Handlebars prompt templates", () => {
 				} else {
 					process.env.PI_CONFIG_DIR = originalConfigDir;
 				}
+				__resetDirsFromEnvForTests();
 			}
 		});
 	});
@@ -668,6 +677,7 @@ describe("system Handlebars prompt templates", () => {
 			const projectWrapperTemplatePath = path.join(dir, ".omp", "SUBAGENT-SYSTEM.template.md");
 			const projectBaseTemplatePath = path.join(dir, ".omp", "SYSTEM.template.md");
 			process.env.PI_CONFIG_DIR = configDirName;
+			__resetDirsFromEnvForTests();
 			try {
 				await fs.mkdir(userConfigDir, { recursive: true });
 				await fs.mkdir(path.dirname(projectWrapperTemplatePath), { recursive: true });
@@ -686,6 +696,7 @@ describe("system Handlebars prompt templates", () => {
 				} else {
 					process.env.PI_CONFIG_DIR = originalConfigDir;
 				}
+				__resetDirsFromEnvForTests();
 			}
 		});
 	});

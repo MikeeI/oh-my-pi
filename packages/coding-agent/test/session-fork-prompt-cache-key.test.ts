@@ -13,7 +13,7 @@ import type { AgentSession } from "@oh-my-pi/pi-coding-agent/session/agent-sessi
 import { AuthStorage } from "@oh-my-pi/pi-coding-agent/session/auth-storage";
 import { CURRENT_SESSION_VERSION, type SessionHeader } from "@oh-my-pi/pi-coding-agent/session/session-entries";
 import { SessionManager } from "@oh-my-pi/pi-coding-agent/session/session-manager";
-import { TempDir } from "@oh-my-pi/pi-utils";
+import { __resetDirsFromEnvForTests, TempDir } from "@oh-my-pi/pi-utils";
 
 const OPENAI_TEST_MODEL = getBundledModel("openai", "gpt-4o-mini");
 
@@ -50,6 +50,8 @@ async function createSourceSessionFixture(tempDir: TempDir, parentId: string): P
 async function withIsolatedPromptConfig<T>(name: string, run: () => Promise<T>): Promise<T> {
 	const originalConfigDir = process.env.PI_CONFIG_DIR;
 	process.env.PI_CONFIG_DIR = `.omp-test-${name}`;
+	// User discovery reads the cached `getAgentDir()`; refresh it after each env change.
+	__resetDirsFromEnvForTests();
 	try {
 		return await run();
 	} finally {
@@ -58,6 +60,7 @@ async function withIsolatedPromptConfig<T>(name: string, run: () => Promise<T>):
 		} else {
 			process.env.PI_CONFIG_DIR = originalConfigDir;
 		}
+		__resetDirsFromEnvForTests();
 	}
 }
 

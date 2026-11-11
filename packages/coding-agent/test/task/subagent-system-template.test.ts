@@ -15,6 +15,7 @@ import {
 	type SubagentIrcRoster,
 } from "@oh-my-pi/pi-coding-agent/task/subagent-system-prompt";
 import type { AgentDefinition } from "@oh-my-pi/pi-coding-agent/task/types";
+import { __resetDirsFromEnvForTests } from "@oh-my-pi/pi-utils";
 
 function model(): Model<Api> {
 	return buildModel({
@@ -91,6 +92,8 @@ async function withTemplateEnvironment(
 	const homedirSpy = vi.spyOn(os, "homedir").mockReturnValue(testHome);
 	try {
 		process.env.PI_CONFIG_DIR = configDirName;
+		// User discovery reads the cached `getAgentDir()`; refresh it for the mocked home and config dir.
+		__resetDirsFromEnvForTests();
 		const userConfigDir = path.join(testHome, configDirName, "agent");
 		await run({
 			projectDir,
@@ -106,6 +109,7 @@ async function withTemplateEnvironment(
 		} else {
 			process.env.PI_CONFIG_DIR = originalConfigDir;
 		}
+		__resetDirsFromEnvForTests();
 		await fs.rm(fixtureDir, { recursive: true, force: true });
 	}
 }
