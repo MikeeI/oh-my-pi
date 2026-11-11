@@ -38,7 +38,6 @@ import sessionAgentNoticePrompt from "../prompts/system/session-agent-notice.md"
 import skillNoticePrompt from "../prompts/system/skill-notice.md" with { type: "text" };
 import toolRosterNoticePrompt from "../prompts/system/tool-roster-notice.md" with { type: "text" };
 import xdevMountNoticePrompt from "../prompts/system/xdev-mount-notice.md" with { type: "text" };
-import type { BuildSystemPromptResult, DynamicPromptPart } from "../system-prompt";
 import { isMCPToolName, normalizeToolNames } from "../tools/builtin-names";
 import {
 	approvalRestrictions,
@@ -71,10 +70,9 @@ import {
 	PERMISSION_REQUIRED_TOOLS,
 } from "./acp-permission-gate";
 import type { ClientBridge, ClientBridgePermissionOutcome } from "./client-bridge";
-import { type BuildSystemPromptResult, toolReadsSkillUris } from "../system-prompt";
+import { type BuildSystemPromptResult, type DynamicPromptPart, toolReadsSkillUris } from "../system-prompt";
 import { matchModelPattern } from "../utils/model-patterns";
 import { resolveToolWireName } from "../utils/tool-wire-name";
-
 import type { CustomMessage } from "./messages";
 import { SESSION_AGENT_NOTICE_TYPE } from "./queued-messages";
 import type { SessionEntry } from "./session-entries";
@@ -177,7 +175,7 @@ export type SystemPromptRebuilder = (
 	toolNames: string[],
 	tools: Map<string, AgentTool>,
 	xdev: XdevState | undefined,
-) => Promise<BuildSystemPromptResult>;
+) => Promise<Omit<BuildSystemPromptResult, "dynamicParts"> & { dynamicParts?: DynamicPromptPart[] }>;
 
 interface SessionToolsOptions {
 	autoApprove?: boolean;

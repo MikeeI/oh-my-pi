@@ -48,7 +48,7 @@ import type { SecretObfuscator } from "../secrets/obfuscator";
 import type { ConfiguredThinkingLevel } from "@oh-my-pi/pi-tui/thinking";
 import type { JobWidgetView } from "@oh-my-pi/pi-tui/tools/job-widget";
 import type { SystemPromptSources } from "@oh-my-pi/pi-tui/status-line/context-usage";
-import type { BuildSystemPromptResult, DynamicPromptPart } from "../system-prompt";
+import type { BuildSystemPromptResult } from "../system-prompt";
 import type { ToolSession } from "../tools";
 import type { XdevState } from "../tools/xdev";
 import type { CodexAutoRedeemCoordinator } from "./codex-auto-reset";
