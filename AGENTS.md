@@ -262,6 +262,8 @@ The upgrader validates these IDs against its executable and manual proof mapping
 - Coverage: upstream v18.14.2 adds operator-approved per-call model render inputs to Task and Eval.
 - Required action: pass those inputs through selected sources while preserving operator-owned activation.
 - Required action: derive a selected Task source's allowed-agent summary from its filtered advertisement.
+- Coverage: upstream v18.18.9 freezes the per-call model advertisement into the session's prompt surface through `advertisedPerCallModel` (#18732).
+- Required action: render the selected Task and Eval descriptions from that frozen advertisement, falling back to live resolution only when the session omits it.
 - Owner: `src/tools/write.ts#WriteTool`, `src/tools/security-scan.ts#SecurityScanTool`, and `src/tools/memory-reflect.ts#MemoryReflectTool` own their additional description sources.
 - Owner: `src/edit/index.ts#resolveEditToolDescription` selects profile sources for Replace and Sloppy.
 - Owner: `src/task/isolation-runner.ts#renderIsolationError` loads and renders profile-owned recovery messages.
@@ -386,6 +388,9 @@ The upgrader validates these IDs against its executable and manual proof mapping
 - Proof: captured options serialize through the real Codex body owner in `test/sdk-tool-activation.test.ts`.
 - Proof: preview reminder isolation and subsequent real dispatch in `test/sdk-tool-activation.test.ts`.
 - Proof: live/preview dialect parity in `packages/agent/test/agent-side-request-context.test.ts`.
+- Coverage: upstream v18.18.9 records context-file and skill ranges through `prompt.renderTracked` for `/context` attribution.
+- Required action: render every inspectable provider block through that owner so `sources` and dynamic parts coexist.
+- Proof: `test/sdk-system-prompt-template.test.ts` and `test/modes/context-view.test.ts` retain instruction-file and skill attribution.
 
 #### `MOMP-TASK-POLICY` — Profile delegation guidance
 
@@ -501,6 +506,7 @@ The upgrader validates these IDs against its executable and manual proof mapping
 - Owner: the project-settings `read.md` override owns model-visible parallel scheduling guidance.
 - Owner: upstream `packages/agent/src/agent-loop.ts#executeToolCalls` owns sibling-tool concurrency.
 - Coverage: upstream concurrently executes compatible sibling tool calls already issued by the model.
+- Coverage: upstream v18.18.9 holds a read behind earlier sibling calls that may write, so parallel reads stay correct after a mutating `bash`.
 - Required action: retain profile scheduling guidance and reuse upstream concurrency without a parallel Read scheduler.
 - Proof: bundled prompt equality against current `upstream/main`.
 - Proof: profile override and fallback cases in `test/tools/tool-prompt-overrides.test.ts`.
@@ -560,6 +566,7 @@ The upgrader validates these IDs against its executable and manual proof mapping
 - Owner: the project-settings `web-search.md` override owns model-visible search scheduling guidance; the bundled prompt stays byte-identical to upstream.
 - Owner: upstream `packages/agent/src/agent-loop.ts#executeToolCalls` owns shared sibling-tool concurrency.
 - Coverage: upstream concurrently executes compatible sibling tool calls already issued by the model.
+- Coverage: upstream v18.18.9 adds Hacker News guidance (`site:news.ycombinator.com`) to the bundled prompt; the profile override mirrors it.
 - Required action: retain the profile override and model-visible scheduling guidance in Settings.
 - Required action: do not add a Web Search-specific scheduler for this guidance.
 - Proof: profile override and fallback cases in `test/tools/tool-prompt-overrides.test.ts`.
