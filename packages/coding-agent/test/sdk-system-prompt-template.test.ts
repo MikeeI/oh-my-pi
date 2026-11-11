@@ -109,10 +109,14 @@ describe("SDK systemPrompt replacements", () => {
 	it("applies task.eager to the main agent prompt only, never to subagents", async () => {
 		const render = (taskDepth: number) =>
 			withSession(
-				"{{#if eagerTasks}}EAGER{{else}}MODEL_POLICY{{/if}}",
+				"{{#if eagerTasks}}",
 				defaultPrompt => defaultPrompt,
 				async session => session.systemPrompt.join("\n\n"),
-				{ settings: Settings.isolated({ "task.eager": "always" }), taskDepth },
+				{
+					systemPromptTemplate: "{{#if eagerTasks}}EAGER{{else}}MODEL_POLICY{{/if}}",
+					settings: Settings.isolated({ "task.eager": "always" }),
+					taskDepth,
+				},
 			);
 		expect(await render(0)).toContain("EAGER");
 		const subagentPrompt = await render(1);
