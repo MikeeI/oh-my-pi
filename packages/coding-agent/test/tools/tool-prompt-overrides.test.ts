@@ -70,7 +70,7 @@ describe("profile-scoped tool prompts", () => {
 	it("uses the bundled Bash prompt when profile bash.md is absent", () => {
 		const description = new BashTool(createSession()).description;
 
-		expect(description).toContain("Long-lived services: unique name");
+		expect(description).toContain("In-process builtins, ahead of PATH");
 	});
 
 	it("refreshes a memoized Glob override and rejects a selected source that becomes empty", async () => {
@@ -102,7 +102,7 @@ describe("profile-scoped tool prompts", () => {
 		expect(constrained.description).toBe("CUSTOM_TASK agent=task batch=true allowed=task");
 
 		const bundled = await TaskTool.create(createSession());
-		expect(bundled.description).toContain("write agent://<id>");
+		expect(bundled.description).toContain("Children start blank");
 	});
 
 	it("rejects an empty selected task.md instead of using the bundled prompt", async () => {

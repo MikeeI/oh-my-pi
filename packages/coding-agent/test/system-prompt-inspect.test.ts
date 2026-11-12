@@ -95,7 +95,6 @@ describe("system prompt inspect metadata", () => {
 				"intent-tracing",
 				"secrets",
 				"tool-priority",
-				"ast-tools",
 				"eager-tasks",
 				"xdev-tools",
 				"workstation",
