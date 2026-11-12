@@ -32,7 +32,6 @@ Next finding ID: ISSUE-033
 | [ISSUE-026](issues/ISSUE-026.md) | Output notices: middle-elided sink output names the wrong shown line ranges | Investigating | Not-Selected | Not-Selected | Medium | Draft upstream sink count fix | Not published. |
 | [ISSUE-028](issues/ISSUE-028.md) | Anthropic prompt cache: every new session re-writes the unanchored `<project-context>` block | Submitted | Research-and-Reporting | Existing-issue-comment | Medium | Await maintainer decision | https://github.com/can1357/oh-my-pi/issues/16883#issuecomment-6387558568 |
 | [ISSUE-029](issues/ISSUE-029.md) | Codex prompt cache: sibling affinity follows the session headers, so sharing `prompt_cache_key` has no effect | Submitted | Research-and-Reporting | Existing-issue-comment | Low | Await maintainer decision | https://github.com/can1357/oh-my-pi/issues/16884#issuecomment-6387558727 |
-| [ISSUE-031](issues/ISSUE-031.md) | Prompt cache: a role edit in one instance rewrites every live session's task tool description | Submitted | Research-and-Reporting | New-issue | High | Await maintainer decision | https://github.com/can1357/oh-my-pi/issues/18716 |
 | [ISSUE-032](issues/ISSUE-032.md) | Usage: Mistral Vibe Code budget is not reported | Submitted | Pull-Request-Implementation | New-pull-request | Medium | Await maintainer review | https://github.com/can1357/oh-my-pi/pull/18723 |
 
 ## Archived-Findings
@@ -51,3 +50,4 @@ Next finding ID: ISSUE-033
 | [ISSUE-019](issues/archive/ISSUE-019.md) | GitHub errors omit structured and request context | Pull-Request-Implementation | New-pull-request | Medium | Merged | https://github.com/can1357/oh-my-pi/pull/10581 |
 | [ISSUE-027](issues/archive/ISSUE-027.md) | Prompt discovery: user templates ignore `PI_CODING_AGENT_DIR` | Not-Selected | Not-Selected | Medium | Fixed-Elsewhere | Not published. |
 | [ISSUE-030](issues/archive/ISSUE-030.md) | Status line: Mistral Vibe login keys bill a subscription but render as metered spend | Research-and-Reporting | New-issue | Medium | Fixed-Elsewhere | https://github.com/can1357/oh-my-pi/issues/18374 |
+| [ISSUE-031](issues/archive/ISSUE-031.md) | Prompt cache: a role edit in one instance rewrites every live session's task tool description | Research-and-Reporting | New-issue | High | Fixed-Elsewhere | https://github.com/can1357/oh-my-pi/issues/18716 |

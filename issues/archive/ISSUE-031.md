@@ -1,6 +1,6 @@
 # ISSUE-031 — Prompt cache: a role edit in one instance rewrites every live session's task tool description
 
-State: Submitted
+State: Archived
 Authorized-Work: Research-and-Reporting
 Publication-Target: New-issue
 External-Reference: https://github.com/can1357/oh-my-pi/issues/18716
@@ -8,7 +8,7 @@ Contribution-Priority: High
 Root-Cause-Confidence: High
 Finding-Category: Performance
 Created: 2026-11-10
-Updated: 2026-11-10
+Updated: 2026-11-12
 Source: `upstream/main@1379127c078f978c9908059d31f6dc6c16efbe53`
 
 ## Root-Cause
@@ -36,7 +36,7 @@ Boundary [O]: similar tool-schema changes with large writes appear in other sess
 - [S] `packages/coding-agent/src/modes/controllers/selector-controller.ts:953-956` persists hub role assignments globally unless `modelRoleStorage` is `project`.
 - [O] Throwaway repro on an `upstream/main@1379127c07` worktree: a separate `bun -e` writer changed the live Task `Approved:` default from `anthropic/claude-opus-4-6` to `anthropic/claude-sonnet-4-6`; `description changed: true (4144 -> 4146 chars)`.
 - [O] Control with `perCallModel: "off"`: `description changed: false (3382 -> 3382 chars)`.
-- [O] Repro script and exact draft: [`evidence/issue-031/issue-body.md`](evidence/issue-031/issue-body.md).
+- [O] Repro script and exact draft: [`evidence/issue-031/issue-body.md`](../evidence/issue-031/issue-body.md).
 - [O] Session `-projects-project-twitter-cli` logged `model_change` `anthropic/claude-sonnet-5-5` `role: default` at 13:29:39.573Z and 13:30:07.788Z; `config.yml` mtime 13:30:07.908Z.
 - [O] `~/.omp/logs/omp.2026-11-10.1684666.log`: `dropped thinking block after conversation prefix changed`, `count: 16`, at 14:29:41+01:00.
 
@@ -74,18 +74,27 @@ None.
 
 ## Next-Action
 
-Summary: Await maintainer decision
-Action: Re-read #18716 for a maintainer decision on holding the advertisement per session versus resolving roles at dispatch.
-Done-When: A maintainer accepts, rejects, or reshapes the proposal, or the issue closes.
+Summary: —
+Action: None.
+Done-When: None.
 
 ## Publication-Draft
 
 Target: can1357/oh-my-pi, New-issue, template `bug_report.yml`; the `bug` label was not applied at submission.
 Title: Role edit in one omp instance rewrites the task tool description of every running session and busts its prompt cache (task.perCallModel)
 
-Body: [`evidence/issue-031/issue-body.md`](evidence/issue-031/issue-body.md); it lives outside this record because its literal placeholders read as unresolved to the ledger validator.
+Body: [`evidence/issue-031/issue-body.md`](../evidence/issue-031/issue-body.md); it lives outside this record because its literal placeholders read as unresolved to the ledger validator.
 
 ## Submitted-Text
 
-Follow-up comment: https://github.com/can1357/oh-my-pi/issues/18716#issuecomment-6769158671 — exact text in [`evidence/issue-031/comment-role-names.md`](evidence/issue-031/comment-role-names.md).
+Follow-up comment: https://github.com/can1357/oh-my-pi/issues/18716#issuecomment-6769158671 — exact text in [`evidence/issue-031/comment-role-names.md`](../evidence/issue-031/comment-role-names.md).
 Maintainer-bot (roboomp) reproduced the issue on 2026-11-10 and deferred the fix choice to maintainers.
+
+## Archive
+
+Archive-Reason: Fixed-Elsewhere
+Detail: None.
+Evidence: Upstream PR https://github.com/can1357/oh-my-pi/pull/18732 (`82685417be`, `679037aa00`, "Fixes #18716") freezes the per-call model advertisement into the session's prompt surface and shipped in v18.18.9; #18716 closed as completed on 2026-11-11.
+Evidence [O]: On a clean `v18.19.0` worktree and on MOMP `personal@92d2316287`, a real `createAgentSession` with `task.perCallModel: "on"` keeps its Task description and system prompt byte-stable after a separate `bun -e` process rewrites the default role in `config.yml` (`settings reloaded: anthropic/claude-sonnet-4-6`, `live session task changed: false`, `live session prompt changed: false`).
+Evidence [O]: The issue's bare-`ToolSession` control still re-renders (`changed: true`), so the repro detects the live path; only the session surface is frozen.
+Checked: 2026-11-12
