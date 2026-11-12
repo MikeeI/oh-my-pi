@@ -135,17 +135,45 @@ function createEmptyWorkspaceTree(rootPath: string) {
 	};
 }
 
+/**
+ * Point user discovery at `~/<configDirName>/agent` for `run`, then restore the prior environment.
+ * `PI_CODING_AGENT_DIR` outranks `PI_CONFIG_DIR`, and another suite's `setAgentDir(original)` restore
+ * leaves it set to the real agent dir, so it is cleared for the run instead of trusted to be absent.
+ * User discovery resolves through the cached `getAgentDir()`, so env changes need a resolver refresh.
+ */
+async function withConfigDirEnv<T>(configDirName: string | undefined, run: () => Promise<T>): Promise<T> {
+	if (!configDirName) return run();
+	const originalConfigDir = process.env.PI_CONFIG_DIR;
+	const originalAgentDir = process.env.PI_CODING_AGENT_DIR;
+	process.env.PI_CONFIG_DIR = configDirName;
+	delete process.env.PI_CODING_AGENT_DIR;
+	__resetDirsFromEnvForTests();
+	try {
+		return await run();
+	} finally {
+		for (const [key, value] of [
+			["PI_CONFIG_DIR", originalConfigDir],
+			["PI_CODING_AGENT_DIR", originalAgentDir],
+		] as const) {
+			if (value === undefined) delete process.env[key];
+			else process.env[key] = value;
+		}
+		__resetDirsFromEnvForTests();
+	}
+}
+
 async function captureRootCommandOptions(
 	dir: string,
 	overrides: Partial<Args> = {},
 	configDirName?: string,
 ): Promise<{ options: CreateAgentSessionOptions; stderr: string }> {
-	const originalConfigDir = process.env.PI_CONFIG_DIR;
-	// User discovery resolves through the cached `getAgentDir()`, so env changes need a resolver refresh.
-	if (configDirName) {
-		process.env.PI_CONFIG_DIR = configDirName;
-		__resetDirsFromEnvForTests();
-	}
+	return withConfigDirEnv(configDirName, () => captureRootCommandOptionsInEnv(dir, overrides));
+}
+
+async function captureRootCommandOptionsInEnv(
+	dir: string,
+	overrides: Partial<Args>,
+): Promise<{ options: CreateAgentSessionOptions; stderr: string }> {
 	const authStorage = await AuthStorage.create(path.join(dir, "auth.db"));
 	const stopError = new Error("stop after capturing session options");
 	let captured: CreateAgentSessionOptions | undefined;
@@ -187,14 +215,6 @@ async function captureRootCommandOptions(
 		if (error !== stopError) throw error;
 	} finally {
 		authStorage.close();
-		if (configDirName) {
-			if (originalConfigDir === undefined) {
-				delete process.env.PI_CONFIG_DIR;
-			} else {
-				process.env.PI_CONFIG_DIR = originalConfigDir;
-			}
-			__resetDirsFromEnvForTests();
-		}
 	}
 	if (!captured) throw new Error("Expected createAgentSession to receive options");
 	return { options: captured, stderr };
@@ -625,61 +645,36 @@ describe("system Handlebars prompt templates", () => {
 
 	test("subagent template discovery returns undefined without a configured source", async () => {
 		await withTempDir(async dir => {
-			const originalConfigDir = process.env.PI_CONFIG_DIR;
-			const configDirName = `.omp-test-${path.basename(dir)}`;
-			process.env.PI_CONFIG_DIR = configDirName;
-			__resetDirsFromEnvForTests();
-			try {
+			await withConfigDirEnv(`.omp-test-${path.basename(dir)}`, async () => {
 				expect(await discoverSubagentSystemPromptTemplate(dir)).toBeUndefined();
 				expect(await discoverSubagentBaseSystemPromptTemplate(dir)).toBeUndefined();
-			} finally {
-				if (originalConfigDir === undefined) {
-					delete process.env.PI_CONFIG_DIR;
-				} else {
-					process.env.PI_CONFIG_DIR = originalConfigDir;
-				}
-				__resetDirsFromEnvForTests();
-			}
+			});
 		});
 	});
 
 	test("subagent template discovery selects the user source", async () => {
 		await withTempDir(async dir => {
-			const originalConfigDir = process.env.PI_CONFIG_DIR;
 			const configDirName = `.omp-test-${path.basename(dir)}`;
 			const userConfigDir = path.join(os.homedir(), configDirName, "agent");
 			const wrapperTemplatePath = path.join(userConfigDir, "SUBAGENT-SYSTEM.template.md");
 			const baseTemplatePath = path.join(userConfigDir, "SYSTEM.template.md");
-			process.env.PI_CONFIG_DIR = configDirName;
-			__resetDirsFromEnvForTests();
-			try {
+			await withConfigDirEnv(configDirName, async () => {
 				await fs.mkdir(userConfigDir, { recursive: true });
 				await fs.writeFile(wrapperTemplatePath, "User child wrapper");
 				await fs.writeFile(baseTemplatePath, "User child base");
 				expect(await discoverSubagentSystemPromptTemplate(dir)).toBe(wrapperTemplatePath);
 				expect(await discoverSubagentBaseSystemPromptTemplate(dir)).toBe(baseTemplatePath);
-			} finally {
-				await fs.rm(path.join(os.homedir(), configDirName), { recursive: true, force: true });
-				if (originalConfigDir === undefined) {
-					delete process.env.PI_CONFIG_DIR;
-				} else {
-					process.env.PI_CONFIG_DIR = originalConfigDir;
-				}
-				__resetDirsFromEnvForTests();
-			}
+			});
 		});
 	});
 
 	test("subagent template discovery prefers the nearest ancestor project source", async () => {
 		await withTempDir(async dir => {
-			const originalConfigDir = process.env.PI_CONFIG_DIR;
 			const configDirName = `.omp-test-${path.basename(dir)}`;
 			const userConfigDir = path.join(os.homedir(), configDirName, "agent");
 			const projectWrapperTemplatePath = path.join(dir, ".omp", "SUBAGENT-SYSTEM.template.md");
 			const projectBaseTemplatePath = path.join(dir, ".omp", "SYSTEM.template.md");
-			process.env.PI_CONFIG_DIR = configDirName;
-			__resetDirsFromEnvForTests();
-			try {
+			await withConfigDirEnv(configDirName, async () => {
 				await fs.mkdir(userConfigDir, { recursive: true });
 				await fs.mkdir(path.dirname(projectWrapperTemplatePath), { recursive: true });
 				await fs.writeFile(path.join(userConfigDir, "SUBAGENT-SYSTEM.template.md"), "User child wrapper");
@@ -690,15 +685,7 @@ describe("system Handlebars prompt templates", () => {
 				await fs.mkdir(nestedCwd, { recursive: true });
 				expect(await discoverSubagentSystemPromptTemplate(nestedCwd)).toBe(projectWrapperTemplatePath);
 				expect(await discoverSubagentBaseSystemPromptTemplate(nestedCwd)).toBe(projectBaseTemplatePath);
-			} finally {
-				await fs.rm(path.join(os.homedir(), configDirName), { recursive: true, force: true });
-				if (originalConfigDir === undefined) {
-					delete process.env.PI_CONFIG_DIR;
-				} else {
-					process.env.PI_CONFIG_DIR = originalConfigDir;
-				}
-				__resetDirsFromEnvForTests();
-			}
+			});
 		});
 	});
 
