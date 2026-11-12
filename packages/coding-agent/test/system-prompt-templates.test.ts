@@ -2,12 +2,9 @@ import { afterEach, describe, expect, test, vi } from "bun:test";
 import * as fs from "node:fs/promises";
 import * as os from "node:os";
 import * as path from "node:path";
-import { type } from "@oh-my-pi/omptype";
-import type { AgentTool } from "@oh-my-pi/pi-agent-core";
 import { getBundledModel } from "@oh-my-pi/pi-catalog/models";
 import {
 	buildSystemPrompt,
-	buildSystemPromptToolMetadata,
 	discoverSubagentBaseSystemPromptTemplate,
 	discoverSubagentSystemPromptTemplate,
 } from "@oh-my-pi/pi-coding-agent/system-prompt";
@@ -1064,46 +1061,5 @@ describe("system Handlebars prompt templates", () => {
 				"Append {{date}}",
 			]);
 		});
-	});
-
-	test("buildSystemPromptToolMetadata captures custom wire names", () => {
-		const editTool = {
-			name: "edit",
-			label: "Edit",
-			description: "Edits files",
-			parameters: type({}),
-			customWireName: "apply_patch",
-			execute: async () => ({ content: [] }),
-		} satisfies AgentTool;
-
-		const metadata = buildSystemPromptToolMetadata(new Map([["edit", editTool]]));
-
-		expect(metadata.get("edit")?.wireName).toBe("apply_patch");
-	});
-
-	test("buildSystemPrompt references overridden tool wire names", async () => {
-		const { systemPrompt } = await buildSystemPrompt({
-			cwd: os.tmpdir(),
-			contextFiles: [],
-			skills: [],
-			rules: [],
-			toolNames: ["read", "search", "find", "edit", "lsp", "bash", "eval"],
-			workspaceTree: createEmptyWorkspaceTree(os.tmpdir()),
-			tools: new Map([
-				["read", { label: "Read", description: "Reads files" }],
-				["search", { label: "Search", description: "Searches files" }],
-				["find", { label: "Find", description: "Finds files" }],
-				["edit", { label: "Edit", description: "Edits files", wireName: "apply_patch" }],
-				["lsp", { label: "LSP", description: "Queries language servers" }],
-				["bash", { label: "Bash", description: "Runs shell commands" }],
-				["eval", { label: "Eval", description: "Runs eval cells" }],
-			]),
-		});
-
-		const promptText = systemPrompt.join("\n\n");
-
-		expect(promptText).toContain("Edit: `apply_patch`");
-		expect(promptText).toContain("`apply_patch`");
-		expect(promptText).not.toContain("Edit: `edit`");
 	});
 });

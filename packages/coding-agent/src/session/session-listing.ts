@@ -592,7 +592,9 @@ async function collectSessionsFromFiles(
 	withStatus: boolean,
 	onFailure?: SessionDiscoveryReporter,
 ): Promise<SessionInfo[]> {
-	const sessions = await mapSessionFiles(files, file => scanSessionFile(file, storage, withStatus, undefined, onFailure));
+	const sessions = await mapSessionFiles(files, file =>
+		scanSessionFile(file, storage, withStatus, undefined, onFailure),
+	);
 	return sessions.filter(session => session !== undefined).sort(compareNewestFirst);
 }
 

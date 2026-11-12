@@ -118,6 +118,10 @@ The upgrader validates these IDs against its executable and manual proof mapping
 - Reason: upstream v18.2.7 added an analogous `SYSTEM_TEMPLATE.md` interface with fallback semantics.
 - Reason: its filename and discovered-template fallback do not satisfy the mandatory MOMP contract.
 - Required action: retain the MOMP filename, discovery, precedence, loading, and mandatory failure behavior.
+- Coverage: upstream v18.19.0 adds the `systemPromptTemplates` setting, a per-model Handlebars file with bundled fallback.
+- Required action: select it only when no raw or template source controls block 0, so it never weakens mandatory MOMP templates.
+- Owner: `src/system-prompt.ts#loadModelSystemPromptTemplate` keeps upstream's warn-and-fallback semantics for that file alone.
+- Proof: upstream `test/sdk-model-system-prompt-template.test.ts`.
 - Proof: `test/system-prompt-templates.test.ts`.
 - Proof: prompt-source cases in `test/acp-mcp-isolation.test.ts`.
 - Proof: `test/agent-session-tool-rebuild-skip.test.ts`.
@@ -255,10 +259,12 @@ The upgrader validates these IDs against its executable and manual proof mapping
 - Owner: `src/tools/read.ts#ReadTool`, `src/tools/bash.ts#BashTool`, `src/task/index.ts#TaskTool`, `src/lsp/tool.ts#LspTool`, `src/tools/eval.ts#EvalTool`, and `src/web/search/index.ts#WebSearchTool` render their selected sources.
 - Owner: `src/tools/glob.ts#GlobTool` renders the selected Glob prompt.
 - Owner: `src/tools/eval.ts#getEvalDocTopics` selects and renders profile-scoped agent-topic guidance.
-- Coverage: upstream v18.13.2 supplies Eval deadline bounds, the configured ceiling, and accepted session tool names.
-- Required action: render those same inputs through the selected profile description without changing its source precedence.
-- Coverage: upstream v18.14.0 adds conditional Task file input and inline Eval prelude documentation.
-- Required action: pass `file` and `inlinePreludes` through selected sources and preserve their conditional Settings guidance.
+- Coverage: upstream v18.19.0 moves Eval deadline bounds into the `timeout` schema and drops them from description render inputs.
+- Required action: keep accepted session tool names and other description inputs flowing through the selected profile description.
+- Coverage: upstream v18.19.0 removes `task.file` and adds `task.steps`, which swaps the Task `task` field for `steps`.
+- Required action: pass `steps` and `inlinePreludes` through selected sources and preserve their conditional Settings guidance.
+- Coverage: upstream v18.19.0 renders Write with `readActive` so archive and SQLite target grammar inlines when `xd://read/sources` is unreachable.
+- Required action: render the selected `write-device-only` source with that input.
 - Coverage: upstream v18.14.2 adds operator-approved per-call model render inputs to Task and Eval.
 - Required action: pass those inputs through selected sources while preserving operator-owned activation.
 - Required action: derive a selected Task source's allowed-agent summary from its filtered advertisement.
