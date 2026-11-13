@@ -543,6 +543,7 @@ The upgrader validates these IDs against its executable and manual proof mapping
 - Reason: upstream's cross-call stat-keyed cache can return old members when a rapid rewrite also preserves ctime.
 - Coverage: upstream v18.14.1 avoids caching archive indexes inside a two-second ctime window.
 - Required action: retain unconditional reopening rather than making freshness depend on clock and timestamp granularity.
+- Coverage: upstream v18.20.0 applies JSON selectors to archive members through `read-json` without changing index reuse.
 - Required action: reopen through `openArchive` per Read without hashing whole payloads or retaining the unsafe cache.
 - Proof: the same-size, restored-mtime archive rewrite case in `test/tools.test.ts`.
 - Proof: repeated TAR member reads preserve ranged payload IO in `test/tools/read-archive-tar-range.test.ts`.
@@ -766,6 +767,9 @@ The upgrader validates these IDs against its executable and manual proof mapping
 - Owner: `src/tools/conversation-search.ts` owns the tool boundary and Main-only exposure.
 - Owner: `src/tools/conversation-search-format.ts` owns output variants.
 - Required action: retain one Main-only MOMP tool and its complete search closure.
+- Coverage: upstream v18.20.0 groups `--help` tools through `src/tools/builtin-names.ts#BUILTIN_TOOL_HELP`, keyed by every built-in.
+- Required action: keep its default-on `conversation_search` entry so help groups match the top-level tool plan.
+- Proof: upstream `test/tools/builtin-defaults.test.ts` matches that help group to the default top-level tool plan.
 - Required action: preserve discovery failures through search coverage accounting.
 - Coverage: upstream v18.12.0 follows transcript symlinks, skips symlinked buckets, and deduplicates physical files.
 - Owner: upstream `src/session/session-listing.ts#scanBucketFiles` owns cross-bucket enumeration.
@@ -892,6 +896,8 @@ The upgrader validates these IDs against its executable and manual proof mapping
 - Owner: upstream `src/session/agent-session.ts` and `src/session/turn-recovery.ts` own post-discovery reconciliation.
 - Coverage: upstream v18.12.0 defers cached or unavailable catalogs during the initial background refresh.
 - Coverage: its CLI schedules validation after starting that refresh and retains warnings for embedders without one.
+- Coverage: upstream v18.20.0 seeds cached discovery states for authenticated special providers and keeps them final without a refresh.
+- Required action: prove deferral in the production order, refresh before validation; upstream alone still flashes the partial-cache case.
 - Reason: built-in catalogs without discovery state and known role-incompatible models still require the MOMP delta.
 - Required action: retain only no-state readiness and unresolved-only deferral alongside upstream refresh lifecycle policy.
 - Proof: partial-cache and failed-refresh cases in `test/agent-session-retry-fallback.test.ts`.
