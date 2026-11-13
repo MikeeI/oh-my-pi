@@ -66,6 +66,10 @@ export const BUILTIN_TOOL_HELP: Record<BuiltinToolName, BuiltinToolHelp> = {
 	todo: { summary: "Track a todo list", defaultState: "on" },
 	ask: { summary: "Ask the user questions (interactive mode only)", defaultState: "on" },
 	web_search: { summary: "Search the web", defaultState: "on" },
+	conversation_search: {
+		summary: "Search earlier conversations by literal terms (main session only)",
+		defaultState: "on",
+	},
 	lsp: { summary: "Language server queries (code intelligence)", defaultState: "on" },
 	ast_edit: { summary: "Rewrite code with AST patterns", defaultState: "on" },
 	debug: { summary: "Debug a running process over DAP", defaultState: "on" },
