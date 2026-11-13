@@ -7722,11 +7722,6 @@ describe("AgentSession retry fallback", () => {
 		session.subscribe(event => {
 			if (event.type === "config_warnings_changed") warningSnapshots.push([...session!.configWarnings]);
 		});
-		session.validateRetryFallbackChains();
-		expect(session.configWarnings.some(warning => warning.includes(validSelector))).toBe(false);
-		expect(session.configWarnings.some(warning => warning.includes(missingSelector))).toBe(false);
-		expect(session.configWarnings.some(warning => warning.includes(wrongKindSelector))).toBe(true);
-
 		// Use the real initial-refresh barrier and offline cache reload so no
 		// provider request or global fetch mutation is needed to control ordering.
 		writeModelCache(
@@ -7737,12 +7732,17 @@ describe("AgentSession retry fallback", () => {
 			"",
 			cacheDbPath,
 		);
+		// Production starts discovery before validating deferred fallback chains (main.ts).
+		registry.refreshInBackground("offline");
+		session.validateRetryFallbackChains();
+		expect(session.configWarnings.some(warning => warning.includes(validSelector))).toBe(false);
+		expect(session.configWarnings.some(warning => warning.includes(missingSelector))).toBe(false);
+		expect(session.configWarnings.some(warning => warning.includes(wrongKindSelector))).toBe(true);
 		const { promise: warningsChanged, resolve: resolveWarningsChanged } = Promise.withResolvers<void>();
 		const unsubscribe = session.subscribe(event => {
 			if (event.type === "config_warnings_changed") resolveWarningsChanged();
 		});
 		try {
-			registry.refreshInBackground("offline");
 			await registry.awaitInitialBackgroundRefresh();
 			await warningsChanged;
 			expect(session.configWarnings.some(warning => warning.includes(missingSelector))).toBe(true);
@@ -7779,18 +7779,21 @@ describe("AgentSession retry fallback", () => {
 			sessionManager: SessionManager.inMemory(),
 			settings,
 			modelRegistry: registry,
+			deferRetryFallbackValidation: true,
 		});
-		expect(session.configWarnings.some(warning => warning.includes(selector))).toBe(false);
 
 		// A failed refresh must release startup suppression rather than hiding
 		// a bad selector indefinitely; the background owner catches this error.
 		vi.spyOn(registry, "refresh").mockRejectedValue(new Error("Discovery unavailable"));
+		// Production starts discovery before validating deferred fallback chains (main.ts).
+		registry.refreshInBackground();
+		session.validateRetryFallbackChains();
+		expect(session.configWarnings.some(warning => warning.includes(selector))).toBe(false);
 		const { promise: warningsChanged, resolve: resolveWarningsChanged } = Promise.withResolvers<void>();
 		const unsubscribe = session.subscribe(event => {
 			if (event.type === "config_warnings_changed") resolveWarningsChanged();
 		});
 		try {
-			registry.refreshInBackground();
 			await registry.awaitInitialBackgroundRefresh();
 			await warningsChanged;
 			expect(session.configWarnings.filter(warning => warning.includes(selector))).toHaveLength(1);
