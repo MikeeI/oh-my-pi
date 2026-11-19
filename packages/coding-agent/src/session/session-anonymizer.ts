@@ -339,6 +339,7 @@ const FIELD_RULES: Record<string, Rule> = {
 		"body",
 		"prompt",
 		"reply",
+		"commandInvocation",
 	]),
 	...fields("label", ["title", "previousTitle", "label", "injectedRules", "intent", "emoji", "nf"]),
 	...fields("error", ["errorMessage", "explanation", "errorClassificationMessage", "upstreamError"]),

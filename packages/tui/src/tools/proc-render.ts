@@ -24,6 +24,7 @@ import type { IrcDeliveryReceipt } from "./irc";
 import { type PersistedSnapshot, type ServiceView, serviceView } from "./daemon";
 import { styleTerminalRow } from "./terminal-output";
 import { card, type CardToolResult as ToolResult, firstText, safe } from "./result-card";
+import { formatReadTokenLabel } from "./read-token";
 
 export interface ProcReadDetails {
 	jobs?: JobSnapshot[];
@@ -236,7 +237,9 @@ export function renderProcRead(
 	details: ProcReadDetails | undefined,
 	options: RenderResultOptions,
 	theme: Theme,
+	readTextTokens: number | undefined,
 ): Component {
+	const tokenLabel = formatReadTokenLabel(readTextTokens);
 	return card((_width, expanded) => {
 		const title = id ? `Proc ${safe(id)}` : "Proc jobs & services";
 		const daemon = details?.daemon;
@@ -244,7 +247,7 @@ export function renderProcRead(
 			{
 				icon: result === undefined ? "pending" : result.isError ? "error" : "info",
 				title,
-				meta: daemon ? daemonMeta(serviceView(daemon), theme) : [],
+				meta: [...(tokenLabel ? [tokenLabel] : []), ...(daemon ? daemonMeta(serviceView(daemon), theme) : [])],
 			},
 			theme,
 		);
@@ -280,6 +283,7 @@ export function renderProcRead(
 		const services = (details?.daemons ?? []).map(serviceView);
 		const agents = details?.agents ?? [];
 		const meta = [
+			...(tokenLabel ? [tokenLabel] : []),
 			`${jobs.length} jobs`,
 			`${services.length} services`,
 			...(agents.length ? [`${agents.length} agents`] : []),
@@ -453,12 +457,15 @@ export function describeProcRead(
 	id: string,
 	result: ToolResult | undefined,
 	details: ProcReadDetails | undefined,
+	readTextTokens: number | undefined,
 ): NativeToolView {
 	const daemon = details?.daemon;
 	const title = id ? "Proc" : "Proc jobs & services";
+	const tokenLabel = formatReadTokenLabel(readTextTokens);
 	const head = toolHead(
 		title,
 		id ? span(safe(id), "accent") : undefined,
+		tokenLabel,
 		daemon ? daemonMetaText(serviceView(daemon)) : undefined,
 	);
 	if (result?.isError) {
@@ -519,7 +526,7 @@ export function describeProcRead(
 	const counts = [`${jobs.length} jobs`, `${services.length} services`];
 	if (agents.length) counts.push(`${agents.length} agents`);
 	return {
-		head: toolHead(title, id ? span(safe(id), "accent") : undefined, counts.join(" · ")),
+		head: toolHead(title, id ? span(safe(id), "accent") : undefined, tokenLabel, counts.join(" · ")),
 		body: [node("list", { empty: "No background jobs or services.", role: "omp.tool.proc.table" }, items)],
 	};
 }

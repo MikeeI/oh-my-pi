@@ -1,7 +1,8 @@
 import * as os from "node:os";
 import * as path from "node:path";
-import { normalizeProfileName } from "@oh-my-pi/pi-utils/dirs";
+import { APP_NAME as UPSTREAM_APP_NAME, normalizeProfileName } from "@oh-my-pi/pi-utils/dirs";
 import { quotePosixArgument } from "../utils/shell-quote";
+import { APP_DISPLAY_NAME } from "../app-version";
 
 export type ProfileAliasShell = "bash" | "zsh" | "fish" | "powershell" | "pwsh";
 
@@ -24,10 +25,10 @@ export interface ProfileAliasProcessOptions {
 }
 
 const DEFAULT_ALIAS_COMMAND: ProfileAliasCommand = {
-	display: "omp",
-	posix: "omp",
-	fish: "omp",
-	powerShell: "omp",
+	display: APP_DISPLAY_NAME,
+	posix: APP_DISPLAY_NAME,
+	fish: APP_DISPLAY_NAME,
+	powerShell: APP_DISPLAY_NAME,
 };
 
 export interface ProfileAliasInstallOptions {
@@ -151,8 +152,13 @@ function validateAliasName(aliasName: string, shell: ProfileAliasShell): string 
 	if (!ALIAS_NAME_RE.test(normalized)) {
 		throw new Error(`Invalid alias "${aliasName}". Alias names must match ${ALIAS_NAME_RE.source}.`);
 	}
-	if (normalized.toLowerCase() === "omp") {
-		throw new Error('Invalid alias "omp". Refusing to shadow the base omp command.');
+	if (
+		normalized.toLowerCase() === APP_DISPLAY_NAME.toLowerCase() ||
+		normalized.toLowerCase() === UPSTREAM_APP_NAME.toLowerCase()
+	) {
+		throw new Error(
+			`Invalid alias "${normalized}". Refusing to shadow the base ${normalized.toLowerCase()} command.`,
+		);
 	}
 	if (getReservedAliasNames(shell).has(normalized.toLowerCase())) {
 		throw new Error(`Invalid alias "${aliasName}". Refusing to create a ${shell} reserved word.`);
@@ -286,7 +292,7 @@ function renderAliasBlock(
 	switch (shell) {
 		case "fish":
 			body = [
-				`function ${aliasName} --wraps omp --description 'OMP profile ${profile}'`,
+				`function ${aliasName} --wraps ${APP_DISPLAY_NAME} --description 'OMP profile ${profile}'`,
 				`    command ${command.fish} --profile=${profile} $argv`,
 				"end",
 			].join("\n");

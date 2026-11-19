@@ -1,3 +1,4 @@
+import { APP_DISPLAY_NAME } from "../app-version";
 import { register } from "../config/registry";
 
 /** Backend for explicit analysis through read selectors and eval's dsm namespace; auto prefers idalib. */
@@ -43,8 +44,7 @@ export const cfgDisasmMaxOpen = register({
 		tab: "tools",
 		group: "Disassembler",
 		label: "Max Open Databases",
-		description:
-			"Most databases (omp.ida.* / omp.ghidra.* daemons in omp ps) open at once per project; opening another evicts an unreferenced idle one. Close retained dsm handles when done",
+		description: `Most databases (omp.ida.* / omp.ghidra.* daemons in ${APP_DISPLAY_NAME} ps) open at once per project; opening another evicts an unreferenced idle one. Close retained dsm handles when done`,
 		options: [
 			{ value: "2", label: "2" },
 			{ value: "4", label: "4" },

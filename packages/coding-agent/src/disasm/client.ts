@@ -8,6 +8,7 @@
  */
 import { logger, postmortem, untilAborted } from "@oh-my-pi/pi-utils";
 import { ToolError } from "@oh-my-pi/pi-tui/tools/tool-errors";
+import { APP_DISPLAY_NAME } from "../app-version";
 import { daemonClient } from "../daemon/client";
 import { type DaemonTunnel, GLOBAL_SCOPE, type UnitSnapshot } from "../daemon/protocol";
 import type { ToolSession } from "../tools";
@@ -116,7 +117,9 @@ class HostConnection {
 	}
 
 	#goneError(): HostGoneError {
-		return new HostGoneError(`${unitLabel(this.#key)} ${this.#key} closed; see \`omp ps logs ${this.#unitId}\``);
+		return new HostGoneError(
+			`${unitLabel(this.#key)} ${this.#key} closed; see \`${APP_DISPLAY_NAME} ps logs ${this.#unitId}\``,
+		);
 	}
 
 	#onLine(line: string): void {
@@ -347,7 +350,7 @@ async function openDatabase(
 		const db = await attachOpen();
 		if (db) return db;
 	}
-	throw new ToolError(`${unitLabel(key)} ${key} exited right after starting; see \`omp ps\``);
+	throw new ToolError(`${unitLabel(key)} ${key} exited right after starting; see \`${APP_DISPLAY_NAME} ps\``);
 }
 
 /** Options for {@link acquireDatabase}. */
@@ -401,7 +404,7 @@ export async function acquireDatabase(
 		const unit = await openingUnit(key);
 		const age = unit ? ` for ${Math.round((Date.now() - unit.startedAt) / 60_000)}m` : "";
 		const where = unit ? ` in unit \`${unit.id}\`` : "";
-		const stop = unit ? `, or stop it with \`omp ps stop ${unit.id}\`` : "";
+		const stop = unit ? `, or stop it with \`${APP_DISPLAY_NAME} ps stop ${unit.id}\`` : "";
 		throw new ToolError(
 			`${label} is still analyzing ${databaseRef(loc)} (opening${age}); the analysis continues${where}. Retry later${stop}`,
 		);

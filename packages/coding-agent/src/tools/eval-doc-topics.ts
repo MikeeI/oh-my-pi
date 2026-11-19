@@ -7,10 +7,13 @@ import type { EvalPreludeDefinition } from "../eval/preludes";
 import evalAgentsTopic from "../prompts/tools/eval-agents.md" with { type: "text" };
 import evalHelpersTopic from "../prompts/tools/eval-helpers.md" with { type: "text" };
 import evalJudgeTopic from "../prompts/tools/eval-judge.md" with { type: "text" };
+import { resolveUserToolPromptSource } from "../prompts/tool-prompt-source";
 import type { PerCallModelAdvertisement } from "../task/model-approval";
 import { resolveSpawnPolicy } from "../task/spawn-policy";
 
 export interface EvalToolDescriptionOptions {
+	/** Active profile directory; omit to render the bundled prompt for standalone callers. */
+	agentDir?: string;
 	py?: boolean;
 	js?: boolean;
 	/**
@@ -77,7 +80,16 @@ export function getEvalDocTopics(options: EvalToolDescriptionOptions = {}): Reco
 		judge: prompt.render(evalJudgeTopic, context),
 		helpers: prompt.render(evalHelpersTopic, context),
 	};
-	if (context.spawns) topics.agents = prompt.render(evalAgentsTopic, context);
+	if (context.spawns) {
+		const source = options.agentDir
+			? resolveUserToolPromptSource({
+					agentDir: options.agentDir,
+					toolName: "eval-agents",
+					bundledSource: evalAgentsTopic,
+				})
+			: evalAgentsTopic;
+		topics.agents = prompt.render(source, context);
+	}
 	for (const prelude of options.preludes ?? []) {
 		const doc = prelude.documentation.trim();
 		if (doc) topics[prelude.name] = doc;
