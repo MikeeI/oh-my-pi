@@ -36,8 +36,10 @@ import {
 	createSyntheticToolResultMessage,
 	lastContextMessage,
 	type NormalizeToolsOptions,
+	type PreparedProviderCall,
 	normalizeMessagesForProvider,
 	normalizeTools,
+	prepareProviderCall,
 	resolveOwnedDialectFromEnv,
 	steeringQueueState,
 	unpairedToolCallTail,
@@ -135,7 +137,7 @@ export interface AgentOptions {
 	 * Optional transform applied after provider context assembly and before
 	 * telemetry capture/provider send.
 	 */
-	transformProviderContext?: (context: Context, model: Model, signal?: AbortSignal) => Context | Promise<Context>;
+	transformProviderContext?: AgentLoopConfig["transformProviderContext"];
 
 	/**
 	 * Steering mode: "all" = send all steering messages at once, "one-at-a-time" = one per turn
@@ -436,7 +438,7 @@ export class Agent {
 	#detachController?: AbortController;
 	#convertToLlm: AgentLoopConfig["convertToLlm"];
 	#transformContext?: (messages: AgentMessage[], signal?: AbortSignal) => Promise<AgentMessage[]>;
-	#transformProviderContext?: (context: Context, model: Model, signal?: AbortSignal) => Context | Promise<Context>;
+	#transformProviderContext?: AgentLoopConfig["transformProviderContext"];
 	#sentToolDefinitions = new SentToolDefinitions();
 	#standbyTools: AgentTool[] = [];
 	#steeringQueue: AgentMessage[] = [];
@@ -976,6 +978,32 @@ export class Agent {
 			names.add(tool.name);
 		}
 		return merged ?? this.#state.tools;
+	}
+
+	/**
+	 * Prepare a configured main-loop request without dispatching or committing request-history state.
+	 * Side channels intentionally omit in-band tool markup; inspection must use the main-loop preparation owner.
+	 */
+	async prepareModelCall(messages: AgentMessage[], systemPrompt: string[]): Promise<PreparedProviderCall> {
+		const model = this.#state.model;
+		if (!model) throw new Error("No active model on agent");
+		// Append-only synchronization, sent-definition recording, and turn hooks belong only to a real dispatch.
+		return prepareProviderCall(
+			{ systemPrompt, messages: [...messages], tools: this.#toolsForModel(model) },
+			{
+				model,
+				convertToLlm: this.#convertToLlm,
+				transformContext: this.#transformContext,
+				transformProviderContext: this.#transformProviderContext
+					? (context, model, signal) => this.#transformProviderContext!(context, model, signal, true)
+					: undefined,
+				intentTracing: this.#intentTracing,
+				pruneToolDescriptions: this.#pruneToolDescriptions,
+				dialect: this.#dialect,
+				getDialect: this.#dialectResolver,
+			},
+			undefined,
+		);
 	}
 
 	/**

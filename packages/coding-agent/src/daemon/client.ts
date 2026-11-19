@@ -12,6 +12,7 @@ import * as os from "node:os";
 import * as path from "node:path";
 import { IpcConnection } from "@oh-my-pi/pi-natives";
 import { isEexist, isEnoent, isPidAlive, logger, postmortem, toError } from "@oh-my-pi/pi-utils";
+import { APP_DISPLAY_NAME } from "../app-version";
 import { resolveCliEntryCmd, resolveWorkerSpawnCmd, workerEnvFromParent } from "../subprocess/worker-client";
 import { daemonBuildId } from "./build";
 import { canonicalProjectDir, daemonDir, daemonEndpoint, daemonTcpAddress, daemonTokenPath } from "./paths";
@@ -216,7 +217,7 @@ function unreachableError(lastError: Error | undefined): Error {
 	return new Error(
 		`The omp daemon did not answer at ${where} within ${START_TIMEOUT_MS / 1000}s: ` +
 			`${lastError?.message ?? "endpoint unavailable"}. Runtime dir: ${daemonDir()}. ` +
-			"Run `omp --smoke-test` to verify daemon startup, or `omp ps` to inspect it.",
+			`Run \`${APP_DISPLAY_NAME} --smoke-test\` to verify daemon startup, or \`${APP_DISPLAY_NAME} ps\` to inspect it.`,
 	);
 }
 

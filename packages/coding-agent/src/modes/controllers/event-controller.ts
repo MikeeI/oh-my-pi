@@ -1455,7 +1455,8 @@ export class EventController {
 				this.#turnStartedAt = event.message.timestamp;
 				this.#turnUsage.reset();
 			}
-			const userText = textContent(event.message.content);
+			// Matches the submitted draft, so a typed file-command keeps its optimistic row.
+			const userText = userDisplayText(event.message);
 			const imageBlocks =
 				typeof event.message.content === "string"
 					? []

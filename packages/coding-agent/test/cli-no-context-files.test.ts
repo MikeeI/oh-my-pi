@@ -17,6 +17,7 @@ const EXTRA_ROOT_MARKER = "extra-root-context-marker-2c9d";
 const IMPORTED_MARKER = "imported-context-marker-5e1b";
 const USER_AGENTS_MARKER = "user-agents-marker-9b41";
 const EXTRA_CLAUDE_MARKER = "extra-claude-marker-6a07";
+const EXPLICIT_MARKER = "explicit-agents-marker-1e83";
 const NESTED_DIR = "nested-context-dir-4d8e";
 // A nested AGENTS.md is not inlined; the prompt lists its path for the agent to read.
 const NESTED_LISTING = `${NESTED_DIR}/AGENTS.md`;
@@ -46,10 +47,11 @@ describe("--no-context-files", () => {
 		await Promise.all([
 			Bun.write(tempDir.join("project/AGENTS.md"), `${PRIMARY_MARKER}\n`),
 			Bun.write(tempDir.join(`project/${NESTED_DIR}/AGENTS.md`), "nested\n"),
-			Bun.write(tempDir.join("extra/AGENTS.md"), `${EXTRA_ROOT_MARKER}\n@imported.md\n`),
+			Bun.write(tempDir.join("extra/AGENTS.md"), `${EXTRA_ROOT_MARKER}\n\n${EXTRA_CLAUDE_MARKER}\n\n@imported.md\n`),
 			Bun.write(tempDir.join("extra/imported.md"), `${IMPORTED_MARKER}\n`),
 			Bun.write(tempDir.join("home/.omp/agent/AGENTS.md"), `${USER_AGENTS_MARKER}\n`),
 			Bun.write(tempDir.join("extra-claude/CLAUDE.md"), `${EXTRA_CLAUDE_MARKER}\n`),
+			Bun.write(tempDir.join("strict.md"), `${EXPLICIT_MARKER}\n`),
 		]);
 		authStorage = await AuthStorage.create(tempDir.join("auth.db"));
 		authStorage.keys.setRuntime("openai", "test-key");
@@ -78,13 +80,14 @@ describe("--no-context-files", () => {
 			"retry.enabled": false,
 			includeWorkspaceTree: true,
 		});
+		// The later AGENTS root repeats the earlier CLAUDE text; filter before cross-root deduplication.
 		const args = parseArgs([
 			"--cwd",
 			tempDir.join("project"),
 			"--add-dir",
-			tempDir.join("extra"),
-			"--add-dir",
 			tempDir.join("extra-claude"),
+			"--add-dir",
+			tempDir.join("extra"),
 			...flags,
 		]);
 		const options = await buildSessionOptions(args, [], SessionManager.inMemory(args.cwd), modelRegistry, settings);
@@ -139,6 +142,17 @@ describe("--no-context-files", () => {
 			}
 		} finally {
 			await ambient.dispose();
+		}
+
+		const explicit = await createSession(["--agents-file", tempDir.join("strict.md")]);
+		try {
+			expect(explicit.systemPrompt.join("\n")).toContain(EXPLICIT_MARKER);
+			expect(await subagentPrompt(explicit)).not.toContain(EXPLICIT_MARKER);
+			await explicit.refreshBaseSystemPrompt();
+			expect(explicit.systemPrompt.join("\n")).toContain(EXPLICIT_MARKER);
+			expect(await subagentPrompt(explicit)).not.toContain(EXPLICIT_MARKER);
+		} finally {
+			await explicit.dispose();
 		}
 
 		const session = await createSession(["--no-context-files"]);

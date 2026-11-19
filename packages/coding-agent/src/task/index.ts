@@ -23,10 +23,11 @@ import type {
 	ToolSpeculationPolicy,
 } from "@oh-my-pi/pi-agent-core";
 import type { Usage } from "@oh-my-pi/pi-ai";
-import { $env, isRecord, logger, prompt } from "@oh-my-pi/pi-utils";
+import { $env, getAgentDir, isRecord, logger, prompt } from "@oh-my-pi/pi-utils";
 import type { ToolSession } from "..";
 import type { EffectiveExtensionRoots } from "../capability/types";
 import type { Settings } from "../config/settings";
+import { resolveUserToolPromptSource } from "../prompts/tool-prompt-source";
 import taskDescriptionTemplate from "../prompts/tools/task.md" with { type: "text" };
 import taskAsyncContractTemplate from "../prompts/tools/task-async-contract.md" with { type: "text" };
 import taskCoordinationAdvisoryTemplate from "../prompts/tools/task-coordination-advisory.md" with { type: "text" };
@@ -160,7 +161,7 @@ interface TaskDescriptionOptions {
 }
 
 /** Render the tool description from a cached agent list and current settings. */
-function renderDescription(options: TaskDescriptionOptions): string {
+function renderDescription(options: TaskDescriptionOptions, descriptionSource: string): string {
 	const spawnPolicy = resolveSpawnPolicy(options.parentSpawns);
 	const spawningDisabled = !spawnPolicy.enabled;
 	const agents = [...options.agents, ...options.sessionAgents];
@@ -181,10 +182,13 @@ function renderDescription(options: TaskDescriptionOptions): string {
 		structured: !options.structured && agent.structured === true,
 	}));
 	const scoutAvailable = isScoutSpawnable(options.disabledAgents, options.parentSpawns);
-	return prompt.render(taskDescriptionTemplate, {
+	return prompt.render(descriptionSource, {
 		agents: renderedAgents,
 		scoutAvailable,
 		spawningDisabled,
+		// Disabled-agent and spawn-policy filtering must also constrain a profile's policy summary.
+		allowedAgentsText:
+			spawnPolicy.allowedAgents === null ? undefined : renderedAgents.map(agent => agent.name).join(", "),
 		defaultAgent: spawnPolicy.defaultAgent,
 		isolationEnabled: options.isolationEnabled,
 		applyIsolatedChanges: options.applyIsolatedChanges,
@@ -597,12 +601,12 @@ class TaskJobError extends AsyncJobError {}
 
 /**
  * Process-level create-time discovery memo and published reload snapshots,
- * keyed by resolved cwd plus the exact effective `extensions` array.
+ * keyed by resolved cwd, agent directory, and the exact effective extension roots.
  *
  * `TaskTool.create` runs for every (sub)agent session in this process. Sessions
- * may share a cwd while carrying different overlay/runtime extension settings,
- * so cwd alone is not an isolation boundary. Explicit plugin reloads replace
- * only the matching cwd+extensions snapshot. Execution-time discovery
+ * may share a cwd while carrying different profiles or overlay/runtime extension
+ * settings, so cwd alone is not an isolation boundary. Explicit plugin reloads
+ * replace only the matching cwd+profile+extensions snapshot. Execution-time discovery
  * (`#runSpawn`) intentionally stays fresh. The memo also tracks the live
  * `discoverAgents` binding: test spies swap that binding, which invalidates
  * both caches automatically.
@@ -611,22 +615,26 @@ const discoveryMemo = new Map<string, Promise<DiscoveryResult>>();
 const discoverySnapshots = new Map<string, AgentDefinition[]>();
 let discoveryMemoFn: typeof discoverAgents | undefined;
 
-/** Stable cache identity for the filesystem root and the full effective extension-root struct. */
-function discoveryCacheKey(cwd: string, extensionRoots?: EffectiveExtensionRoots): string {
-	return `${path.resolve(cwd)}\0${JSON.stringify(extensionRoots ?? null)}`;
+/** Stable cache identity for the workspace, profile, and full effective extension-root struct. */
+function discoveryCacheKey(cwd: string, agentDir: string, extensionRoots?: EffectiveExtensionRoots): string {
+	return `${path.resolve(cwd)}\0${path.resolve(agentDir)}\0${JSON.stringify(extensionRoots ?? null)}`;
 }
 
-function discoverAgentsForCreate(cwd: string, extensionRoots?: EffectiveExtensionRoots): Promise<DiscoveryResult> {
+function discoverAgentsForCreate(
+	cwd: string,
+	agentDir: string,
+	extensionRoots?: EffectiveExtensionRoots,
+): Promise<DiscoveryResult> {
 	const fn = discoverAgents;
 	if (discoveryMemoFn !== fn) {
 		discoveryMemoFn = fn;
 		discoveryMemo.clear();
 		discoverySnapshots.clear();
 	}
-	const key = discoveryCacheKey(cwd, extensionRoots);
+	const key = discoveryCacheKey(cwd, agentDir, extensionRoots);
 	let pending = discoveryMemo.get(key);
 	if (!pending) {
-		pending = fn(cwd, undefined, extensionRoots);
+		pending = fn(cwd, undefined, extensionRoots, agentDir);
 		discoveryMemo.set(key, pending);
 		pending.catch(() => {
 			if (discoveryMemo.get(key) === pending) discoveryMemo.delete(key);
@@ -636,10 +644,15 @@ function discoverAgentsForCreate(cwd: string, extensionRoots?: EffectiveExtensio
 }
 
 /** Rescan one cwd and publish its definitions to existing and future task tools. */
-export async function refreshAgentDiscovery(cwd: string, extensionRoots?: EffectiveExtensionRoots): Promise<void> {
-	const key = discoveryCacheKey(cwd, extensionRoots);
+export async function refreshAgentDiscovery(
+	cwd: string,
+	extensionRoots?: EffectiveExtensionRoots,
+	agentDir?: string,
+): Promise<void> {
+	const resolvedAgentDir = agentDir ?? getAgentDir();
+	const key = discoveryCacheKey(cwd, resolvedAgentDir, extensionRoots);
 	discoveryMemo.delete(key);
-	const pending = discoverAgentsForCreate(cwd, extensionRoots);
+	const pending = discoverAgentsForCreate(cwd, resolvedAgentDir, extensionRoots);
 	const { agents } = await pending;
 	if (discoveryMemo.get(key) === pending) {
 		discoverySnapshots.set(key, agents);
@@ -830,8 +843,13 @@ export class TaskTool implements AgentTool<TaskToolSchemaInstance, TaskToolDetai
 	get description(): string {
 		const disabledAgents = cfgTaskDisabledAgents.get(this.session.settings);
 		const agents =
-			discoverySnapshots.get(discoveryCacheKey(this.session.cwd, this.session.effectiveExtensionRoots?.())) ??
-			this.#discoveredAgents;
+			discoverySnapshots.get(
+				discoveryCacheKey(
+					this.session.cwd,
+					this.session.settings.getAgentDir(),
+					this.session.effectiveExtensionRoots?.(),
+				),
+			) ?? this.#discoveredAgents;
 		const sessionAgents = this.session.advertisedSessionAgents?.() ?? this.session.getSessionAgents?.() ?? [];
 		const planMode = this.session.getPlanModeState?.()?.enabled === true;
 		const isolationEnabled = cfgTaskIsolationEnabled.get(this.session.settings);
@@ -845,24 +863,32 @@ export class TaskTool implements AgentTool<TaskToolSchemaInstance, TaskToolDetai
 						this.session.modelRegistry,
 					)
 				: undefined);
-		return renderDescription({
-			agents,
-			sessionAgents,
-			isolationEnabled: !planMode && isolationEnabled,
-			applyIsolatedChanges: cfgTaskIsolationApply.get(this.session.settings),
-			disabledAgents,
-			batchEnabled: this.#isBatchEnabled(),
-			effortEnabled: cfgTaskEnableEffort.get(this.session.settings),
-			perCallModelEnabled: perCallModel,
-			perCallModelAdvertisement,
-			evalToolsEnabled: evalToolsEnabled(this.session),
-			structured: this.#isStructured(),
-			steps: cfgTaskSteps.get(this.session.settings),
-			asyncEnabled: cfgAsyncEnabled.get(this.session.settings),
-			ircEnabled: isIrcEnabled(this.session.settings, this.session.taskDepth ?? 0),
-			asyncGuidance: this.delegationGuidance,
-			parentSpawns: this.session.getSessionSpawns() ?? "*",
+		const descriptionSource = resolveUserToolPromptSource({
+			agentDir: this.session.settings.getAgentDir(),
+			toolName: this.name,
+			bundledSource: taskDescriptionTemplate,
 		});
+		return renderDescription(
+			{
+				agents,
+				sessionAgents,
+				isolationEnabled: !planMode && isolationEnabled,
+				applyIsolatedChanges: cfgTaskIsolationApply.get(this.session.settings),
+				disabledAgents,
+				batchEnabled: this.#isBatchEnabled(),
+				effortEnabled: cfgTaskEnableEffort.get(this.session.settings),
+				perCallModelEnabled: perCallModel,
+				perCallModelAdvertisement,
+				evalToolsEnabled: evalToolsEnabled(this.session),
+				structured: this.#isStructured(),
+				steps: cfgTaskSteps.get(this.session.settings),
+				asyncEnabled: cfgAsyncEnabled.get(this.session.settings),
+				ircEnabled: isIrcEnabled(this.session.settings, this.session.taskDepth ?? 0),
+				asyncGuidance: this.delegationGuidance,
+				parentSpawns: this.session.getSessionSpawns() ?? "*",
+			},
+			descriptionSource,
+		);
 	}
 	private constructor(
 		private readonly session: ToolSession,
@@ -1013,7 +1039,9 @@ export class TaskTool implements AgentTool<TaskToolSchemaInstance, TaskToolDetai
 
 	/** Agents a TaskTool for `session` offers at construction; memoized per cwd and extension roots. */
 	static async discoverAgents(session: ToolSession): Promise<AgentDefinition[]> {
-		return (await discoverAgentsForCreate(session.cwd, session.effectiveExtensionRoots?.())).agents;
+		return (
+			await discoverAgentsForCreate(session.cwd, session.settings.getAgentDir(), session.effectiveExtensionRoots?.())
+		).agents;
 	}
 
 	/** Create a TaskTool synchronously from agents found by {@link TaskTool.discoverAgents}. */

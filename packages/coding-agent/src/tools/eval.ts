@@ -31,6 +31,7 @@ import { runWithEvalShadowCell } from "../eval/speculation/runtime-context";
 import type { EvalCellResult, EvalLanguage, EvalStatusEvent, EvalToolDetails, EvalViewEntry } from "./details/eval";
 import evalDescription from "../prompts/tools/eval.md" with { type: "text" };
 import { type EvalToolDescriptionOptions, evalTemplateContext, getEvalDocTopics } from "./eval-doc-topics";
+import { resolveUserToolPromptSource } from "../prompts/tool-prompt-source";
 import { DEFAULT_MAX_BYTES, findColumnCapped, OutputSink, type OutputSummary, TailBuffer } from "./streaming-output";
 import { sessionDelegationBias } from "../task/prompt-policy";
 import { canSpawnAtDepth } from "../task/types";
@@ -184,14 +185,23 @@ export function getEvalToolDescription(options: EvalToolDescriptionOptions = {})
 			preludes.push({ name: prelude.name, summary });
 		}
 	}
-	return prompt.render(evalDescription, {
-		...evalTemplateContext(options),
-		preludes,
-		firstCallPreludes: firstCallPreludes.length > 0 ? firstCallPreludes : undefined,
-		toolNames: options.toolNames,
-		inlinePreludes,
-		inlineTopics: options.inlineTopics ? Object.values(getEvalDocTopics(options)).join("\n\n") : undefined,
-	});
+	return prompt.render(
+		options.agentDir
+			? resolveUserToolPromptSource({
+					agentDir: options.agentDir,
+					toolName: "eval",
+					bundledSource: evalDescription,
+				})
+			: evalDescription,
+		{
+			...evalTemplateContext(options),
+			preludes,
+			firstCallPreludes: firstCallPreludes.length > 0 ? firstCallPreludes : undefined,
+			toolNames: options.toolNames,
+			inlinePreludes,
+			inlineTopics: options.inlineTopics ? Object.values(getEvalDocTopics(options)).join("\n\n") : undefined,
+		},
+	);
 }
 
 export interface EvalToolOptions {
@@ -320,6 +330,7 @@ export class EvalTool implements AgentTool<typeof evalSchema> {
 				? getPerCallModelAdvertisement(session.settings, session.getActiveModel?.(), session.modelRegistry)
 				: undefined);
 		return {
+			agentDir: session.settings.getAgentDir(),
 			py: backends.python,
 			js: backends.js,
 			spawns: depthAllowsSpawning ? (session.getSessionSpawns?.() ?? "*") : false,

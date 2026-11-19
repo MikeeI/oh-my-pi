@@ -62,6 +62,14 @@ export interface SessionInfo {
 	status?: SessionStatus;
 }
 
+export interface SessionDiscoveryFailure {
+	path: string;
+	stage: "enumeration" | "stat" | "read" | "header";
+	error: unknown;
+}
+
+type SessionDiscoveryReporter = (failure: SessionDiscoveryFailure) => void;
+
 export interface ResolvedSessionMatch {
 	session: SessionInfo;
 	scope: "local" | "global";
@@ -438,11 +446,13 @@ async function scanSessionFile(
 	storage: SessionStorage,
 	withStatus: boolean,
 	knownStat?: SessionStorageStat,
+	onFailure?: SessionDiscoveryReporter,
 ): Promise<SessionInfo | undefined> {
 	let stat: SessionStorageStat;
 	try {
 		stat = knownStat ?? storage.statSync(file);
-	} catch {
+	} catch (error) {
+		onFailure?.({ path: file, stage: "stat", error });
 		// Missing/unstatable file: no stat identity to cache under.
 		return undefined;
 	}
@@ -451,7 +461,8 @@ async function scanSessionFile(
 	// two variants are cached under distinct keys.
 	const cacheKey = withStatus ? `s\0${file}` : `h\0${file}`;
 	const cached = cache.get(cacheKey);
-	if (cached && cached.mtimeMs === stat.mtimeMs && cached.size === stat.size) {
+	// Coverage-aware transcript readers need the current header identity, not just a stat-coincident cache hit.
+	if (cached && cached.mtimeMs === stat.mtimeMs && cached.size === stat.size && !onFailure) {
 		return cached.info ? { ...cached.info } : undefined;
 	}
 	try {
@@ -467,7 +478,16 @@ async function scanSessionFile(
 			// Cache the negative result too: an unparseable file stays unparseable
 			// until its stat identity changes.
 			cache.set(cacheKey, { mtimeMs: stat.mtimeMs, size: stat.size, info: undefined });
+			onFailure?.({ path: file, stage: "header", error: new Error("Invalid session header") });
 			return undefined;
+		}
+		if (
+			cached?.info &&
+			cached.mtimeMs === stat.mtimeMs &&
+			cached.size === stat.size &&
+			cached.info.id === header.id
+		) {
+			return { ...cached.info };
 		}
 
 		let parsedMessageCount = 0;
@@ -553,7 +573,8 @@ async function scanSessionFile(
 		// callers can never mutate the shared cached object.
 		cache.set(cacheKey, { mtimeMs: stat.mtimeMs, size: stat.size, info: { ...info } });
 		return info;
-	} catch {
+	} catch (error) {
+		onFailure?.({ path: file, stage: "read", error });
 		return undefined;
 	}
 }
@@ -577,8 +598,11 @@ async function collectSessionsFromFiles(
 	files: string[],
 	storage: SessionStorage,
 	withStatus: boolean,
+	onFailure?: SessionDiscoveryReporter,
 ): Promise<SessionInfo[]> {
-	const sessions = await mapSessionFiles(files, file => scanSessionFile(file, storage, withStatus));
+	const sessions = await mapSessionFiles(files, file =>
+		scanSessionFile(file, storage, withStatus, undefined, onFailure),
+	);
 	return sessions.filter(session => session !== undefined).sort(compareNewestFirst);
 }
 
@@ -1451,13 +1475,17 @@ async function dedupeRealPaths(files: readonly string[]): Promise<string[]> {
  * Unavailable buckets are skipped individually. Unexpected enumeration errors
  * propagate so callers can distinguish a failed scan from an empty result.
  */
-async function scanBucketFiles(root: string, pattern: string): Promise<string[]> {
+async function scanBucketFiles(root: string, pattern: string, onFailure?: SessionDiscoveryReporter): Promise<string[]> {
 	let entries: fs.Dirent[];
 	try {
 		entries = await fs.promises.readdir(root, { withFileTypes: true });
-	} catch (err) {
-		if (isEnoent(err) || isEnotdir(err)) return [];
-		throw err;
+	} catch (error) {
+		if (onFailure) {
+			if (!isEnoent(error)) onFailure({ path: root, stage: "enumeration", error });
+			return [];
+		}
+		if (isEnoent(error) || isEnotdir(error)) return [];
+		throw error;
 	}
 	const glob = new Bun.Glob(pattern);
 	// Buckets scan concurrently: thousands of project directories listed one
@@ -1466,11 +1494,18 @@ async function scanBucketFiles(root: string, pattern: string): Promise<string[]>
 		entries.map(async entry => {
 			if (entry.isSymbolicLink() || !entry.isDirectory()) return [];
 			const dir = path.join(root, entry.name);
+			const files: string[] = [];
 			try {
-				return await Array.fromAsync(glob.scan({ cwd: dir, followSymlinks: true }), name => path.join(dir, name));
-			} catch (err) {
-				if (isEnoent(err) || isEacces(err) || hasFsCode(err, "EPERM") || isEnotdir(err)) return [];
-				throw err;
+				for await (const name of glob.scan({ cwd: dir, followSymlinks: true })) files.push(path.join(dir, name));
+				return files;
+			} catch (error) {
+				if (onFailure) {
+					// Coverage-aware searches retain yielded files and report even a bucket that vanished after enumeration.
+					onFailure({ path: dir, stage: "enumeration", error });
+					return files;
+				}
+				if (isEnoent(error) || isEacces(error) || hasFsCode(error, "EPERM") || isEnotdir(error)) return [];
+				throw error;
 			}
 		}),
 	);
@@ -1486,12 +1521,14 @@ export interface StatedSessionFile {
 /**
  * Files matching `pattern` under `root`, newest mtime first. Stat-only: costs
  * one glob plus one stat per file, never a content read. Files that vanish
- * between discovery and stat are dropped.
+ * between discovery and stat are dropped; `onFailure` makes enumeration and
+ * stat failures visible to coverage-aware callers instead of silently omitting them.
  */
 async function newestSessionFiles(
 	root: string,
 	pattern: string,
 	storage: SessionStorage,
+	onFailure?: SessionDiscoveryReporter,
 ): Promise<StatedSessionFile[]> {
 	// A pattern that crosses buckets (`*/*.jsonl`) is scanned bucket by
 	// bucket, so a symlinked bucket is skipped rather than followed; a
@@ -1500,38 +1537,81 @@ async function newestSessionFiles(
 	let files: string[];
 	try {
 		if (!(storage instanceof FileSessionStorage)) files = storage.listFilesSync(root, pattern);
-		else if (slash >= 0) files = await scanBucketFiles(root, pattern.slice(slash + 1));
+		else if (slash >= 0) files = await scanBucketFiles(root, pattern.slice(slash + 1), onFailure);
 		else {
 			files = await Array.fromAsync(new Bun.Glob(pattern).scan({ cwd: root, followSymlinks: true }), name =>
 				path.join(root, name),
 			);
 		}
-	} catch {
+	} catch (error) {
+		if (!isEnoent(error)) onFailure?.({ path: root, stage: "enumeration", error });
 		return [];
 	}
 	if (storage instanceof FileSessionStorage) {
-		return statNewestFirst(slash >= 0 ? await dedupeRealPaths(files) : files);
+		return statNewestFirst(slash >= 0 ? await dedupeRealPaths(files) : files, onFailure);
 	}
 	const stated: StatedSessionFile[] = [];
 	for (const file of files) {
 		try {
 			stated.push({ file, stat: storage.statSync(file) });
-		} catch {}
+		} catch (error) {
+			onFailure?.({ path: file, stage: "stat", error });
+		}
 	}
 	return stated.sort((a, b) => b.stat.mtimeMs - a.stat.mtimeMs);
 }
 
-/** `files` with their stats, newest mtime first; a file gone before its stat is dropped. */
-async function statNewestFirst(files: readonly string[]): Promise<StatedSessionFile[]> {
+/**
+ * `files` with their stats, newest mtime first; a file gone before its stat is dropped,
+ * and `onFailure` reports every failed stat to coverage-aware callers.
+ */
+async function statNewestFirst(
+	files: readonly string[],
+	onFailure?: SessionDiscoveryReporter,
+): Promise<StatedSessionFile[]> {
 	const stated = await Promise.all(
 		files.map(file =>
 			fs.promises.stat(file).then(
 				stat => ({ file, stat }),
-				() => undefined,
+				(error: unknown) => {
+					onFailure?.({ path: file, stage: "stat", error });
+					return undefined;
+				},
 			),
 		),
 	);
 	return stated.filter(entry => entry !== undefined).sort((a, b) => b.stat.mtimeMs - a.stat.mtimeMs);
+}
+
+/** Selects the session files {@link listSessionsModifiedSince} content-scans. */
+export interface SessionsModifiedSinceQuery {
+	/** Inclusive lower bound on file mtime, in epoch milliseconds. */
+	modifiedSinceMs: number;
+	/** One project's session directory; omitted spans every project under `sessionsRoot`. */
+	sessionDir?: string;
+	/** Root holding one directory per project. Default: {@link getSessionsDir}. */
+	sessionsRoot?: string;
+}
+
+/**
+ * Sessions whose files changed at or after `modifiedSinceMs`, ordered like {@link listAllSessions}.
+ * Older files are only stat'ed: a time-windowed consumer cannot use them, and content-scanning
+ * every file of a large store costs far more than the window and thrashes the shared scan cache.
+ */
+export async function listSessionsModifiedSince(
+	query: SessionsModifiedSinceQuery,
+	onFailure?: SessionDiscoveryReporter,
+): Promise<SessionInfo[]> {
+	const storage = new FileSessionStorage();
+	const stated = query.sessionDir
+		? await newestSessionFiles(query.sessionDir, "*.jsonl", storage, onFailure)
+		: await newestSessionFiles(query.sessionsRoot ?? getSessionsDir(), "*/*.jsonl", storage, onFailure);
+	const files: string[] = [];
+	for (const { file, stat } of stated) {
+		if (stat.mtimeMs < query.modifiedSinceMs) break;
+		files.push(file);
+	}
+	return collectSessionsFromFiles(files, storage, true, onFailure);
 }
 
 /** Header-level {@link SessionInfo} with status for one session file; undefined when unreadable or not a session. */

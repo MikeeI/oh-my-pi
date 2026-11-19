@@ -20,7 +20,7 @@
 import * as fs from "node:fs/promises";
 import * as os from "node:os";
 import * as path from "node:path";
-import { logger } from "@oh-my-pi/pi-utils";
+import { getAgentDir, logger } from "@oh-my-pi/pi-utils";
 import { isProviderEnabled, isUserSourceEnabled } from "../capability";
 import type { EffectiveExtensionRoots } from "../capability/types";
 import { findAllNearestProjectConfigDirs, getConfigDirs } from "../config";
@@ -113,6 +113,7 @@ export async function discoverAgents(
 	cwd: string,
 	home: string = os.homedir(),
 	extensionRoots?: EffectiveExtensionRoots,
+	agentDir?: string,
 ): Promise<DiscoveryResult> {
 	const resolvedCwd = path.resolve(cwd);
 
@@ -189,7 +190,7 @@ export async function discoverAgents(
 		return true;
 	});
 
-	const bundledAgents = loadBundledAgents().filter(agent => {
+	const bundledAgents = loadBundledAgents(agentDir ?? getAgentDir()).filter(agent => {
 		if (seen.has(agent.name)) return false;
 		seen.add(agent.name);
 		return true;

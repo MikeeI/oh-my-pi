@@ -16,6 +16,7 @@ function createHarness() {
 	const frames: object[] = [];
 	const session = {
 		isStreaming: false,
+		isRunningRoutine: false,
 		hasAdmittedSubmission: false,
 		queuedMessageCount: 0,
 		isRunActive: false,
@@ -235,7 +236,13 @@ describe("RpcPromptResults", () => {
 	test("writes prompt_result after output queued synchronously with the settle", async () => {
 		const frames: object[] = [];
 		const results = new RpcPromptResults(
-			{ isRunActive: false, isStreaming: false, hasAdmittedSubmission: false, queuedMessageCount: 0 },
+			{
+				isRunActive: false,
+				isStreaming: false,
+				isRunningRoutine: false,
+				hasAdmittedSubmission: false,
+				queuedMessageCount: 0,
+			},
 			frame => frames.push(frame),
 		);
 		results.completeLocal(results.begin("req_6"));
@@ -248,10 +255,51 @@ describe("RpcPromptResults", () => {
 		]);
 	});
 
+	test("settles after a held routine releases its prompt admission on success or failure", async () => {
+		for (const failed of [false, true]) {
+			const frames: object[] = [];
+			const session = {
+				isRunActive: false,
+				isStreaming: false,
+				isRunningRoutine: true,
+				hasAdmittedSubmission: true,
+				queuedMessageCount: 0,
+			};
+			const watcher = new RpcSessionSettleWatcher(session, frame => frames.push(frame));
+			const results = new RpcPromptResults(session, frame => frames.push(frame), undefined, {
+				settledWithoutRun: () => void watcher.check(),
+			});
+			const ticket = results.begin("routine");
+			watcher.observe(agentStart);
+			watcher.observe(agentEnd([assistant({ stopReason: "stop" })]));
+			await flushFrames();
+			await flushFrames();
+			expect(frames).toEqual([]);
+			session.isRunningRoutine = false;
+			session.hasAdmittedSubmission = false;
+			if (failed) results.fail(ticket, "routine failed");
+			else results.completeLocal(ticket);
+			await flushFrames();
+			await flushFrames();
+			expect(frames).toEqual([
+				{
+					type: "prompt_result",
+					id: "routine",
+					agentInvoked: false,
+					status: failed ? "error" : "completed",
+					...(failed ? { error: { message: "routine failed", retryable: false } } : {}),
+					sessionSettled: true,
+				},
+				{ type: "session_settled" },
+			]);
+		}
+	});
+
 	test("reports a run the cost gate stopped as an error with code cost_cap, and only that run", async () => {
 		const frames: object[] = [];
 		const session = {
 			isStreaming: false,
+			isRunningRoutine: false,
 			hasAdmittedSubmission: false,
 			queuedMessageCount: 0,
 			isRunActive: false,

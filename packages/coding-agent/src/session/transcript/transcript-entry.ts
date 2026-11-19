@@ -1,6 +1,6 @@
 import type { AgentMessage } from "@oh-my-pi/pi-agent-core";
 import { createCustomMessage } from "@oh-my-pi/pi-agent-core/compaction/messages";
-import type { ImageContent, MessageAttribution, TextContent } from "@oh-my-pi/pi-ai";
+import type { ImageContent, MessageAttribution, TextContent, UserMessage } from "@oh-my-pi/pi-ai";
 import {
 	type CustomMessage,
 	type CustomMessageContent,
@@ -99,20 +99,28 @@ export function isUserTurnEntry(entry: TranscriptEntryLike): boolean {
 	return isUserRequestEntry(entry);
 }
 
-/** A user turn's one-line label: its prompt text (or a custom message's draft), whitespace collapsed. */
+/** A user turn's one-line label: its typed invocation or prompt text (or a custom message's draft), whitespace collapsed. */
 export function userTurnLabel(entry: TranscriptEntryLike): string | undefined {
 	const draft =
 		entry.type === "message" && entry.message.role === "user"
-			? textContent(entry.message.content, " ")
+			? entry.message.commandInvocation || textContent(entry.message.content, " ")
 			: userTurnDraft(entry);
 	return draft?.replace(/\s+/g, " ").trim();
 }
 
-/** Editable user request text, preserving skill invocation syntax. */
+/**
+ * Text a user message shows and restores: the typed file-command invocation
+ * when one expanded into the content, otherwise the content verbatim.
+ */
+export function userDisplayText(message: Pick<UserMessage, "content" | "commandInvocation">): string {
+	return message.commandInvocation || textContent(message.content);
+}
+
+/** Editable user request text, preserving skill and file-command invocation syntax. */
 export function userTurnDraft(entry: TranscriptEntryLike): string | undefined {
 	const message = transcriptEntryMessage(entry);
 	if (!message) return undefined;
-	if (message.role === "user") return textContent(message.content);
+	if (message.role === "user") return userDisplayText(message);
 	if (message.role !== "custom" || !isUserTurnInitiator(message)) return undefined;
 	return titleTextFromSkillPrompt(message) ?? textContent(message.content);
 }

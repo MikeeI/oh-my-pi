@@ -24,7 +24,7 @@ import { AgentSession } from "@oh-my-pi/pi-coding-agent/session/agent-session";
 import { AuthStorage } from "@oh-my-pi/pi-coding-agent/session/auth-storage";
 import { visitEntriesFromFileStream } from "@oh-my-pi/pi-coding-agent/session/session-loader";
 import { SessionManager } from "@oh-my-pi/pi-coding-agent/session/session-manager";
-import { getBundledAgent } from "@oh-my-pi/pi-coding-agent/task/agents";
+import { getBundledAgent, getBundledAgentsMap } from "@oh-my-pi/pi-coding-agent/task/agents";
 import { SessionObserverRegistry } from "@oh-my-pi/pi-coding-agent/task/session-observer-registry";
 import { TempDir } from "@oh-my-pi/pi-utils";
 import { type MountedHub, mountAgentHub } from "./helpers/agent-hub";
@@ -433,7 +433,8 @@ describe("Agent hub Enter activation", () => {
 					id: "init",
 					parentId: "model",
 					timestamp: createdAt,
-					systemPrompt: `base prompt\n\nROLE\n====\n${getBundledAgent("scout")?.systemPrompt}`,
+					// Historical role inference recognizes immutable bundled prompts, not today's profile override.
+					systemPrompt: `base prompt\n\nROLE\n====\n${getBundledAgentsMap().get("scout")?.systemPrompt}`,
 					task: "Inspect persisted telemetry.",
 					tools: ["read", "grep"],
 				}),

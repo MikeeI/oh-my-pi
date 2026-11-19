@@ -60,6 +60,7 @@ import { type AppliedEditSnapshot, createEditBlackboxRecorder } from "./blackbox
 import hashlineCompactPrompt from "./hashline-compact.md" with { type: "text" };
 import { MAGIC_EDIT_GRAMMAR, magicEditPaths, runMagicEdit } from "./magic";
 import magicEditDescription from "../prompts/tools/magic-edit.md" with { type: "text" };
+import { resolveUserToolPromptSource } from "../prompts/tool-prompt-source";
 import { getLspBatchRequest } from "../lsp/batch";
 import { type EditToolDetails, type EditToolPerFileResult, type Operation } from "../tools/details/edit";
 import {
@@ -182,11 +183,15 @@ export function editDescriptionCompact(mode: EditMode): string | undefined {
 export function resolveEditToolDescription(
 	mode: EditMode,
 	model: Pick<Model, "editPromptVariant"> | undefined,
+	agentDir?: string,
 ): string {
-	const source =
+	let source =
 		model?.editPromptVariant === "compact"
 			? (editDescriptionCompact(mode) ?? editDescription(mode))
 			: editDescription(mode);
+	if (agentDir && (mode === "replace" || mode === "sloppy")) {
+		source = resolveUserToolPromptSource({ agentDir, toolName: mode, bundledSource: source });
+	}
 	return prompt.render(source);
 }
 
@@ -414,7 +419,11 @@ export class EditTool implements AgentTool<TInput> {
 
 	get description(): string {
 		if (this.#magic) return prompt.render(magicEditDescription);
-		return resolveEditToolDescription(this.mode, this.session.getActiveModel?.());
+		return resolveEditToolDescription(
+			this.mode,
+			this.session.getActiveModel?.(),
+			this.session.settings.getAgentDir(),
+		);
 	}
 
 	get parameters(): TInput {

@@ -1,9 +1,21 @@
 import { describe, expect, test } from "bun:test";
 import { buildAvailableSlashCommands } from "@oh-my-pi/pi-coding-agent/slash-commands/available-commands";
 
+const emptyRoutines = async () => [];
+
 describe("buildAvailableSlashCommands", () => {
 	test("returns RPC-safe command metadata with stable sources", async () => {
 		const fileCommands = [{ name: "notes", description: "Open notes", content: "body", source: "test" }];
+		const routines = [
+			{
+				name: "review-all",
+				description: "Run reviews",
+				path: "/tmp/review-all.yaml",
+				steps: [{ command: "notes" }],
+				level: "user" as const,
+				_source: { provider: "test", providerName: "Test", path: "/tmp/review-all.yaml", level: "user" as const },
+			},
+		];
 		const mcpPrompt = {
 			path: "mcp:server/prompt",
 			resolvedPath: "mcp:server/prompt",
@@ -27,12 +39,17 @@ describe("buildAvailableSlashCommands", () => {
 			skills: [{ name: "reviewer", description: "Review code", filePath: "/tmp/reviewer/SKILL.md" }],
 			skillsSettings: { enableSkillCommands: true },
 			sessionManager: { getCwd: () => process.cwd() },
-			setSlashCommands(commands: typeof fileCommands) {
+			setCommandCatalog(commands: typeof fileCommands, loaded: typeof routines) {
 				expect(commands).toEqual(fileCommands);
+				expect(loaded).toEqual(routines);
 			},
 		};
 
-		const commands = await buildAvailableSlashCommands(session as never, async () => fileCommands);
+		const commands = await buildAvailableSlashCommands(
+			session as never,
+			async () => fileCommands,
+			async () => routines,
+		);
 		const byName = Object.fromEntries(commands.map(command => [command.name, command]));
 
 		expect(byName.usage.subcommands).toContainEqual({
@@ -53,6 +70,7 @@ describe("buildAvailableSlashCommands", () => {
 		expect(byName["server:prompt"].description).toBe("MCP prompt");
 		expect(byName.notes.description).toBe("Open notes");
 		expect(byName["skill:reviewer"].description).toBe("Review code");
+		expect(byName["review-all"].description).toBe("Run reviews");
 
 		expect(byName.model.source).toBe("builtin");
 		expect(byName["skill:reviewer"].source).toBe("skill");
@@ -60,26 +78,99 @@ describe("buildAvailableSlashCommands", () => {
 		expect(byName["server:prompt"].source).toBe("mcp_prompt");
 		expect(byName["custom:hello"].source).toBe("custom");
 		expect(byName.notes.source).toBe("file");
+		expect(byName["review-all"].source).toBe("routine");
+		expect(byName["review-all"].input).toBeUndefined();
 	});
 
-	test("loads file commands into the session before advertising them", async () => {
+	test("loads file commands and routines into the session before advertising them", async () => {
 		const fileCommands = [{ name: "notes", description: "Open notes", content: "body", source: "test" }];
+		const routines = [
+			{
+				name: "review-all",
+				description: "Run reviews",
+				path: "/tmp/review-all.yaml",
+				steps: [{ command: "notes" }],
+				level: "user" as const,
+				_source: { provider: "test", providerName: "Test", path: "/tmp/review-all.yaml", level: "user" as const },
+			},
+		];
 		let loadedCommands: typeof fileCommands | undefined;
+		let loadedRoutines: typeof routines | undefined;
 
 		const commands = await buildAvailableSlashCommands(
 			{
 				customCommands: [],
 				skills: [],
 				sessionManager: { getCwd: () => process.cwd() },
-				setSlashCommands(commands: typeof fileCommands) {
+				setCommandCatalog(commands: typeof fileCommands, next: typeof routines) {
 					loadedCommands = commands;
+					loadedRoutines = next;
 				},
 			} as never,
 			async () => fileCommands,
+			async () => routines,
 		);
 
 		expect(loadedCommands).toEqual(fileCommands);
+		expect(loadedRoutines).toEqual(routines);
 		expect(commands.find(command => command.name === "notes")?.source).toBe("file");
+		expect(commands.find(command => command.name === "review-all")?.source).toBe("routine");
+	});
+
+	test("rejects conflicting candidates without replacing the committed command state", async () => {
+		const validFileCommands = [{ name: "stable", description: "Stable command", content: "body", source: "test" }];
+		const validRoutines = [
+			{
+				name: "review-all",
+				description: "Run reviews",
+				path: "/tmp/review-all.yaml",
+				steps: [{ command: "stable" }],
+				level: "user" as const,
+				_source: { provider: "test", providerName: "Test", path: "/tmp/review-all.yaml", level: "user" as const },
+			},
+		];
+		const conflictingRoutines = [
+			{
+				...validRoutines[0],
+				name: "stable",
+				path: "/tmp/stable.yaml",
+				_source: { ...validRoutines[0]._source, path: "/tmp/stable.yaml" },
+			},
+		];
+		const candidateFileCommands = validFileCommands;
+		let candidateRoutines = validRoutines;
+		let loadedCommands = validFileCommands;
+		let loadedRoutines = validRoutines;
+		const session = {
+			customCommands: [],
+			skills: [],
+			sessionManager: { getCwd: () => process.cwd() },
+			setCommandCatalog(commands: typeof validFileCommands, routines: typeof validRoutines) {
+				loadedCommands = commands;
+				loadedRoutines = routines;
+			},
+		};
+
+		await buildAvailableSlashCommands(
+			session as never,
+			async () => candidateFileCommands,
+			async () => candidateRoutines,
+		);
+		candidateRoutines = conflictingRoutines;
+
+		await expect(
+			buildAvailableSlashCommands(
+				session as never,
+				async () => candidateFileCommands,
+				async () => candidateRoutines,
+			),
+		).rejects.toThrow("Routine /stable conflicts with existing slash command /stable");
+
+		const isDispatchable = (name: string) =>
+			loadedCommands.some(command => command.name === name) || loadedRoutines.some(routine => routine.name === name);
+		expect(isDispatchable("stable")).toBe(true);
+		expect(isDispatchable("review-all")).toBe(true);
+		expect(loadedRoutines.some(routine => routine.name === "stable")).toBe(false);
 	});
 
 	test("forwards file-command argumentHint as ACP input hint", async () => {
@@ -99,7 +190,7 @@ describe("buildAvailableSlashCommands", () => {
 				customCommands: [],
 				skills: [],
 				sessionManager: { getCwd: () => process.cwd() },
-				setSlashCommands() {},
+				setCommandCatalog() {},
 			} as never,
 			async () => fileCommands,
 		);
@@ -128,9 +219,10 @@ describe("buildAvailableSlashCommands", () => {
 				],
 				skills: [],
 				sessionManager: { getCwd: () => process.cwd() },
-				setSlashCommands() {},
+				setCommandCatalog() {},
 			} as never,
 			async () => [],
+			emptyRoutines,
 		);
 
 		const byName = Object.fromEntries(commands.map(command => [command.name, command]));
@@ -144,9 +236,10 @@ describe("buildAvailableSlashCommands", () => {
 				customCommands: [{ command: { name: "legacy", description: "Legacy fixture" } }],
 				skills: [],
 				sessionManager: { getCwd: () => process.cwd() },
-				setSlashCommands() {},
+				setCommandCatalog() {},
 			} as never,
 			async () => [],
+			emptyRoutines,
 		);
 
 		expect(commands.find(command => command.name === "legacy")?.source).toBe("custom");
@@ -162,7 +255,7 @@ describe("buildAvailableSlashCommands", () => {
 				customCommands: [{ command: { name: "plugin", description: "My plugin helper" } }],
 				skills: [],
 				sessionManager: { getCwd: () => "/tmp" },
-				setSlashCommands: () => {},
+				setCommandCatalog() {},
 			} as never,
 			async () => fileCommands,
 		);

@@ -2,8 +2,9 @@
  * CLI argument parsing and help display
  */
 import * as path from "node:path";
-import { $env, APP_NAME } from "@oh-my-pi/pi-utils";
+import { $env } from "@oh-my-pi/pi-utils";
 import chalk from "@oh-my-pi/pi-utils/chalk";
+import { APP_DISPLAY_NAME as APP_NAME } from "../app-version";
 import type { MotionMode } from "../config/motion-presets";
 import type { ServiceTierOpenAISettingValue } from "../config/service-tier";
 import type { ApprovalMode } from "../tools/approval";
@@ -51,8 +52,9 @@ export interface Args {
 	maxCost?: number;
 	apiKey?: string;
 	systemPrompt?: string;
-	systemPromptTemplate?: string;
+	systemTemplate?: string;
 	appendSystemPrompt?: string;
+	agentsFile?: string;
 	thinking?: ConfiguredThinkingLevel;
 	serviceTier?: ServiceTierOpenAISettingValue;
 	hideThinking?: boolean;
@@ -344,7 +346,12 @@ export function parseArgs(inputArgs: string[], extensionFlags?: Map<string, { ty
 				if (i + 1 < args.length && args[i + 1] !== PROFILE_BOOTSTRAP_BOUNDARY_ARG) i++;
 				continue;
 			}
-			if (i + 1 < args.length && args[i + 1] !== PROFILE_BOOTSTRAP_BOUNDARY_ARG) {
+			const next = args[i + 1];
+			if (next === undefined) {
+				if (!EXTENSION_SHADOWABLE_STRING_FLAGS.has(arg)) throw new Error(`${arg} requires a value`);
+			} else if (next === PROFILE_BOOTSTRAP_BOUNDARY_ARG) {
+				if (!EXTENSION_SHADOWABLE_STRING_FLAGS.has(arg)) throw new Error(`${arg} requires a value`);
+			} else {
 				const consumed = consumeBuiltInStringValue(arg, args, i + 1);
 				i = consumed.index;
 				STRING_SETTERS[arg](result, consumed.value, parseDeps);
@@ -482,8 +489,11 @@ export function parseArgs(inputArgs: string[], extensionFlags?: Map<string, { ty
 		throw new CliUsageError("--no-tools cannot be combined with --extension, -e, --hook, or --trusted-extension");
 	}
 
-	if (result.systemPrompt !== undefined && result.systemPromptTemplate !== undefined) {
-		throw new CliUsageError("--system-prompt and --system-prompt-template cannot be combined");
+	if (result.systemPrompt !== undefined && result.systemTemplate !== undefined) {
+		throw new CliUsageError("--system-prompt cannot be combined with --system-template");
+	}
+	if (result.noContextFiles && result.agentsFile !== undefined) {
+		throw new CliUsageError("--no-context-files cannot be combined with --agents-file");
 	}
 	return result;
 }

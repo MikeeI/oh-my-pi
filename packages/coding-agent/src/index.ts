@@ -21,6 +21,7 @@ export { keyHintPlatform, setKeyHintPlatform } from "./ui/keys/format";
 export { formatDoubleTap, formatKeyHint, formatKeyHints, formatTooltipKey } from "./ui/keys/hints";
 export type { ResolvedRoleModel } from "./modes/view-model/overlays/model-picker";
 export type { ContextUsage } from "./modes/view-model/status-line/types";
+export * from "./capability/routine";
 export * from "./config/model-registry";
 // Prompt templates
 export type * from "./config/prompt-templates";

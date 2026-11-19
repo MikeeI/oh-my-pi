@@ -14,6 +14,7 @@ import { kimiRankingStrategy, kimiUsageProvider } from "./kimi";
 import { kiroRankingStrategy, kiroUsageProvider } from "./kiro";
 import { museCodeUsageProvider } from "./muse-code";
 import { minimaxCodeUsageProvider } from "./minimax-code";
+import { mistralUsageProvider } from "./mistral";
 import { ollamaCloudUsageProvider, ollamaUsageProvider } from "./ollama";
 import { codexRankingStrategy, openaiCodexUsageProvider } from "./openai-codex";
 import { opencodeGoRankingStrategy, opencodeGoUsageProvider } from "./opencode-go";
@@ -47,6 +48,7 @@ export const DEFAULT_USAGE_PROVIDERS: readonly UsageProvider[] = [
 	xaiOauthUsageProvider,
 	devinUsageProvider,
 	charmHyperUsageProvider,
+	mistralUsageProvider,
 	commandCodeUsageProvider,
 	kiroUsageProvider,
 ];

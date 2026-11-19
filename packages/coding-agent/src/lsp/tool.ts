@@ -10,6 +10,7 @@ import type {
 } from "@oh-my-pi/pi-agent-core";
 import { isEnoent, isFsError, logger, prompt, ptree, untilAborted } from "@oh-my-pi/pi-utils";
 import lspDescription from "../prompts/tools/lsp.md" with { type: "text" };
+import { resolveUserToolPromptSource } from "../prompts/tool-prompt-source";
 import type { ToolSession } from "../tools";
 import { truncateForPrompt } from "../tools/approval";
 import { formatPathRelativeToCwd, resolveToCwd } from "../tools/path-utils";
@@ -327,11 +328,18 @@ export class LspTool implements AgentTool<typeof lspSchema, LspToolDetails, Them
 	get description(): string {
 		const maxTimeout = cfgToolsMaxTimeout.get(this.session.settings);
 		const defaults = resolveLspTimeouts(undefined, cfgLspRequestTimeout.get(this.session.settings), maxTimeout);
-		return prompt.render(lspDescription, {
-			defaultTimeoutSec: defaults.call,
-			defaultWaitSec: defaults.wait,
-			maxTimeoutSec: clampTimeout("lsp", TOOL_TIMEOUTS.lsp.max, maxTimeout),
-		});
+		return prompt.render(
+			resolveUserToolPromptSource({
+				agentDir: this.session.settings.getAgentDir(),
+				toolName: this.name,
+				bundledSource: lspDescription,
+			}),
+			{
+				defaultTimeoutSec: defaults.call,
+				defaultWaitSec: defaults.wait,
+				maxTimeoutSec: clampTimeout("lsp", TOOL_TIMEOUTS.lsp.max, maxTimeout),
+			},
+		);
 	}
 
 	static createIf(session: ToolSession): LspTool | null {

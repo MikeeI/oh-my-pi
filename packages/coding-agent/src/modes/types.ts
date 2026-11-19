@@ -422,6 +422,11 @@ export interface AgentHubOpenOptions {
 	trayFirst?: boolean;
 }
 
+export interface NewVersionNotificationOptions {
+	sourceLabel?: string;
+	actionText?: string;
+}
+
 export interface InteractiveModeContext {
 	// UI access
 	/**
@@ -709,6 +714,7 @@ export interface InteractiveModeContext {
 	/** The extension editor dialog in the composer's place, if open. */
 	hookEditor: OverlayHandle | undefined;
 	fileSlashCommands: Set<string>;
+	routineSlashCommands: Set<string>;
 	skillCommands: Map<string, Skill>;
 	oauthManualInput: OAuthManualInputManager;
 	todoPhases: TodoPhase[];
@@ -789,7 +795,7 @@ export interface InteractiveModeContext {
 	showPinnedError(message: string): void;
 	clearPinnedError(): void;
 	showWarning(message: string, options?: { hideWithToolActivity?: boolean }): void;
-	showNewVersionNotification(newVersion: string): void;
+	showNewVersionNotification(newVersion: string, options?: NewVersionNotificationOptions): void;
 	clearEditor(): void;
 	updatePendingMessagesDisplay(): void;
 	queueCompactionMessage(
@@ -971,7 +977,7 @@ export interface InteractiveModeContext {
 	/** `/wt`: fork the checkout into a new worktree (keeping changes unless `keepChanges` is false) and move there. */
 	handleWorktreeCommand(branch?: string, options?: { keepChanges?: boolean }): Promise<void>;
 	withBtwSessionMove(operation: () => Promise<boolean>): Promise<boolean>;
-	handleRenameCommand(title: string): Promise<void>;
+	handleRenameCommand(title: string, generated?: boolean): Promise<void>;
 	handleMemoryCommand(text: string): Promise<void>;
 	handleSTTToggle(): Promise<void>;
 	/** Space-bar push-to-talk into `target`: a recognized hold starts dictation and its release stops

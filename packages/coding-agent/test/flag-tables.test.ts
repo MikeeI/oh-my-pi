@@ -55,6 +55,18 @@ describe("STRING_VALUE_FLAGS table is honored by args.ts parseArgs", () => {
 			}
 		});
 	}
+
+	for (const flag of STRING_VALUE_FLAGS) {
+		if (EXTENSION_SHADOWABLE_STRING_FLAGS.has(flag)) continue;
+		it(`${flag} rejects a missing value`, () => {
+			// Goal validation is collected for CLI reporting rather than thrown by parseArgs.
+			if (flag === "--goal") {
+				expect(reportInvalidFlagValues(parseArgs([flag]), () => {})).toBe(true);
+				return;
+			}
+			expect(() => parseArgs([flag])).toThrow(`${flag} requires a value`);
+		});
+	}
 });
 
 describe("EXTENSION_SHADOWABLE_STRING_FLAGS table is honored by args.ts parseArgs", () => {
@@ -84,6 +96,14 @@ describe("OPTIONAL_VALUE_FLAGS table is honored by args.ts parseArgs", () => {
 				result.profile,
 				`parseArgs should release --profile back to its own handler when it follows ${flag}`,
 			).toBe("work");
+		});
+	}
+
+	for (const flag of OPTIONAL_VALUE_FLAGS) {
+		it(`${flag} accepts the bare form`, () => {
+			const result = parseArgs([flag]);
+			expect(result.unrecognizedFlags).toEqual([]);
+			expect(result.messages).toEqual([]);
 		});
 	}
 });
@@ -369,23 +389,5 @@ describe("--restore", () => {
 		expect(() => validateRestorePrompt(parseArgs(["--restore", "a", "keep going"]))).toThrow(CliUsageError);
 		validateRestoreLaunch(parseArgs(["--restore", "a"]), true);
 		validateRestorePrompt(parseArgs(["--resume", "a", "keep going"]));
-	});
-});
-
-describe("--system-prompt-template", () => {
-	it("parses a template path without leaking it into the prompt", () => {
-		const result = parseArgs(["--system-prompt-template", "/tmp/SYSTEM_TEMPLATE.md", "hello"]);
-
-		expect(result.systemPromptTemplate).toBe("/tmp/SYSTEM_TEMPLATE.md");
-		expect(result.systemPrompt).toBeUndefined();
-		expect(result.messages).toEqual(["hello"]);
-	});
-
-	it("supports equals syntax and consumes flag-looking values", () => {
-		const result = parseArgs(["--system-prompt-template=--profile", "hello"]);
-
-		expect(result.systemPromptTemplate).toBe("--profile");
-		expect(result.profile).toBeUndefined();
-		expect(result.messages).toEqual(["hello"]);
 	});
 });

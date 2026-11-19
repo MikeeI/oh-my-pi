@@ -1147,13 +1147,11 @@ export class UiHelpers {
 	}
 
 	isKnownSlashCommand(text: string): boolean {
-		if (!text.startsWith("/")) return false;
 		const parsed = parseSlashCommand(text);
-		const builtin = parsed && lookupBuiltinSlashCommand(parsed.name);
+		if (!parsed) return false;
+		const commandName = parsed.name;
+		const builtin = lookupBuiltinSlashCommand(commandName);
 		if (builtin && (builtin.allowArgs || !parsed.args)) return true;
-		const spaceIndex = text.indexOf(" ");
-		const commandName = spaceIndex === -1 ? text.slice(1) : text.slice(1, spaceIndex);
-		if (!commandName) return false;
 
 		if (this.ctx.session.extensionRunner?.getCommand(commandName)) {
 			return true;
@@ -1165,7 +1163,7 @@ export class UiHelpers {
 			}
 		}
 
-		return this.ctx.fileSlashCommands.has(commandName);
+		return this.ctx.fileSlashCommands.has(commandName) || this.ctx.routineSlashCommands.has(commandName);
 	}
 
 	async flushCompactionQueue(options?: { willRetry?: boolean }): Promise<void> {

@@ -32,6 +32,7 @@ import { closeDaemonClient, daemonClient, probeDaemon } from "../daemon/client";
 import type { DaemonClient, DaemonSignal, UnitSnapshot } from "../daemon/protocol";
 import { isSharedBrowserUnit, restartSharedBrowser } from "../tools/browser/shared-daemon";
 import { collectBoard, KILL_GRACE_MS, resolveUnit } from "./ps-data";
+import { APP_DISPLAY_NAME } from "../app-version";
 
 export type PsAction = "list" | "info" | "logs" | "stop" | "kill" | "restart" | "send" | "mode";
 
@@ -184,7 +185,9 @@ export async function runPsCommand(cmd: PsCommandArgs): Promise<void> {
 			return;
 		}
 		if (!cmd.name) {
-			console.error(chalk.red(`${cmd.action} requires a unit name or id. Run \`omp ps\` to list units.`));
+			console.error(
+				chalk.red(`${cmd.action} requires a unit name or id. Run \`${APP_DISPLAY_NAME} ps\` to list units.`),
+			);
 			process.exitCode = 1;
 			return;
 		}

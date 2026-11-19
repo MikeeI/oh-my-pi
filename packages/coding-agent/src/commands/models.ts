@@ -3,7 +3,7 @@
  */
 
 import { MODEL_KINDS, type ModelKind } from "@oh-my-pi/pi-catalog/types";
-import { APP_NAME } from "@oh-my-pi/pi-utils";
+import { APP_DISPLAY_NAME as APP_NAME } from "../app-version";
 import { Args, Command, Flags } from "@oh-my-pi/pi-utils/cli";
 import { modelsHelp as commandHelp } from "../cli/command-help";
 import { resolveModelsArgs, runModelsCommand } from "../cli/models-cli";
