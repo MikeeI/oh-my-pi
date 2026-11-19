@@ -547,6 +547,24 @@ It also rejects `AGENTS.md` index rows whose IDs or dispositions differ from thi
 - Proof: the idle-slot project-anchor case in `packages/ai/test/anthropic-head-caching.test.ts`.
 - Proof: block-order cases in `test/system-prompt-templates.test.ts` and `test/system-prompt-inspect.test.ts`.
 
+### `MOMP-ANTHROPIC-TOOL-PREDECLARE` — Cache-neutral `/goal` activation
+
+- Disposition: `UPSTREAM-INTEGRIERT`.
+- Contract: a Main session's first Anthropic request declares the registered `goal` tool with `defer_loading` after the active tools.
+- Contract: later requests re-declare it byte-identically, so activating `goal` appends only a `tool_addition` control.
+- Contract: subagent sessions declare no prospective tools.
+- Contract: transcripts whose first request predates this delta keep the upstream append path.
+- Owner: `packages/ai/src/providers/anthropic.ts#planAnthropicToolControls` declares `inactiveTools` deferred without a recorded declaration.
+- Owner: `packages/agent/src/sent-tool-definitions.ts` attaches and remembers `AgentOptions.prospectiveTools` before the first record.
+- Owner: `packages/agent/src/agent-loop.ts#prepareProviderCall` normalizes prospective tools like active tools.
+- Owner: `src/sdk.ts` supplies `goal` for Main sessions.
+- Reason: upstream appends a newly active tool to `tools`; Anthropic then re-writes the system and message cache levels.
+- Evidence: ISSUE-033; Sonnet 5.5 probes read about 9.2K of 19K tokens on activation upstream and the full prefix with this delta.
+- Required action: retain until upstream declares activatable tools up front or otherwise keeps activation cache-neutral.
+- Proof: the up-front declaration case in `packages/ai/test/anthropic-control-state-stability.test.ts`.
+- Proof: the prospective-tool case in `packages/agent/test/sent-tool-definitions.test.ts`.
+- Proof: `bun --cwd=packages/coding-agent run probe:cache probe` arm B keeps the full R2 read.
+
 ### `MOMP-ROUTINES` — User-defined sequential routines
 
 - Disposition: `MOMP-EIGEN`.

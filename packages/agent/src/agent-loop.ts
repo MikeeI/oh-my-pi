@@ -2059,9 +2059,20 @@ export async function prepareProviderCall(
 			}),
 		};
 	}
+	// Normalized like the active tools, so a prospective tool declared up front keeps its bytes once activated.
+	const prospectiveTools =
+		config.getProspectiveTools && !ownedDialect
+			? normalizeTools(config.getProspectiveTools(), {
+					injectIntent: !!config.intentTracing,
+					intentDescription: config.intentDescription,
+					pruneDescriptions: pruneToolDescriptions,
+				})
+			: undefined;
 	// Before the transform too, so a request-size clamp in it measures the withdrawn definitions the provider
 	// re-declares; recomputed below against what the transform returns.
-	if (config.sentToolDefinitions) llmContext = config.sentToolDefinitions.withInactiveTools(llmContext);
+	if (config.sentToolDefinitions) {
+		llmContext = config.sentToolDefinitions.withInactiveTools(llmContext, prospectiveTools);
+	}
 	if (config.transformProviderContext) {
 		llmContext = await config.transformProviderContext(llmContext, model);
 	}
@@ -2079,7 +2090,7 @@ export async function prepareProviderCall(
 	// After `transformProviderContext`, so the recorded definitions are exactly what the provider receives.
 	if (config.sentToolDefinitions) {
 		if (llmContext.tools) config.sentToolDefinitions.record(llmContext.tools);
-		llmContext = config.sentToolDefinitions.withInactiveTools(llmContext);
+		llmContext = config.sentToolDefinitions.withInactiveTools(llmContext, prospectiveTools);
 	}
 	return { model, context: llmContext, promptToolWireTools, ownedDialect };
 }

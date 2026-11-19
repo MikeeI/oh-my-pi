@@ -94,4 +94,43 @@ describe("Agent — inactive tool definitions", () => {
 			else Bun.env.PI_DIALECT = previousDialect;
 		}
 	});
+
+	it("keeps declaring a prospective tool from the first request until it is activated", async () => {
+		const previousDialect = Bun.env.PI_DIALECT;
+		delete Bun.env.PI_DIALECT;
+		try {
+			const contexts: Context[] = [];
+			// The provider records the first declaration with the prospective tool deferred.
+			const responses = [
+				reply({ messageIndex: 1, tools: { declared: ["read", "goal"], deferred: ["goal"], active: ["read"] } }),
+			];
+			const goal = agentTool("goal");
+			const agent = new Agent({
+				initialState: {
+					model: createMockModel({ responses: [] }),
+					systemPrompt: ["system"],
+					tools: [agentTool("read")],
+				},
+				prospectiveTools: () => [goal],
+				streamFn: (_model, context) => {
+					contexts.push(context);
+					const message = responses[contexts.length - 1] ?? reply();
+					const stream = new AssistantMessageEventStream();
+					queueMicrotask(() => stream.push({ type: "done", reason: "stop", message }));
+					return stream;
+				},
+			});
+
+			await agent.prompt("first");
+			await agent.prompt("second");
+
+			// Losing the definition on the second request would drop `goal` from the declaration, so its
+			// later activation would grow the tool list again and re-write the cache.
+			expect(contexts[0]?.inactiveTools?.map(tool => tool.name)).toEqual(["goal"]);
+			expect(contexts[1]?.inactiveTools).toEqual(contexts[0]?.inactiveTools);
+		} finally {
+			if (previousDialect === undefined) delete Bun.env.PI_DIALECT;
+			else Bun.env.PI_DIALECT = previousDialect;
+		}
+	});
 });

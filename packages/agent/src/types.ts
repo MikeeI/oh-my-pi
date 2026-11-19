@@ -278,6 +278,12 @@ export interface AgentLoopConfig extends SimpleStreamOptions {
 	sentToolDefinitions?: SentToolDefinitions;
 
 	/**
+	 * Tools a later turn may activate. Before the transcript records a declaration they ride
+	 * {@link Context.inactiveTools}, so Anthropic declares them deferred from the first request.
+	 */
+	getProspectiveTools?: () => AgentTool[];
+
+	/**
 	 * Resolves the API key or resolver for the current model before each LLM call.
 	 *
 	 * Returning an ApiKeyResolver lets the stream retry policy refresh or rotate

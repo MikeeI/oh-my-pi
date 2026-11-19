@@ -4932,6 +4932,8 @@ function diffAnthropicActiveTools(
  * Keep top-level `tools` byte-stable across a conversation. The declared list
  * is the latest record's, minus names with no definition in `tools` or
  * `inactiveTools`, plus newly active tools appended with `defer_loading`.
+ * Without a record, the active tools are declared first and `inactiveTools`
+ * follow with `defer_loading`, so a later activation keeps the list intact.
  * Every recorded active-set change is replayed as a control before the
  * response of the request that made it; the change this request makes goes
  * at the tail. Records at a different index than they were written at are
@@ -4995,6 +4997,19 @@ function planAnthropicToolControls(
 		}
 		const toolChanges = ownChange ? diffAnthropicActiveTools(previous, activeNames, declaredSet) : [];
 		if (toolChanges.length > 0) inserts.push({ index: context.messages.length, spec: { toolChanges } });
+	} else if (activeNames.length > 0) {
+		// First declaration: tools the caller may activate later are declared
+		// deferred now, so activating one appends only a tail `tool_addition`.
+		// Appending a deferred declaration later still changes the prefix the
+		// system and message cache levels are keyed on: a live probe re-wrote
+		// everything after the tool breakpoint. Without an active tool the
+		// declaration would be all-deferred, which the API rejects.
+		const activeSet = new Set(activeNames);
+		const prospective = (context.inactiveTools ?? []).filter(tool => !activeSet.has(tool.name));
+		if (prospective.length > 0) {
+			declared = [...activeNames, ...prospective.map(tool => tool.name)];
+			for (const tool of prospective) deferred.add(tool.name);
+		}
 	}
 
 	const tools: Tool[] = [];

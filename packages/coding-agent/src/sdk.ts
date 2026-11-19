@@ -5301,6 +5301,15 @@ async function createAgentSessionScoped(options: CreateAgentSessionOptions): Pro
 			deadline: options.deadline,
 			transformContext,
 			transformProviderContext,
+			// `/goal` activates `goal` mid-session. Declaring it deferred from the first request keeps the
+			// Anthropic tool list byte-stable; appending it on activation re-writes the system and message cache.
+			// Subagents never enter goal mode, so they would only pay the deferred schema in every request.
+			prospectiveTools: isSubagentSession
+				? undefined
+				: () => {
+						const goal = session?.getToolByName("goal");
+						return goal ? [goal] : [];
+					},
 			steeringMode: cfgSteeringMode.get(settings),
 			followUpMode: cfgFollowUpMode.get(settings),
 			interruptMode: cfgInterruptMode.get(settings),

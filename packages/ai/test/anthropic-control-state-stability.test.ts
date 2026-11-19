@@ -221,6 +221,20 @@ describe("Anthropic controls derived from the transcript", () => {
 		expectCacheStableContinuation(gained.payload, next.payload);
 	});
 
+	it("keeps the declaration byte-identical when a tool declared up front is activated", async () => {
+		const turn0 = [user("start")];
+		const first = await capture(turn0, Effort.Low, { tools: [tool("read")], inactiveTools: [tool("goal")] });
+		expect(first.payload.tools?.map(declared => declared.defer_loading)).toEqual([undefined, true]);
+
+		const turn1 = [...turn0, answering(reply("ready"), first), user("continue")];
+		const activated = await capture(turn1, Effort.Low, { tools: [tool("read"), tool("goal")] });
+
+		// A grown `tools` array would re-write the system and message cache levels.
+		expect(withoutCacheControl(activated.payload.tools)).toEqual(withoutCacheControl(first.payload.tools));
+		expect(referencesTool(activated.payload, wireName(first, 1))).toBe(true);
+		expectValidSystemPlacement(activated.payload);
+	});
+
 	it("moves an interrupted request's tool control past the steer and keeps it there once answered", async () => {
 		const turn0 = [user("start")];
 		const first = await capture(turn0, Effort.Low, { tools: [tool("read"), tool("grep")] });

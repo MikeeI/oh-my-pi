@@ -87,6 +87,7 @@ Local patch [O]: `issues/evidence/issue-033/predeclare-prospective-tools.patch`,
 - `packages/ai`: without a recorded declaration, `planAnthropicToolControls` declares `context.inactiveTools` deferred after the active tools.
 - `packages/agent`: `AgentOptions.prospectiveTools` is normalized like active tools and attached through `SentToolDefinitions` before the first record, then remembered.
 - `packages/coding-agent`: `sdk.ts` supplies the registered `goal` tool.
+- Fork delta [O]: applied on `personal` as `MOMP-ANTHROPIC-TOOL-PREDECLARE`, limited to Main sessions, with an agent-level regression case.
 - Test: one case in `packages/ai/test/anthropic-control-state-stability.test.ts`.
 
 ## Scope-and-Constraints

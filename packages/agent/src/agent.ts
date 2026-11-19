@@ -187,6 +187,8 @@ export interface AgentOptions {
 	 * (see {@link Agent.copySentToolDefinitions}). Defaults to an empty store.
 	 */
 	sentToolDefinitions?: SentToolDefinitions;
+	/** Tools a later turn may activate, declared deferred up front; see {@link AgentLoopConfig.getProspectiveTools}. */
+	prospectiveTools?: () => AgentTool[];
 
 	/**
 	 * Resolves an API key or resolver dynamically for each LLM call.
@@ -434,6 +436,7 @@ export class Agent {
 	#transformContext?: (messages: AgentMessage[], signal?: AbortSignal) => Promise<AgentMessage[]>;
 	#transformProviderContext?: AgentLoopConfig["transformProviderContext"];
 	#sentToolDefinitions = new SentToolDefinitions();
+	#prospectiveTools?: () => AgentTool[];
 	#steeringQueue: AgentMessage[] = [];
 	#followUpQueue: AgentMessage[] = [];
 	#queuedMessageClaims: Partial<Record<QueuedMessageQueue, QueuedMessageClaim>> = {};
@@ -590,6 +593,7 @@ export class Agent {
 		this.#promptCacheKey = opts.promptCacheKey;
 		this.#providerSessionState = opts.providerSessionState;
 		if (opts.sentToolDefinitions) this.#sentToolDefinitions = opts.sentToolDefinitions;
+		this.#prospectiveTools = opts.prospectiveTools;
 		this.#thinkingBudgets = opts.thinkingBudgets;
 		this.#temperature = opts.temperature;
 		this.#topP = opts.topP;
@@ -2072,6 +2076,7 @@ export class Agent {
 			convertToLlm: this.#convertToLlm,
 			transformProviderContext: this.#transformProviderContext,
 			sentToolDefinitions: this.#sentToolDefinitions,
+			getProspectiveTools: this.#prospectiveTools,
 			transformContext: this.#transformContext,
 			onPayload: this.#onPayload,
 			onResponse: this.#onResponse,

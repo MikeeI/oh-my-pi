@@ -27,15 +27,22 @@ export class SentToolDefinitions {
 	 * `context` with {@link Context.inactiveTools} set to the definitions for names the latest
 	 * `requestControls.tools.declared` in its messages holds that are not in its `tools`; cleared when
 	 * there are none or the request declares no tools. Names never sent by this Agent are skipped: the
-	 * provider drops them from the declaration.
+	 * provider drops them from the declaration. Before any recorded declaration, `prospective` tools
+	 * that are not active are attached instead and remembered, so later requests keep declaring them.
 	 */
-	withInactiveTools(context: Context): Context {
-		const inactiveTools = context.tools?.length ? this.#inactiveFor(context.messages, context.tools) : undefined;
+	withInactiveTools(context: Context, prospective?: readonly Tool[]): Context {
+		const inactiveTools = context.tools?.length
+			? this.#inactiveFor(context.messages, context.tools, prospective)
+			: undefined;
 		if (!inactiveTools && !context.inactiveTools) return context;
 		return { ...context, inactiveTools };
 	}
 
-	#inactiveFor(messages: readonly Message[], active: readonly Tool[]): Tool[] | undefined {
+	#inactiveFor(
+		messages: readonly Message[],
+		active: readonly Tool[],
+		prospective?: readonly Tool[],
+	): Tool[] | undefined {
 		let declared: readonly string[] | undefined;
 		for (let index = messages.length - 1; index >= 0; index--) {
 			const message = messages[index];
@@ -44,8 +51,14 @@ export class SentToolDefinitions {
 				break;
 			}
 		}
-		if (!declared) return undefined;
 		const activeNames = new Set(active.map(tool => tool.name));
+		if (!declared) {
+			const upFront = prospective?.filter(tool => !activeNames.has(tool.name));
+			if (!upFront?.length) return undefined;
+			// The provider declares these now; later requests find them through the recorded declaration.
+			this.record(upFront);
+			return upFront;
+		}
 		const inactive: Tool[] = [];
 		for (const name of declared) {
 			if (activeNames.has(name)) continue;
