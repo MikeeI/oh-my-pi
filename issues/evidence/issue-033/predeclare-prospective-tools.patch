@@ -1,0 +1,228 @@
+diff --git a/packages/agent/src/agent-loop.ts b/packages/agent/src/agent-loop.ts
+index 57d8a10b25..7e6d219801 100644
+--- a/packages/agent/src/agent-loop.ts
++++ b/packages/agent/src/agent-loop.ts
+@@ -2059,9 +2059,20 @@ export async function prepareProviderCall(
+ 			}),
+ 		};
+ 	}
++	// Normalized like the active tools, so a prospective tool declared up front keeps its bytes once activated.
++	const prospectiveTools =
++		config.getProspectiveTools && !ownedDialect
++			? normalizeTools(config.getProspectiveTools(), {
++					injectIntent: !!config.intentTracing,
++					intentDescription: config.intentDescription,
++					pruneDescriptions: pruneToolDescriptions,
++				})
++			: undefined;
+ 	// Before the transform too, so a request-size clamp in it measures the withdrawn definitions the provider
+ 	// re-declares; recomputed below against what the transform returns.
+-	if (config.sentToolDefinitions) llmContext = config.sentToolDefinitions.withInactiveTools(llmContext);
++	if (config.sentToolDefinitions) {
++		llmContext = config.sentToolDefinitions.withInactiveTools(llmContext, prospectiveTools);
++	}
+ 	if (config.transformProviderContext) {
+ 		llmContext = await config.transformProviderContext(llmContext, model);
+ 	}
+@@ -2079,7 +2090,7 @@ export async function prepareProviderCall(
+ 	// After `transformProviderContext`, so the recorded definitions are exactly what the provider receives.
+ 	if (config.sentToolDefinitions) {
+ 		if (llmContext.tools) config.sentToolDefinitions.record(llmContext.tools);
+-		llmContext = config.sentToolDefinitions.withInactiveTools(llmContext);
++		llmContext = config.sentToolDefinitions.withInactiveTools(llmContext, prospectiveTools);
+ 	}
+ 	return { model, context: llmContext, promptToolWireTools, ownedDialect };
+ }
+diff --git a/packages/agent/src/agent.ts b/packages/agent/src/agent.ts
+index a7cb81e09f..f487a3ed63 100644
+--- a/packages/agent/src/agent.ts
++++ b/packages/agent/src/agent.ts
+@@ -187,6 +187,8 @@ export interface AgentOptions {
+ 	 * (see {@link Agent.copySentToolDefinitions}). Defaults to an empty store.
+ 	 */
+ 	sentToolDefinitions?: SentToolDefinitions;
++	/** Tools a later turn may activate, declared deferred up front; see {@link AgentLoopConfig.getProspectiveTools}. */
++	prospectiveTools?: () => AgentTool[];
+ 
+ 	/**
+ 	 * Resolves an API key or resolver dynamically for each LLM call.
+@@ -434,6 +436,7 @@ export class Agent {
+ 	#transformContext?: (messages: AgentMessage[], signal?: AbortSignal) => Promise<AgentMessage[]>;
+ 	#transformProviderContext?: AgentLoopConfig["transformProviderContext"];
+ 	#sentToolDefinitions = new SentToolDefinitions();
++	#prospectiveTools?: () => AgentTool[];
+ 	#steeringQueue: AgentMessage[] = [];
+ 	#followUpQueue: AgentMessage[] = [];
+ 	#queuedMessageClaims: Partial<Record<QueuedMessageQueue, QueuedMessageClaim>> = {};
+@@ -590,6 +593,7 @@ export class Agent {
+ 		this.#promptCacheKey = opts.promptCacheKey;
+ 		this.#providerSessionState = opts.providerSessionState;
+ 		if (opts.sentToolDefinitions) this.#sentToolDefinitions = opts.sentToolDefinitions;
++		this.#prospectiveTools = opts.prospectiveTools;
+ 		this.#thinkingBudgets = opts.thinkingBudgets;
+ 		this.#temperature = opts.temperature;
+ 		this.#topP = opts.topP;
+@@ -2072,6 +2076,7 @@ export class Agent {
+ 			convertToLlm: this.#convertToLlm,
+ 			transformProviderContext: this.#transformProviderContext,
+ 			sentToolDefinitions: this.#sentToolDefinitions,
++			getProspectiveTools: this.#prospectiveTools,
+ 			transformContext: this.#transformContext,
+ 			onPayload: this.#onPayload,
+ 			onResponse: this.#onResponse,
+diff --git a/packages/agent/src/sent-tool-definitions.ts b/packages/agent/src/sent-tool-definitions.ts
+index fb7d5872da..2c147db81c 100644
+--- a/packages/agent/src/sent-tool-definitions.ts
++++ b/packages/agent/src/sent-tool-definitions.ts
+@@ -27,15 +27,22 @@ export class SentToolDefinitions {
+ 	 * `context` with {@link Context.inactiveTools} set to the definitions for names the latest
+ 	 * `requestControls.tools.declared` in its messages holds that are not in its `tools`; cleared when
+ 	 * there are none or the request declares no tools. Names never sent by this Agent are skipped: the
+-	 * provider drops them from the declaration.
++	 * provider drops them from the declaration. Before any recorded declaration, `prospective` tools
++	 * that are not active are attached instead and remembered, so later requests keep declaring them.
+ 	 */
+-	withInactiveTools(context: Context): Context {
+-		const inactiveTools = context.tools?.length ? this.#inactiveFor(context.messages, context.tools) : undefined;
++	withInactiveTools(context: Context, prospective?: readonly Tool[]): Context {
++		const inactiveTools = context.tools?.length
++			? this.#inactiveFor(context.messages, context.tools, prospective)
++			: undefined;
+ 		if (!inactiveTools && !context.inactiveTools) return context;
+ 		return { ...context, inactiveTools };
+ 	}
+ 
+-	#inactiveFor(messages: readonly Message[], active: readonly Tool[]): Tool[] | undefined {
++	#inactiveFor(
++		messages: readonly Message[],
++		active: readonly Tool[],
++		prospective?: readonly Tool[],
++	): Tool[] | undefined {
+ 		let declared: readonly string[] | undefined;
+ 		for (let index = messages.length - 1; index >= 0; index--) {
+ 			const message = messages[index];
+@@ -44,8 +51,14 @@ export class SentToolDefinitions {
+ 				break;
+ 			}
+ 		}
+-		if (!declared) return undefined;
+ 		const activeNames = new Set(active.map(tool => tool.name));
++		if (!declared) {
++			const upFront = prospective?.filter(tool => !activeNames.has(tool.name));
++			if (!upFront?.length) return undefined;
++			// The provider declares these now; later requests find them through the recorded declaration.
++			this.record(upFront);
++			return upFront;
++		}
+ 		const inactive: Tool[] = [];
+ 		for (const name of declared) {
+ 			if (activeNames.has(name)) continue;
+diff --git a/packages/agent/src/types.ts b/packages/agent/src/types.ts
+index 98e5de6564..b3f6e3dc79 100644
+--- a/packages/agent/src/types.ts
++++ b/packages/agent/src/types.ts
+@@ -277,6 +277,12 @@ export interface AgentLoopConfig extends SimpleStreamOptions {
+ 	/** Remembers sent tool definitions to fill {@link Context.inactiveTools}. */
+ 	sentToolDefinitions?: SentToolDefinitions;
+ 
++	/**
++	 * Tools a later turn may activate. Before the transcript records a declaration they ride
++	 * {@link Context.inactiveTools}, so Anthropic declares them deferred from the first request.
++	 */
++	getProspectiveTools?: () => AgentTool[];
++
+ 	/**
+ 	 * Resolves the API key or resolver for the current model before each LLM call.
+ 	 *
+diff --git a/packages/ai/src/providers/anthropic.ts b/packages/ai/src/providers/anthropic.ts
+index d17d38d808..0f0847a0b2 100644
+--- a/packages/ai/src/providers/anthropic.ts
++++ b/packages/ai/src/providers/anthropic.ts
+@@ -4932,6 +4932,8 @@ function diffAnthropicActiveTools(
+  * Keep top-level `tools` byte-stable across a conversation. The declared list
+  * is the latest record's, minus names with no definition in `tools` or
+  * `inactiveTools`, plus newly active tools appended with `defer_loading`.
++ * Without a record, the active tools are declared first and `inactiveTools`
++ * follow with `defer_loading`, so a later activation keeps the list intact.
+  * Every recorded active-set change is replayed as a control before the
+  * response of the request that made it; the change this request makes goes
+  * at the tail. Records at a different index than they were written at are
+@@ -4995,6 +4997,19 @@ function planAnthropicToolControls(
+ 		}
+ 		const toolChanges = ownChange ? diffAnthropicActiveTools(previous, activeNames, declaredSet) : [];
+ 		if (toolChanges.length > 0) inserts.push({ index: context.messages.length, spec: { toolChanges } });
++	} else if (activeNames.length > 0) {
++		// First declaration: tools the caller may activate later are declared
++		// deferred now, so activating one appends only a tail `tool_addition`.
++		// Appending a deferred declaration later still changes the prefix the
++		// system and message cache levels are keyed on: a live probe re-wrote
++		// everything after the tool breakpoint. Without an active tool the
++		// declaration would be all-deferred, which the API rejects.
++		const activeSet = new Set(activeNames);
++		const prospective = (context.inactiveTools ?? []).filter(tool => !activeSet.has(tool.name));
++		if (prospective.length > 0) {
++			declared = [...activeNames, ...prospective.map(tool => tool.name)];
++			for (const tool of prospective) deferred.add(tool.name);
++		}
+ 	}
+ 
+ 	const tools: Tool[] = [];
+diff --git a/packages/ai/src/types.ts b/packages/ai/src/types.ts
+index abf8b06763..5c146a4bc1 100644
+--- a/packages/ai/src/types.ts
++++ b/packages/ai/src/types.ts
+@@ -1793,7 +1793,11 @@ export interface Context {
+ 	systemPrompt?: string[];
+ 	messages: Message[];
+ 	tools?: Tool[];
+-	/** Definitions of tools the transcript's latest Anthropic request declared but that are no longer in `tools`; only the Anthropic provider reads it. */
++	/**
++	 * Definitions of tools the transcript's latest Anthropic request declared but that are no longer in `tools`.
++	 * Before any recorded declaration, tools that may be activated later; Anthropic declares them deferred up front.
++	 * Only the Anthropic provider reads it.
++	 */
+ 	inactiveTools?: Tool[];
+ }
+ 
+diff --git a/packages/ai/test/anthropic-control-state-stability.test.ts b/packages/ai/test/anthropic-control-state-stability.test.ts
+index 643bd04fa4..baf225cc39 100644
+--- a/packages/ai/test/anthropic-control-state-stability.test.ts
++++ b/packages/ai/test/anthropic-control-state-stability.test.ts
+@@ -221,6 +221,20 @@ describe("Anthropic controls derived from the transcript", () => {
+ 		expectCacheStableContinuation(gained.payload, next.payload);
+ 	});
+ 
++	it("keeps the declaration byte-identical when a tool declared up front is activated", async () => {
++		const turn0 = [user("start")];
++		const first = await capture(turn0, Effort.Low, { tools: [tool("read")], inactiveTools: [tool("goal")] });
++		expect(first.payload.tools?.map(declared => declared.defer_loading)).toEqual([undefined, true]);
++
++		const turn1 = [...turn0, answering(reply("ready"), first), user("continue")];
++		const activated = await capture(turn1, Effort.Low, { tools: [tool("read"), tool("goal")] });
++
++		// A grown `tools` array would re-write the system and message cache levels.
++		expect(withoutCacheControl(activated.payload.tools)).toEqual(withoutCacheControl(first.payload.tools));
++		expect(referencesTool(activated.payload, wireName(first, 1))).toBe(true);
++		expectValidSystemPlacement(activated.payload);
++	});
++
+ 	it("moves an interrupted request's tool control past the steer and keeps it there once answered", async () => {
+ 		const turn0 = [user("start")];
+ 		const first = await capture(turn0, Effort.Low, { tools: [tool("read"), tool("grep")] });
+diff --git a/packages/coding-agent/src/sdk.ts b/packages/coding-agent/src/sdk.ts
+index e3b43e6b53..5bd5e88857 100644
+--- a/packages/coding-agent/src/sdk.ts
++++ b/packages/coding-agent/src/sdk.ts
+@@ -5301,6 +5301,12 @@ async function createAgentSessionScoped(options: CreateAgentSessionOptions): Pro
+ 			deadline: options.deadline,
+ 			transformContext,
+ 			transformProviderContext,
++			// `/goal` activates `goal` mid-session. Declaring it deferred from the first request keeps the
++			// Anthropic tool list byte-stable; appending it on activation re-writes the system and message cache.
++			prospectiveTools: () => {
++				const goal = session?.getToolByName("goal");
++				return goal ? [goal] : [];
++			},
+ 			steeringMode: cfgSteeringMode.get(settings),
+ 			followUpMode: cfgFollowUpMode.get(settings),
+ 			interruptMode: cfgInterruptMode.get(settings),
