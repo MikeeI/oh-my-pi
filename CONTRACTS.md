@@ -873,33 +873,6 @@ It also rejects `AGENTS.md` index rows whose IDs or dispositions differ from thi
 - Proof: scoped rejection in `test/repro-issue-1022-disabled-default-model.test.ts`.
 - Proof: configured endpoint discovery in `test/sdk-default-role-discovery-config-provider.test.ts`.
 
-### `MOMP-MODEL-CACHE-ISOLATION` — Compatible model-cache writer namespaces
-
-- Disposition: `UPSTREAM-GEDECKT`.
-- Contract: builds sharing one model cache never overwrite each other's provider catalogs.
-- Contract: same-policy writers retain shared snapshots, freshness-only updates, and payload-change invalidation.
-- Contract: public cache APIs and diagnostics retain logical provider IDs.
-- Contract: the existing pre-v11 credential scrub and exact schema/policy validation remain effective.
-- Owner: upstream `packages/catalog/src/model-cache.ts` keys payload and freshness rows by provider and materialization policy.
-- Coverage: upstream v18.20.1 keys `model_cache` and `model_cache_freshness` by `(provider_id, materialization_policy)`.
-- Coverage: it keeps this build's row plus the two most recently written foreign rows per provider through `pruneOtherPolicies`.
-- Coverage: upstream v18.8.0 validates memoized payloads using scalar metadata and `models_hash`; v18.15.0 uses cache schema 15.
-- Required action: keep every catalog and model-cache test byte-identical to upstream; this contract has no source or test delta.
-- Proof: upstream `packages/catalog/test/model-cache-rewrites.test.ts`, `packages/ai/test/model-cache.test.ts`, and `packages/catalog/test/build.test.ts`.
-
-### `MOMP-CODEX-CLIENT-VERSION` — Current Codex model gate
-
-- Disposition: `UPSTREAM-GEDECKT`.
-- Contract: Codex discovery and requests report a client version that the backend accepts for GPT-6.2 Astra and Sol.
-- Contract: discovered `openai-codex/gpt-6.2-astra` and `gpt-6.2-sol` carry API-equivalent costs, Codex speed multipliers, the 922K extended maximum, and paid-plan routing.
-- Owner: upstream `packages/catalog/src/wire/codex.ts#CODEX_CLIENT_VERSION` owns the reported version.
-- Owner: upstream `packages/catalog/src/compat/rules/providers/openai-codex.kdl`, `openai.kdl`, and `runtime/behavior.kdl` own GPT-6.2 policy.
-- Coverage: upstream v18.22.1 pins `0.169.0` and carries the GPT-6.2 rules.
-- Coverage: this contract has no source or test delta.
-- Required action: keep catalog, wire, and provider files byte-identical to upstream.
-- Proof: GPT-6.2 discovery cases in upstream `packages/catalog/test/codex-discovery.test.ts`.
-- Proof: an installed-candidate `openai-codex/gpt-6.2-sol` print request answers through the configured auth broker.
-
 ### `MOMP-MISTRAL-USAGE` — Mistral Vibe budget reporting
 
 - Disposition: `UPSTREAM-INTEGRIERT`.
@@ -1122,27 +1095,6 @@ It also rejects `AGENTS.md` index rows whose IDs or dispositions differ from thi
 - Proof: actual candidate CLI help, usage errors, and resume recovery hints.
 - Proof: source and packed missing-VHS diagnostics name `omp` and `momp`, respectively.
 - Proof: publish and smoke gates owned by `project-momp-upgrader`.
-
-### `MOMP-SUBAGENT-LSP` — Child LSP capability
-
-- Disposition: `UPSTREAM-GEDECKT`.
-- Contract: bundled agent prompt definitions follow upstream; Scout retains the upstream read-only tool set.
-- Contract: Children receive LSP except in plan mode, unless the parent or request disables it.
-- Contract: parent capability and plan-mode restrictions still attenuate Child LSP.
-- Contract: managed profiles keep LSP write-through diagnostics and format-on-write in Children.
-- Owner: upstream `src/task/structured-subagent.ts#resolveEffectiveSubagentPolicy` owns effective Child LSP policy.
-- Owner: upstream `src/task/executor.ts#subagentLspWritethroughSettings` gates Child LSP write-through on `task.enableLsp`.
-- Owner: upstream `src/task/settings.ts#cfgTaskEnableLsp` owns the setting and its disabled default.
-- Owner: project-settings `data/sync/agent/config.yml` explicitly enables `task.enableLsp` for managed profiles.
-- Coverage: upstream v19.0.0 grants Child LSP unconditionally outside plan mode and narrows `task.enableLsp` to edit write-through.
-- Reason: upstream satisfies the capability contract, and synchronized configuration supplies the MOMP write-through preference.
-- Required action: keep the source setting upstream-identical and retain explicit activation in managed Settings.
-- Required action: require `task.enableLsp: true` in managed configuration and the candidate's effective release settings.
-- Required action: keep the proof tests byte-identical to upstream because this contract has no source or test delta.
-- Coverage: installations without the managed config keep Child LSP but skip Child write-through diagnostics.
-- Proof: `test/task/subagent-lsp.test.ts`.
-- Proof: `test/tools/task-agent-capabilities.test.ts`.
-- Proof: load the managed profile through source `Settings.loadReadOnly` and verify enabled LSP with global provenance.
 
 ### `MOMP-LSP` — LSP extensions at upstream owners
 
