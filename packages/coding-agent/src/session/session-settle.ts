@@ -8,7 +8,7 @@ import type { AgentSession } from "./agent-session";
 /** Session surface the settle predicate reads. */
 export type SessionSettleState = Pick<
 	AgentSession,
-	"isRunActive" | "isStreaming" | "hasAdmittedSubmission" | "queuedMessageCount"
+	"isRunActive" | "isStreaming" | "isRunningRoutine" | "hasAdmittedSubmission" | "queuedMessageCount"
 >;
 
 /**
@@ -20,6 +20,7 @@ export function isSessionSettled(session: SessionSettleState, scheduledTurn?: ()
 	return (
 		!session.isRunActive &&
 		!session.isStreaming &&
+		!session.isRunningRoutine &&
 		!session.hasAdmittedSubmission &&
 		session.queuedMessageCount === 0 &&
 		scheduledTurn?.() !== true

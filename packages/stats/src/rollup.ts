@@ -760,12 +760,14 @@ export function getUsageAttribution(
 		cache_read_tokens: number | null;
 		cache_write_tokens: number | null;
 		cost_total: number | null;
+		unpriced: number | null;
 	}>(
 		{ cutoff },
 		`f.agent_type AS agent_type, f.purpose AS purpose, f.api AS api,
 		 SUM(f.requests) AS requests, SUM(f.input_tokens) AS input_tokens,
 		 SUM(f.output_tokens) AS output_tokens, SUM(f.cache_read_tokens) AS cache_read_tokens,
-		 SUM(f.cache_write_tokens) AS cache_write_tokens, TOTAL(f.cost_total) AS cost_total`,
+		 SUM(f.cache_write_tokens) AS cache_write_tokens, TOTAL(f.cost_total) AS cost_total,
+		 SUM(f.unpriced) AS unpriced`,
 		"GROUP BY f.agent_type, f.purpose, f.api",
 	);
 	const emptyTotals = (): UsageAttributionTotals => ({
@@ -775,6 +777,7 @@ export function getUsageAttribution(
 		totalCacheReadTokens: 0,
 		totalCacheWriteTokens: 0,
 		totalCost: 0,
+		unpricedRequests: 0,
 	});
 	const byAgentType = new Map<AgentType, AgentTypeStats>();
 	const bySideChannel = new Map<string, SideChannelStats>();
@@ -805,6 +808,7 @@ export function getUsageAttribution(
 		totals.totalCacheReadTokens += row.cache_read_tokens ?? 0;
 		totals.totalCacheWriteTokens += row.cache_write_tokens ?? 0;
 		totals.totalCost += row.cost_total ?? 0;
+		totals.unpricedRequests += row.unpriced ?? 0;
 	}
 	return {
 		byAgentType: [...byAgentType.values()],

@@ -4,6 +4,7 @@
  * user-facing output.
  */
 
+import { APP_DISPLAY_NAME } from "../app-version";
 import { findUnpackedInstalls } from "../tools/browser/relay/chromium-profiles";
 import { defaultRelayExtensionDir, extensionIdForPath } from "../tools/browser/relay/extension-files";
 import { installRelayExtension, registeredRelayExtensionIds, syncRelayInstalls } from "../tools/browser/relay/installs";
@@ -43,7 +44,9 @@ export async function runBrowserRelayCommand(args: BrowserRelayCommandArgs): Pro
 async function runSync(): Promise<void> {
 	const results = await syncRelayInstalls();
 	if (results.length === 0) {
-		console.log("No omp extension directories registered. Use `omp browser-relay install` to register one.");
+		console.log(
+			`No omp extension directories registered. Use \`${APP_DISPLAY_NAME} browser-relay install\` to register one.`,
+		);
 		return;
 	}
 	let failed = false;
@@ -105,7 +108,9 @@ async function runInstall(args: BrowserRelayCommandArgs): Promise<void> {
 	}
 	if (loaded.length > 0) {
 		console.log("");
-		console.log("Optional: `omp config set browser.relay true` makes the browser tool drive this Chrome by default.");
+		console.log(
+			`Optional: \`${APP_DISPLAY_NAME} config set browser.relay true\` makes the browser tool drive this Chrome by default.`,
+		);
 		return;
 	}
 	const developerMode = profiles.some(profile => profile.developerMode);
@@ -117,5 +122,7 @@ async function runInstall(args: BrowserRelayCommandArgs): Promise<void> {
 	console.log(
 		"From then on omp updates and reloads it by itself. Its toolbar badge shows 'on' while its native host serves the relay.",
 	);
-	console.log("Optional: `omp config set browser.relay true` makes the browser tool drive this Chrome by default.");
+	console.log(
+		`Optional: \`${APP_DISPLAY_NAME} config set browser.relay true\` makes the browser tool drive this Chrome by default.`,
+	);
 }

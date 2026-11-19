@@ -1,0 +1,28 @@
+{
+	"cwd": "/root/projects/project-oh-my-pi-fork",
+	"agentDir": "/root/.omp/agent",
+	"titleModel": {
+		"provider": "openai-codex",
+		"id": "gpt-6-luna",
+		"api": "openai-codex-responses"
+	},
+	"judgeModel": {
+		"provider": "openai-codex",
+		"id": "gpt-6.1-sol",
+		"api": "openai-codex-responses"
+	},
+	"titleSelector": "openai-codex/gpt-6-luna:low",
+	"judgeSelector": "openai-codex/gpt-6.1-sol:medium",
+	"titleIcons": "nf+emoji",
+	"sourceHashes": {
+		"packages/coding-agent/src/utils/title-generator.ts": "fbbf7b559412fe64c342a309de116d25b8fd741ca5c8f650f30d9285cd48e685",
+		"packages/coding-agent/src/session/agent-session.ts": "b793cce03cfc1d17f6c7739b146ac9c87294dddc5c2f08e2aa146aafb4369db2",
+		"packages/coding-agent/src/utils/title-card.ts": "e5266cf88c174624bad70b01a29ed7b46973f6e326b31f8f42328d2981352f72",
+		"packages/coding-agent/src/tiny/message-preproc.ts": "58954fad7e08bee4760024b44e91d051bd4013808658530129e9438ca4244627",
+		"packages/coding-agent/src/tiny/text.ts": "d678c463cd135510f0231c97b09ed267ee6676078a99ddd8256a0233bf1dbb5c"
+	},
+	"configHashes": {
+		"config.yml": "e44bee4cba2b9c3281a41370a71e2e46b9ee4ed1def5171e34e65747fa116285",
+		"models.yml": "f4de948d53c919ef7a53e995b2eb0cf2fa9a24ba41aeda4dffbfd2affc9acd69"
+	}
+}

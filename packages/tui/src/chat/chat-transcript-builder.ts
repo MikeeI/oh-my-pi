@@ -29,9 +29,9 @@ import {
 } from "./messages";
 import {
 	imageContent,
-	textContent,
 	type TranscriptEntryLike as TranscriptEntry,
 	transcriptEntryMessage,
+	userDisplayText,
 } from "./transcript-entry";
 import { theme } from "../theme";
 import {
@@ -338,7 +338,7 @@ export class ChatTranscriptBuilder {
 					);
 					break;
 				}
-				const userText = message.role === "user" ? textContent(message.content) : "";
+				const userText = message.role === "user" ? userDisplayText(message) : "";
 				if (userText) {
 					const isSynthetic = message.role === "developer" ? true : (message.synthetic ?? false);
 					// Synthetic (agent-attributed) inputs — chiefly the advisor's `Session
@@ -355,6 +355,7 @@ export class ChatTranscriptBuilder {
 							new UserMessageComponent(userText, {
 								liveSteered: message.role === "user" && message.liveSteered === true,
 								timestamp: message.timestamp,
+								commandInvocation: message.role === "user" ? message.commandInvocation : undefined,
 								images: imageContent(message.content),
 							}),
 						);

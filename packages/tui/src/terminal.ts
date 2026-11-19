@@ -37,7 +37,7 @@ import {
 import { tmuxMultiplexer } from "./multiplexers/tmux";
 import type { TerminalMultiplexerBackgroundColorCache } from "./multiplexers/types";
 import { classifyTerminalMultiplexerModule, terminalMultiplexerSessions } from "./terminal-multiplexer";
-import { setTmuxPaneApcTitles, tmuxSessionSpeaksTsp } from "./tmux";
+import { getTmuxPaneSize, setTmuxPaneApcTitles, tmuxSessionSpeaksTsp } from "./tmux";
 import { setHangulCompatibilityJamoWidth } from "./utils";
 import { Win32InputModeDecoder, Win32PasteMarkerNormalizer } from "./windows-input-mode";
 
@@ -520,6 +520,8 @@ export interface Terminal {
 	// Get terminal dimensions
 	get columns(): number;
 	get rows(): number;
+	/** Check grid geometry before committing history; false leaves the offered batch unacknowledged. */
+	isSizeCurrent?(columns: number, rows: number): boolean;
 	/**
 	 * Output bytes accepted but not yet delivered to the terminal, when the
 	 * implementation can report it. The renderer skips composing new frames
@@ -2872,6 +2874,15 @@ export class ProcessTerminal implements Terminal {
 		return () => listeners.delete(callback);
 	}
 
+	isSizeCurrent(columns: number, rows: number): boolean {
+		if (!tmuxMultiplexer.isInside($env) || !$env.TMUX_PANE) {
+			return this.columns === columns && this.rows === rows;
+		}
+		// tmux's grid can change before it updates the PTY size or delivers SIGWINCH.
+		// A fresh TTY ioctl alone therefore cannot validate a history-bearing frame.
+		const grid = getTmuxPaneSize($env);
+		return grid.columns === columns && grid.rows === rows;
+	}
 	/**
 	 * With the output pump, a backlog bound at or below
 	 * {@link STDOUT_BACKLOG_CLEAR_BYTES} is reported as-is instead of re-read:

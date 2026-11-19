@@ -22,6 +22,7 @@ import {
 	sanitizeText,
 	withTimeout,
 } from "@oh-my-pi/pi-utils";
+import { APP_DISPLAY_NAME } from "../../app-version";
 import { daemonClient } from "../../daemon/client";
 import { canonicalProjectDir } from "../../daemon/paths";
 import { type DaemonClient, type OpenRequest, projectScope } from "../../daemon/protocol";
@@ -193,7 +194,7 @@ export async function ensureSharedBrowser(opts: {
 		// start restores the stale session; the claim holder starts Chrome instead.
 		if (!claim) {
 			throw new ToolError(
-				`Shared browser daemon unavailable: ${reason ? `${reason}, and ` : ""}another omp process held the shared browser profile while starting Chrome. \`omp ps\` lists the ${name} unit.`,
+				`Shared browser daemon unavailable: ${reason ? `${reason}, and ` : ""}another omp process held the shared browser profile while starting Chrome. \`${APP_DISPLAY_NAME} ps\` lists the ${name} unit.`,
 			);
 		}
 		await seedOwnedProfilePreferences(userDataDir);
@@ -208,7 +209,7 @@ export async function ensureSharedBrowser(opts: {
 		);
 		if (typeof started !== "string") return started;
 		throw new ToolError(
-			`Shared browser daemon unavailable: ${reason ? `${reason}; its replacement failed: ` : ""}${started}. \`omp ps\` lists the ${name} unit.`,
+			`Shared browser daemon unavailable: ${reason ? `${reason}; its replacement failed: ` : ""}${started}. \`${APP_DISPLAY_NAME} ps\` lists the ${name} unit.`,
 		);
 	} finally {
 		claim?.release();

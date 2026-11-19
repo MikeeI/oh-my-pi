@@ -34,6 +34,7 @@ export {
 	isHighlightLanguage,
 	setMarkdownColorful,
 	setMarkdownMermaidRendering,
+	setMarkdownTextColors,
 	warmHighlighter,
 } from "./tui-adapters";
 

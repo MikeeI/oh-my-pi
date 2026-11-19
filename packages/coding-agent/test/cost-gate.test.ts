@@ -358,6 +358,32 @@ describe("cost gate in a running session", () => {
 		expect(notices[0]?.message).toContain("Cost cap reached");
 	});
 
+	it("fails a routine at a mid-turn cost cap without starting its next step or reporting complete", async () => {
+		const api = "test-cost-gate-routine";
+		const provider = scriptedProvider(api, [response(1.5, true), response(0.1)]);
+		const session = await createSession(api, { "session.maxCost": 1 });
+		session.setRoutines([
+			{
+				name: "budget-run",
+				description: "Budgeted routine",
+				path: "/tmp/budget-run.yaml",
+				steps: [{ message: "First step" }, { message: "Must not run" }],
+				level: "user",
+				_source: { provider: "test", providerName: "Test", path: "/tmp/budget-run.yaml", level: "user" },
+			},
+		]);
+		const statuses: string[] = [];
+		await expect(
+			session.runRoutineInvocation("/budget-run", {
+				onProgress: progress => {
+					statuses.push(progress.status);
+				},
+			}),
+		).rejects.toThrow("Cost cap reached");
+		expect(statuses).toEqual(["running", "failed"]);
+		expect(provider.calls()).toBe(1);
+	});
+
 	it("warns once at session.warnCost and keeps sending requests", async () => {
 		const api = "test-cost-gate-warn";
 		const provider = scriptedProvider(api, [response(0.6, true), response(0.6, true), response(0.6)]);

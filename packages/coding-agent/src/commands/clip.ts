@@ -3,6 +3,7 @@ import { CLIP_DESCRIPTION_MAX, STREAM_TITLE_MAX } from "@oh-my-pi/pi-wire";
 import { isEnoent } from "@oh-my-pi/pi-utils";
 import { Args, CliUsageError, Command, Flags } from "@oh-my-pi/pi-utils/cli";
 import { clipHelp as commandHelp } from "../cli/command-help";
+import { APP_DISPLAY_NAME } from "../app-version";
 import { Settings } from "../config/settings";
 import { StencilCredential } from "../stencil/credential";
 import { uploadClip } from "../stream/clip-upload";
@@ -24,9 +25,9 @@ export default class Clip extends Command {
 	};
 
 	static examples = [
-		"omp clip",
-		'omp clip -t "Streaming the lexer" -d "Rewrote the tokenizer live"',
-		"omp clip /tmp/omp-recordings/2026-09-22T10-00-00-1a2b3c4d.ompcast",
+		`${APP_DISPLAY_NAME} clip`,
+		`${APP_DISPLAY_NAME} clip -t "Streaming the lexer" -d "Rewrote the tokenizer live"`,
+		`${APP_DISPLAY_NAME} clip /tmp/omp-recordings/2026-09-22T10-00-00-1a2b3c4d.ompcast`,
 	];
 
 	async run(): Promise<void> {

@@ -5,7 +5,8 @@
  * The settings registry (`config/registry.ts`) is the source of truth for available settings.
  */
 
-import { APP_NAME, getAgentDir, isRecord } from "@oh-my-pi/pi-utils";
+import { getAgentDir, isRecord } from "@oh-my-pi/pi-utils";
+import { APP_DISPLAY_NAME as APP_NAME } from "../app-version";
 import chalk from "@oh-my-pi/pi-utils/chalk";
 import { orderedSettings } from "../config/all-settings";
 import { type AnySetting, lookup } from "../config/registry";

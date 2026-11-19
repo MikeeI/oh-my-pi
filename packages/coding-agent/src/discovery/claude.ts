@@ -480,47 +480,26 @@ async function loadTools(ctx: LoadContext): Promise<LoadResult<CustomTool>> {
 
 async function loadSystemPrompts(ctx: LoadContext): Promise<LoadResult<SystemPrompt>> {
 	const items: SystemPrompt[] = [];
-	const warnings: string[] = [];
 
-	const projectBase = getProjectClaude(ctx);
-	for (const [file, kind] of [
-		["SYSTEM_TEMPLATE.md", "template"],
-		["SYSTEM.md", "text"],
-	] as const) {
-		const projectPath = path.join(projectBase, file);
-		const content = await readFile(projectPath);
-		if (content) {
+	const load = async (filePath: string, level: "user" | "project"): Promise<void> => {
+		const content = await readFile(filePath);
+		if (content !== null) {
 			items.push({
-				path: projectPath,
+				path: filePath,
 				content,
-				kind,
-				level: "project",
-				_source: createSourceMeta(PROVIDER_ID, projectPath, "project"),
+				level,
+				_source: createSourceMeta(PROVIDER_ID, filePath, level),
 			});
 		}
-	}
+	};
 
+	await load(path.join(getProjectClaude(ctx), "SYSTEM.md"), "project");
 	const userBase = getUserClaude(ctx);
 	if (userBase) {
-		for (const [file, kind] of [
-			["SYSTEM_TEMPLATE.md", "template"],
-			["SYSTEM.md", "text"],
-		] as const) {
-			const userPath = path.join(userBase, file);
-			const content = await readFile(userPath);
-			if (content !== null) {
-				items.push({
-					path: userPath,
-					content,
-					kind,
-					level: "user",
-					_source: createSourceMeta(PROVIDER_ID, userPath, "user"),
-				});
-			}
-		}
+		await load(path.join(userBase, "SYSTEM.md"), "user");
 	}
 
-	return { items, warnings };
+	return { items, warnings: [] };
 }
 
 // =============================================================================

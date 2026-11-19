@@ -48,6 +48,7 @@ import type { SyncWorkerRequest, SyncWorkerResponse } from "./sync-worker";
 // JavaScript entry. Standalone source `omp-stats` keeps using this package's
 // own sync-worker source file.
 import type {
+	AggregatedStats,
 	DashboardStats,
 	FolderStats,
 	MessageStats,
@@ -56,6 +57,7 @@ import type {
 	RequestDetails,
 	SessionEntry,
 	SessionModelUsageEntry,
+	SummaryStats,
 	ToolDashboardStats,
 } from "./types";
 import { computeUsageWindowStats, fetchUsageData, type UsageDataSnapshot } from "./usage-windows";
@@ -492,7 +494,7 @@ async function syncAllSessionsLocked(
 const HOUR_MS = 60 * 60 * 1000;
 const DAY_MS = 24 * HOUR_MS;
 
-type TimeRange = "1h" | "24h" | "2d" | "3d" | "7d" | "30d" | "90d" | "all";
+export type TimeRange = "1h" | "24h" | "2d" | "3d" | "7d" | "30d" | "90d" | "all";
 
 const DEFAULT_TIME_RANGE: TimeRange = "24h";
 
@@ -537,6 +539,23 @@ export async function getDashboardStats(range?: string | null): Promise<Dashboar
 		modelPerformanceSeries: getModelPerformanceSeries(window),
 		costSeries: getCostTimeSeries(window.cutoff),
 	};
+}
+
+/** Summary ranking and omitted counts require every folder, not the dashboard's request-ranked subset. */
+export async function getSummaryStats(range?: string | null): Promise<SummaryStats> {
+	await initDb();
+	const { cutoff } = getTimeRangeConfig(range);
+	return {
+		overall: getOverallStats(cutoff),
+		byModel: getStatsByModel(cutoff),
+		byFolder: getStatsByFolder(cutoff),
+		byAgentType: getUsageAttribution(cutoff).byAgentType,
+	};
+}
+
+export async function getOverallStatsForRange(range: TimeRange): Promise<AggregatedStats> {
+	await initDb();
+	return getOverallStats(getTimeRangeConfig(range).cutoff);
 }
 
 export async function getOverviewStats(
