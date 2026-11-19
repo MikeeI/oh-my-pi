@@ -1182,6 +1182,13 @@ Resume a paused investigation only after an explicit user request.
   - Owner: the Source probe uses existing Tool description and Eval-topic owners; it never executes their operations.
   - Proof: `momp-upgrade prove` checks every divergent runtime override against the probe output.
 
+- `packages/coding-agent/scripts/cache-probe.ts` (`probe:cache`): `NICHT-CONTRACT-AKTIV`.
+  - Consumer: regression investigation of Anthropic prompt-cache findings, starting with ISSUE-033.
+  - Owner: `scan` reuses `detectCacheInvalidation` and adds the idle gap and TTL class per miss.
+    TTL expiry is therefore never blamed on a request change.
+  - Owner: `probe` sends paired live requests on nonce-separated prefixes through the real provider path.
+  - Proof: `bun --cwd=packages/coding-agent run probe:cache probe --reps 1` reports arm A `tools_same=no` with a partial R2 read.
+
 - `.omp/ratchet/rename-title/` and `.omp/ratchet/rename-title-expanded/`: `NICHT-CONTRACT-AKTIV`.
   - Consumer: the recorded rename-title optimization workflow resumes its frozen baseline and expanded-case evaluator.
   - Owner: each flow's `_state.json` and harness retain cases, selection, source/config fingerprints, and results together.
