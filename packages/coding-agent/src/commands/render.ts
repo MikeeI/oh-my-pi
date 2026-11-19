@@ -5,6 +5,7 @@
 import { postmortem } from "@oh-my-pi/pi-utils";
 import { Args, Command, Flags } from "@oh-my-pi/pi-utils/cli";
 import { renderHelp as commandHelp } from "../cli/command-help";
+import { APP_DISPLAY_NAME } from "../app-version";
 import { runRenderCommand } from "../cli/render-cli";
 import { CliUsageError } from "../cli/usage-error";
 
@@ -25,10 +26,10 @@ export default class Render extends Command {
 	};
 
 	static examples = [
-		"omp render",
-		"omp render 01a0285c --plain",
-		"omp render ~/.omp/agent/sessions/--work-pi--/big.jsonl -q -t --repaint 5",
-		"omp render -w 200 > thread.ansi",
+		`${APP_DISPLAY_NAME} render`,
+		`${APP_DISPLAY_NAME} render 01a0285c --plain`,
+		`${APP_DISPLAY_NAME} render ~/.omp/agent/sessions/--work-pi--/big.jsonl -q -t --repaint 5`,
+		`${APP_DISPLAY_NAME} render -w 200 > thread.ansi`,
 	];
 
 	async run(): Promise<void> {

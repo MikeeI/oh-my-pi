@@ -1,0 +1,36 @@
+{
+  "baselineRevision": "77adac703fc417e0692d0f1e2946ece747d83421",
+  "runtimeSha256": "deb25c73413216e3fd24ff8d9539259b777bad7f2c0780c2aa6309ef7d3e0c37",
+  "testedRuntimeSha256": "295a6f0728ff529a2c86c217cb6b11f48835fa7388b82f3081fbe764ff9a283b",
+  "postTestSourceChanges": "Preserved the existing stale-shell-cleanup rationale beside its new owner; comments only, no executable changes.",
+  "upstreamComparison": "8ac1309bd8adaddc891eeb389c545345073875be",
+  "coreCaptureManifest": "verification.json",
+  "coreCaptureStage": "Captured before fullscreen epoch and first-recovery-frame hardening; final runtime gates below include that hardening.",
+  "testRuns": [
+    {
+      "selection": "real tmux production Composer with zero, partial and full native history; delayed notification, width/height rotation, net-zero fullscreen return, contraction, append and Stop",
+      "tests": 3,
+      "expectCalls": 808,
+      "failures": 0
+    },
+    {
+      "selection": "remaining focused rendering gates across nine files, excluding the three already-passed production Composer cases",
+      "tests": 86,
+      "expectCalls": 498,
+      "failures": 0
+    }
+  ],
+  "totalTests": 89,
+  "totalExpectCalls": 1306,
+  "testFiles": 9,
+  "tuiTypes": "passed",
+  "codingAgentTypes": "passed",
+  "oxlint": "passed",
+  "oxfmt": "passed",
+  "ledger": "passed",
+  "gitDiffCheck": "passed",
+  "noProviderCalls": true,
+  "realTermiusClientMeasured": false,
+  "releasePerformed": false,
+  "sourceCommitCreated": false
+}

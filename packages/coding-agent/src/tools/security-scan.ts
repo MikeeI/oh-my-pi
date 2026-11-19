@@ -1,6 +1,7 @@
 import { type } from "@oh-my-pi/omptype";
 import type { AgentTool, AgentToolResult, ToolTier } from "@oh-my-pi/pi-agent-core";
 import securityScanDescription from "../prompts/tools/security-scan.md" with { type: "text" };
+import { resolveUserToolPromptSource } from "../prompts/tool-prompt-source";
 import { selectSecurityOAuthAccount } from "../security/auth";
 import {
 	CodexSecurityCloudClient,
@@ -110,7 +111,13 @@ export class SecurityScanTool implements AgentTool<typeof securityScanSchema, Se
 	readonly label = "Security Scan";
 	readonly loadMode = "discoverable";
 	readonly summary = "Run OMP-native scans and explicit Codex Security cloud operations";
-	readonly description = securityScanDescription.trim();
+	get description(): string {
+		return resolveUserToolPromptSource({
+			agentDir: this.session.settings.getAgentDir(),
+			toolName: "security-scan",
+			bundledSource: securityScanDescription,
+		}).trim();
+	}
 	readonly parameters = securityScanSchema;
 	readonly strict = true;
 

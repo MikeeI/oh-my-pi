@@ -33,7 +33,7 @@
 		},
 		"colors": {
 			"type": "object",
-			"description": "Theme color definitions (all required except thinkingMax, assistantMessageText, mdExtensionLink and subagent1-subagent6)",
+			"description": "Theme color definitions (all required except thinkingMax, cacheMiss, commandPrompt, assistantMessageText, mdExtensionLink and subagent1-subagent6)",
 			"required": [
 				"accent",
 				"border",
@@ -131,6 +131,14 @@
 				"warning": {
 					"$ref": "#/$defs/colorValue",
 					"description": "Warning states"
+				},
+				"cacheMiss": {
+					"$ref": "#/$defs/colorValue",
+					"description": "Cache miss marker foreground; defaults to lemon yellow"
+				},
+				"commandPrompt": {
+					"$ref": "#/$defs/colorValue",
+					"description": "File-command rail foreground and chip background; defaults to Dracula light violet"
 				},
 				"muted": {
 					"$ref": "#/$defs/colorValue",
@@ -499,10 +507,7 @@
 								}
 							},
 							"additionalProperties": false,
-							"anyOf": [
-								{ "required": ["status"] },
-								{ "required": ["activity"] }
-							]
+							"anyOf": [{ "required": ["status"] }, { "required": ["activity"] }]
 						}
 					]
 				}

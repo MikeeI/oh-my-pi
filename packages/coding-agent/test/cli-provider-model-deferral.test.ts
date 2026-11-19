@@ -89,7 +89,7 @@ describe("print-mode suggestions for a provider-qualified miss", () => {
 });
 
 describe("print mode with a stale configured default", () => {
-	test("warns on stderr naming the stale default and the model that runs instead", async () => {
+	test("rejects a stale configured default instead of selecting an unrelated model", async () => {
 		const home = path.join(os.tmpdir(), `pi-cli-stale-default-${Snowflake.next()}`);
 		const agentDir = path.join(home, ".omp", "agent");
 		fs.mkdirSync(agentDir, { recursive: true });
@@ -98,13 +98,12 @@ describe("print mode with a stale configured default", () => {
 			"modelRoles:\n  default: anthropic/claude-sonnet-9-9\nretry:\n  enabled: false\n",
 		);
 		try {
-			// The fallback model's request fails at the dead proxy; the test stops the run once the warning is out.
+			// The dead proxy fails discovery at once, and even a faulty fallback cannot reach the real provider.
 			const proc = spawnPrintCli(home, ["hi"], { ANTHROPIC_API_KEY: "test-key" });
-			const warning = "Default model anthropic/claude-sonnet-9-9 not found. Using anthropic/";
-			const stderr = await readUntil(proc.stderr, warning);
-			proc.kill();
-			await proc.exited;
-			expect(stderr).toContain(warning);
+			const [exitCode, stderr] = await Promise.all([proc.exited, new Response(proc.stderr).text()]);
+			expect(exitCode).not.toBe(0);
+			expect(stderr).toContain('Configured default model "anthropic/claude-sonnet-9-9" could not be resolved');
+			expect(stderr).not.toContain("Using anthropic/");
 		} finally {
 			removeSyncWithRetries(home);
 		}
@@ -150,21 +149,4 @@ function spawnPrintCli(home: string, args: string[], env: Record<string, string>
 			stderr: "pipe",
 		},
 	);
-}
-
-/** Stderr read until it contains `needle`, or all of it once the stream ends without it. */
-async function readUntil(stream: ReadableStream<Uint8Array>, needle: string): Promise<string> {
-	const reader = stream.getReader();
-	const decoder = new TextDecoder();
-	let text = "";
-	try {
-		while (!text.includes(needle)) {
-			const { value, done } = await reader.read();
-			if (done) break;
-			text += decoder.decode(value, { stream: true });
-		}
-	} finally {
-		reader.releaseLock();
-	}
-	return text;
 }

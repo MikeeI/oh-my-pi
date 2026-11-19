@@ -1,0 +1,37 @@
+{
+  "name": "finalize-short-control",
+  "stage": "scroll",
+  "live": "\n ASSISTANT-6\n\n ASSISTANT-7\n\n ASSISTANT-8\n\n ASSISTANT-9\n\n ASSISTANT-10\n\n ASSISTANT-11\n\n ASSISTANT-12\n\n ASSISTANT-13\n\n ASSISTANT-14\n\n ASSISTANT-15\n\n ASSISTANT-16\n\n ASSISTANT-17\n\n ASSISTANT-18\n\n ASSISTANT-19\n\n ASSISTANT-20\n\n ASSISTANT-21\n\n ASSISTANT-22\n\n ASSISTANT-23\n\n╭──AUDIT-STATUS───────────────────────────────────────────────────────────────╮\n╰─                                                                           ─╯\n",
+  "full": "╭─── ✎ Edit: 🗒 diagnostic.txt ⟦+2⟧ ───────────────────────────────────────────╮\n│  +1│FINAL-PREVIEW-0                                                         │\n│  +2│FINAL-PREVIEW-1                                                         │\n╰─────────────────────────────────────────────────────────────────────────────╯\n\n ASSISTANT-0\n\n ASSISTANT-1\n\n ASSISTANT-0\n\n ASSISTANT-1\n\n ASSISTANT-2\n\n ASSISTANT-3\n\n ASSISTANT-4\n\n ASSISTANT-5\n\n ASSISTANT-6\n\n ASSISTANT-7\n\n ASSISTANT-8\n\n ASSISTANT-9\n\n ASSISTANT-10\n\n ASSISTANT-11\n\n ASSISTANT-12\n\n ASSISTANT-13\n\n ASSISTANT-14\n\n ASSISTANT-15\n\n ASSISTANT-16\n\n ASSISTANT-17\n\n ASSISTANT-18\n\n ASSISTANT-19\n\n ASSISTANT-20\n\n ASSISTANT-21\n\n ASSISTANT-22\n\n ASSISTANT-23\n\n╭──AUDIT-STATUS───────────────────────────────────────────────────────────────╮\n╰─                                                                           ─╯\n",
+  "historySize": 20,
+  "history": "╭─── ✎ Edit: 🗒 diagnostic.txt ⟦+2⟧ ───────────────────────────────────────────╮\n│  +1│FINAL-PREVIEW-0                                                         │\n│  +2│FINAL-PREVIEW-1                                                         │\n╰─────────────────────────────────────────────────────────────────────────────╯\n\n ASSISTANT-0\n\n ASSISTANT-1\n\n ASSISTANT-0\n\n ASSISTANT-1\n\n ASSISTANT-2\n\n ASSISTANT-3\n\n ASSISTANT-4\n\n ASSISTANT-5",
+  "paint": {
+    "t": 1790722956140,
+    "kind": "paint",
+    "stage": "scroll",
+    "paint": 6,
+    "history": [],
+    "viewport": [
+      "╭──AUDIT-STATUS───────────────────────────────────────────────────────────────╮",
+      "╰─                                                                           ─╯"
+    ],
+    "reset": false,
+    "alt": false,
+    "columns": 79,
+    "rows": 39,
+    "draft": "",
+    "debug": {
+      "lines": [
+        "\u001b[38;2;61;66;74m╭──\u001b[39mAUDIT-STATUS\u001b[38;2;61;66;74m─────────────────────────────────────────────────────────────\u001b[39m\u001b[38;2;61;66;74m──╮\u001b[39m",
+        "\u001b[38;2;61;66;74m╰─ \u001b[39m\u001b[38;2;229;229;231m\u001b[39m                                                                         \u001b[38;2;61;66;74m ─╯\u001b[39m"
+      ],
+      "windowTop": 0,
+      "altScreen": false,
+      "cursor": {
+        "x": 3,
+        "y": 38,
+        "visible": true
+      }
+    }
+  }
+}

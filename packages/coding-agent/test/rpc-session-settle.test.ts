@@ -11,6 +11,7 @@ function createSession() {
 	return {
 		isRunActive: false,
 		isStreaming: false,
+		isRunningRoutine: false,
 		hasAdmittedSubmission: false,
 		queuedMessageCount: 0,
 	};

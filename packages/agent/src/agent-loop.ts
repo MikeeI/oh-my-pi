@@ -1958,7 +1958,7 @@ async function emitHarmonyAudit(
 	);
 }
 
-interface PreparedProviderCall {
+export interface PreparedProviderCall {
 	model: Model;
 	context: Context;
 	promptToolWireTools: Context["tools"];
@@ -2029,7 +2029,7 @@ function openLiveSteering(
 	});
 }
 
-async function prepareProviderCall(
+export async function prepareProviderCall(
 	context: AgentContext,
 	config: AgentLoopConfig,
 	signal: AbortSignal | undefined,

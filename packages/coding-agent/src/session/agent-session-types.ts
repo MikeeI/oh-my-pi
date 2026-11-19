@@ -41,6 +41,7 @@ import type { ExtensionRunner, PreparedExtension } from "../extensibility/extens
 import type { MCPLoadResult } from "../mcp";
 import type { CacheWarmer } from "./cache-warmer";
 import type { ContextUsage } from "../extensibility/extensions/types";
+import type { Routine } from "../extensibility/routines";
 import type { SkillDescriptionCatalog } from "../extensibility/skill-descriptions";
 import type { MCPEvalNamespaceCatalog } from "../mcp/eval-namespaces";
 import type { Skill, SkillWarning } from "../extensibility/skills";
@@ -51,6 +52,7 @@ import type { ShellStream } from "@oh-my-pi/pi-tui/tools/shell-steps";
 import type { JobWidgetView } from "@oh-my-pi/pi-tui/tools/job-widget";
 import type { ShellTrace } from "@oh-my-pi/pi-wire";
 import type { SystemPromptSources } from "@oh-my-pi/pi-tui/status-line/context-usage";
+import type { BuildSystemPromptResult } from "../system-prompt";
 import type { ToolSession } from "../tools";
 import type { ToolCommandState } from "../tools/tool-commands";
 import type { CodexAutoRedeemCoordinator } from "./codex-auto-reset";
@@ -261,6 +263,8 @@ export interface AgentSessionConfig {
 	promptTemplates?: PromptTemplate[];
 	/** File-based slash commands for expansion. */
 	slashCommands?: FileSlashCommand[];
+	/** User-defined routines for slash-style sequential execution. */
+	routines?: Routine[];
 	/** Extension runner created with wrapped tools. */
 	extensionRunner?: ExtensionRunner;
 	/**
@@ -366,6 +370,8 @@ export interface AgentSessionConfig {
 	rebuildSystemPrompt?: SystemPromptRebuilder;
 	/** Sources of the initial base prompt, as returned by `buildSystemPrompt`. */
 	systemPromptSources?: SystemPromptSources;
+	/** Initial structured prompt build retained for live inspection. */
+	initialSystemPromptResult?: BuildSystemPromptResult;
 	/** Tools mounted as bash commands, for `/tools` display. */
 	getToolCommandEntries?: () => Array<{ name: string; summary: string }>;
 	/** Tool command presentation state backed by the canonical tool map. */

@@ -21,6 +21,7 @@ import { card, type CardToolResult, firstText, safe } from "./result-card";
 import { code, compact, span, text } from "../native/describe";
 import { plainText } from "../native/spans";
 import { errorView, toolHead } from "./native-view";
+import { formatReadTokenLabel } from "./read-token";
 
 /** Summary of a `cfg://` read, attached to read tool details. */
 export interface CfgReadDetails {
@@ -54,9 +55,11 @@ export function renderCfgRead(
 	details: CfgReadDetails | undefined,
 	options: RenderResultOptions,
 	theme: Theme,
+	readTextTokens: number | undefined,
 ): Component {
+	const tokenLabel = formatReadTokenLabel(readTextTokens);
 	return card((_width, expanded) => {
-		const meta: string[] = [];
+		const meta: string[] = tokenLabel ? [tokenLabel] : [];
 		if (details) {
 			meta.push(details.count === 1 ? "1 setting" : `${details.count} settings`);
 			if (details.modified) meta.push(`${details.modified} modified`);
@@ -85,9 +88,11 @@ export function describeCfgRead(
 	url: string,
 	result: CardToolResult | undefined,
 	details: CfgReadDetails | undefined,
+	readTextTokens: number | undefined,
 ): NativeToolView {
 	const description = (details?.path ?? parseCfgUrl(url)?.segments.join(".")) || "all settings";
-	const meta: string[] = [];
+	const tokenLabel = formatReadTokenLabel(readTextTokens);
+	const meta: string[] = tokenLabel ? [tokenLabel] : [];
 	if (details) {
 		meta.push(details.count === 1 ? "1 setting" : `${details.count} settings`);
 		if (details.modified) meta.push(`${details.modified} modified`);

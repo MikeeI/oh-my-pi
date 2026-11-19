@@ -171,6 +171,44 @@ describe("structured subagent primitive", () => {
 		expect(policy.modelOverride).toEqual(["b/y"]);
 	});
 
+	it("keeps concurrent Child discovery isolated between profiles in the same workspace", async () => {
+		using workspace = TempDir.createSync("@omp-discovery-workspace-");
+		using firstProfile = TempDir.createSync("@omp-discovery-first-");
+		using secondProfile = TempDir.createSync("@omp-discovery-second-");
+		const scoutFrontmatter = "---\nname: scout\ndescription: Profile scout\ntools: read\n---\n";
+		await Bun.write(firstProfile.join("prompts", "agents", "scout.md"), `${scoutFrontmatter}FIRST_PROFILE\n`);
+		await Bun.write(secondProfile.join("prompts", "agents", "scout.md"), `${scoutFrontmatter}SECOND_PROFILE\n`);
+		const firstSettings = Settings.isolated();
+		const secondSettings = Settings.isolated();
+		vi.spyOn(firstSettings, "getAgentDir").mockReturnValue(firstProfile.path());
+		vi.spyOn(secondSettings, "getAgentDir").mockReturnValue(secondProfile.path());
+		vi.spyOn(firstSettings, "reloadFromDisk").mockResolvedValue();
+		vi.spyOn(secondSettings, "reloadFromDisk").mockResolvedValue();
+		const discover = discoveryModule.discoverAgents;
+		const entered = Promise.withResolvers<void>();
+		const release = Promise.withResolvers<void>();
+		vi.spyOn(discoveryModule, "discoverAgents").mockImplementation(async (...args) => {
+			const discovered = await discover(...args);
+			if (args[3] === firstProfile.path()) {
+				entered.resolve();
+				await release.promise;
+			}
+			return discovered;
+		});
+		const first = resolveEffectiveSubagentPolicy(
+			request({ agent: "scout", session: session({ cwd: workspace.path(), settings: firstSettings }) }),
+		);
+		await entered.promise;
+		const second = resolveEffectiveSubagentPolicy(
+			request({ agent: "scout", session: session({ cwd: workspace.path(), settings: secondSettings }) }),
+		);
+		// Let the second preflight cross its reload boundary while the first scan remains in flight.
+		await Promise.resolve();
+		release.resolve();
+		const policies = await Promise.all([first, second]);
+		expect(policies.map(policy => policy.agent.systemPrompt)).toEqual(["FIRST_PROFILE", "SECOND_PROFILE"]);
+	});
+
 	it("rescans agents when a plugin provider is disabled while an earlier discovery is in flight", async () => {
 		const previouslyDisabled = getDisabledProviders();
 		enableProvider("omp-plugins");

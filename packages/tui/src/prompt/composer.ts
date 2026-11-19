@@ -5,7 +5,7 @@ import { extensionLinkLabels } from "../render/extension-links";
 import { LinkHints, type ViewportLink, viewportLinkTargets } from "../render/link-hints";
 import type { StatusLineSession } from "../status-line/host";
 import { createStartupStatusLine, type StatusLineStartupData, startupComposerState } from "../status-line/startup";
-import { isInsideTerminalMultiplexer } from "../terminal-multiplexer";
+import { hasTerminalMultiplexerSession, isInsideTerminalMultiplexer } from "../terminal-multiplexer";
 import { ProcessTerminal, type Terminal } from "../terminal";
 import {
 	type Component,
@@ -17,15 +17,15 @@ import {
 	type TUIOptions,
 	type ViewportSize,
 } from "../tui";
-import { wrapLiteralLine } from "../utils";
-import type { DescribeContext, NativeChild, NativeSurface, NativeSurfaceProvider } from "../native/node";
-import { sameItems } from "../native/memo";
 import { postmortem } from "@oh-my-pi/pi-utils";
 import { CustomEditor } from "./custom-editor";
 import type { WordCompletionMethod } from "./word-completion";
 import { type AnimationFrame, TranscriptContainer } from "../chrome/transcript-container";
 import { type VersionUpdate, WelcomeComponent } from "./welcome";
 import { ensureThemeSync, getEditorTheme, theme } from "../theme/theme";
+import { reflowHardRows } from "../render/terminal-row-reflow";
+import type { DescribeContext, NativeChild, NativeSurface, NativeSurfaceProvider } from "../native/node";
+import { sameItems } from "../native/memo";
 
 const DOUBLE_INTERRUPT_MS = 500;
 
@@ -80,6 +80,8 @@ export interface ComposerStatusCache {
 
 /** Optional dependencies and initial state for a standalone composer. */
 export interface ComposerOptions {
+	/** Executable used by copyable welcome tips; standalone hosts retain the library identity when omitted. */
+	readonly appName?: string;
 	readonly terminal?: Terminal;
 	/** Extra TUI construction options (render scheduler injection for tests and `omp render`). */
 	readonly tuiOptions?: TUIOptions;
@@ -234,6 +236,7 @@ export class Composer implements TerminalFrameProvider, NativeSurfaceProvider {
 	#welcome: WelcomeComponent | undefined;
 	#version = "";
 	#versionUpdate: VersionUpdate | null = null;
+	readonly #appName: string | undefined;
 	#headerBefore: readonly Component[] = [];
 	#headerAfter: readonly Component[] = [];
 	#runtimeChildren: readonly Component[] = [];
@@ -305,6 +308,7 @@ export class Composer implements TerminalFrameProvider, NativeSurfaceProvider {
 		// ExtensionExitError through the guarded process.exit (#11789).
 		this.#exit = options.exit ?? (code => postmortem.exitProcess(code));
 		this.#now = options.now ?? Date.now;
+		this.#appName = options.appName;
 		this.#preferences = { ...COMPOSER_DEFAULTS, ...options.preferences };
 		this.#applyWelcomeUpdate(options.welcome ?? {});
 
@@ -791,11 +795,13 @@ export class Composer implements TerminalFrameProvider, NativeSurfaceProvider {
 	): { id: number; rows: readonly string[]; kind: "append" | "replay" } | undefined {
 		if (this.#offeredHistory !== undefined) {
 			this.#rerenderOfferedHistory(width);
-			return {
-				id: this.#offeredHistory.id,
-				rows: this.#offeredHistory.rows,
-				kind: this.#offeredHistory.kind,
-			};
+			if (this.#offeredHistory !== undefined) {
+				return {
+					id: this.#offeredHistory.id,
+					rows: this.#offeredHistory.rows,
+					kind: this.#offeredHistory.kind,
+				};
+			}
 		}
 		if (this.#headerReplayPending) {
 			const transcriptReplay = transcript.peekReplayBatch(width);
@@ -848,9 +854,15 @@ export class Composer implements TerminalFrameProvider, NativeSurfaceProvider {
 			this.#headerRetired = true;
 			this.#retiredHeaderRows = [];
 		}
+		// tmux may move settled live rows into native history during reflow.
+		// Partial retirement then has two owners for one block and repeats or
+		// loses its seam; preserve mode retires bounded whole blocks instead.
+		const capacity = Math.max(0, rows - chromeRows);
 		const batch = this.#historyFlush
 			? transcript.peekFlushBatch(width)
-			: transcript.peekFinalizedBatch(width, Math.max(0, rows - chromeRows));
+			: this.#preferences.resizeScrollback === "preserve" && hasTerminalMultiplexerSession("tmux")
+				? transcript.peekWholeFinalizedBatch(width, capacity)
+				: transcript.peekFinalizedBatch(width, capacity);
 		if (batch === undefined) return undefined;
 		this.#offeredHistory = {
 			id: this.#nextHistoryId++,
@@ -874,6 +886,13 @@ export class Composer implements TerminalFrameProvider, NativeSurfaceProvider {
 			return;
 		}
 		const transcript = offered.source.transcript.rerenderOfferedBatch(width);
+		if (offered.source.transcriptId !== undefined && transcript?.id !== offered.source.transcriptId) {
+			// A destructive presentation reset invalidates the underlying offer.
+			// Never write its stale wrapper rows; retain header-only transactions.
+			this.#offeredHistory = undefined;
+			if (this.#historyReplayRequested) this.#startHistoryReplay();
+			return;
+		}
 		if (offered.source.header === "none") {
 			if (transcript !== undefined) offered.rows = transcript.rows;
 			return;
@@ -912,11 +931,7 @@ export class Composer implements TerminalFrameProvider, NativeSurfaceProvider {
 		const lines = this.#retiredHeaderRows;
 		if (!lines) return [];
 		if (isInsideTerminalMultiplexer()) return lines.slice(start);
-		const reflowed: string[] = [];
-		for (let index = start; index < lines.length; index++) {
-			reflowed.push(...wrapLiteralLine(lines[index]!, width));
-		}
-		return reflowed;
+		return reflowHardRows(lines.slice(start), width);
 	}
 
 	/** Live editor whose draft survives startup and session adoption. */
@@ -1098,7 +1113,7 @@ export class Composer implements TerminalFrameProvider, NativeSurfaceProvider {
 
 	#ensureWelcome(): void {
 		if (this.#welcome) return;
-		this.#welcome = new WelcomeComponent(this.#version);
+		this.#welcome = new WelcomeComponent(this.#version, this.#appName);
 		this.#welcome.setVersionUpdate(this.#versionUpdate);
 	}
 

@@ -23,8 +23,10 @@ import { setAutoThemeMapping, setColorBlindMode, setSymbolPreset } from "@oh-my-
 import { DEFAULT_MAX_FPS, parseMaxFps, setMaxFps } from "@oh-my-pi/pi-tui/frame-rate";
 import { setMotionEffects } from "@oh-my-pi/pi-tui/motion-effects";
 import { parseSpinnerInterval, setSpinnerInterval } from "@oh-my-pi/pi-tui/spinner-clock";
+import { APP_DISPLAY_NAME } from "../app-version";
 
 const EMPTY_UNKNOWN_RECORD: Record<string, unknown> = {};
+const DEFAULT_TUI_TEXT_COLORS = false;
 
 // ────────────────────────────────────────────────────────────────────────
 // General settings (no UI)
@@ -513,6 +515,18 @@ export const cfgTuiAutoGraph = register({
 			},
 			{ value: "off", label: "Off", description: "Leave tables as tables" },
 		],
+	},
+});
+
+export const cfgTuiTextColors = register({
+	id: "tui.textColors",
+	type: "boolean",
+	default: DEFAULT_TUI_TEXT_COLORS,
+	ui: {
+		tab: "appearance",
+		group: "Display",
+		label: "Colored Response Text",
+		description: "Render inline RGB foreground spans and enable color guidance for Main UI sessions. Off by default.",
 	},
 });
 
@@ -1301,7 +1315,7 @@ export const cfgUpdateChannel = register({
 		tab: "interaction",
 		group: "Startup & Updates",
 		label: "Update Channel",
-		description: "Update channel used by omp update and the startup update check",
+		description: `Update channel used by ${APP_DISPLAY_NAME} update and the startup update check`,
 		options: [
 			{ value: "stable", label: "Stable" },
 			{ value: "canary", label: "Canary" },

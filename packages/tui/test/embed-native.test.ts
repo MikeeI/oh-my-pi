@@ -64,7 +64,8 @@ function described(reply: string, kinds: (kind: TspKind) => boolean): NativeNode
 		flat.push(child);
 		child.c?.forEach(walk);
 	};
-	walk(createAssistantMessageComponent(HOST, assistant(reply)).describe(cx));
+	const root = createAssistantMessageComponent(HOST, assistant(reply)).describe(cx);
+	if (root) walk(root);
 	return flat;
 }
 

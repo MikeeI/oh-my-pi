@@ -2,6 +2,7 @@
  * `omp browser-relay` — drive the user's own Chrome tabs.
  */
 import { Args, Command, Flags } from "@oh-my-pi/pi-utils/cli";
+import { APP_DISPLAY_NAME } from "../app-version";
 import { BROWSER_RELAY_ACTIONS, runBrowserRelayCommand } from "../cli/browser-relay-cli";
 import { browserRelayHelp } from "../cli/command-help";
 
@@ -31,8 +32,8 @@ export default class BrowserRelay extends Command {
 	};
 
 	static examples = [
-		"omp browser-relay install    # install the omp extension, register it in Chrome and add its native host",
-		"omp browser-relay sync       # sync every registered extension directory",
+		`${APP_DISPLAY_NAME} browser-relay install    # install the omp extension, register it in Chrome and add its native host`,
+		`${APP_DISPLAY_NAME} browser-relay sync       # sync every registered extension directory`,
 	];
 
 	async run(): Promise<void> {

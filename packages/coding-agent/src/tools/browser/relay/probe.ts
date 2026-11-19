@@ -7,6 +7,7 @@
  * which takes moments.
  */
 import { VERSION } from "@oh-my-pi/pi-utils/dirs";
+import { APP_DISPLAY_NAME } from "../../../app-version";
 import { throwIfAborted } from "../../tool-errors";
 import { probeCdpResponse } from "../attach";
 import { DISCARDED_TABS_PROTOCOL_VERSION, isOlderOmpVersion, RELAY_RESTART_PATH } from "./protocol";
@@ -160,7 +161,7 @@ export async function requestRelayRestart(
 }
 
 /** The steps that replace an out-of-date relay extension. */
-export const UPDATE_RELAY_EXTENSION = "Run `omp browser-relay install` and reload the omp extension in Chrome.";
+export const UPDATE_RELAY_EXTENSION = `Run \`${APP_DISPLAY_NAME} browser-relay install\` and reload the omp extension in Chrome.`;
 
 /**
  * Notice for an open through a ready relay where a connected extension was

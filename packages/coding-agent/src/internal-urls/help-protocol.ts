@@ -64,7 +64,10 @@ export class HelpProtocolHandler implements ProtocolHandler {
 		const topics =
 			tool?.docTopics?.() ??
 			(name === "eval" && !tool
-				? getEvalDocTopics({ preludes: getEnabledEvalPreludes(session.getEvalPreludes?.() ?? []) })
+				? getEvalDocTopics({
+						agentDir: session.settings.getAgentDir(),
+						preludes: getEnabledEvalPreludes(session.getEvalPreludes?.() ?? []),
+					})
 				: undefined);
 		if (!topics) {
 			throw new ToolError(tool ? `Tool '${name}' has no doc topics.` : `No tool '${name}' in this session.`);
