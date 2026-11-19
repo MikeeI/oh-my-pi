@@ -156,7 +156,7 @@ C    cr=0     cw=19059   cr=19059  cw=14       yes (no change)
 ````
 
 Platform: `Linux`
-omp version: `19.0.0`
+omp version: `19.0.1`
 Bun version: `1.4.5`
 Provider: `Anthropic (Claude Pro/Max)`
 Area: `Other`
