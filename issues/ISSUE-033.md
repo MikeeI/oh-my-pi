@@ -1,8 +1,8 @@
 # ISSUE-033 — Anthropic prompt cache: a tool activated mid-session re-writes the system and message cache
 
-State: Investigating
-Authorized-Work: Not-Selected
-Publication-Target: Not-Selected
+State: Draft-Ready
+Authorized-Work: Research-and-Reporting
+Publication-Target: New-issue
 External-Reference: Not published.
 Contribution-Priority: High
 Root-Cause-Confidence: High
@@ -33,6 +33,7 @@ Boundary: The next turn reads the cache again, so the cost is one full re-write 
 - [S] `packages/ai/src/providers/anthropic.ts:4969` emits the appended tool with `deferLoading: true` after every earlier declaration.
 - [S] `packages/ai/src/providers/anthropic.ts:4685` anchors the tool breakpoint on the last non-deferred tool, before the appended tool.
 - [S] `packages/coding-agent/src/modes/interactive-mode.ts:6496` builds the `/goal` roster as `[...new Set([...enabledTools, "goal"])]`.
+- [S] `packages/agent/src/sent-tool-definitions.ts` fills `inactiveTools` only from a recorded declaration, so no first request can declare an inactive tool.
 - [O] Session `~/.omp/agent/sessions/-projects-project-product-sms-gateway/2026-11-19T22-01-50-275Z_01a1f5d4-8dc3-71ff-8ad8-f84b260e2347.jsonl`, `/goal` at 2026-11-19T23:03:46Z on `anthropic/claude-opus-5-5`.
   Request controls changed `declared` from 12 to 13 tools with `deferred: ["goal"]`.
   The journal holds a single `system-prompt-digest` entry, so the base system prompt did not change.
@@ -45,60 +46,133 @@ Boundary: The next turn reads the cache again, so the cost is one full re-write 
 
 ## Performance-Evidence
 
-Workload: Throwaway pi-ai probe with `anthropic/claude-sonnet-5-5`, broker OAuth credential, `cacheRetention: "short"`, `reasoning: "low"`, 2026-11-20.
-Each arm used a nonce-separated prefix of 8 tools, about 3.3K system tokens, and about 2K user tokens (about 19K tokens in total).
-R1 sends one user turn; R2, 3 s later, replays R1's reply and adds a user turn.
-Baseline [O]: Arm A, the current provider path (R2 adds `goal` to `context.tools`), gave R1 `cw=19059` and R2 `cr=9221 cw=9945`, identical in 2/2 reps.
+Workload: Throwaway probes with `anthropic/claude-sonnet-5-5`, broker OAuth credential, about 19K-token nonce-separated prefixes, 2026-11-20.
+Each prefix had 8 tools, about 3.3K system tokens, and about 2K user tokens.
+Baseline [O]: Provider path (`completeSimple`, `cacheRetention: "short"`, `reasoning: "low"`), arm A (R2 adds `goal` to `context.tools`).
+It gave R1 `cw=19059` and R2 `cr=9221 cw=9945`, identical in 2/2 reps.
 The `system` hash was equal, the `tools` hash differed, and `tool_addition` was the R2 tail.
-Candidate [O]: Arm B (R1 already declares the same deferred `goal` wire object, R2 path unchanged) gave R1 `cw=19158` and R2 `cr=19158 cw=14`, identical in 2/2 reps.
-The `tools` and `system` hashes were equal and the R2 tail was the same `tool_addition`.
+Candidate [O]: Arm B (R1 already declares the same deferred `goal` wire object) gave R1 `cw=19158` and R2 `cr=19158 cw=14` in 2/2 reps.
 Guard [O]: Arm C (no tool change) gave R1 `cw=19059` and R2 `cr=19059 cw=14` in 2/2 reps.
-Boundary: Pre-declaring `goal` costs about 99 extra prefix tokens, written once.
-The API-key path, Opus models, and real-session sizes remain unmeasured.
-End-to-end-Measurement: Not measured
+End-to-end [O]: Real `Agent` loop with the patch applied; R1, then R1b with `goal` inactive, then R2 after `setTools([...tools, goal])`.
+Without `prospectiveTools` it gave R1b `cr=19054` and R2 `cr=9216 cw=9960`.
+With `prospectiveTools: () => [goal]` it gave R1b `cr=19145` (declared `deferred: ["goal"]`) and R2 `cr=19160 cw=14`.
+Boundary: Pre-declaring `goal` costs about 90 extra prefix tokens in the probe, written once.
+The real `goal` schema size, the API-key path, and Opus models remain unmeasured.
+End-to-end-Measurement: Measured
 
 ## Prior-Art
 
 Coverage: upstream issues and pull requests searched for `defer_loading cache`, `goal mode cache miss`, `tool roster prompt cache anthropic`, `tool_addition deferred`, `mid-conversation tool changes`, and `deferred tool declaration system cache tool_addition`; checked=2026-11-20.
 Gaps: Upstream Discord not searched.
-The middle 607 lines of #4645 (review threads) and the open PRs #11813 and #18520 were not read.
 
 - `https://github.com/can1357/oh-my-pi/issues/5992` — Related; a 2026-07-28 comment measured a `/goal` full miss on omp 17.1.5, before tool-change controls existed, and asked for miss attribution.
-- `https://github.com/can1357/oh-my-pi/pull/4645` — Related, open; it keeps `goal` active from the start, which avoids this trigger by changing goal-tool availability rather than the provider.
+- `https://github.com/can1357/oh-my-pi/pull/4645` — Related, open; it keeps `goal` active from the start. Its review threads cover goal and plan semantics, not caching.
+- `https://github.com/can1357/oh-my-pi/pull/11813` — Related, open; cache-miss attribution. It suppresses `tools` reasons for plane-carried adds because "the plane keeps the sent array stable", which this evidence contradicts.
 - `https://github.com/can1357/oh-my-pi/pull/15233` — Related, merged; it changed the all-deferred guard in `planAnthropicToolControls` and assumes a tool-list change costs one miss.
+- `https://github.com/can1357/oh-my-pi/pull/18520` — Distinct, open; the OpenAI Responses analogue, `additional_tools`, keeps the first declaration.
 - `https://github.com/can1357/oh-my-pi/pull/11202` — Distinct, closed; it showed that the tool-changes beta header does not affect caching.
 - `https://github.com/can1357/oh-my-pi/issues/18454` — Distinct; a WorkPool `yield` schema swap changes tool bytes, not the deferred-append path.
 
-Contribution fit: undecided between a new issue and a comment on #5992, which owns attribution rather than this provider root cause.
+Contribution fit: New issue; no thread owns this provider root cause, and #5992 owns attribution.
 
 ## Proposed-Change
 
 Declare activatable tools as deferred from the transcript's first Anthropic request, so a later activation only appends a `tool_addition` control.
-The coding agent would pass registered but inactive definitions, for example `goal`, through `Context.inactiveTools`.
-`planAnthropicToolControls` would then include them in the first declaration as deferred.
-Tools first registered after the first request keep today's append path.
+Local patch [O]: `issues/evidence/issue-033/predeclare-prospective-tools.patch`, 8 files, +82/−8, applies cleanly to `personal@f7c6564e16`.
+
+- `packages/ai`: without a recorded declaration, `planAnthropicToolControls` declares `context.inactiveTools` deferred after the active tools.
+- `packages/agent`: `AgentOptions.prospectiveTools` is normalized like active tools and attached through `SentToolDefinitions` before the first record, then remembered.
+- `packages/coding-agent`: `sdk.ts` supplies the registered `goal` tool.
+- Test: one case in `packages/ai/test/anthropic-control-state-stability.test.ts`.
 
 ## Scope-and-Constraints
 
 - Preserve: the byte-stable later declarations, `tool_addition`/`tool_removal` replay, the all-deferred guard from #15233, and held system-prompt rosters on prefix-bound models.
-- Exclude: miss attribution in the cache marker, which is owned by #5992.
+- Exclude: miss attribution in the cache marker, which is owned by #5992 and #11813.
 - Exclude: the separate removal-path miss.
+- Exclude: resumed transcripts recorded without the prospective tool, which keep today's append path.
 - Cost: each pre-declared deferred tool adds its schema to the cached prefix once per session.
-- Open design: which inactive definitions the agent passes, and whether that set must stay stable across resume.
 
 ## Verification
 
-- Re-run the arm A/B/C probe against the implemented provider path: activating `goal` must keep R2 `cacheRead` equal to R1's prefix.
-- Add one provider-level regression in `packages/ai/test/anthropic-control-state-stability.test.ts`: a first request with an inactive `goal` definition declares it deferred, and the activation turn keeps `tools` byte-identical.
+- [O] `bun test` on the 4 Anthropic provider suites plus `sent-tool-definitions` and `output-budget` → 104 pass with the patch applied.
+- [O] `bun --cwd=packages/{ai,agent,coding-agent} run check` → no type errors, format clean after `oxfmt`.
+- [O] The end-to-end `Agent` probe in Performance-Evidence keeps the activation turn's full read.
 
 ## Publication-Blockers
 
-- Authorized-Work and Publication-Target are not selected.
-- Prior art #4645 (middle section), #11813, and #18520 are not fully read.
-- The source of the inactive definitions that the agent passes is undecided.
+None.
 
 ## Next-Action
 
-Summary: Finish prior art and target
-Action: Read #4645's elided review threads, #11813, and #18520, then record the target fit against #5992 and #4645.
-Done-When: Prior-Art lists no unread plausible candidate and names a recommended Publication-Target.
+Summary: Await publication approval
+Action: Show the user the exact Publication-Target and Publication-Draft for approval.
+Done-When: The user approves or changes the draft, or the issue URL is recorded.
+
+## Publication-Draft
+
+Target: New issue in `can1357/oh-my-pi` via the Bug Report form.
+Title: `Anthropic: activating a tool mid-session (e.g. /goal) re-writes the system and message cache despite the deferred declaration`
+
+Description:
+
+````markdown
+`planAnthropicToolControls` keeps the top-level tool list stable by appending a newly active tool with `defer_loading: true` and announcing it with a tail `tool_addition` ([anthropic.ts#L4942-L4969](https://github.com/can1357/oh-my-pi/blob/57771ae562b9345e0579bceb2d68d585e3e6927e/packages/ai/src/providers/anthropic.ts#L4942-L4969)). The appended entry still invalidates the system and message cache levels: the activation turn reads back only the tool breakpoint (the last non-deferred tool, [L4685](https://github.com/can1357/oh-my-pi/blob/57771ae562b9345e0579bceb2d68d585e3e6927e/packages/ai/src/providers/anthropic.ts#L4685)) and writes the system prompt and the whole transcript again.
+
+`/goal` triggers this on every entry. In a 304K-token Opus 5.5 session, the request after `/goal` read 14,629 tokens and wrote 313,290; the system prompt did not change (one `system-prompt-digest` entry for the whole session). All 6 `goal` activations on Opus 5.5 and Sonnet 5.5 in my last 14 days of sessions show the same drop.
+
+Declaring the same tool deferred from the first request avoids it: the activation turn then reads the full prefix.
+````
+
+Steps to Reproduce:
+
+````markdown
+Live probe against `anthropic/claude-sonnet-5-5` (OAuth), each arm with its own ~19K-token prefix (8 tools, ~3.3K system, ~2K user), `cacheRetention: "short"`. R1 is one user turn; R2 replays R1's reply plus a new user turn 3 s later.
+
+1. Arm A (current path): R1 with tools `T`; R2 with tools `T + goal`. The provider appends `goal` with `defer_loading: true` and adds `tool_addition` at the tail.
+2. Arm B: R1 already declares the identical deferred `goal` object; R2 is built exactly as in arm A.
+3. Arm C (control): R2 changes nothing.
+
+Same result in 2/2 repetitions per arm. The `system` block hashed identically in R1 and R2 in every arm.
+````
+
+Expected Behavior:
+
+````markdown
+Activating a tool only appends the `tool_addition` control, so the activation turn reads back the earlier prefix, as it does when the tool was declared from the first request (arm B).
+````
+
+Error Output:
+
+````shell
+arm  R1                  R2                    tools R1==R2
+A    cr=0     cw=19059   cr=9221   cw=9945     no  (goal appended, deferred)
+B    cr=0     cw=19158   cr=19158  cw=14       yes (goal declared deferred from R1)
+C    cr=0     cw=19059   cr=19059  cw=14       yes (no change)
+````
+
+Platform: `Linux`
+omp version: `19.0.0`
+Bun version: `1.4.5`
+Provider: `Anthropic (Claude Pro/Max)`
+Area: `Other`
+
+Additional context:
+
+````markdown
+Anthropic's [tool use with prompt caching](https://platform.claude.com/docs/en/agents-and-tools/tool-use/tool-use-with-prompt-caching) page says deferred tools stay out of the prefix, but that holds for tools declared deferred from the start; adding a declaration later behaves like "Modifying tool definitions" for the system and message levels.
+
+A possible direction, which I verified locally end to end (not opening a PR): before the transcript records a declaration, pass tools that may be activated later (here `goal`) through `Context.inactiveTools` and let `planAnthropicToolControls` declare them deferred after the active tools. With the real `Agent` loop, R1 → R1b (`goal` inactive, `deferred: ["goal"]`) → R2 (`goal` activated), R2 read 19,160 cached tokens and wrote 14, versus reading 9,216 and writing 9,960 without it. The cost is the deferred schema in every session's prefix, written once.
+
+Related: #5992 (a comment there measured the `/goal` miss before tool-change controls existed; that thread is about attributing misses), #4645 (keeps `goal` always active, a different trade-off), #11813 (treats plane-carried adds as prefix-stable).
+
+### Disclosure
+
+Investigated thoroughly with Claude Opus 5.5 (high reasoning effort), using [Oh My Pi](https://github.com/can1357/oh-my-pi) as the agent framework.
+
+This report is not generic or unreviewed AI-generated output. Its claims were checked against the cited evidence, and it includes the relevant detail intended to help maintainers resolve the issue.
+
+If reports like this are not useful to the project, please let me know and I will refrain from submitting similar ones. My intent is to help without wasting maintainer time or energy or discouraging their work.
+
+Thank you for your work.
+````
