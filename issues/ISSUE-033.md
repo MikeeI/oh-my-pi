@@ -38,15 +38,19 @@ Boundary: The next turn reads the cache again, so the cost is one full re-write 
   Request controls changed `declared` from 12 to 13 tools with `deferred: ["goal"]`.
   The journal holds a single `system-prompt-digest` entry, so the base system prompt did not change.
   Usage moved from `cacheRead 303560` to `cacheRead 14629`, `cacheWrite 313290`.
-- [O] Local journals from the last 14 days (604 files): all 6 Anthropic `goal` additions missed below the tool level.
-  The 6 transitions were 280K→0, 275K→0, 241K→14K, 230K→14K, 177K→0, and 304K→14.6K cache reads on Opus 5.5 and Sonnet 5.5.
-- [O] Removing `goal` with byte-identical `tools` missed once (113K→14K) and held once (419K→419K); this removal path has an unresolved cause.
+- [O] `bun --cwd=packages/coding-agent run probe:cache scan --days 15` (697 journals, 2026-11-20) lists each miss with idle gap and TTL class.
+  5 of 6 Anthropic `goal` additions came within the 60-minute TTL (gaps 0.3–10.8 min) and missed below the tool level.
+  3 of them read back exactly the tool level (13,945, 14,135, 14,629); 2 on omp 18.14.0 and 18.16.0 read 0.
+  The 6th (2026-11-15, 177K→0) followed a 156.6-minute idle gap; that miss is TTL expiry, not this cause.
+- [O] `goal` removals with byte-identical `tools` behave as expected: the one within the TTL (0.8 min) read 419,864 tokens.
+  The three removal misses followed idle gaps of 178.7, 1004.7, and 1159.3 minutes, so all three are TTL expiry.
 - [S] https://platform.claude.com/docs/en/agents-and-tools/tool-use/tool-use-with-prompt-caching states that deferred tools stay out of the prefix.
   The same page lists "Modifying tool definitions" as invalidating tools, system, and messages.
 
 ## Performance-Evidence
 
-Workload: Throwaway probes with `anthropic/claude-sonnet-5-5`, broker OAuth credential, about 19K-token nonce-separated prefixes, 2026-11-20.
+Workload: Live probes with `anthropic/claude-sonnet-5-5`, broker OAuth credential, about 19K-token nonce-separated prefixes, 2026-11-20.
+Repeatable as `bun --cwd=packages/coding-agent run probe:cache probe`; a third run (1 rep) gave the same A/B/C split.
 Each prefix had 8 tools, about 3.3K system tokens, and about 2K user tokens.
 Baseline [O]: Provider path (`completeSimple`, `cacheRetention: "short"`, `reasoning: "low"`), arm A (R2 adds `goal` to `context.tools`).
 It gave R1 `cw=19059` and R2 `cr=9221 cw=9945`, identical in 2/2 reps.
@@ -89,7 +93,6 @@ Local patch [O]: `issues/evidence/issue-033/predeclare-prospective-tools.patch`,
 
 - Preserve: the byte-stable later declarations, `tool_addition`/`tool_removal` replay, the all-deferred guard from #15233, and held system-prompt rosters on prefix-bound models.
 - Exclude: miss attribution in the cache marker, which is owned by #5992 and #11813.
-- Exclude: the separate removal-path miss.
 - Exclude: resumed transcripts recorded without the prospective tool, which keep today's append path.
 - Cost: each pre-declared deferred tool adds its schema to the cached prefix once per session.
 
@@ -119,7 +122,7 @@ Description:
 ````markdown
 `planAnthropicToolControls` keeps the top-level tool list stable by appending a newly active tool with `defer_loading: true` and announcing it with a tail `tool_addition` ([anthropic.ts#L4942-L4969](https://github.com/can1357/oh-my-pi/blob/57771ae562b9345e0579bceb2d68d585e3e6927e/packages/ai/src/providers/anthropic.ts#L4942-L4969)). The appended entry still invalidates the system and message cache levels: the activation turn reads back only the tool breakpoint (the last non-deferred tool, [L4685](https://github.com/can1357/oh-my-pi/blob/57771ae562b9345e0579bceb2d68d585e3e6927e/packages/ai/src/providers/anthropic.ts#L4685)) and writes the system prompt and the whole transcript again.
 
-`/goal` triggers this on every entry. In a 304K-token Opus 5.5 session, the request after `/goal` read 14,629 tokens and wrote 313,290; the system prompt did not change (one `system-prompt-digest` entry for the whole session). All 6 `goal` activations on Opus 5.5 and Sonnet 5.5 in my last 14 days of sessions show the same drop.
+`/goal` triggers this on every entry. In a 304K-token Opus 5.5 session, the request after `/goal` read 14,629 tokens and wrote 313,290; the system prompt did not change (one `system-prompt-digest` entry for the whole session). In my last 15 days of sessions, all 5 `goal` activations within the 1-hour cache TTL rewrote the system prompt and transcript (Opus 5.5 and Sonnet 5.5): 3 read back exactly the tool level (13,945–14,629 tokens), and 2 on older builds (18.14.0, 18.16.0) read nothing. A sixth activation came after a 157-minute idle gap, so I left it out as TTL expiry.
 
 Declaring the same tool deferred from the first request avoids it: the activation turn then reads the full prefix.
 ````
