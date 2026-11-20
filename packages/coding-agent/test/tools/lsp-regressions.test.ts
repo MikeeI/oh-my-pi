@@ -4445,6 +4445,56 @@ describe("lsp regressions", () => {
 		}
 	});
 
+	it("searches workspace symbols by `symbol` when `query` is omitted", async () => {
+		const tempDir = TempDir.createSync("@omp-lsp-workspace-symbol-fallback-");
+		const definitionPath = path.join(tempDir.path(), "target.py");
+		const receivedQueries: string[] = [];
+		try {
+			await Bun.write(definitionPath, "def target():\n    return 1\n");
+			const serverConfig: ServerConfig = { command: "fake-pyls", fileTypes: ["py"], rootMarkers: [] };
+			installFakeLsp((message, srv) => {
+				if (message.method === "initialize") {
+					srv.send({
+						jsonrpc: "2.0",
+						id: message.id,
+						result: { capabilities: { workspaceSymbolProvider: true } },
+					});
+				} else if (message.method === "workspace/symbol") {
+					const params = message.params;
+					if (params && typeof params === "object" && "query" in params && typeof params.query === "string") {
+						receivedQueries.push(params.query);
+					}
+					const location = {
+						uri: Bun.pathToFileURL(definitionPath).href,
+						range: { start: { line: 0, character: 4 }, end: { line: 0, character: 10 } },
+					};
+					srv.send({ jsonrpc: "2.0", id: message.id, result: [{ name: "target", kind: 12, location }] });
+				} else if (message.method === "shutdown") {
+					srv.send({ jsonrpc: "2.0", id: message.id, result: null });
+				} else if (message.method === "exit") {
+					srv.exit(0);
+				}
+			});
+			vi.spyOn(lspConfig, "loadConfig").mockReturnValue({
+				servers: { "fake-pyls": serverConfig },
+				idleTimeoutMs: undefined,
+			});
+			const tool = new LspTool(makeLspSession(tempDir.path()));
+
+			const symbols = textResult(
+				await tool.execute("symbols", { action: "symbols", file: "*", symbol: "target#2" }),
+			);
+
+			expect(receivedQueries).toEqual(["target"]);
+			expect(symbols).toContain('matching "target"');
+			expect(symbols).toContain("target.py:1");
+		} finally {
+			configCache.delete(tempDir.path());
+			await lspClient.shutdownAll();
+			tempDir.removeSync();
+		}
+	});
+
 	describe("files in another checkout", () => {
 		/** Session checkout `main/` and a linked worktree `feature/` (a `.git` file), each with `src/target.py`. */
 		async function makeCheckouts(prefix: string) {

@@ -1120,12 +1120,16 @@ It also rejects `AGENTS.md` index rows whose IDs or dispositions differ from thi
 - Disposition: `UPSTREAM-INTEGRIERT`.
 - Contract: rename previews show bounded positions and replacement text and report omitted edits.
 - Owner: current upstream `src/lsp/utils.ts#formatWorkspaceEdit` and `#formatTextEdit` own the rename-preview delta.
+- Contract: workspace `symbols` (`file: "*"`) without `query` searches the `symbol` name, ignoring its `#N` suffix.
+- Reason: a 30-day session audit (2026-11-20) found 18 workspace symbol searches rejected for a missing `query`.
+- Owner: `src/lsp/tool.ts#LspTool.execute` owns the workspace-symbol query fallback.
 - Coverage: upstream v19.0.0 filters file-scoped symbol queries through `formatMatchingDocumentSymbols`, so MOMP removed its filter helpers and test.
-- Owner: the project-settings `lsp.md` override owns guidance for file-rename previews and omitted text-edit details.
+- Owner: the project-settings `lsp.md` override owns guidance for file-rename previews, omitted text-edit details, and name-only symbol lookup.
 - Coverage: upstream v18.11.3 owns configurable LSP call and diagnostic-wait budgets.
 - Required action: render the selected profile prompt with its current timeout variables at the dynamic description owner.
-- Required action: retain the rename-preview source, prompt, and proof deltas until current upstream satisfies that contract.
+- Required action: retain the rename-preview and workspace-symbol fallback deltas with their prompt and proof until current upstream satisfies them.
 - Proof: rename-preview cases in `test/tools/lsp-regressions.test.ts`.
+- Proof: the workspace-symbol `symbol` fallback case in `test/tools/lsp-regressions.test.ts`.
 
 ### `MOMP-READ-TOKEN-COUNT` — Exact Read token totals
 
