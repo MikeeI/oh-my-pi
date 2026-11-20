@@ -1,9 +1,9 @@
 # ISSUE-033 — Anthropic prompt cache: a tool activated mid-session re-writes the system and message cache
 
-State: Draft-Ready
+State: Submitted
 Authorized-Work: Research-and-Reporting
 Publication-Target: New-issue
-External-Reference: Not published.
+External-Reference: https://github.com/can1357/oh-my-pi/issues/19826
 Contribution-Priority: High
 Root-Cause-Confidence: High
 Finding-Category: Performance
@@ -108,9 +108,9 @@ None.
 
 ## Next-Action
 
-Summary: Await publication approval
-Action: Show the user the exact Publication-Target and Publication-Draft for approval.
-Done-When: The user approves or changes the draft, or the issue URL is recorded.
+Summary: Await maintainer decision
+Action: Answer maintainer questions on #19826 with probe evidence; drop the fork delta once upstream ships an equivalent fix.
+Done-When: Upstream fixes, declines, or closes #19826, and the fork delta is removed or reclassified.
 
 ## Publication-Draft
 

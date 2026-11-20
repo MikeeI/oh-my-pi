@@ -33,7 +33,7 @@ Next finding ID: ISSUE-034
 | [ISSUE-028](issues/ISSUE-028.md) | Anthropic prompt cache: every new session re-writes the unanchored `<project-context>` block | Submitted | Research-and-Reporting | Existing-issue-comment | Medium | Await maintainer decision | https://github.com/can1357/oh-my-pi/issues/16883#issuecomment-6387558568 |
 | [ISSUE-029](issues/ISSUE-029.md) | Codex prompt cache: sibling affinity follows the session headers, so sharing `prompt_cache_key` has no effect | Submitted | Research-and-Reporting | Existing-issue-comment | Low | Await maintainer decision | https://github.com/can1357/oh-my-pi/issues/16884#issuecomment-6387558727 |
 | [ISSUE-032](issues/ISSUE-032.md) | Usage: Mistral Vibe Code budget is not reported | Submitted | Pull-Request-Implementation | New-pull-request | Medium | Await maintainer review | https://github.com/can1357/oh-my-pi/pull/18723 |
-| [ISSUE-033](issues/ISSUE-033.md) | Anthropic prompt cache: a tool activated mid-session re-writes the system and message cache | Draft-Ready | Research-and-Reporting | New-issue | High | Await publication approval | Not published. |
+| [ISSUE-033](issues/ISSUE-033.md) | Anthropic prompt cache: a tool activated mid-session re-writes the system and message cache | Submitted | Research-and-Reporting | New-issue | High | Await maintainer decision | https://github.com/can1357/oh-my-pi/issues/19826 |
 
 ## Archived-Findings
 
