@@ -1104,13 +1104,24 @@ It also rejects `AGENTS.md` index rows whose IDs or dispositions differ from thi
 - Contract: workspace `symbols` (`file: "*"`) without `query` searches the `symbol` name, ignoring its `#N` suffix.
 - Reason: a 30-day session audit (2026-11-20) found 18 workspace symbol searches rejected for a missing `query`.
 - Owner: `src/lsp/tool.ts#LspTool.execute` owns the workspace-symbol query fallback.
+- Contract: typescript-language-server starts on the tsserver of the package behind the resolved `tsc`.
+  This applies when `node_modules/typescript` ships no `lib/tsserver.js`; a usable workspace TypeScript keeps precedence.
+- Reason: alias layouts (`typescript` → `@typescript/typescript6`, `.bin/tsc` → `@typescript/old`) crashed it at initialize.
+  Five local projects used that layout on 2026-11-20.
+- Owner: `src/lsp/config.ts#selectTypescriptServer` sets `initOptions.tsserver.fallbackPath`.
+- Contract: a server without `$/progress` within 2 s of `initialized` or a folder add ends its project-load wait then.
+- Reason: pyright, ty, ruff, and typescript-language-server never report progress and waited for the 15 s fallback.
+  First edits then delivered diagnostics late, and first `lsp diagnostics` calls timed out.
+- Owner: `src/lsp/client.ts#settleProjectLoadWithoutProgress`.
 - Coverage: upstream v19.0.0 filters file-scoped symbol queries through `formatMatchingDocumentSymbols`, so MOMP removed its filter helpers and test.
 - Owner: the project-settings `lsp.md` override owns guidance for file-rename previews, omitted text-edit details, and name-only symbol lookup.
 - Coverage: upstream v18.11.3 owns configurable LSP call and diagnostic-wait budgets.
 - Required action: render the selected profile prompt with its current timeout variables at the dynamic description owner.
-- Required action: retain the rename-preview and workspace-symbol fallback deltas with their prompt and proof until current upstream satisfies them.
+- Required action: retain the rename-preview, workspace-symbol, tsserver-fallback, and silent-load deltas with their prompt and proof.
+  Retain each until current upstream satisfies it.
 - Proof: rename-preview cases in `test/tools/lsp-regressions.test.ts`.
 - Proof: the workspace-symbol `symbol` fallback case in `test/tools/lsp-regressions.test.ts`.
+- Proof: the alias-layout tsserver case and the silent-server project-load case in `test/tools/lsp-regressions.test.ts`.
 
 ### `MOMP-READ-TOKEN-COUNT` — Exact Read token totals
 
