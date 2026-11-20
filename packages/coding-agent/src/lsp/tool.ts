@@ -1220,7 +1220,9 @@ export class LspTool implements AgentTool<typeof lspSchema, LspToolDetails, Them
 
 		const resolvedFile = file && !isWorkspace ? resolveToCwd(file, this.session.cwd) : null;
 		if (action === "symbols" && (isWorkspace || !resolvedFile)) {
-			const normalizedQuery = query?.trim();
+			// Callers routinely name the target through `symbol`, the parameter every other
+			// lookup uses; treat it as the query instead of failing the name search.
+			const normalizedQuery = (query ?? (symbol ? parseSymbolSpec(symbol).symbol : undefined))?.trim();
 			if (!normalizedQuery) {
 				return {
 					content: [{ type: "text", text: "Error: query parameter required for workspace symbol search" }],
