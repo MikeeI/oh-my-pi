@@ -560,6 +560,7 @@ It also rejects `AGENTS.md` index rows whose IDs or dispositions differ from thi
 - Owner: `src/sdk.ts` supplies `goal` for Main sessions.
 - Reason: upstream appends a newly active tool to `tools`; Anthropic then re-writes the system and message cache levels.
 - Evidence: ISSUE-033; Sonnet 5.5 probes read about 9.2K of 19K tokens on activation upstream and the full prefix with this delta.
+- Coverage: upstream issue #19826 tracks this root cause.
 - Required action: retain until upstream declares activatable tools up front or otherwise keeps activation cache-neutral.
 - Proof: the up-front declaration case in `packages/ai/test/anthropic-control-state-stability.test.ts`.
 - Proof: the prospective-tool case in `packages/agent/test/sent-tool-definitions.test.ts`.
