@@ -394,19 +394,26 @@ function textResult(result: AgentToolResult<LspToolDetails>): string {
  */
 let lspHomeOverride: string | undefined;
 let lspOriginalHome: string | undefined;
+let lspOriginalAgentDir: string | undefined;
 
 beforeEach(() => {
 	lspOriginalHome = process.env.HOME;
+	lspOriginalAgentDir = process.env.PI_CODING_AGENT_DIR;
 	lspHomeOverride = fs.mkdtempSync(path.join(os.tmpdir(), "omp-lsp-test-home-"));
 	process.env.HOME = lspHomeOverride;
 	// Bun's os.homedir() reads the passwd entry rather than $HOME, so the env
 	// var alone does not redirect the config walk.
 	vi.spyOn(os, "homedir").mockReturnValue(lspHomeOverride);
+	// The agent dir is resolved once at module load, before the spy above, so it
+	// still named the operator's ~/.omp/agent (and its .lsp.json) without this.
+	piUtils.setAgentDir(path.join(lspHomeOverride, ".omp", "agent"));
 });
 
 afterEach(() => {
 	if (lspOriginalHome === undefined) delete process.env.HOME;
 	else process.env.HOME = lspOriginalHome;
+	restoreEnvValue("PI_CODING_AGENT_DIR", lspOriginalAgentDir);
+	piUtils.__resetDirsFromEnvForTests();
 	if (lspHomeOverride) fs.rmSync(lspHomeOverride, { recursive: true, force: true });
 	lspHomeOverride = undefined;
 });

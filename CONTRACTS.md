@@ -1122,6 +1122,8 @@ It also rejects `AGENTS.md` index rows whose IDs or dispositions differ from thi
 - Proof: rename-preview cases in `test/tools/lsp-regressions.test.ts`.
 - Proof: the workspace-symbol `symbol` fallback case in `test/tools/lsp-regressions.test.ts`.
 - Proof: the alias-layout tsserver case and the silent-server project-load case in `test/tools/lsp-regressions.test.ts`.
+- Implementation constraint: `lsp-regressions.test.ts` points the agent dir at its empty test home.
+  The resolver caches `~/.omp/agent` at import, so an operator `.lsp.json` otherwise leaked into the release proof.
 
 ### `MOMP-READ-TOKEN-COUNT` — Exact Read token totals
 
