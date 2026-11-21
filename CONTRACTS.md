@@ -176,8 +176,7 @@ It also rejects `AGENTS.md` index rows whose IDs or dispositions differ from thi
 
 - Disposition: `MOMP-EIGEN`.
 - Contract: `prompts/tools/read.md`, `bash.md`, `task.md`, `lsp.md`, `eval.md`, `web-search.md`, and `glob.md` under the active user agent directory override their bundled tool descriptions.
-- Contract: `eval-agents.md` overrides Eval agent guidance in both inline and `xd://eval/agents` views.
-- Contract: `write-device-only.md` overrides only the restricted Write description, not full-access previews.
+- Contract: `eval-agents.md` overrides Eval agent guidance in both inline and `help://eval/agents` views.
 - Contract: `replace.md` and `sloppy.md` override only their matching Edit descriptions, not schemas or grammars.
 - Contract: `security-scan.md` and `reflect.md` override their tools' descriptions.
 - Contract: `isolation-error.md` overrides isolated-run recovery messages under the owning session's profile.
@@ -190,27 +189,27 @@ It also rejects `AGENTS.md` index rows whose IDs or dispositions differ from thi
 - Owner: `src/tools/read.ts#ReadTool`, `src/tools/bash.ts#BashTool`, `src/task/index.ts#TaskTool`, `src/lsp/tool.ts#LspTool`, `src/tools/eval.ts#EvalTool`, and `src/web/search/index.ts#WebSearchTool` render their selected sources.
 - Owner: `src/tools/glob.ts#GlobTool` renders the selected Glob prompt.
 - Owner: upstream `src/tools/eval-doc-topics.ts#getEvalDocTopics` selects and renders profile-scoped agent-topic guidance.
-- Coverage: upstream v19.0.0 moves Eval doc topics into the leaf `eval-doc-topics.ts` and serves them to sessions without Eval from `src/internal-urls/xd-protocol.ts`.
-- Required action: pass the session's `agentDir` from both the Eval tool and the `xd://eval/<topic>` fallback.
+- Coverage: upstream v19.1.0 replaces `xd://` devices with bash tool commands and serves Eval doc topics to sessions without Eval from `src/internal-urls/help-protocol.ts`.
+- Required action: pass the session's `agentDir` from both the Eval tool and the `help://eval/<topic>` fallback.
 - Coverage: upstream v18.19.0 moves Eval deadline bounds into the `timeout` schema and drops them from description render inputs.
 - Coverage: upstream v18.22.1 adds `firstCallPreludes` to the Eval description inputs.
 - Required action: render the selected Eval source with `firstCallPreludes`.
 - Required action: keep accepted session tool names and other description inputs flowing through the selected profile description.
 - Coverage: upstream v18.19.0 removes `task.file` and adds `task.steps`, which swaps the Task `task` field for `steps`.
 - Required action: pass `steps` and `inlinePreludes` through selected sources and preserve their conditional Settings guidance.
-- Coverage: upstream v18.19.0 renders Write with `readActive` so archive and SQLite target grammar inlines when `xd://read/sources` is unreachable.
-- Required action: render the selected `write-device-only` source with that input.
 - Coverage: upstream v18.14.2 adds operator-approved per-call model render inputs to Task and Eval.
 - Required action: pass those inputs through selected sources while preserving operator-owned activation.
 - Required action: derive a selected Task source's allowed-agent summary from its filtered advertisement.
 - Coverage: upstream v18.18.9 freezes the per-call model advertisement into the session's prompt surface through `advertisedPerCallModel` (#18732).
 - Required action: render the selected Task and Eval descriptions from that frozen advertisement, falling back to live resolution only when the session omits it.
-- Owner: `src/tools/write.ts#WriteTool`, `src/tools/security-scan.ts#SecurityScanTool`, and `src/tools/memory-reflect.ts#MemoryReflectTool` own their additional description sources.
+- Owner: `src/tools/security-scan.ts#SecurityScanTool` and `src/tools/memory-reflect.ts#MemoryReflectTool` own their additional description sources.
+- Coverage: upstream v19.1.0 deletes the restricted Write description and its `deviceOnlyWrite` session state, so no `write-device-only` override remains.
 - Owner: `src/edit/index.ts#resolveEditToolDescription` selects profile sources for Replace and Sloppy.
 - Owner: `src/task/isolation-runner.ts#renderIsolationError` loads and renders profile-owned recovery messages.
 - Owner: `src/task/structured-subagent.ts#runStructuredSubagent` passes Task and Eval's owning profile to isolation.
 - Implementation constraint: Eval selects agent-topic overrides only while spawning is allowed.
 - Implementation constraint: Edit overrides preserve Hashline density selection and all other Edit modes.
+- Coverage: upstream v19.1.0 adds the `magic` Edit mode with its own bundled description; no profile source overrides it.
 - Implementation constraint: isolation receives its profile explicitly, without consulting process-global settings.
 - Implementation constraint: Glob validates its selected source before memo lookup and keys rendering by source and flags.
 - Implementation constraint: Web Search freezes auth-dependent guidance per tool instance to isolate profile prompt sources.
@@ -288,7 +287,9 @@ It also rejects `AGENTS.md` index rows whose IDs or dispositions differ from thi
 - Contract: `--ui` is Main-only and fails as a usage error with `--subagent`.
 - Contract: Child inspection reports configured-preview fidelity and omitted invocation-only state.
 - Contract: breakdown measures provider prompts, tool prompts, tool schemas, dynamic parts, and dynamic sources.
-- Contract: dynamic parts attribute the complete inline `xd://` protocol, built-in docs, schemas, and device catalog.
+- Contract: dynamic parts attribute the complete inline tool-command catalog, its inlined `--help` usage, and mounted MCP command guidance.
+- Contract: Main previews declare upstream standby tools exactly as the first real request does.
+- Owner: `packages/agent/src/agent.ts#prepareModelCall` supplies standby tools through a disposable `SentToolDefinitions` record.
 - Contract: `--first-message <text>` is Main-only and requires `--breakdown` or `--codex-wire-hash`.
 - Contract: first-message inspection captures the final request after runtime message injection.
 - Contract: offline capture includes non-consuming SDK option decoration without redeeming fallback credits.
@@ -429,7 +430,7 @@ It also rejects `AGENTS.md` index rows whose IDs or dispositions differ from thi
 ### `MOMP-READ-SKILL-COMPACT` — Compact skill-read display
 
 - Disposition: `UPSTREAM-INTEGRIERT`.
-- Contract: `read skill://` calls collapse into the compact grouped read view like `xd://` device reads.
+- Contract: `read skill://` calls collapse into the compact grouped read view like `help://` doc reads.
 - Contract: collapsed skill loads stay expandable so their full resolved content remains visible.
 - Contract: the full skill body still reaches the model; collapsing is display-only and never trims load-bearing content.
 - Owner: `src/internal-urls/skill-protocol.ts#SkillProtocolHandler.spec` declares compact skill grouping.
@@ -669,6 +670,7 @@ It also rejects `AGENTS.md` index rows whose IDs or dispositions differ from thi
 
 - Disposition: `MOMP-EIGEN`.
 - Reason: current upstream has no persisted-conversation lexical search tool or equivalent benchmark.
+- Coverage: upstream v19.1.0 `archive.search` is an Eval-only, word-prefix, full-history session lookup without windowing, coverage diagnostics, or a Main tool, so it does not satisfy this contract.
 
 #### Lookup behavior
 
@@ -720,6 +722,8 @@ It also rejects `AGENTS.md` index rows whose IDs or dispositions differ from thi
 - Coverage: upstream v18.14.2 isolates expected unavailable-bucket failures for ordinary session lookup.
 - Required action: preserve its rollback and unexpected-error propagation without a coverage reporter.
 - Required action: coverage-aware search retains yielded files and reports every failed enumerated bucket.
+- Coverage: upstream v19.1.0 scans buckets concurrently in `scanBucketFiles` and stats through `statNewestFirst`.
+- Required action: collect each concurrent bucket incrementally so a reported failure keeps its yielded files, and report `statNewestFirst` failures.
 - Proof: `test/conversation-search.test.ts`, including restored-mtime header changes and atomic replacements.
 - Proof: upstream `test/session-bucket-isolation.test.ts` retains ordinary lookup isolation.
 - Proof: active-continuation copy exclusion, divergent siblings, and limit-prefix stability in `test/conversation-search.test.ts`.
@@ -966,7 +970,7 @@ It also rejects `AGENTS.md` index rows whose IDs or dispositions differ from thi
 - Coverage: upstream v18.9.1 separates live image placements from immutable history; resize seed rows use its current rewrite API.
 - Coverage: upstream v18.10.0 partially retires settled blocks through `RowSplit` and bills all below-transcript chrome at its floor.
 - Coverage: upstream v18.11.3 owns transient chrome floors, run-state settlement, and stable streaming-list publication.
-- Coverage: upstream v18.12.2 adds opt-in `tui.completeScrollback` for rows displaced by growing chrome.
+- Coverage: upstream v19.1.0 removes the chrome floor and the `tui.completeScrollback` setting; complete scrollback is the only retirement mode.
 - Owner: upstream `packages/tui/src/prompt/composer.ts#renderFrame` owns its retirement-budget selection.
 - Required action: retain that upstream policy alongside MOMP's accepted-row replay and tmux resize safeguards.
 - Required action: retain those lifecycle owners alongside whole-block tmux retirement and accepted-row replay.
@@ -977,7 +981,7 @@ It also rejects `AGENTS.md` index rows whose IDs or dispositions differ from thi
 - Contract: preserve-mode tmux accepts settled blocks whole without waiting for pressure, before reflow archives an unowned copy.
 - Contract: active streaming heads retain capacity-based progressive publication and ordered retirement.
 - Required action: select whole-block retirement at the Composer policy boundary; keep upstream partial retirement elsewhere.
-- Required action: retain upstream `chromeFloor`, bounded retirement budgets, and progressive append-only publication.
+- Required action: retain bounded retirement budgets and progressive append-only publication.
 - Required action: record known blank separators in split replay so width changes never drop an accepted paragraph prefix.
 - Required action: retain that singular-row path alongside MOMP's bounded finalized-Assistant tail rendering.
 - Owner: `packages/tui/src/render/terminal-row-reflow.ts#reflowHardRows` owns accepted-row hard reflow.
@@ -1013,7 +1017,7 @@ It also rejects `AGENTS.md` index rows whose IDs or dispositions differ from thi
 - Coverage: upstream v18.17.0 packs compact transcript runs and tracks separator ownership through `historyEnd`.
 - Required action: capture accepted row boundaries after compact separators and preserve separator-only offers.
 - Proof: upstream `packages/tui/test/transcript-compact-packing.test.ts` and native compact-run tests.
-- Coverage: upstream v18.18.6 commits streaming rows under `tui.completeScrollback` through `headEmittedEnd` commit offers.
+- Coverage: upstream v18.18.6 commits streaming rows through `headEmittedEnd` commit offers, unconditionally since v19.1.0.
 - Required action: capture those streaming-head rows as accepted tape parts in both offer composition and frame recomposition.
 - Coverage: upstream v18.18.6 moves rows with DL/IL instead of repainting on terminals without synchronized output.
 - Required action: keep that absolute-row path off cursor-relative multiplexer frames and preserved resize tails.
@@ -1069,6 +1073,8 @@ It also rejects `AGENTS.md` index rows whose IDs or dispositions differ from thi
 - Owner: `src/cli/gallery-screenshot.ts#captureGalleryScreenshots` uses active identity in missing-VHS recovery commands.
 - Owner: upstream v19.0.0 daemon consumers `src/daemon/client.ts`, `src/disasm/client.ts`, `src/tools/browser/shared-daemon.ts`, `src/cli/ps-cli.ts`, and `src/commands/ps.ts` render recovery hints and `ps` examples with active identity.
 - Coverage: upstream v19.0.0 replaces per-project brokers with one per-user daemon under `run/daemon`, which MOMP and upstream share.
+- Coverage: upstream v19.1.0 also hosts MCP servers in that shared daemon; the newest-install rule below therefore also selects the MCP host build.
+- Owner: `src/cli/browser-relay-cli.ts` and `src/commands/browser-relay.ts` brand copyable relay commands after upstream v19.1.0 moved hosting into the extension's native host.
 - Reason: a shared daemon keeps one `ps` board and one shared-browser claim, while separate directories would race the shared Chrome profile.
 - Coverage: daemon builds compare the shared Utils `VERSION` plus a file-mtime stamp, so the MOMP suffix never orders builds and the newest install wins without ping-pong.
 - Proof: an isolated `OMP_DAEMON_DIR` daemon spawned by the source candidate served installed `omp ps --json` and source `ps --json` from one PID.
@@ -1200,7 +1206,7 @@ Resume a paused investigation only after an explicit user request.
   - Proof: `momp-upgrade prove` checks every divergent runtime override against the probe output.
 
 - `packages/coding-agent/scripts/cache-probe.ts` (`probe:cache`): `NICHT-CONTRACT-AKTIV`.
-  - Consumer: regression investigation of Anthropic prompt-cache findings, starting with ISSUE-033.
+  - Consumer: regression investigation of open Anthropic prompt-cache findings such as ISSUE-028; archived ISSUE-033 was its first user.
   - Owner: `scan` reuses `detectCacheInvalidation` and adds the idle gap and TTL class per miss.
     TTL expiry is therefore never blamed on a request change.
   - Owner: `probe` sends paired live requests on nonce-separated prefixes through the real provider path.

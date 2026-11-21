@@ -1,6 +1,6 @@
 # ISSUE-033 — Anthropic prompt cache: a tool activated mid-session re-writes the system and message cache
 
-State: Submitted
+State: Archived
 Authorized-Work: Research-and-Reporting
 Publication-Target: New-issue
 External-Reference: https://github.com/can1357/oh-my-pi/issues/19826
@@ -8,7 +8,7 @@ Contribution-Priority: High
 Root-Cause-Confidence: High
 Finding-Category: Performance
 Created: 2026-11-20
-Updated: 2026-11-20
+Updated: 2026-11-22
 Source: `upstream/main@57771ae562b9345e0579bceb2d68d585e3e6927e`
 
 ## Root-Cause
@@ -108,9 +108,9 @@ None.
 
 ## Next-Action
 
-Summary: Await maintainer decision
-Action: Answer maintainer questions on #19826 with probe evidence; drop the fork delta once upstream ships an equivalent fix.
-Done-When: Upstream fixes, declines, or closes #19826, and the fork delta is removed or reclassified.
+Summary: —
+Action: None.
+Done-When: None.
 
 ## Publication-Draft
 
@@ -179,3 +179,12 @@ If reports like this are not useful to the project, please let me know and I wil
 
 Thank you for your work.
 ````
+
+## Archive
+
+Archive-Reason: Fixed-Elsewhere
+Detail: None.
+Evidence: Upstream PR https://github.com/can1357/oh-my-pi/pull/19827 (`97b34e7ae2`, "Fixes #19826") declares standby tools deferred from the first Anthropic request through `Agent.setStandbyTools` and shipped in v19.1.0; #19826 closed as completed on 2026-11-20.
+Evidence [S]: roboomp notes that sessions resumed from a transcript recorded before the fix keep their old declaration, so their first `/goal` still misses once; the dropped MOMP delta had the same boundary.
+Evidence [O]: MOMP 19.1.0 drops its `MOMP-ANTHROPIC-TOOL-PREDECLARE` closure; upstream `anthropic-control-state-stability` and `sent-tool-definitions` suites cover the shipped fix.
+Checked: 2026-11-22
