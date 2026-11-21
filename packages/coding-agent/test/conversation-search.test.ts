@@ -525,7 +525,8 @@ describe("conversation_search", () => {
 		const activeFile = tempDir.join("active.jsonl");
 		const main = await createTools(makeToolSession(tempDir.path(), activeFile), ["conversation_search"]);
 		const child = await createTools(makeToolSession(tempDir.path(), activeFile, 1), ["conversation_search"]);
-		expect(main.map(tool => tool.name)).toEqual(["conversation_search"]);
-		expect(child.map(tool => tool.name)).toEqual([]);
+		// Upstream may add session tools such as `report_issue`; this contract gates only conversation_search.
+		expect(main.map(tool => tool.name)).toContain("conversation_search");
+		expect(child.map(tool => tool.name)).not.toContain("conversation_search");
 	});
 });

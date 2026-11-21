@@ -978,10 +978,17 @@ export class Agent {
 		const model = this.#state.model;
 		if (!model) throw new Error("No active model on agent");
 		// Append-only synchronization, sent-definition recording, and turn hooks belong only to a real dispatch.
+		// A disposable definition record still declares standby tools the way the first real request does.
 		return prepareProviderCall(
-			{ systemPrompt, messages: [...messages], tools: this.#toolsForModel(model) },
+			{
+				systemPrompt,
+				messages: [...messages],
+				tools: this.#toolsForModel(model),
+				standbyTools: this.#standbyTools,
+			},
 			{
 				model,
+				sentToolDefinitions: new SentToolDefinitions(),
 				convertToLlm: this.#convertToLlm,
 				transformContext: this.#transformContext,
 				transformProviderContext: this.#transformProviderContext
