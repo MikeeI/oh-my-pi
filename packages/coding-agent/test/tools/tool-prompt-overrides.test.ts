@@ -12,7 +12,6 @@ import { getEvalDocTopics } from "@oh-my-pi/pi-coding-agent/tools/eval-doc-topic
 import { EditTool } from "@oh-my-pi/pi-coding-agent/edit";
 import { MemoryReflectTool } from "@oh-my-pi/pi-coding-agent/tools/memory-reflect";
 import { SecurityScanTool } from "@oh-my-pi/pi-coding-agent/tools/security-scan";
-import { WriteTool } from "@oh-my-pi/pi-coding-agent/tools/write";
 import { TaskTool } from "@oh-my-pi/pi-coding-agent/task";
 import { LspTool } from "@oh-my-pi/pi-coding-agent/lsp/tool";
 import { WebSearchTool } from "@oh-my-pi/pi-coding-agent/web/search";
