@@ -243,7 +243,9 @@ describe("subagent system prompt templates", () => {
 				structured: true,
 			});
 
-			expect(() => transform({ systemPrompt: ["base-block"], dynamicParts: [], toolCommandCatalogNames: [] })).toThrow(
+			expect(() =>
+				transform({ systemPrompt: ["base-block"], dynamicParts: [], toolCommandCatalogNames: [] }),
+			).toThrow(
 				`Could not render subagent system prompt template ${projectTemplate}: Missing helper: "SECTION_SEPARATOR"`,
 			);
 		});
