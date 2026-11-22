@@ -1,9 +1,9 @@
 # ISSUE-036 — ast_grep: truncated results omit the next skip offset
 
-State: PR-Ready
+State: Submitted
 Authorized-Work: Pull-Request-Implementation
 Publication-Target: New-pull-request
-External-Reference: Not published.
+External-Reference: https://github.com/can1357/oh-my-pi/pull/20203
 Contribution-Priority: Medium
 Root-Cause-Confidence: High
 Finding-Category: API
@@ -82,9 +82,9 @@ None.
 
 ## Next-Action
 
-Summary: Approve ast-grep paging PR
-Action: Show the exact Publication-Draft and target and publish only after explicit user approval.
-Done-When: The user approves or rejects the exact draft, and External-Reference records any resulting PR URL.
+Summary: Await maintainer review
+Action: Await maintainer review of PR #20203 and address requested changes.
+Done-When: PR #20203 is merged, declined, or receives actionable review.
 
 ## Publication-Draft
 

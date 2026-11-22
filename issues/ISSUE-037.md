@@ -1,9 +1,9 @@
 # ISSUE-037 — LSP: servers without `$/progress` hold every project-load wait for the 15 s fallback
 
-State: PR-Ready
+State: Submitted
 Authorized-Work: Pull-Request-Implementation
 Publication-Target: New-pull-request
-External-Reference: Not published.
+External-Reference: https://github.com/can1357/oh-my-pi/pull/20204
 Contribution-Priority: Medium
 Root-Cause-Confidence: High
 Finding-Category: Performance
@@ -74,9 +74,9 @@ None.
 
 ## Next-Action
 
-Summary: Approve LSP silent-load PR
-Action: Show the exact Publication-Draft and target and publish only after explicit user approval.
-Done-When: The user approves or rejects the exact draft, and External-Reference records any resulting PR URL.
+Summary: Await maintainer review
+Action: Await maintainer review of PR #20204 and address requested changes.
+Done-When: PR #20204 is merged, declined, or receives actionable review.
 
 ## Publication-Draft
 
