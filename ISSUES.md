@@ -18,7 +18,7 @@ Next finding ID: ISSUE-035
 | [ISSUE-007](issues/ISSUE-007.md) | Hub capability: disabled process supervision remains fully advertised | Implementing | Pull-Request-Implementation | New-pull-request | High | Approve reviewed Hub PR | Not published. |
 | [ISSUE-010](issues/ISSUE-010.md) | LSP prompt: raw requests omit multi-server routing guidance | Implementing | Pull-Request-Implementation | New-pull-request | Medium | Review local LSP prompt PR | Not published. |
 | [ISSUE-012](issues/ISSUE-012.md) | Prompt: metadata-free workspace tree | Submitted | Pull-Request-Implementation | New-pull-request | Medium | Await tree current-head review | https://github.com/can1357/oh-my-pi/pull/9152 |
-| [ISSUE-014](issues/ISSUE-014.md) | LSP rename: previews omit edit details | Submitted | Pull-Request-Implementation | New-pull-request | Medium | Rebase LSP preview PR | https://github.com/can1357/oh-my-pi/pull/8401 |
+| [ISSUE-014](issues/ISSUE-014.md) | LSP rename: previews omit edit details | Submitted | Pull-Request-Implementation | New-pull-request | Medium | Await preview PR review | https://github.com/can1357/oh-my-pi/pull/8401 |
 | [ISSUE-015](issues/ISSUE-015.md) | Cache marker: implicit-provider cache collapse is never reported | Investigating | Not-Selected | Not-Selected | Medium | Measure implicit cache collapse | Not published. |
 | [ISSUE-016](issues/ISSUE-016.md) | RPC wait: every event wake rescans the complete turn history | Investigating | Not-Selected | Not-Selected | Medium | Benchmark RPC completion wait | Not published. |
 | [ISSUE-017](issues/ISSUE-017.md) | Session stats: aggregate messages through four full passes | Investigating | Not-Selected | Not-Selected | Low | Benchmark session stats scans | Not published. |
@@ -32,7 +32,7 @@ Next finding ID: ISSUE-035
 | [ISSUE-028](issues/ISSUE-028.md) | Anthropic prompt cache: every new session re-writes the unanchored `<project-context>` block | Submitted | Research-and-Reporting | Existing-issue-comment | Medium | Await maintainer decision | https://github.com/can1357/oh-my-pi/issues/16883#issuecomment-6387558568 |
 | [ISSUE-029](issues/ISSUE-029.md) | Codex prompt cache: sibling affinity follows the session headers, so sharing `prompt_cache_key` has no effect | Submitted | Research-and-Reporting | Existing-issue-comment | Low | Await maintainer decision | https://github.com/can1357/oh-my-pi/issues/16884#issuecomment-6387558727 |
 | [ISSUE-032](issues/ISSUE-032.md) | Usage: Mistral Vibe Code budget is not reported | Submitted | Pull-Request-Implementation | New-pull-request | Medium | Await maintainer review | https://github.com/can1357/oh-my-pi/pull/18723 |
-| [ISSUE-034](issues/ISSUE-034.md) | Compaction: the grace-cap pass aborts a running remote speculation and re-sends it | PR-Ready | Pull-Request-Implementation | New-pull-request | High | Approve compaction takeover PR | Not published. |
+| [ISSUE-034](issues/ISSUE-034.md) | Compaction: the grace-cap pass aborts a running remote speculation and re-sends it | Submitted | Pull-Request-Implementation | New-pull-request | High | Await maintainer review | https://github.com/can1357/oh-my-pi/pull/20201 |
 
 ## Archived-Findings
 
