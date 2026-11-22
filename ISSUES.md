@@ -33,9 +33,9 @@ Next finding ID: ISSUE-038
 | [ISSUE-029](issues/ISSUE-029.md) | Codex prompt cache: sibling affinity follows the session headers, so sharing `prompt_cache_key` has no effect | Submitted | Research-and-Reporting | Existing-issue-comment | Low | Await maintainer decision | https://github.com/can1357/oh-my-pi/issues/16884#issuecomment-6387558727 |
 | [ISSUE-032](issues/ISSUE-032.md) | Usage: Mistral Vibe Code budget is not reported | Submitted | Pull-Request-Implementation | New-pull-request | Medium | Await maintainer review | https://github.com/can1357/oh-my-pi/pull/18723 |
 | [ISSUE-034](issues/ISSUE-034.md) | Compaction: the grace-cap pass aborts a running remote speculation and re-sends it | Submitted | Pull-Request-Implementation | New-pull-request | High | Await maintainer review | https://github.com/can1357/oh-my-pi/pull/20201 |
-| [ISSUE-035](issues/ISSUE-035.md) | LSP: aliased typescript installs crash typescript-language-server at initialize | PR-Ready | Pull-Request-Implementation | New-pull-request | Medium | Approve tsserver fallback PR | Not published. |
-| [ISSUE-036](issues/ISSUE-036.md) | ast_grep: truncated results omit the next skip offset | PR-Ready | Pull-Request-Implementation | New-pull-request | Medium | Approve ast-grep paging PR | Not published. |
-| [ISSUE-037](issues/ISSUE-037.md) | LSP: servers without `$/progress` hold every project-load wait for the 15 s fallback | PR-Ready | Pull-Request-Implementation | New-pull-request | Medium | Approve LSP silent-load PR | Not published. |
+| [ISSUE-035](issues/ISSUE-035.md) | LSP: aliased typescript installs crash typescript-language-server at initialize | Submitted | Pull-Request-Implementation | New-pull-request | Medium | Await maintainer review | https://github.com/can1357/oh-my-pi/pull/20202 |
+| [ISSUE-036](issues/ISSUE-036.md) | ast_grep: truncated results omit the next skip offset | Submitted | Pull-Request-Implementation | New-pull-request | Medium | Await maintainer review | https://github.com/can1357/oh-my-pi/pull/20203 |
+| [ISSUE-037](issues/ISSUE-037.md) | LSP: servers without `$/progress` hold every project-load wait for the 15 s fallback | Submitted | Pull-Request-Implementation | New-pull-request | Medium | Await maintainer review | https://github.com/can1357/oh-my-pi/pull/20204 |
 
 ## Archived-Findings
 
