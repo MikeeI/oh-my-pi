@@ -1,6 +1,6 @@
 # ISSUE-026 — Output notices: middle-elided sink output names the wrong shown line ranges
 
-State: Investigating
+State: Archived
 Authorized-Work: Not-Selected
 Publication-Target: Not-Selected
 External-Reference: Not published.
@@ -8,7 +8,7 @@ Contribution-Priority: Medium
 Root-Cause-Confidence: High
 Finding-Category: Correctness
 Created: 2026-10-20
-Updated: 2026-10-20
+Updated: 2026-11-22
 Source: `upstream/main@53a0377db6845e0dae606146130766ec92d407fd`
 
 ## Root-Cause
@@ -62,11 +62,17 @@ Proposal-Status: Verified locally in MOMP.
 
 ## Publication-Blockers
 
-- No upstream branch or test exists yet.
-- Authorized-Work and Publication-Target remain unselected.
+None.
 
 ## Next-Action
 
-Summary: Draft upstream sink count fix
-Action: Prepare a clean `upstream/main` branch that returns exact sink head and tail line counts.
-Done-When: A focused upstream test shows notices matching the shown rows.
+Summary: —
+Action: None.
+Done-When: None.
+
+## Archive
+
+Archive-Reason: Fixed-Elsewhere
+Detail: None.
+Evidence: Upstream `a4663d570d` (2026-11-03, "keep bash's middle cut on whole lines") changes `src/tools/output-meta.ts` and adds `middle elision keeps whole lines, and its notice names the lines shown`; the original probe (200 rows, `headBytes: 64`, `spillThreshold: 128`) on `upstream/main@88295533e6` reports `Showing lines 1-8 and 194-200 of 200`, matching the rows shown.
+Checked: 2026-11-22
