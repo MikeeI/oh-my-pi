@@ -463,7 +463,8 @@ It also rejects `AGENTS.md` index rows whose IDs or dispositions differ from thi
 - Owner: `src/tools/output-meta.ts#OutputMetaBuilder.truncationFromSummary` maps that report without guessed ranges.
 - Implementation constraint: substituted inline chunks withhold ranges because their lines no longer match the artifact.
 - Reason: upstream v18.4.9 caps output artifacts; original stream coordinates do not address their omitted middle.
-- Reason: upstream splits sink head and tail lines evenly, so its ranges name the wrong artifact lines.
+- Coverage: upstream `a4663d570d` keeps the sink's middle cut on whole lines and names the shown ranges exactly (ISSUE-026 archived); upstream still links only the whole artifact, so the exact omitted-range selector remains MOMP-owned.
+- Required action: during the next upgrade, drop any fork shown-count hunk that upstream now duplicates and keep only the omitted-range selector closure.
 - Coverage: upstream v18.12.3 stops middle-eliding Read file pages and continues them with an exact `:N` offset.
 - Coverage: upstream v19.0.0 renames spill references to `local://<N>.log` through `spillUrl()` but still offers only full-output recovery.
 - Required action: build exact middle-range selectors with `spillUrl()`, never a literal URL scheme.
