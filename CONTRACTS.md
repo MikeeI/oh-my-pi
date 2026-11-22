@@ -829,6 +829,7 @@ It also rejects `AGENTS.md` index rows whose IDs or dispositions differ from thi
 - Owner: `#claimArmedSpeculation` and `#commitAutoCompactionResult` retain validation and history-commit ownership.
 - Reason: upstream 18.7.0 aborts unfinished speculation before establishing that its replacement can run.
 - Source: https://github.com/can1357/oh-my-pi/blob/e0fc1cf4ea354b445a359b37fa5eb58deaa85598/packages/coding-agent/src/session/session-maintenance.ts#L2361-L2373
+- Upstream: https://github.com/can1357/oh-my-pi/pull/20201 (ISSUE-034) carries this closure; the abort still reproduces on `upstream/main@88295533e6`.
 - Required action: retain this upstreamable delta until upstream safely adopts running remote speculation.
 - Proof: grace-cap adoption and post-snapshot replay in `test/compaction-speculation.test.ts`.
 - Proof: cancellation, late completion, remaining deadline, failure fallback, and reset-during-wait in that test file.

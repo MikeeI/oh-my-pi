@@ -73,16 +73,17 @@ Migration: None.
 ## Pull-Request-Implementation
 
 Branch: `feat/lsp-rename-preview-details`
-Base: `upstream/main@6be4a1bec9c53ed9eef33e65a70a060970f30cce`
+Base: `upstream/main@88295533e6`
 Scope: Add bounded rename preview details and terminal-safe replacement text.
-Commit: PR review identifies `c8d7d3e214`; current MOMP fixes are `0925bd1fdf97` and `16d20db9be64`.
+Commit: `1ab44e8ac1` rebuilt on current upstream with CR, LF, and tab escaping; force-pushed over `0deb7cbf1a` on 2026-11-22.
 Push: `MikeeI/oh-my-pi:feat/lsp-rename-preview-details`
 Checks:
 
-- Focused rename preview regression → passes in current MOMP.
-- Current GitHub merge state → unstable on 2026-08-27.
+- `bun test packages/coding-agent/test/tools/lsp-regressions.test.ts -t 'rename'` → 19 pass, 0 fail.
+- `bun --cwd=packages/coding-agent check` → pass.
+- GitHub merge state → `UNSTABLE` (no longer `DIRTY`) on 2026-11-22.
 
-Review [O]: The reviewed PR head needs the later carriage-return escaping from current MOMP.
+Review [O]: The rebased head carries the carriage-return escaping requested in `discussion_r3772223379`.
 
 ## Publication-Blockers
 
@@ -90,9 +91,9 @@ None.
 
 ## Next-Action
 
-Summary: Rebase LSP preview PR
-Action: Rebase PR #8401 onto current upstream and carry the carriage-return fix from current MOMP.
-Done-When: The current PR head contains CR-safe rendering and its focused test and required CI pass.
+Summary: Await preview PR review
+Action: Await maintainer review of PR #8401 and address requested changes.
+Done-When: PR #8401 is merged, declined, or receives actionable review.
 
 ## Publication-Draft
 
