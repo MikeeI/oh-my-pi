@@ -472,23 +472,6 @@ It also rejects `AGENTS.md` index rows whose IDs or dispositions differ from thi
 - Proof: exact sink middle-elision recovery in `test/streaming-output.test.ts`.
 - Proof: capped middle-elision recovery in `test/streaming-output.test.ts`.
 
-### `MOMP-READ-ARCHIVE-FRESHNESS` — Fresh archive indexes across Read calls
-
-- Disposition: `UPSTREAM-INTEGRIERT`.
-- Contract: a later archive Read observes an in-place rewrite even when size and restored mtime match.
-- Contract: timestamp-coincident writes never reuse an earlier archive member index.
-- Owner: upstream `src/tools/read-archive.ts#readArchive` owns opening the current archive index.
-- Reason: upstream's cross-call stat-keyed cache can return old members when a rapid rewrite also preserves ctime.
-- Coverage: upstream v18.14.1 avoids caching archive indexes inside a two-second ctime window.
-- Required action: retain unconditional reopening rather than making freshness depend on clock and timestamp granularity.
-- Coverage: upstream v18.20.0 applies JSON selectors to archive members through `read-json` without changing index reuse.
-- Required action: reopen through `openArchive` per Read without hashing whole payloads or retaining the unsafe cache.
-- Coverage: upstream v19.0.0 passes an explicit container format for extensionless archive paths such as `report.docx:word/document.xml`.
-- Required action: forward that format to `openArchive` on every reopen.
-- Proof: the same-size, restored-mtime archive rewrite case in `test/tools.test.ts`.
-- Proof: repeated TAR member reads preserve ranged payload IO in `test/tools/read-archive-tar-range.test.ts`.
-- Trade-off: repeated reads re-index ZIP, ASAR, and ISO members instead of reusing an unprovable snapshot.
-
 ### `MOMP-READ-USER-AGENTS` — URL fetch identity fallback
 
 - Disposition: `UPSTREAM-INTEGRIERT`.
