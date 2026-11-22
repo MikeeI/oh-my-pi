@@ -1,9 +1,9 @@
 # ISSUE-034 — Compaction: the grace-cap pass aborts a running remote speculation and re-sends it
 
-State: PR-Ready
+State: Submitted
 Authorized-Work: Pull-Request-Implementation
 Publication-Target: New-pull-request
-External-Reference: Not published.
+External-Reference: https://github.com/can1357/oh-my-pi/pull/20201
 Contribution-Priority: High
 Root-Cause-Confidence: High
 Finding-Category: Correctness
@@ -81,9 +81,9 @@ None.
 
 ## Next-Action
 
-Summary: Approve compaction takeover PR
-Action: Show the exact Publication-Draft and target and publish only after explicit user approval.
-Done-When: The user approves or rejects the exact draft, and External-Reference records any resulting PR URL.
+Summary: Await maintainer review
+Action: Await maintainer review of PR #20201 and address requested changes.
+Done-When: PR #20201 is merged, declined, or receives actionable review.
 
 ## Publication-Draft
 
