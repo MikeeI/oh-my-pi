@@ -8,7 +8,7 @@ This file owns `Next-Finding-ID` and projects current issue-file state.
 When a row disagrees with its issue file, correct the row from the issue file in the same task.
 ISSUE-020, ISSUE-023, and ISSUE-024 are paused at the user's request; their lifecycle states do not authorize investigation.
 
-Next finding ID: ISSUE-034
+Next finding ID: ISSUE-035
 
 ## Open-Findings
 
@@ -32,6 +32,7 @@ Next finding ID: ISSUE-034
 | [ISSUE-028](issues/ISSUE-028.md) | Anthropic prompt cache: every new session re-writes the unanchored `<project-context>` block | Submitted | Research-and-Reporting | Existing-issue-comment | Medium | Await maintainer decision | https://github.com/can1357/oh-my-pi/issues/16883#issuecomment-6387558568 |
 | [ISSUE-029](issues/ISSUE-029.md) | Codex prompt cache: sibling affinity follows the session headers, so sharing `prompt_cache_key` has no effect | Submitted | Research-and-Reporting | Existing-issue-comment | Low | Await maintainer decision | https://github.com/can1357/oh-my-pi/issues/16884#issuecomment-6387558727 |
 | [ISSUE-032](issues/ISSUE-032.md) | Usage: Mistral Vibe Code budget is not reported | Submitted | Pull-Request-Implementation | New-pull-request | Medium | Await maintainer review | https://github.com/can1357/oh-my-pi/pull/18723 |
+| [ISSUE-034](issues/ISSUE-034.md) | Compaction: the grace-cap pass aborts a running remote speculation and re-sends it | PR-Ready | Pull-Request-Implementation | New-pull-request | High | Approve compaction takeover PR | Not published. |
 
 ## Archived-Findings
 
