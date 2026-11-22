@@ -95,7 +95,6 @@ Paths starting with `src/` or `scripts/` are relative to `packages/coding-agent/
 | `MOMP-READ-SKILL-COMPACT` | `UPSTREAM-INTEGRIERT` | Compact skill-read display | `src/internal-urls/skill-protocol.ts`, `packages/tui/src/chat/read-tool-group.ts` |
 | `MOMP-READ-SCHEDULING` | `UPSTREAM-INTEGRIERT` | Provider-roundtrip-efficient reads | `packages/agent/src/agent-loop.ts` |
 | `MOMP-READ-ARTIFACT-RECOVERY` | `UPSTREAM-INTEGRIERT` | Exact output-artifact recovery | `packages/tui/src/tools/output-meta.ts`, `packages/tui/src/tools/streaming-output.ts`, `src/tools/output-meta.ts` |
-| `MOMP-READ-ARCHIVE-FRESHNESS` | `UPSTREAM-INTEGRIERT` | Fresh archive indexes across Read calls | `src/tools/read-archive.ts` |
 | `MOMP-READ-USER-AGENTS` | `UPSTREAM-INTEGRIERT` | URL fetch identity fallback | `src/web/scrapers/types.ts` |
 | `MOMP-WEB-SEARCH-PARALLEL` | `UPSTREAM-INTEGRIERT` | Provider-roundtrip-efficient searches | `packages/agent/src/agent-loop.ts` |
 | `MOMP-TREE-COMPACT` | `UPSTREAM-INTEGRIERT` | Token-efficient directory context | `src/workspace-tree.ts` |
