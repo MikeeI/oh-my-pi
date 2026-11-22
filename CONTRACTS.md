@@ -835,6 +835,7 @@ It also rejects `AGENTS.md` index rows whose IDs or dispositions differ from thi
 - Required action: prove deferral in the production order, refresh before validation; upstream alone still flashes the partial-cache case.
 - Reason: built-in catalogs without discovery state and known role-incompatible models still require the MOMP delta.
 - Required action: retain only no-state readiness and unresolved-only deferral alongside upstream refresh lifecycle policy.
+- Finding: ISSUE-039 tracks the wrong-kind deferral; on `upstream/main@88295533e6` only that assertion fails, and the failed-refresh case passes.
 - Proof: partial-cache and failed-refresh cases in `test/agent-session-retry-fallback.test.ts`.
 
 ### `MOMP-MODEL-STARTUP` — Strict configured-default resolution
@@ -857,6 +858,7 @@ It also rejects `AGENTS.md` index rows whose IDs or dispositions differ from thi
 - Required action: reuse upstream final-model effort resolution without a parallel fork implementation.
 - Coverage: upstream v18.14.0 requires exact provider-qualified selectors but only warns before an unrelated default fallback.
 - Required action: retain upstream selector matching and reject that fallback under the configured-default contract.
+- Finding: ISSUE-038 tracks the built-in-catalog discovery gate for upstream; the rejection of unresolved defaults stays fork-only.
 - Proof: stale-default rejection in `test/cli-provider-model-deferral.test.ts`.
 - Proof: cold built-in discovery, unresolved-default rejection, and fallback effort in `test/sdk-model-selection.test.ts`.
 - Proof: scoped rejection in `test/repro-issue-1022-disabled-default-model.test.ts`.

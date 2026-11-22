@@ -8,7 +8,7 @@ This file owns `Next-Finding-ID` and projects current issue-file state.
 When a row disagrees with its issue file, correct the row from the issue file in the same task.
 ISSUE-020, ISSUE-023, and ISSUE-024 are paused at the user's request; their lifecycle states do not authorize investigation.
 
-Next finding ID: ISSUE-038
+Next finding ID: ISSUE-040
 
 ## Open-Findings
 
@@ -35,6 +35,8 @@ Next finding ID: ISSUE-038
 | [ISSUE-035](issues/ISSUE-035.md) | LSP: aliased typescript installs crash typescript-language-server at initialize | Submitted | Pull-Request-Implementation | New-pull-request | Medium | Await maintainer review | https://github.com/can1357/oh-my-pi/pull/20202 |
 | [ISSUE-036](issues/ISSUE-036.md) | ast_grep: truncated results omit the next skip offset | Submitted | Pull-Request-Implementation | New-pull-request | Medium | Await maintainer review | https://github.com/can1357/oh-my-pi/pull/20203 |
 | [ISSUE-037](issues/ISSUE-037.md) | LSP: servers without `$/progress` hold every project-load wait for the 15 s fallback | Submitted | Pull-Request-Implementation | New-pull-request | Medium | Await maintainer review | https://github.com/can1357/oh-my-pi/pull/20204 |
+| [ISSUE-038](issues/ISSUE-038.md) | Startup: a cold built-in account default starts on another provider when no local discovery provider is enabled | Investigating | Not-Selected | Not-Selected | Medium | Select contribution path | Not published. |
+| [ISSUE-039](issues/ISSUE-039.md) | Fallback chains: a known model of the wrong kind is reported only after discovery settles | Investigating | Not-Selected | Not-Selected | Low | Decide contribution value | Not published. |
 
 ## Archived-Findings
 
