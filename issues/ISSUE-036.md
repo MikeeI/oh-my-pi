@@ -8,7 +8,7 @@ Contribution-Priority: Medium
 Root-Cause-Confidence: High
 Finding-Category: API
 Created: 2026-11-22
-Updated: 2026-11-22
+Updated: 2026-11-23
 Source: `upstream/main@88295533e6`
 
 ## Root-Cause
@@ -69,7 +69,7 @@ Migration: None.
 Branch: `fix/issue-036`
 Base: `upstream/main@88295533e6`
 Scope: Report the next skip offset for truncated `ast_grep` results.
-Commit: `92489ec363`
+Commit: `92489ec363`; attribution `72074b51ef`; review fix `5b8fcdbf3e` (attributed `packages/tui/CHANGELOG.md` entry).
 Push: `MikeeI/oh-my-pi:fix/issue-036`
 Checks:
 

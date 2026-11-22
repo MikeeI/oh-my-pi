@@ -8,7 +8,7 @@ Contribution-Priority: Medium
 Root-Cause-Confidence: High
 Finding-Category: Performance
 Created: 2026-11-22
-Updated: 2026-11-22
+Updated: 2026-11-23
 Source: `upstream/main@88295533e6`
 
 ## Root-Cause
@@ -42,7 +42,7 @@ Contribution fit: Upstream's readiness work covers progress-reporting servers on
 
 ## Proposed-Change
 
-After `initialized` and after each workspace-folder add, start a 2 s timer that resolves project load only for clients that have never begun `$/progress`.
+After the client's first opened document and after each workspace-folder add, start a 2 s timer that resolves project load only for clients that have never begun `$/progress`; the window never starts at `initialized`, because warmed-up `tsc --lsp` and clangd begin loading only after `didOpen` (review on PR #20204).
 Clients that ever reported progress keep the existing progress and fallback settlement.
 
 ## Scope-and-Constraints
@@ -60,8 +60,8 @@ Clients that ever reported progress keep the existing progress and fallback sett
 
 Branch: `fix/issue-037`
 Base: `upstream/main@88295533e6`
-Scope: End project-load waits 2 s after start or folder add for servers that never report progress.
-Commit: `4f6df4feec`
+Scope: End project-load waits 2 s after the first open or a folder add for servers that never report progress.
+Commit: `4f6df4feec`; attribution `8f17a11d7c`; review fix `f3c925b4da` (first-open window, pending-before-open regression test).
 Push: `MikeeI/oh-my-pi:fix/issue-037`
 Checks:
 

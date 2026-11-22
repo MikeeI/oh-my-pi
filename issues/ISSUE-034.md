@@ -8,7 +8,7 @@ Contribution-Priority: High
 Root-Cause-Confidence: High
 Finding-Category: Correctness
 Created: 2026-11-22
-Updated: 2026-11-22
+Updated: 2026-11-23
 Source: `upstream/main@88295533e6`
 
 ## Root-Cause
@@ -67,8 +67,8 @@ Revalidate the snapshot after the wait; failure, deadline, or invalidation advan
 
 Branch: `fix/issue-034`
 Base: `upstream/main@88295533e6`
-Scope: Adopt an eligible running remote speculation at the grace cap instead of aborting it; upstream's existing interval-preservation test stays unchanged.
-Commit: `f8bb054a8d`
+Scope: Adopt an eligible running remote speculation at the grace cap instead of aborting it; bridge speculation keeps the abort; upstream's existing interval-preservation test stays unchanged.
+Commit: `f8bb054a8d`; attribution `5cfa904dfd`; review fix `5a5aea4502` (exclude `bridge` runs, await `speculationCompletion()` in tests).
 Push: `MikeeI/oh-my-pi:fix/issue-034`
 Checks:
 
