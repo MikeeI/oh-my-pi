@@ -8,7 +8,7 @@ Contribution-Priority: Medium
 Root-Cause-Confidence: High
 Finding-Category: UI
 Created: 2026-08-13
-Updated: 2026-08-27
+Updated: 2026-11-22
 Source: `upstream/main@6be4a1bec9c53ed9eef33e65a70a060970f30cce`
 
 ## Root-Cause
@@ -28,6 +28,9 @@ Impact: Agents and users cannot inspect the proposed replacements before the def
 - [O] The regression escapes CRLF, CR, and LF and rejects literal carriage returns in output.
 - [O] GitHub reports PR #8401 open, non-draft, and unstable; checked 2026-08-27.
 - [O] Review comment `discussion_r3772223379` identified unescaped carriage returns on the reviewed head.
+- [S] `upstream/main@88295533e6` `src/lsp/utils.ts:305-340` `formatWorkspaceEdit` still emits only per-file edit counts and resource operations; its `formatTextEdit` (`:346-352`) is unused there; checked 2026-11-22.
+- [O] The fork's `rename_file with apply:false previews edits without filesystem changes` case fails on that upstream (expected `line 1:14`, received only `old.ts: 9 edits`) and passes on `personal`; checked 2026-11-22.
+- [O] PR #8401 merge state is `DIRTY` against current upstream; the root cause remains valid.
 
 ## Prior-Art
 
