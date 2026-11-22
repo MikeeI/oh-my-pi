@@ -1,6 +1,6 @@
 # ISSUE-013 — LSP symbols: file query is ignored
 
-State: Submitted
+State: Archived
 Authorized-Work: Pull-Request-Implementation
 Publication-Target: New-pull-request
 External-Reference: https://github.com/can1357/oh-my-pi/pull/8400
@@ -8,7 +8,7 @@ Contribution-Priority: Medium
 Root-Cause-Confidence: High
 Finding-Category: API
 Created: 2026-08-13
-Updated: 2026-08-27
+Updated: 2026-11-22
 Source: `upstream/main@6be4a1bec9c53ed9eef33e65a70a060970f30cce`
 
 ## Root-Cause
@@ -86,9 +86,9 @@ None.
 
 ## Next-Action
 
-Summary: Rebase LSP symbol PR
-Action: Rebase PR #8400 onto current upstream and carry the symbol-renderer fix from current MOMP.
-Done-When: The current PR head contains the renderer fix and its focused test and required CI pass.
+Summary: —
+Action: None.
+Done-When: None.
 
 ## Publication-Draft
 
@@ -145,3 +145,10 @@ My intent is to help without wasting maintainer time or energy or discouraging t
 
 Thank you for your work.
 ```
+
+## Archive
+
+Archive-Reason: Fixed-Elsewhere
+Detail: None.
+Evidence: Upstream `290d787845` (2026-11-18) filters file-scoped `symbols` by `query` through `formatMatchingDocumentSymbols` in `packages/coding-agent/src/lsp/utils.ts`; its `Symbols matching "X" in path:` header still matches the TUI `/Symbols in (.+):/` renderer; `bun test test/lsp/symbol-lookup.test.ts` on `personal` → 3 pass; PR #8400 closed as superseded with comment on 2026-11-22T22:31:36Z.
+Checked: 2026-11-22
