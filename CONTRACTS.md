@@ -1117,7 +1117,8 @@ It also rejects `AGENTS.md` index rows whose IDs or dispositions differ from thi
 - Reason: alias layouts (`typescript` → `@typescript/typescript6`, `.bin/tsc` → `@typescript/old`) crashed it at initialize.
   Five local projects used that layout on 2026-11-20.
 - Owner: `src/lsp/config.ts#selectTypescriptServer` sets `initOptions.tsserver.fallbackPath`.
-- Contract: a server without `$/progress` within 2 s of `initialized` or a folder add ends its project-load wait then.
+- Contract: a server without `$/progress` within 2 s of its first opened document or a folder add ends its project-load wait then.
+- Implementation constraint: the window never starts at `initialized`, because warmed-up `tsc --lsp` and clangd begin loading only after `didOpen` (upstream review on PR #20204).
 - Reason: pyright, ty, ruff, and typescript-language-server never report progress and waited for the 15 s fallback.
   First edits then delivered diagnostics late, and first `lsp diagnostics` calls timed out.
 - Owner: `src/lsp/client.ts#settleProjectLoadWithoutProgress`.
