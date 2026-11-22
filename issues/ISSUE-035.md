@@ -1,9 +1,9 @@
 # ISSUE-035 — LSP: aliased typescript installs crash typescript-language-server at initialize
 
-State: PR-Ready
+State: Submitted
 Authorized-Work: Pull-Request-Implementation
 Publication-Target: New-pull-request
-External-Reference: Not published.
+External-Reference: https://github.com/can1357/oh-my-pi/pull/20202
 Contribution-Priority: Medium
 Root-Cause-Confidence: High
 Finding-Category: Reliability
@@ -74,9 +74,9 @@ None.
 
 ## Next-Action
 
-Summary: Approve tsserver fallback PR
-Action: Show the exact Publication-Draft and target and publish only after explicit user approval.
-Done-When: The user approves or rejects the exact draft, and External-Reference records any resulting PR URL.
+Summary: Await maintainer review
+Action: Await maintainer review of PR #20202 and address requested changes.
+Done-When: PR #20202 is merged, declined, or receives actionable review.
 
 ## Publication-Draft
 
