@@ -1,6 +1,6 @@
 # ISSUE-035 — LSP: aliased typescript installs crash typescript-language-server at initialize
 
-State: Submitted
+State: Archived
 Authorized-Work: Pull-Request-Implementation
 Publication-Target: New-pull-request
 External-Reference: https://github.com/can1357/oh-my-pi/pull/20202
@@ -8,7 +8,7 @@ Contribution-Priority: Medium
 Root-Cause-Confidence: High
 Finding-Category: Reliability
 Created: 2026-11-22
-Updated: 2026-11-22
+Updated: 2026-11-23
 Source: `upstream/main@88295533e6`
 
 ## Root-Cause
@@ -74,9 +74,9 @@ None.
 
 ## Next-Action
 
-Summary: Await maintainer review
-Action: Await maintainer review of PR #20202 and address requested changes.
-Done-When: PR #20202 is merged, declined, or receives actionable review.
+Summary: —
+Action: None.
+Done-When: None.
 
 ## Publication-Draft
 
@@ -119,3 +119,10 @@ I reviewed the full diff and checked the claims against the cited code and test 
 
 Thank you for your work.
 ```
+
+## Archive
+
+Archive-Reason: Merged
+Detail: None.
+Evidence: https://github.com/can1357/oh-my-pi/pull/20202 — PR state `MERGED` by H4vC at 2026-11-23T10:56:19Z; merge commit `1404e5a60f` of head `62001d9ac6`; `packages/coding-agent/src/lsp/config.ts` on `upstream/main@0aefd54236` is identical to the PR head.
+Checked: 2026-11-23

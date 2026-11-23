@@ -1,6 +1,6 @@
 # ISSUE-037 — LSP: servers without `$/progress` hold every project-load wait for the 15 s fallback
 
-State: Submitted
+State: Archived
 Authorized-Work: Pull-Request-Implementation
 Publication-Target: New-pull-request
 External-Reference: https://github.com/can1357/oh-my-pi/pull/20204
@@ -74,9 +74,9 @@ None.
 
 ## Next-Action
 
-Summary: Await maintainer review
-Action: Await maintainer review of PR #20204 and address requested changes.
-Done-When: PR #20204 is merged, declined, or receives actionable review.
+Summary: —
+Action: None.
+Done-When: None.
 
 ## Publication-Draft
 
@@ -120,3 +120,10 @@ I reviewed the full diff and checked the claims against the cited code and test 
 
 Thank you for your work.
 ```
+
+## Archive
+
+Archive-Reason: Merged
+Detail: None.
+Evidence: https://github.com/can1357/oh-my-pi/pull/20204 — PR state `MERGED` by H4vC at 2026-11-23T10:56:19Z; merge commit `ccbb881a78` of head `f3c925b4da` including the first-open review fix; `upstream/main@0aefd54236` differs from the PR head in `lsp/client.ts` only by #20224's `./uri` import move.
+Checked: 2026-11-23
