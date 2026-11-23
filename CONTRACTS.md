@@ -191,6 +191,7 @@ It also rejects `AGENTS.md` index rows whose IDs or dispositions differ from thi
 - Owner: upstream `src/tools/eval-doc-topics.ts#getEvalDocTopics` selects and renders profile-scoped agent-topic guidance.
 - Coverage: upstream v19.1.0 replaces `xd://` devices with bash tool commands and serves Eval doc topics to sessions without Eval from `src/internal-urls/help-protocol.ts`.
 - Required action: pass the session's `agentDir` from both the Eval tool and the `help://eval/<topic>` fallback.
+- Coverage: upstream v19.1.1 renders Read with `HAS_LINE_NUMBERS` and Eval with `timeoutDefault`/`timeoutRaisable`; the profile override source receives the same inputs.
 - Coverage: upstream v18.19.0 moves Eval deadline bounds into the `timeout` schema and drops them from description render inputs.
 - Coverage: upstream v18.22.1 adds `firstCallPreludes` to the Eval description inputs.
 - Required action: render the selected Eval source with `firstCallPreludes`.
@@ -647,6 +648,7 @@ It also rejects `AGENTS.md` index rows whose IDs or dispositions differ from thi
 - Owner: `src/modes/rpc/wire/content.ts` declares the field for generated RPC clients.
 - Reason: upstream renders the expanded command body as an ordinary user message.
 - Required action: retain the field, its render consumers, and regenerated RPC clients until upstream records file-command provenance.
+- Coverage: upstream v19.1.1 `src/session/messages.ts#operatorTitleText` also titles writable-collab prompts; the typed invocation still precedes the expanded body for user messages.
 - Proof: the typed file-command case in `test/agent-session-queued-steer-delivery.test.ts`.
 - Proof: identical `--codex-wire-hash` input hashes for an invocation and its literal expansion.
 - Proof: command styling in `packages/tui/test/user-message.test.ts` and source/installed TUI rendering with narrow resize and resume.
@@ -846,6 +848,7 @@ It also rejects `AGENTS.md` index rows whose IDs or dispositions differ from thi
 - Coverage: upstream v18.11.1 resolves the configured default retry-fallback chain at startup through `tryResolveDefaultRoleFallback`.
 - Coverage: upstream v18.11.3 resolves explicit fallback authentication and skips catalog loading without a configured chain.
 - Required action: retain that upstream fallback owner alongside mandatory discovery and configured-default rejection.
+- Coverage: upstream v19.1.1 routes the stale-default CLI case through `spawnPrintCli` behind a dead proxy; the MOMP proof keeps that helper and asserts rejection instead of the warning.
 - Contract: a default still unresolved after discovery and its configured fallback chain fails startup instead of selecting an unrelated model.
 - Contract: this failure applies even when retry model fallback is disabled or another provider has credentials.
 - Contract: explicit model selection and restored-session precedence retain their existing behavior.
