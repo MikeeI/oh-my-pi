@@ -232,7 +232,8 @@ It also rejects `AGENTS.md` index rows whose IDs or dispositions differ from thi
 - Coverage: upstream v18.11.1 replaces the `limit` advice with generic `skip` advice but exposes no next offset.
 - Coverage: upstream v18.18.8 renders zero-match results as one `0 matches` line; paged results keep the MOMP offset.
 - Reason: without the computed offset, neither the model nor the TUI can request the next page directly.
-- Required action: retain the minimal upstream-owner delta until upstream gives both consumers actionable pagination guidance.
+- Coverage: upstream `main` merged PR #20203 (ISSUE-036, merge `7952ae45bb`, follow-up `5483012eef`) with this exact contract; no release contains it yet.
+- Required action: retain the delta until the upgrade base contains `7952ae45bb`, then restore both owner files to upstream and remove this contract (`UPSTREAM-GEDECKT`).
 - Proof: the model-and-TUI pagination contract in `test/tools/ast-grep.test.ts`.
 
 ### `MOMP-AGENT-PROMPT-OVERRIDES` — Profile-scoped agent templates
@@ -1111,7 +1112,9 @@ It also rejects `AGENTS.md` index rows whose IDs or dispositions differ from thi
 - Owner: the project-settings `lsp.md` override owns guidance for file-rename previews, omitted text-edit details, and name-only symbol lookup.
 - Coverage: upstream v18.11.3 owns configurable LSP call and diagnostic-wait budgets.
 - Required action: render the selected profile prompt with its current timeout variables at the dynamic description owner.
+- Coverage: upstream `main` merged PR #20202 (ISSUE-035, merge `1404e5a60f`) and PR #20204 (ISSUE-037, merge `ccbb881a78`) with the tsserver-fallback and first-open silent-load contracts; no release contains them yet.
 - Required action: retain the rename-preview, workspace-symbol, tsserver-fallback, and silent-load deltas with their prompt and proof.
+  At the first upgrade whose base contains both merges, drop the tsserver-fallback and silent-load closures and their contract lines.
   Retain each until current upstream satisfies it.
 - Proof: rename-preview cases in `test/tools/lsp-regressions.test.ts`.
 - Proof: the workspace-symbol `symbol` fallback case in `test/tools/lsp-regressions.test.ts`.

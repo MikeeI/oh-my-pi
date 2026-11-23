@@ -1,6 +1,6 @@
 # ISSUE-036 — ast_grep: truncated results omit the next skip offset
 
-State: Submitted
+State: Archived
 Authorized-Work: Pull-Request-Implementation
 Publication-Target: New-pull-request
 External-Reference: https://github.com/can1357/oh-my-pi/pull/20203
@@ -82,9 +82,9 @@ None.
 
 ## Next-Action
 
-Summary: Await maintainer review
-Action: Await maintainer review of PR #20203 and address requested changes.
-Done-When: PR #20203 is merged, declined, or receives actionable review.
+Summary: —
+Action: None.
+Done-When: None.
 
 ## Publication-Draft
 
@@ -127,3 +127,10 @@ I reviewed the full diff and checked the claims against the cited code and test 
 
 Thank you for your work.
 ```
+
+## Archive
+
+Archive-Reason: Merged
+Detail: None.
+Evidence: https://github.com/can1357/oh-my-pi/pull/20203 — PR state `MERGED` by H4vC at 2026-11-23T10:56:19Z; merge commit `7952ae45bb` of head `5b8fcdbf3e`; maintainer follow-up `5483012eef` folds both TUI hint paths into `limitAdvice()` without behavior change.
+Checked: 2026-11-23
