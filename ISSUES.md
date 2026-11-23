@@ -33,7 +33,6 @@ Next finding ID: ISSUE-040
 | [ISSUE-032](issues/ISSUE-032.md) | Usage: Mistral Vibe Code budget is not reported | Submitted | Pull-Request-Implementation | New-pull-request | Medium | Await maintainer review | https://github.com/can1357/oh-my-pi/pull/18723 |
 | [ISSUE-034](issues/ISSUE-034.md) | Compaction: the grace-cap pass aborts a running remote speculation and re-sends it | Submitted | Pull-Request-Implementation | New-pull-request | High | Await maintainer review | https://github.com/can1357/oh-my-pi/pull/20201 |
 | [ISSUE-038](issues/ISSUE-038.md) | Startup: a cold built-in account default starts on another provider when no local discovery provider is enabled | Investigating | Not-Selected | Not-Selected | Medium | Select contribution path | Not published. |
-| [ISSUE-039](issues/ISSUE-039.md) | Fallback chains: a known model of the wrong kind is reported only after discovery settles | Investigating | Not-Selected | Not-Selected | Low | Decide contribution value | Not published. |
 
 ## Archived-Findings
 
@@ -58,3 +57,4 @@ Next finding ID: ISSUE-040
 | [ISSUE-035](issues/archive/ISSUE-035.md) | LSP: aliased typescript installs crash typescript-language-server at initialize | Pull-Request-Implementation | New-pull-request | Medium | Merged | https://github.com/can1357/oh-my-pi/pull/20202 |
 | [ISSUE-036](issues/archive/ISSUE-036.md) | ast_grep: truncated results omit the next skip offset | Pull-Request-Implementation | New-pull-request | Medium | Merged | https://github.com/can1357/oh-my-pi/pull/20203 |
 | [ISSUE-037](issues/archive/ISSUE-037.md) | LSP: servers without `$/progress` hold every project-load wait for the 15 s fallback | Pull-Request-Implementation | New-pull-request | Medium | Merged | https://github.com/can1357/oh-my-pi/pull/20204 |
+| [ISSUE-039](issues/archive/ISSUE-039.md) | Fallback chains: a known model of the wrong kind is reported only after discovery settles | Not-Selected | Not-Selected | Low | Not-Worth-Pursuing | Not published. |
