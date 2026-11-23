@@ -836,7 +836,7 @@ It also rejects `AGENTS.md` index rows whose IDs or dispositions differ from thi
 - Required action: prove deferral in the production order, refresh before validation; upstream alone still flashes the partial-cache case.
 - Reason: built-in catalogs without discovery state and known role-incompatible models still require the MOMP delta.
 - Required action: retain only no-state readiness and unresolved-only deferral alongside upstream refresh lifecycle policy.
-- Finding: ISSUE-039 tracks the wrong-kind deferral; on `upstream/main@88295533e6` only that assertion fails, and the failed-refresh case passes.
+- Finding: ISSUE-039 (archived, Not-Worth-Pursuing) covers the wrong-kind deferral; on `upstream/main@e4fe878297` only that assertion fails, and the failed-refresh case passes, so this delta stays fork-only.
 - Proof: partial-cache and failed-refresh cases in `test/agent-session-retry-fallback.test.ts`.
 
 ### `MOMP-MODEL-STARTUP` — Strict configured-default resolution

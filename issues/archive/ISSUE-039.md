@@ -1,6 +1,6 @@
 # ISSUE-039 — Fallback chains: a known model of the wrong kind is reported only after discovery settles
 
-State: Investigating
+State: Archived
 Authorized-Work: Not-Selected
 Publication-Target: Not-Selected
 External-Reference: Not published.
@@ -70,6 +70,13 @@ Before deferring a kind-role selector, resolve it against the full catalog; when
 
 ## Next-Action
 
-Summary: Decide contribution value
-Action: Decide with the user whether an immediate wrong-kind warning justifies a focused PR or the delta stays fork-only.
-Done-When: Authorized-Work and Publication-Target are recorded, or the record is archived as not pursued.
+Summary: —
+Action: None.
+Done-When: None.
+
+## Archive
+
+Archive-Reason: Not-Worth-Pursuing
+Detail: None.
+Evidence: User decision 2026-11-23; the only upstream-observable harm is a wrong-kind warning delayed until the initial refresh settles. Rechecked on `upstream/main@e4fe878297`: `retry-fallback-chains.ts` is unchanged and still lacks the known-model check, so the `MOMP-FALLBACK-DISCOVERY` delta stays fork-only.
+Checked: 2026-11-23
