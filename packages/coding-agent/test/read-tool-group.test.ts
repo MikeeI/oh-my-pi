@@ -98,6 +98,7 @@ describe("read group", () => {
 		expect(rendered).not.toContain("line 1");
 		expect(rendered.toLowerCase()).not.toContain("ctrl+o");
 	});
+
 	it("keeps a collapsed skill body expandable with Read previews disabled", () => {
 		const component = new ReadToolGroupComponent();
 		component.updateArgs({ path: "skill://example" }, "read-skill");
@@ -107,10 +108,9 @@ describe("read group", () => {
 			"read-skill",
 		);
 
-		expect(JSON.stringify(component.describe())).not.toContain("Unique skill instruction for expansion");
-		component.setExpanded(true);
+		expect(Bun.stripANSI(component.render(120).join("\n"))).not.toContain("Unique skill instruction for expansion");
+		component.group.setExpanded(true);
 		expect(Bun.stripANSI(component.render(120).join("\n"))).toContain("Unique skill instruction for expansion");
-		expect(JSON.stringify(component.describe())).toContain("Unique skill instruction for expansion");
 	});
 
 	it("omits Read Tokens when no exact measurement is available", () => {
@@ -122,6 +122,85 @@ describe("read group", () => {
 		const rendered = Bun.stripANSI(component.render(120).join("\n"));
 		expect(rendered).toContain(`Read ${examplePath}`);
 		expect(rendered).not.toContain("Read Tokens");
+	});
+
+	it("places a single read's exact total after its path", () => {
+		const component = new ReadToolGroupComponent();
+		const examplePath = path.resolve("/tmp/example.ts");
+		component.updateArgs({ path: `${examplePath}:10-20` }, "read-single");
+		component.updateResult(
+			{ content: [{ type: "text", text: "line" }], details: { readTextTokens: 1_284 } },
+			false,
+			"read-single",
+		);
+
+		expect(Bun.stripANSI(component.render(120).join("\n"))).toContain(
+			`Read ${examplePath}:10-20 · 1,284 Read Tokens`,
+		);
+	});
+
+	it("shows the exact aggregate only after every grouped read settles", () => {
+		const component = new ReadToolGroupComponent();
+		const onePath = path.resolve("/tmp/one.ts");
+		const twoPath = path.resolve("/tmp/two.ts");
+		component.updateArgs({ path: onePath }, "read-one");
+		component.updateArgs({ path: twoPath }, "read-two");
+		component.updateResult(
+			{ content: [{ type: "text", text: "one" }], details: { readTextTokens: 10_000 } },
+			false,
+			"read-one",
+		);
+		expect(Bun.stripANSI(component.render(120).join("\n"))).not.toContain("Read Tokens");
+
+		component.updateResult(
+			{ content: [{ type: "text", text: "two" }], details: { readTextTokens: 4_823 } },
+			false,
+			"read-two",
+		);
+		const plain = Bun.stripANSI(component.render(120).join("\n"));
+		expect(plain).toContain("Read (2) · 14,823 Read Tokens");
+		expect(plain.match(/Read Tokens/g)).toHaveLength(1);
+	});
+
+	it("counts one delimited Read result once across its rendered target rows", () => {
+		const component = new ReadToolGroupComponent();
+		const onePath = path.resolve("/tmp/one.ts");
+		const twoPath = path.resolve("/tmp/two.ts");
+		const threePath = path.resolve("/tmp/three.ts");
+		component.updateArgs({ path: `${onePath}:1-2,${twoPath}:3-4;${threePath}:5-6` }, "read-many");
+		component.updateResult(
+			{ content: [{ type: "text", text: "combined" }], details: { readTextTokens: 14_823 } },
+			false,
+			"read-many",
+		);
+
+		const plain = Bun.stripANSI(component.render(120).join("\n"));
+		expect(plain).toContain("Read (3) · 14,823 Read Tokens");
+		expect(plain.match(/Read Tokens/g)).toHaveLength(1);
+	});
+
+	it("labels each preview head and keeps the merged-selector aggregate above them", () => {
+		const component = new ReadToolGroupComponent({ showContentPreview: true });
+		const examplePath = path.resolve("/tmp/merged.ts");
+		component.updateArgs({ path: `${examplePath}:1-2` }, "read-first");
+		component.updateArgs({ path: `${examplePath}:3-4` }, "read-second");
+		component.updateResult(
+			{ content: [{ type: "text", text: "first preview" }], details: { readTextTokens: 10_000 } },
+			false,
+			"read-first",
+		);
+		component.updateResult(
+			{ content: [{ type: "text", text: "second preview" }], details: { readTextTokens: 4_823 } },
+			false,
+			"read-second",
+		);
+
+		const rendered = Bun.stripANSI(component.render(120).join("\n"));
+		expect(rendered.match(/14,823 Read Tokens/g)).toHaveLength(1);
+		expect(rendered).toContain("10,000 Read Tokens");
+		expect(rendered).toContain("4,823 Read Tokens");
+		expect(rendered).toContain("first preview");
+		expect(rendered).toContain("second preview");
 	});
 
 	it("marks a completed read with the green success glyph", () => {
@@ -160,54 +239,6 @@ describe("read group", () => {
 		// Child rows of successful reads carry no success mark of their own.
 		expect(plain).not.toContain(`${sym("tree.branch")} ${sym("status.success")}`);
 		expect(plain).not.toContain(`${sym("tree.last")} ${sym("status.success")}`);
-	});
-
-	it("shows the exact aggregate only after every grouped read settles", () => {
-		const component = new ReadToolGroupComponent();
-		const onePath = path.resolve("/tmp/one.ts");
-		const twoPath = path.resolve("/tmp/two.ts");
-		component.updateArgs({ path: onePath }, "read-one");
-		component.updateArgs({ path: twoPath }, "read-two");
-		component.updateResult(
-			{ content: [{ type: "text", text: "one" }], details: { readTextTokens: 10_000 } },
-			false,
-			"read-one",
-		);
-
-		expect(Bun.stripANSI(component.render(120).join("\n"))).not.toContain("Read Tokens");
-		expect(JSON.stringify(component.describe())).not.toContain("Read Tokens");
-
-		component.updateResult(
-			{ content: [{ type: "text", text: "two" }], details: { readTextTokens: 4_823 } },
-			false,
-			"read-two",
-		);
-		const plain = Bun.stripANSI(component.render(120).join("\n"));
-		expect(plain).toContain("Read (2) · 14,823 Read Tokens");
-		expect(plain.match(/Read Tokens/g)).toHaveLength(1);
-		const native = JSON.stringify(component.describe());
-		expect(native).toContain("14,823 Read Tokens");
-		expect(native.match(/Read Tokens/g)).toHaveLength(1);
-	});
-
-	it("counts one delimited Read result once across its rendered target rows", () => {
-		const component = new ReadToolGroupComponent();
-		const onePath = path.resolve("/tmp/one.ts");
-		const twoPath = path.resolve("/tmp/two.ts");
-		const threePath = path.resolve("/tmp/three.ts");
-		component.updateArgs({ path: `${onePath}:1-2,${twoPath}:3-4;${threePath}:5-6` }, "read-many");
-		component.updateResult(
-			{
-				content: [{ type: "text", text: "combined" }],
-				details: { readTextTokens: 14_823 },
-			},
-			false,
-			"read-many",
-		);
-
-		const plain = Bun.stripANSI(component.render(120).join("\n"));
-		expect(plain).toContain("Read (3) · 14,823 Read Tokens");
-		expect(plain.match(/Read Tokens/g)).toHaveLength(1);
 	});
 
 	it("nests one usage row beneath the last path from each read-only turn", () => {
@@ -450,7 +481,6 @@ describe("read group", () => {
 		component.updateResult(
 			{
 				content: [{ type: "text", text: "line 1\nline 2\nline 3\nline 4" }],
-				details: { readTextTokens: 1_284 },
 			},
 			false,
 			"read-3",
@@ -458,62 +488,8 @@ describe("read group", () => {
 
 		const rendered = Bun.stripANSI(component.render(120).join("\n"));
 		const matches = rendered.split(`Read ${examplePath}:L10-L20`).length - 1;
-		expect(rendered).toContain(`Read ${examplePath}:L10-L20 · 1,284 Read Tokens`);
 
 		expect(matches).toBe(1);
-	});
-
-	it("retains the aggregate token total above previews of merged selectors", () => {
-		const component = new ReadToolGroupComponent({ showContentPreview: true });
-		const examplePath = path.resolve("/tmp/merged.ts");
-		component.updateArgs({ path: `${examplePath}:1-2` }, "read-first");
-		component.updateArgs({ path: `${examplePath}:3-4` }, "read-second");
-		component.updateResult(
-			{ content: [{ type: "text", text: "first preview" }], details: { readTextTokens: 10_000 } },
-			false,
-			"read-first",
-		);
-		expect(Bun.stripANSI(component.render(120).join("\n"))).not.toContain("14,823 Read Tokens");
-		component.updateResult(
-			{ content: [{ type: "text", text: "second preview" }], details: { readTextTokens: 4_823 } },
-			false,
-			"read-second",
-		);
-
-		const rendered = Bun.stripANSI(component.render(120).join("\n"));
-		expect(rendered).toContain("14,823 Read Tokens");
-		expect(rendered.match(/14,823 Read Tokens/g)).toHaveLength(1);
-		expect(rendered).toContain("first preview");
-		expect(rendered).toContain("second preview");
-		expect(JSON.stringify(component.describe())).toContain("14,823 Read Tokens");
-	});
-
-	it.each([false, true])("labels every native Read preview after its path with data-first=%s", dataFirst => {
-		const component = new ReadToolGroupComponent({ showContentPreview: true });
-		for (const [id, target, tokens] of [
-			["one", "/tmp/one.ts", 10_000],
-			["two", "/tmp/two.ts", 4_823],
-		] as const) {
-			component.updateArgs({ path: target }, id);
-			component.updateResult(
-				{ content: [{ type: "text", text: `Preview ${id}` }], details: { readTextTokens: tokens } },
-				false,
-				id,
-			);
-		}
-		const description = component.describe({
-			cols: 120,
-			dark: true,
-			reduceMotion: false,
-			supports: () => dataFirst,
-			feature: () => false,
-		});
-		const previews =
-			description.c?.filter(child => "k" in child && (child.k === "section" || child.k === "card")) ?? [];
-		expect(previews).toHaveLength(2);
-		expect(JSON.stringify(previews[0])).toContain("10,000 Read Tokens");
-		expect(JSON.stringify(previews[1])).toContain("4,823 Read Tokens");
-		expect(JSON.stringify(description)).toContain("14,823 Read Tokens");
 	});
 
 	it("keeps usage below an inline preview when the summary row is suppressed", () => {

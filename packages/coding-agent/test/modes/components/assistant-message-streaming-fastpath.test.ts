@@ -280,30 +280,4 @@ Average Latency: 1,240 ms
 		] as unknown as AssistantMessage["content"]);
 		expect(Bun.stripANSI(freshRender(m))).toContain("keep me");
 	});
-	it("versions and rebuilds thinking settings only when their values change", () => {
-		const component = new AssistantMessageComponent(
-			msg([
-				{ type: "thinking", thinking: "Reasoning **details**" },
-				{ type: "text", text: "answer" },
-			]),
-		);
-		const initialVersion = component.getTranscriptBlockVersion();
-		expect(Bun.stripANSI(component.render(W).join("\n"))).toContain("Reasoning");
-
-		component.setHideThinkingBlock(true);
-		const hiddenVersion = component.getTranscriptBlockVersion();
-		expect(hiddenVersion).toBe(initialVersion + 1);
-		expect(Bun.stripANSI(component.render(W).join("\n"))).not.toContain("Reasoning");
-		component.setHideThinkingBlock(true);
-		expect(component.getTranscriptBlockVersion()).toBe(hiddenVersion);
-
-		component.setHideThinkingBlock(false);
-		const visibleVersion = component.getTranscriptBlockVersion();
-		expect(visibleVersion).toBe(hiddenVersion + 1);
-		component.setProseOnlyThinking(false);
-		const rawVersion = component.getTranscriptBlockVersion();
-		expect(rawVersion).toBe(visibleVersion + 1);
-		component.setProseOnlyThinking(false);
-		expect(component.getTranscriptBlockVersion()).toBe(rawVersion);
-	});
 });

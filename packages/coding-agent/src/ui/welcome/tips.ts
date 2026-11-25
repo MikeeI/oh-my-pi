@@ -8,6 +8,7 @@
  *   keys, formatted through the symbol preset.
  * - `[label](url)`: a link.
  */
+import { APP_DISPLAY_NAME } from "../../app-version";
 import { formatKey, formatKeys, formatKeyTwice, type KeyStyle } from "../keys/format";
 import type { TspSpan, TspText } from "@oh-my-pi/pi-wire";
 import tipsText from "./tips.txt" with { type: "text" };
@@ -16,6 +17,8 @@ const NO_TERN = /^\[NO-TERN\]\s*/;
 const NEW = /\s*\[NEW\]\s*$/;
 /** Pick weight of a `[NEW]` tip; others weigh 1. */
 const NEW_WEIGHT = 4;
+/** Only inline CLI invocations are host-branded; prose and links retain their upstream spelling. */
+const TIP_SELF_INVOCATION = /`omp(?=\s|`)/g;
 
 const LINES: readonly string[] = tipsText
 	.split("\n")
@@ -48,9 +51,13 @@ export function welcomeTip(options: {
 	readonly tipRoll: number;
 	readonly preset: string;
 	readonly tern: boolean;
+	/** Executable name inline CLI invocations are branded with (default: the running package's). */
+	readonly appName?: string;
 }): string | undefined {
 	if (options.preset === "unicode" && options.nagRoll < 0.1) return NERD_FONT_NAG;
-	return pickTip(tipPool(options.tern), options.tipRoll) || undefined;
+	const tip = pickTip(tipPool(options.tern), options.tipRoll);
+	const appName = options.appName ?? APP_DISPLAY_NAME;
+	return tip ? tip.replace(TIP_SELF_INVOCATION, () => `\`${appName}`) : undefined;
 }
 
 /** Whether `tip` ends in the `[NEW]` marker. */

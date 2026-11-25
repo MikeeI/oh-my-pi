@@ -8,7 +8,7 @@ import {
 	resolvePromptInput,
 } from "../system-prompt";
 import { normalizeSchema } from "../tools/jtd-to-json-schema";
-import { shortenPath } from "@oh-my-pi/pi-tui/render/render-utils";
+import { shortenPath } from "../utils/render-utils";
 import type { WorkPoolYieldItem } from "./workpool-yield";
 
 export interface SubagentIrcRoster {

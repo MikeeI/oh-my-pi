@@ -12,7 +12,7 @@ import {
 } from "../session/conversation-search";
 import type { ToolSession } from ".";
 import { type ConversationSearchFormat, formatConversationSearchReport } from "./conversation-search-format";
-import { ToolError } from "@oh-my-pi/pi-tui/tools/tool-errors";
+import { ToolError } from "./tool-errors";
 
 // Shared across sessions and tool instances in this process so repeated searches
 // parse only journal bytes appended since an earlier search.

@@ -20,7 +20,7 @@ import {
 } from "@oh-my-pi/pi-ai";
 import { Effort } from "@oh-my-pi/pi-catalog/effort";
 import { createDefaultBenchRuntime } from "@oh-my-pi/pi-coding-agent/cli/bench-runtime";
-import { detectCacheInvalidation } from "@oh-my-pi/pi-tui/chat/cache-invalidation-marker";
+import { detectCacheInvalidation } from "@oh-my-pi/pi-coding-agent/session/transcript/cache-invalidation-marker";
 import { getSessionsDir } from "@oh-my-pi/pi-utils";
 
 const USAGE = `Usage:

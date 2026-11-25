@@ -16,6 +16,7 @@ export const FOREGROUND_KEYS = [
 	"success",
 	"error",
 	"warning",
+	"cacheMiss",
 	"muted",
 	"dim",
 	"text",
@@ -109,11 +110,12 @@ export function isBackgroundKey(key: string): key is BackgroundKey {
 
 /**
  * Tokens a theme may leave out. `thinkingMax` falls back to `thinkingXhigh`,
- * `mdExtensionLink` is derived from `mdLink` and `text`, the rest paint in the
- * terminal default.
+ * `mdExtensionLink` is derived from `mdLink` and `text`, `cacheMiss` defaults to
+ * {@link DEFAULT_CACHE_MISS_COLOR}, the rest paint in the terminal default.
  */
 export const OPTIONAL_KEYS: Readonly<Record<string, true>> = {
 	assistantMessageText: true,
+	cacheMiss: true,
 	mdExtensionLink: true,
 	thinkingMax: true,
 	subagent1: true,
@@ -123,6 +125,9 @@ export const OPTIONAL_KEYS: Readonly<Record<string, true>> = {
 	subagent5: true,
 	subagent6: true,
 };
+
+/** Lemon-yellow cache-miss marker (MOMP): prominent where `muted`/`warning` would blend into the transcript. */
+export const DEFAULT_CACHE_MISS_COLOR = "#FFFF00";
 
 export type SymbolPreset = "unicode" | "nerd" | "ascii";
 

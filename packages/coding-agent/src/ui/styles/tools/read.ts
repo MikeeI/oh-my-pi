@@ -77,6 +77,7 @@ function paintRead(node: UiNode, cx: PaintContext): Block {
 		};
 	}
 	let title = display ? `Read ${display}${correction}` : "Read";
+	if (term?.tokens) title += theme.fg("dim", ` · ${term.tokens}`);
 	if (term?.summarySpans !== undefined)
 		title += ` (summary: ${term.summarySpans} elided span${term.summarySpans === 1 ? "" : "s"})`;
 	if (term?.conflicts)

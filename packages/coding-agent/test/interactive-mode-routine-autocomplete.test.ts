@@ -9,11 +9,11 @@ import type { PromptTemplate } from "@oh-my-pi/pi-coding-agent/config/prompt-tem
 import { resetSettingsForTest, Settings } from "@oh-my-pi/pi-coding-agent/config/settings";
 import { InteractiveMode } from "@oh-my-pi/pi-coding-agent/modes/interactive-mode";
 import { cfgStartupQuiet } from "@oh-my-pi/pi-coding-agent/modes/settings";
-import { initTheme } from "@oh-my-pi/pi-tui/theme";
+import { initTheme } from "../src/ui/theme/service";
 import { AgentSession } from "@oh-my-pi/pi-coding-agent/session/agent-session";
 import { AuthStorage } from "@oh-my-pi/pi-coding-agent/session/auth-storage";
 import { SessionManager } from "@oh-my-pi/pi-coding-agent/session/session-manager";
-import type { AutocompleteProvider } from "@oh-my-pi/pi-tui";
+import type { AutocompleteProvider } from "../src/ui/composer/autocomplete";
 import { getAgentDir, setAgentDir, TempDir } from "@oh-my-pi/pi-utils";
 
 function makeTool(name: string): AgentTool {
@@ -96,7 +96,7 @@ describe("InteractiveMode routine autocomplete", () => {
 
 	function captureAutocompleteProvider(target: InteractiveMode): { current: AutocompleteProvider | undefined } {
 		const slot: { current: AutocompleteProvider | undefined } = { current: undefined };
-		vi.spyOn(target.editor, "setAutocompleteProvider").mockImplementation(provider => {
+		vi.spyOn(target.composer, "setAutocomplete").mockImplementation(provider => {
 			slot.current = provider;
 		});
 		return slot;

@@ -416,6 +416,35 @@ describe("InputController keybinding setup", () => {
 		expect(editor.text()).toBe("draft with image");
 	});
 
+	it("opens native tmux history when PageUp is pressed on an empty focused composer", () => {
+		const { ctx, press } = createContext();
+		const openNativeScrollback = vi.fn(() => true);
+		new InputController(ctx, undefined, openNativeScrollback).setupKeyHandlers();
+
+		expect(press("pageUp")).toBe("composer");
+		expect(openNativeScrollback).toHaveBeenCalledTimes(1);
+	});
+
+	it("keeps PageUp in the composer when native tmux history is unavailable", () => {
+		const { ctx, press } = createContext();
+		const openNativeScrollback = vi.fn(() => false);
+		new InputController(ctx, undefined, openNativeScrollback).setupKeyHandlers();
+
+		// The app binding declines, so the key continues to the composer's own editing keys.
+		press("pageUp");
+		expect(openNativeScrollback).toHaveBeenCalledTimes(1);
+	});
+
+	it("keeps PageUp in the composer while a whitespace draft is present", () => {
+		const { ctx, editor, press } = createContext();
+		const openNativeScrollback = vi.fn(() => true);
+		editor.setText(" ");
+		new InputController(ctx, undefined, openNativeScrollback).setupKeyHandlers();
+
+		press("pageUp");
+		expect(openNativeScrollback).not.toHaveBeenCalled();
+	});
+
 	it("routes b to branch a branchable /btw panel", () => {
 		const { ctx, press, spies } = createContext();
 		spies.handlesBtwBranchKey.mockReturnValue(true);

@@ -82,6 +82,12 @@ export function hexFg(hex: string, text: string): string {
 	return `\x1b[38;2;${(value >> 16) & 255};${(value >> 8) & 255};${value & 255}m${text}\x1b[39m`;
 }
 
+/** Background `#rrggbb`, ending with a background reset. */
+export function hexBg(hex: string, text: string): string {
+	const value = Number.parseInt(hex.slice(1), 16);
+	return `\x1b[48;2;${(value >> 16) & 255};${(value >> 8) & 255};${value & 255}m${text}\x1b[49m`;
+}
+
 /**
  * Styled text wrapped with the terminal's standard horizontal padding,
  * every row padded to the full width.

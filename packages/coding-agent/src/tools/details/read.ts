@@ -39,6 +39,8 @@ export interface ReadToolDetails {
 	fileSize?: number;
 	/** Full source line count when the read reached EOF and the count is exact. */
 	totalLines?: number;
+	/** Exact native-token count of the final sanitized text blocks after session-owned postprocessing. */
+	readTextTokens?: number;
 	/**
 	 * Whether the text's rows carry line-number prefixes (`N:` hashline, `N|` line numbers). Set where a
 	 * file read is formatted; a raw read sets `false`. Snapcompact reads it to tell a `12:` prefix from content.

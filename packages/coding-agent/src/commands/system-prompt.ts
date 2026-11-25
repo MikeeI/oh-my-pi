@@ -28,8 +28,8 @@ import {
 	cfgTaskEnableLsp,
 	cfgTaskStructured,
 } from "../task/settings";
-import type { AgentSource } from "@oh-my-pi/pi-tui/tools/task";
-import { shortenPath } from "@oh-my-pi/pi-tui/render/render-utils";
+import type { AgentSource } from "../task/task-details";
+import { shortenPath } from "../utils/render-utils";
 
 const ACTIONS = ["inspect"] as const;
 type SystemPromptAction = (typeof ACTIONS)[number];

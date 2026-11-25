@@ -81,8 +81,9 @@ export function CacheMissMarker(props: { info: CacheInvalidation }): JSXNode {
 		<MessageDivider
 			glyph="icon.cacheMiss"
 			label={`cache miss · ${tokens} tokens`}
-			labelColor="muted"
-			ruleColor="dim"
+			// MOMP: the marker-specific `cacheMiss` token (default lemon yellow) keeps an invalidation prominent.
+			labelColor="cacheMiss"
+			ruleColor="cacheMiss"
 			ruleWidth={10}
 			role="omp.marker.cache-miss"
 			native={{ icon: "database", label: `Cache miss · ${tokens} tokens` }}

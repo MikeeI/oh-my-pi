@@ -37,6 +37,8 @@ export interface UserMessageModel {
 	readonly synthetic?: boolean;
 	/** Delivered into the response that was streaming. */
 	readonly liveSteered?: boolean;
+	/** `text` is a typed file-command invocation shown instead of its expanded body (MOMP). */
+	readonly command?: boolean;
 	/** SKILL.md path of a skill chip, by skill name. */
 	readonly skillPath?: (name: string) => string | undefined;
 	/** Magic keywords that glow in the prompt (the enabled ones); none when absent. */
@@ -162,6 +164,7 @@ export function UserMessage(props: { model: UserMessageModel }): JSXNode {
 	const display = chipText(model.text, {
 		imageLinks: model.imageLinks,
 		skillPath: model.skillPath,
+		command: model.command === true,
 	});
 	const chipSpans = synthetic ? [] : chipMarks(display.chips);
 	const chips = termChips(display.chips);

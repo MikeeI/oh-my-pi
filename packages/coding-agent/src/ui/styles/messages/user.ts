@@ -25,7 +25,7 @@ import { type GlowingKeyword, MAGIC_KEYWORD_PERIOD_MS, magicKeywordLetters } fro
 import type { TermChip } from "../../transcript/messages/chips";
 import { fileLink } from "../tools/file-common";
 import { expandKeyLabel } from "../../keys/hints";
-import { fillRow, hexFg, propsOf, termOf, withResolvedColor } from "./fill";
+import { fillRow, hexBg, hexFg, propsOf, termOf, withResolvedColor } from "./fill";
 
 const ZONE_START = "\x1b]133;A\x07";
 const ZONE_CLOSE = "\x1b]133;B\x07\x1b]133;C\x07\x1b]133;D;0\x07";
@@ -50,11 +50,13 @@ interface PromptTerm {
 function colorChips(theme: Theme, text: string, chips: readonly TermChip[], hyperlinks: boolean): string {
 	let out = text;
 	for (const chip of chips) {
-		const styled = chip.color.startsWith("#")
-			? hexFg(chip.color, `\x1b[1m${chip.t}\x1b[22m`)
-			: chip.pill
-				? theme.bg("customMessageBg", theme.style(chip.color, chip.t))
-				: theme.style(chip.color, chip.t);
+		const styled = chip.fill
+			? hexBg(chip.fill, hexFg(chip.color, `\x1b[1m${chip.t}\x1b[22m`))
+			: chip.color.startsWith("#")
+				? hexFg(chip.color, `\x1b[1m${chip.t}\x1b[22m`)
+				: chip.pill
+					? theme.bg("customMessageBg", theme.style(chip.color, chip.t))
+					: theme.style(chip.color, chip.t);
 		out = out.split(chip.t).join(fileLink({ hyperlinks }, styled, chip.link?.path, chip.link?.line));
 	}
 	return out;

@@ -4,7 +4,7 @@ import type { Api, AssistantMessage, Model, RawSseEvent } from "@oh-my-pi/pi-ai"
 import * as ai from "@oh-my-pi/pi-ai";
 import { Effort } from "@oh-my-pi/pi-ai";
 import { RawSseDebugBuffer } from "../../src/debug/raw-sse-buffer";
-import { TempDir } from "@oh-my-pi/pi-utils";
+import { getAgentDir, TempDir } from "@oh-my-pi/pi-utils";
 import { $ } from "bun";
 import type { ModelRegistry } from "../../src/config/model-registry";
 import { cfgOffline } from "../../src/config/auxiliary-model-policy";
@@ -371,7 +371,7 @@ describe("runEvalCompletion", () => {
 
 		/** A user-tagged model agent, built the way `ModelMentionRegistry.sessionAgents()` builds one. */
 		function taggedAgent(name: string, selector: string): AgentDefinition {
-			const task = getBundledAgent("task");
+			const task = getBundledAgent("task", getAgentDir());
 			if (!task) throw new Error("Bundled task agent is unavailable");
 			return { ...task, name, model: [selector], filePath: undefined };
 		}

@@ -27,7 +27,7 @@ import {
 	type AsyncNotifyDetails,
 	type CustomMessage,
 } from "../../session/transcript/messages";
-import { imageContent, textContent } from "../../session/transcript/transcript-entry";
+import { imageContent, userDisplayText } from "../../session/transcript/transcript-entry";
 import { extensionTheme, isCompactOutput, renderExtension } from "../../ui/extensions/render-output";
 import { CollabPrompt } from "../../ui/transcript/figures/collab";
 import { AdvisorMessage } from "../../ui/transcript/messages/advisor-message";
@@ -267,7 +267,9 @@ function promptFace(
 			face: () => <ParentIrcMessage parentIrc={parentIrc} timestamp={message.timestamp} expanded={env.expanded} />,
 		};
 	}
-	const text = message.role === "user" ? textContent(message.content) : "";
+	// A file-command prompt shows (and copies) its typed invocation; the model still got the expanded body.
+	const text = message.role === "user" ? userDisplayText(message) : "";
+	const command = message.role === "user" && Boolean(message.commandInvocation);
 	if (!text) return undefined;
 	const images = imageContent(message.content);
 	const imageLinks = options?.imageLinks ?? env.imageLinks(message, images);
@@ -282,6 +284,7 @@ function promptFace(
 					...(imageLinks ? { imageLinks } : {}),
 					synthetic,
 					liveSteered: message.role === "user" && message.liveSteered === true,
+					command,
 					skillPath: env.skillPath,
 					timestamp: message.timestamp,
 					hour12: env.hour12,

@@ -3,9 +3,10 @@ import { ThinkingLevel } from "@oh-my-pi/pi-agent-core";
 import type { ImageContent } from "@oh-my-pi/pi-ai";
 import { createRoot, effect, type KeyEvent, type PasteEvent, type UiNode, untrack } from "@oh-my-pi/pi-tui";
 import type { InputEvent } from "@oh-my-pi/pi-tui/driver/index";
+import { hasMultiplexerSession } from "@oh-my-pi/pi-tui/driver/mux/detect";
 import { emergencyTerminalRestore } from "@oh-my-pi/pi-tui/driver/session";
 import { currentTheme } from "@oh-my-pi/pi-tui/theme/runtime";
-import { isEnoent, logger, postmortem, sanitizeText } from "@oh-my-pi/pi-utils";
+import { $which, isEnoent, logger, postmortem, sanitizeText } from "@oh-my-pi/pi-utils";
 import type { AutocompleteProvider, SlashCommand } from "../../autocomplete/autocomplete";
 import { expandEmoticons } from "../../autocomplete/emoji";
 import { createModelMentionSource } from "../../autocomplete/model-mention";
@@ -248,7 +249,7 @@ const LEFT_DOUBLE_TAP_MIN_GAP_MS = 40;
 const LEFT_DOUBLE_TAP_MAX_GAP_MS = 500;
 function openTmuxScrollback(): boolean {
 	const pane = Bun.env.TMUX_PANE;
-	if (!hasTerminalMultiplexerSession("tmux") || !pane) return false;
+	if (!hasMultiplexerSession("tmux", Bun.env) || !pane) return false;
 	const tmux = $which("tmux");
 	if (!tmux) return false;
 	try {
@@ -327,7 +328,6 @@ export class InputController {
 	#submissionHookOrder: Promise<void> = Promise.resolve();
 	/** Submissions (Enter or the follow-up key) the session has not admitted yet and that still dispatch locally. */
 	readonly #submissionDispatches = new Set<Promise<void>>();
-	#tmuxScrollbackListenerInstalled = false;
 
 	/** Return the last full editor snapshot delivered by its change contract. */
 	getDraftText(): string {
@@ -485,6 +485,16 @@ export class InputController {
 		if (key.kind === "release") return false;
 		const km = this.ctx.keybindings;
 		const empty = this.ctx.composer.text().trim() === "";
+		// PageUp on a truly empty draft hands the pane to tmux copy mode one page up; drafts (even
+		// whitespace), pending images, and failed or non-tmux sessions keep the editor's own paging.
+		if (
+			key.id === "pageUp" &&
+			this.ctx.composer.text() === "" &&
+			this.ctx.composer.pendingImages.length === 0 &&
+			this.openNativeScrollback()
+		) {
+			return true;
+		}
 		// Left-arrow on an empty editor: the agent-hub double-tap gesture (in a focused subagent
 		// view, ←← returns to the main session). Plain "left" only.
 		if (key.id === "left" && empty) {
@@ -1994,19 +2004,17 @@ export class InputController {
 		// Consume only the submitted draft before the routine yields; later input
 		// belongs to a new draft even when the routine eventually fails.
 		detach?.();
-		this.ctx.editor.addToHistory(text);
+		this.ctx.composer.addToHistory(text);
 		try {
 			const handled = await runRoutineInvocation.call(this.ctx.session, text, {
 				onProgress: progress => this.ctx.showStatus(formatRoutineProgress(progress)),
 			});
 			if (!handled) return false;
 			this.ctx.updatePendingMessagesDisplay();
-			this.ctx.ui.requestRender();
 			return true;
 		} catch (error) {
 			this.ctx.showError(error instanceof Error ? error.message : String(error));
 			this.ctx.updatePendingMessagesDisplay();
-			this.ctx.ui.requestRender();
 			return true;
 		}
 	}

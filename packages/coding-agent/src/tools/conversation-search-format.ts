@@ -3,7 +3,8 @@ import {
 	type ConversationSearchReport,
 	MAX_CONVERSATION_SEARCH_LIMIT,
 } from "../session/conversation-search";
-import { replaceTabs, shortenPath } from "@oh-my-pi/pi-tui/render/render-utils";
+import { shortenPath } from "../utils/render-utils";
+import { replaceTabs } from "../utils/text-width";
 
 export type ConversationSearchFormat = "text" | "json";
 

@@ -55,6 +55,8 @@ export interface MarkdownOptions {
 	readonly textSizing?: boolean;
 	/** Draw ```mermaid fences as diagrams (default: the host's {@link markdownLook}). */
 	readonly mermaid?: boolean;
+	/** Draw `<span style="color:#rrggbb">` foreground scopes (default: the host's {@link markdownLook}). */
+	readonly textColors?: boolean;
 	/** TSP span tokens every prose run is drawn with (`"muted em"` for thinking traces). */
 	readonly textStyle?: string;
 	/** The hyperlink target of an href; the href itself when undefined. */
@@ -486,6 +488,7 @@ function createRenderer(tokens: readonly Token[], fullWidth: number, options: Ma
 			linkTarget: options.linkTarget,
 			extensionLink: extensionLinkTest(options.linkSchemes ?? []),
 			marks: options.marks,
+			textColors: options.textColors ?? false,
 		},
 		prose,
 		header:
@@ -695,6 +698,7 @@ function blockKey(width: number, options: MarkdownOptions, links: string): strin
 		options.hyperlinks ?? false,
 		options.textSizing ?? false,
 		options.mermaid ?? true,
+		options.textColors ?? false,
 		options.textStyle ?? "",
 		options.codeIndent ?? 2,
 		options.linkSchemes?.join(",") ?? "",
@@ -818,9 +822,15 @@ export function renderMarkdown(source: string, width: number, options: MarkdownO
 
 /** `options` with the host's look where they leave `colorful` or `mermaid` unset. */
 function withHostLook(options: MarkdownOptions): MarkdownOptions {
-	if (options.colorful !== undefined && options.mermaid !== undefined) return options;
+	if (options.colorful !== undefined && options.mermaid !== undefined && options.textColors !== undefined)
+		return options;
 	const look = markdownLook();
-	return { ...options, colorful: options.colorful ?? look.colorful, mermaid: options.mermaid ?? look.mermaid };
+	return {
+		...options,
+		colorful: options.colorful ?? look.colorful,
+		mermaid: options.mermaid ?? look.mermaid,
+		textColors: options.textColors ?? look.textColors,
+	};
 }
 
 /**

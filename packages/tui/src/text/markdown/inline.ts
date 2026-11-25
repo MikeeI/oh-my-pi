@@ -32,6 +32,8 @@ export interface InlineEnvironment {
 	readonly extensionLink?: (href: string) => boolean;
 	/** Literal runs drawn as these spans wherever they occur in prose. */
 	readonly marks?: readonly TspSpan[];
+	/** Draw `<span style="color:#rrggbb">` foreground scopes (MOMP `tui.textColors`); off shows tags as structure only. */
+	readonly textColors?: boolean;
 }
 
 const ENTITY: Readonly<Record<string, string>> = {
@@ -111,6 +113,20 @@ function proseText(env: InlineEnvironment, ctx: InlineContext, raw: string): str
 	return out;
 }
 
+/** A `style="color:#rrggbb"` attribute of a `<span>`. */
+const SPAN_COLOR = /\bstyle\s*=\s*(["'])\s*color\s*:\s*(#[\da-f]{6})\s*;?\s*\1/i;
+const FG_RESET = "\x1b[39m";
+
+/**
+ * `base` drawn in foreground `hex`. The color opens inside the base style so it wins over a prose
+ * color, and `restore` reopens it after a styled run (bold, code, a link) closed its attributes.
+ */
+function foregroundContext(base: InlineContext, hex: string): InlineContext {
+	const [r, g, b] = rgbOf(hex);
+	const open = `\x1b[38;2;${r};${g};${b}m`;
+	return { text: text => base.text(`${open}${text}`), restore: `${base.restore}${open}` };
+}
+
 /** An HTML tag: its lowercase name, whether it closes, and its attributes. */
 interface Tag {
 	readonly name: string;
@@ -180,7 +196,10 @@ interface HtmlList {
 }
 
 /** Render inline tokens in `ctx`. */
-export function renderInline(env: InlineEnvironment, tokens: readonly Token[], ctx: InlineContext): string {
+export function renderInline(env: InlineEnvironment, tokens: readonly Token[], baseCtx: InlineContext): string {
+	let ctx = baseCtx;
+	// Open `<span>` scopes; each holds the context its content draws in (an uncolored span inherits).
+	const spans: InlineContext[] = [];
 	const { styles } = env;
 	let out = "";
 	// A line break swallows the spaces around it.
@@ -218,6 +237,21 @@ export function renderInline(env: InlineEnvironment, tokens: readonly Token[], c
 					if (!tag.closing) lineBreak();
 					break;
 				case "span":
+					if (env.textColors) {
+						if (tag.closing) {
+							if (spans.pop() !== undefined) {
+								ctx = spans.at(-1) ?? baseCtx;
+								out += FG_RESET + ctx.restore;
+							}
+						} else {
+							const color = SPAN_COLOR.exec(tag.attributes)?.[2];
+							ctx = color ? foregroundContext(baseCtx, color) : ctx;
+							spans.push(ctx);
+						}
+					}
+					// Zero-width: the tag passes line-start trimming on instead of consuming it.
+					afterBreak = breakBefore;
+					break;
 				case "text":
 				case "blockquote":
 					afterBreak = breakBefore;
@@ -325,5 +359,7 @@ export function renderInline(env: InlineEnvironment, tokens: readonly Token[], c
 				out += ctx.text(token.raw);
 		}
 	}
+	// A scope left open ends with this inline run (an inline-block boundary).
+	if (spans.length > 0) out += FG_RESET + baseCtx.restore;
 	return out;
 }

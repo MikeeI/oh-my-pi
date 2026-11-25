@@ -20,6 +20,11 @@ import { type ChipKind, chipColor, chipLabel } from "../../composer/attachments"
 
 const VISION_MARKER = /\[(Image|Video) #([1-9]\d*)(?:,[^\]\n]*)?\](?: attachment:\/\/\2)?/g;
 const MODEL_MENTION = /<model agent="m\d+" name="([^"]*)"\/>/g;
+/** The typed `/name` that opens a file-command invocation. */
+const COMMAND_NAME = /^\/\S+/;
+/** File-command chips: a filled Dracula light-violet pill with dark Dracula text (MOMP). */
+const COMMAND_CHIP_FILL = "#c8a1ff";
+const COMMAND_CHIP_INK = "#282a36";
 /** A skill name after its chip glyph (`ns/name`, dotted segments). */
 const SKILL_NAME = String.raw` ((?:[\w-]+\/)?[\w-]+(?:\.[\w-]+)*)(?![\w-])`;
 
@@ -37,7 +42,7 @@ function skillChips(glyph: string): RegExp {
 /** One chip in the display text. */
 export interface Chip {
 	readonly label: string;
-	readonly kind: ChipKind | "skill" | "mention";
+	readonly kind: ChipKind | "skill" | "mention" | "command";
 	/** Attachment number (`#N`) of image and video chips. */
 	readonly n?: number;
 	/** File the chip opens (an attachment's materialized file, a skill's SKILL.md). */
@@ -56,6 +61,8 @@ export function chipText(
 	options: {
 		readonly imageLinks?: readonly (string | undefined)[];
 		readonly skillPath?: (name: string) => string | undefined;
+		/** The text is a typed file-command invocation: its leading `/name` draws as a command chip. */
+		readonly command?: boolean;
 	} = {},
 ): ChipText {
 	const chips = new Map<string, Chip>();
@@ -78,6 +85,8 @@ export function chipText(
 		if (!chips.has(label)) chips.set(label, { label, kind: "mention" });
 		return label;
 	});
+	const command = options.command ? COMMAND_NAME.exec(out)?.[0] : undefined;
+	if (command) chips.set(command, { label: command, kind: "command" });
 	const skillGlyph = symbols.symbol("icon.extensionSkill");
 	// A theme without a skill glyph marks no chip apart from prose.
 	for (const match of skillGlyph ? out.matchAll(skillChips(skillGlyph)) : []) {
@@ -102,7 +111,7 @@ function fileHref(path: string): string | undefined {
 
 /** The native style of a chip: attachments accent, skills and mentions their pill colors. */
 function chipStyle(chip: Chip): string {
-	if (chip.kind === "skill") return "customMessageLabel strong";
+	if (chip.kind === "skill" || chip.kind === "command") return "customMessageLabel strong";
 	if (chip.kind === "mention") return "statusLineModel strong";
 	return "accent strong";
 }
@@ -124,12 +133,15 @@ export interface TermChip {
 	readonly pill?: boolean;
 	/** The file the chip links to (a skill's SKILL.md at its first line, an attachment's file). */
 	readonly link?: { readonly path: string; readonly line?: number };
+	/** `#rrggbb` fill behind the label; `color` is then the label's ink. */
+	readonly fill?: string;
 }
 
 /** Terminal chip looks. */
 export function termChips(chips: readonly Chip[]): TermChip[] {
 	return chips.map(chip => {
 		if (chip.kind === "mention") return { t: chip.label, color: chipStyle(chip), pill: true };
+		if (chip.kind === "command") return { t: chip.label, color: COMMAND_CHIP_INK, fill: COMMAND_CHIP_FILL };
 		const link = chip.path
 			? { link: chip.kind === "skill" ? { path: chip.path, line: 1 } : { path: chip.path } }
 			: {};

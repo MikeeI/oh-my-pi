@@ -290,7 +290,7 @@ import {
 	revokeComputerControlForOwner,
 } from "../tools/computer/supervisor";
 import { isAutoQaEnabled } from "../tools/report-tool-issue";
-import type { ReadToolDetails } from "@oh-my-pi/pi-tui/tools/read";
+import type { ReadToolDetails } from "../tools/details/read";
 import {
 	buildResolveReminderMessage,
 	buildResolveUnsatisfiedNotice,

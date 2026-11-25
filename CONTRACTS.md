@@ -222,21 +222,6 @@ It also rejects `AGENTS.md` index rows whose IDs or dispositions differ from thi
 - Proof: unchanged native and compact fallback behavior in `test/edit-prompt-variant.test.ts`.
 - Proof: release-only runtime description and topic rendering through `scripts/inspect-tool-prompt-overrides.ts`.
 
-### `MOMP-AST-GREP-PAGING` — Actionable AST search pagination
-
-- Disposition: `UPSTREAM-INTEGRIERT`.
-- Contract: truncated `ast_grep` results give the model and TUI the next `skip` offset.
-- Contract: the tool calculates that offset from normalized `skip` and the number of matches returned on the current page.
-- Contract: historical results without the offset advise narrowing `path` or using `skip`, never increasing the unavailable public `limit`.
-- Owner: upstream `src/tools/ast-grep.ts#AstGrepTool` owns pagination and model-visible output.
-- Owner: upstream `packages/tui/src/tools/ast-grep.ts#astGrepToolRenderer` owns TUI rendering and the result metadata type.
-- Coverage: upstream v18.11.1 replaces the `limit` advice with generic `skip` advice but exposes no next offset.
-- Coverage: upstream v18.18.8 renders zero-match results as one `0 matches` line; paged results keep the MOMP offset.
-- Reason: without the computed offset, neither the model nor the TUI can request the next page directly.
-- Coverage: upstream `main` merged PR #20203 (ISSUE-036, merge `7952ae45bb`, follow-up `5483012eef`) with this exact contract; no release contains it yet.
-- Required action: retain the delta until the upgrade base contains `7952ae45bb`, then restore both owner files to upstream and remove this contract (`UPSTREAM-GEDECKT`).
-- Proof: the model-and-TUI pagination contract in `test/tools/ast-grep.test.ts`.
-
 ### `MOMP-AGENT-PROMPT-OVERRIDES` — Profile-scoped agent templates
 
 - Disposition: `MOMP-EIGEN`.
@@ -435,9 +420,10 @@ It also rejects `AGENTS.md` index rows whose IDs or dispositions differ from thi
 - Contract: `read skill://` calls collapse into the compact grouped read view like `help://` doc reads.
 - Contract: collapsed skill loads stay expandable so their full resolved content remains visible.
 - Contract: the full skill body still reaches the model; collapsing is display-only and never trims load-bearing content.
-- Owner: `src/internal-urls/skill-protocol.ts#SkillProtocolHandler.spec` declares compact skill grouping.
-- Owner: upstream `packages/tui/src/chat/read-tool-group.ts#readArgsCollapseIntoGroup` applies the registered scheme policy.
-- Owner: `packages/tui/src/chat/read-tool-group.ts#shouldRenderPreview` keeps expanded skill loads visible when ordinary previews are disabled.
+- Owner: `src/internal-urls/skill-protocol.ts#SkillProtocolHandler.spec` declares compact skill grouping through `compactTranscript`.
+- Owner: upstream `src/session/transcript/read-tool-group.ts#readArgsCollapseIntoGroup` applies the registered scheme policy.
+- Owner: `src/ui/transcript/read-group.tsx#ReadGroup.previews` keeps expanded skill loads visible when ordinary previews are disabled.
+- Coverage: upstream v19.2.1 adds `SchemeSpec.compactTranscript` (set by `help://`); MOMP only sets it for `skill://`.
 - Required action: retain compact skill grouping and the display-only expanded-skill preview exception.
 - Proof: `test/read-tool-group.test.ts`.
 
@@ -460,13 +446,13 @@ It also rejects `AGENTS.md` index rows whose IDs or dispositions differ from thi
 - Disposition: `UPSTREAM-INTEGRIERT`.
 - Contract: middle-elided results expose the exact omitted range in complete artifacts without repeating preserved output.
 - Contract: capped artifacts advertise head/tail samples, never recovery selectors for bytes that were not saved.
-- Owner: `packages/tui/src/tools/output-meta.ts#formatTruncationMetaNotice` owns exact recovery references.
-- Owner: `packages/tui/src/tools/streaming-output.ts#OutputSink` reports exact shown line counts and elided artifact lines.
+- Owner: `src/tools/output-meta-format.ts#formatTruncationMetaNotice` owns exact recovery references.
+- Owner: `src/tools/streaming-output.ts#OutputSink` reports exact shown line counts and elided artifact lines.
 - Owner: `src/tools/output-meta.ts#OutputMetaBuilder.truncationFromSummary` maps that report without guessed ranges.
 - Implementation constraint: substituted inline chunks withhold ranges because their lines no longer match the artifact.
 - Reason: upstream v18.4.9 caps output artifacts; original stream coordinates do not address their omitted middle.
 - Coverage: upstream `a4663d570d` keeps the sink's middle cut on whole lines and names the shown ranges exactly (ISSUE-026 archived); upstream still links only the whole artifact, so the exact omitted-range selector remains MOMP-owned.
-- Required action: during the next upgrade, drop any fork shown-count hunk that upstream now duplicates and keep only the omitted-range selector closure.
+- Coverage: upstream v19.2.1 moves the TUI output-meta and sink owners into `src/tools/` and supplies head/tail samples for capped artifacts; it still exposes no omitted-range selector or per-side shown counts.
 - Coverage: upstream v18.12.3 stops middle-eliding Read file pages and continues them with an exact `:N` offset.
 - Coverage: upstream v19.0.0 renames spill references to `local://<N>.log` through `spillUrl()` but still offers only full-output recovery.
 - Required action: build exact middle-range selectors with `spillUrl()`, never a literal URL scheme.
@@ -620,7 +606,7 @@ It also rejects `AGENTS.md` index rows whose IDs or dispositions differ from thi
 - Proof: `test/title-generator.test.ts`.
 - Proof: `test/command-controller-rename.test.ts`.
 - Proof: rename cases in `test/acp-builtins.test.ts` and `test/slash-commands/rename.test.ts`.
-- Proof: `packages/tui/test/prompt-action-autocomplete.test.ts`.
+- Proof: the icon-free slash-list case in `test/interactive-mode-routine-autocomplete.test.ts`.
 - Coverage: upstream v18.20.1 resolves `^` mention rows through `#modelMentionSuggestions` and retries pending discovery.
 - Required action: route slash-argument and ordinary prompt paths through that owner beside command-owned completion modes.
 
@@ -628,15 +614,12 @@ It also rejects `AGENTS.md` index rows whose IDs or dispositions differ from thi
 
 - Disposition: `UPSTREAM-INTEGRIERT`.
 - Contract: a prompt expanded from a file slash command shows its typed `/name args` invocation in live, resumed, and rebuilt transcripts.
-- Contract: confirmed file-command rows use a violet rail and filled violet chip with a bold dark command name and one inner padding cell per side.
-- Contract: chip text uses Dracula `#282a36`; three display-only spaces separate the chip from normally styled arguments.
+- Contract: the leading `/name` of a confirmed invocation draws as a filled Dracula light-violet `#c8a1ff` chip with bold Dracula `#282a36` text.
 - Contract: ordinary slash-looking text retains normal user styling; copy and rewind retain the original invocation.
-- Contract: command arguments render literally so Markdown cannot collapse their spacing or reinterpret their punctuation.
-- Owner: upstream `packages/tui/src/chat/user-message.ts#UserMessageComponent` owns terminal, emergency, and native command presentation.
-- Owner: `packages/tui/src/theme/schema.ts` owns optional `commandPrompt`, defaulting to Dracula light violet `#c8a1ff`.
-- Implementation constraint: native command colors use the existing ANSI node because upstream v18.13.3 retired TSP palette synchronization.
-- Owner: `packages/tui/src/theme/schema-validation.ts` and `theme-schema.json` accept the optional command rail and chip color.
-- Implementation constraint: optimistic file-command rows wait for canonical provenance so immutable history never captures an unstyled duplicate.
+- Owner: upstream `src/modes/interactive/messages.tsx#promptFace` selects the typed invocation and marks command rows.
+- Owner: upstream `src/ui/transcript/messages/chips.ts#chipText` and `#termChips` own the command chip; `src/ui/styles/messages/user.ts#colorChips` fills it.
+- Implementation constraint: a matching optimistic row is replaced by the canonical message so the command chip appears.
+- Owner: `src/modes/controllers/event-controller.ts` owns that replacement in the user `message_start` handler.
 - Contract: the model receives the expanded body unchanged; `UserMessage.commandInvocation` never reaches a provider request.
 - Contract: unknown commands keep their literal text and record no invocation.
 - Contract: rewind drafts and automatic titles use the typed invocation, never the expanded body.
@@ -644,14 +627,15 @@ It also rejects `AGENTS.md` index rows whose IDs or dispositions differ from thi
 - Owner: upstream `src/session/agent-session.ts#pushQueuedUserMessage` carries the display-only field onto queued messages.
 - Owner: `src/extensibility/slash-commands.ts#expandSlashCommand` returns confirmed invocation provenance even when expansion leaves the bytes unchanged.
 - Owner: upstream `packages/ai/src/types.ts#UserMessage` carries the display-only field beside `liveSteered`.
-- Owner: `packages/tui/src/chat/transcript-entry.ts#userDisplayText` selects displayed and restored text.
+- Owner: `src/session/transcript/transcript-entry.ts#userDisplayText` selects displayed and restored text.
 - Owner: `src/modes/rpc/wire/content.ts` declares the field for generated RPC clients.
 - Reason: upstream renders the expanded command body as an ordinary user message.
+- Coverage: upstream v19.2.1 replaces the user-message component with Tern's chip-based user card; the violet rail, three-space separator, and literal-argument rendering of the old component have no owner there and were dropped.
 - Required action: retain the field, its render consumers, and regenerated RPC clients until upstream records file-command provenance.
 - Coverage: upstream v19.1.1 `src/session/messages.ts#operatorTitleText` also titles writable-collab prompts; the typed invocation still precedes the expanded body for user messages.
 - Proof: the typed file-command case in `test/agent-session-queued-steer-delivery.test.ts`.
 - Proof: identical `--codex-wire-hash` input hashes for an invocation and its literal expansion.
-- Proof: command styling in `packages/tui/test/user-message.test.ts` and source/installed TUI rendering with narrow resize and resume.
+- Proof: command chip cases in `test/ui/transcript/messages/command-chip.test.ts` and installed TUI rendering with resume.
 
 ### `MOMP-CONVERSATION-SEARCH` — Persisted conversation lookup
 
@@ -755,19 +739,16 @@ It also rejects `AGENTS.md` index rows whose IDs or dispositions differ from thi
 
 - Disposition: `UPSTREAM-INTEGRIERT`.
 - Contract: enabled cache-miss markers use lemon yellow `#FFFF00` for their terminal label and short rule by default.
-- Contract: native marker labels use the same semantic color; existing text, geometry, and detection remain unchanged.
+- Contract: native marker labels use the same theme token; existing text, geometry, and detection remain unchanged.
 - Contract: optional theme color `cacheMiss` overrides only this marker without changing `muted`, `dim`, or `warning`.
-- Contract: themes without `cacheMiss` retain compatibility and receive the default in terminal, native, and export rendering.
-- Owner: upstream `packages/tui/src/chat/cache-invalidation-marker.ts` owns marker presentation.
-- Owner: `packages/tui/src/theme/schema.ts` owns the token and its default.
-- Owner: upstream `packages/tui/src/theme/color.ts#resolveThemeColors` materializes the optional default.
-- Owner: upstream `packages/tui/src/native/spans.ts` owns ANSI-to-native color mapping.
-- Owner: upstream `packages/tui/src/chrome/message-divider.ts#describe` emits the native marker label.
-- Implementation constraint: use its existing ANSI node for the custom foreground after upstream v18.13.3 retired TSP palettes.
+- Contract: themes without `cacheMiss` retain compatibility and receive the default.
+- Owner: upstream `src/ui/transcript/messages/markers.tsx#CacheMissMarker` owns marker presentation.
+- Owner: `packages/tui/src/theme/schema.ts` owns the optional token and `DEFAULT_CACHE_MISS_COLOR`.
+- Owner: upstream `packages/tui/src/theme/theme.ts` materializes the optional default beside `thinkingMax`.
 - Reason: current upstream renders the marker label as `muted` and its rule as `dim`.
 - Coverage: upstream v18.9.0 adds optional `assistantMessageText`; keep its terminal-default semantics separate from `cacheMiss`.
-- Required action: retain the marker-specific token and render integration without restoring retired palette messages.
-- Proof: `packages/tui/test/cache-invalidation-marker.test.ts`.
+- Required action: retain the marker-specific token and render integration.
+- Proof: default and override resolution in `packages/tui/test/theme/cache-miss-color.test.ts`.
 - Proof: render the real marker in a TUI and inspect its foreground and unchanged geometry.
 
 ### `MOMP-RUNTIME-AUDIT` — Repeatable local performance evidence
@@ -917,121 +898,18 @@ It also rejects `AGENTS.md` index rows whose IDs or dispositions differ from thi
 - Proof: `packages/coding-agent/test/stats-cli-output.test.ts`.
 - Proof: `packages/coding-agent/test/stats-cli-summary.test.ts`.
 
-### `MOMP-SCROLLBACK` — Accepted transcript and multiplexer history integrity
-
-- Disposition: `UPSTREAM-INTEGRIERT`.
-- Contract: accepted terminal rows remain immutable after a finalized component mutates.
-- Contract: unchanged components retain semantic replay and width reflow.
-- Contract: drifted components replay accepted physical rows without joining source rows on width growth.
-- Contract: replay includes each accepted active-head prefix exactly once.
-- Contract: a paired destructive presentation reset invalidates old tape and pending container and Composer offers.
-- Contract: the accepted replacement replay establishes the baseline for subsequent component drift.
-- Contract: finalized Assistant tails remain reachable while ordered retirement is blocked by active predecessors.
-- Contract: emergency pressure renders the finalized emergency block's newest rows, not one representative row.
-- Contract: finalized blocks awaiting an SVG raster retain emergency-tail visibility but cannot retire placeholders.
-- Contract: emergency rows commit click hit-test spans while the summary row stays unmapped.
-- Contract: stable pane geometry records final transcript rows exactly once and preserves pre-existing pane history.
-- Contract: a top-anchored, full-height tmux viewport never scrolls an unfinished row into history on width reflow.
-- Contract: preserve-mode height bursts retain accepted rows below the repaint and hand off Stop below that physical tail.
-- Contract: contractions erase only known mutable rows, including a contraction during resize recovery.
-- Contract: ordinary tmux frames stay attached to the cursor while grid resize precedes SIGWINCH delivery.
-- Contract: a recovered frame uses its measured anchor before resuming cursor-relative painting.
-- Contract: history-bearing tmux frames validate the server-owned grid before writing or acknowledging an offered batch.
-- Contract: a geometry mismatch retains the same unacknowledged offer until a fresh frame can be composed.
-- Contract: hiding the editor cursor updates physical cursor bookkeeping before Stop hands control to the shell.
-- Contract: a destructive reset triggered during frame-write or paint notification replays accepted history exactly once.
-- Implementation constraint: physical-frame bookkeeping and history acknowledgement precede synchronous frame-write observers.
-- Contract: Stop never writes or acknowledges a history offer composed against stale server geometry.
-- Contract: ordinary multiplexer append and preserve-mode resize rendering never emits ED3 or invokes `clear-history`.
-- Contract: changed geometry starts a new resize transaction during post-settle suppression.
-- Contract: CPR replies from an earlier fullscreen geometry never determine the current resize anchor.
-- Implementation constraint: geometry epochs currently distinguish stale CPR replies from the active resize transaction.
-- Contract: fullscreen exits recover the normal-buffer anchor after size changes, including net-zero bursts.
-- Contract: resize recovery retains its normal-buffer snapshot until the first recovered frame is painted.
-- Contract: after accepted-row drift, the resize tail renders only the accepted segments its viewport needs.
-- Owner: upstream `packages/tui/src/chrome/transcript-container.ts#TranscriptContainer` owns retirement and replay.
-- Owner: `packages/tui/src/prompt/composer.ts#rerenderOfferedHistory` discards invalidated transcript wrappers.
-- Owner: upstream `packages/tui/src/tui.ts#TUI.emitPlanFrame` owns the sole physical history write.
-- Owner: `packages/tui/src/chat/assistant-message.ts#renderTranscriptBlockEmergencyRows` owns emergency-tail selection.
-- Owner: `packages/tui/src/chrome/collab-qrcode.ts` preserves the QR hint through the shared emergency-row interface.
-- Owner: `packages/tui/src/chrome/transcript-container.ts#FinalizableBlock` owns the presentation-version interface.
-- Owner: `packages/tui/src/chat/user-message.ts#getTranscriptBlockVersion` versions reaction changes for accepted terminal replay.
-- Proof: accepted User rows remain unchanged after a reaction arrives in `packages/tui/test/transcript-container.test.ts`.
-- Owner: upstream `packages/tui/src/chrome/transcript-container.ts#renderEmergencyCandidate` consumes singular emergency rows from blocks such as user messages.
-- Coverage: upstream v18.9.1 separates live image placements from immutable history; resize seed rows use its current rewrite API.
-- Coverage: upstream v18.10.0 partially retires settled blocks through `RowSplit` and bills all below-transcript chrome at its floor.
-- Coverage: upstream v18.11.3 owns transient chrome floors, run-state settlement, and stable streaming-list publication.
-- Coverage: upstream v19.1.0 removes the chrome floor and the `tui.completeScrollback` setting; complete scrollback is the only retirement mode.
-- Owner: upstream `packages/tui/src/prompt/composer.ts#renderFrame` owns its retirement-budget selection.
-- Required action: retain that upstream policy alongside MOMP's accepted-row replay and tmux resize safeguards.
-- Required action: retain those lifecycle owners alongside whole-block tmux retirement and accepted-row replay.
-- Required action: capture partial row boundaries in accepted tape, discarded offers, and semantic replay at that upstream owner.
-- Coverage: upstream v18.12.4 relocates split seams through archived inline images via `RowSplit.images`.
-- Required action: keep recorded blank separators beside image seams; image-reserved rows never count as blanks.
-- Owner: `packages/tui/src/chrome/transcript-container.ts#peekWholeFinalizedBatch` owns budget-bounded whole-block acceptance.
-- Contract: preserve-mode tmux accepts settled blocks whole without waiting for pressure, before reflow archives an unowned copy.
-- Contract: active streaming heads retain capacity-based progressive publication and ordered retirement.
-- Required action: select whole-block retirement at the Composer policy boundary; keep upstream partial retirement elsewhere.
-- Required action: retain bounded retirement budgets and progressive append-only publication.
-- Required action: record known blank separators in split replay so width changes never drop an accepted paragraph prefix.
-- Required action: retain that singular-row path alongside MOMP's bounded finalized-Assistant tail rendering.
-- Owner: `packages/tui/src/render/terminal-row-reflow.ts#reflowHardRows` owns accepted-row hard reflow.
-- Owner: upstream `packages/tui/src/tui.ts` owns resize epochs, anchor recovery, and fullscreen-exit probing.
-- Owner: upstream `packages/tui/src/tui.ts#resolveResizeAnchor` owns width-reflow CPR anchoring.
-- Owner: `packages/tui/src/tui.ts#captureResizeProbeWindow` retains the paired normal-buffer snapshot across recovery restarts.
-- Owner: `packages/tui/src/tmux.ts#getTmuxPaneSize` reads the server-owned pane geometry.
-- Owner: `packages/tui/src/terminal.ts#ProcessTerminal.isSizeCurrent` validates a history frame against that grid.
-- Owner: `packages/tui/src/tui.ts#renderProviderFrame` defers stale-grid offers before the physical write.
-- Trade-off: server IPC runs only for history-bearing frames, not ordinary spinner, editor, or diff paints.
-- Owner: upstream `packages/tui/src/tui.ts#stop` owns the shell handoff after a preserve-mode resize.
-- Required action: retain only accepted-transcript and resize deltas at the named current upstream owners.
-- Required action: preserve upstream render-cache release hooks alongside accepted replay and replacement-baseline acknowledgement.
-- Required action: release committed render caches after a drifted resize tail renders them.
-- Proof: mixed accepted-batch drift, semantic neighbor reflow, and retirement in `packages/tui/test/transcript-container.test.ts`.
-- Proof: split-prefix acceptance, discarded-frame recomposition, drift, and unchanged-neighbor reflow in that test file.
-- Proof: finalized-pending emergency visibility and retirement ordering in `packages/tui/test/transcript-container.test.ts`.
-- Proof: drifted-tail chunk and replay-chunk bounds in `packages/tui/test/transcript-container.test.ts`.
-- Proof: drifted-tail cache release in `packages/tui/test/transcript-committed-release.test.ts`.
-- Proof: reentrant paint reset and frame-plan cases in `packages/tui/test/history-frame-plan.test.ts`.
-- Proof: CPR offsets and a full-height width-reflow start row in `packages/tui/test/resize-multiplexer-anchor.test.ts`.
-- Proof: bounded erasure and stale fullscreen CPR rejection in `packages/tui/test/resize-multiplexer-anchor.test.ts`.
-- Proof: production Composer resize, contraction, fullscreen return, and Stop in `packages/coding-agent/test/tmux-scrollback-exactness.test.ts`.
-- Proof: zero-history Composer fullscreen return with delayed SIGWINCH in `packages/coding-agent/test/tmux-scrollback-exactness.test.ts`.
-- Proof: real tmux covers delayed SIGWINCH, width/height changes, and zero, partial, or full native history.
-- Proof: new finalized output during delayed resize, full paragraph contents, and continued interaction before Stop in that test.
-- Proof: explicit reset and rebuild ED3 ordering in `packages/tui/test/destructive-reset-clear-order.test.ts`.
-- Required action: seed retained live rows before a history scroll only when no reset or erase already cleared them.
-- Required action: route seeded rows through the synchronized-output renewal owner.
-- Proof: upstream `packages/tui/test/resize-tmux-sync.test.ts` and `packages/tui/test/image-clip.test.ts` pass unchanged.
-- Coverage: upstream v18.14.0 publishes settled lines of an open code fence and removes its fabricated closing frame.
-- Required action: retain both upstream owners alongside accepted-row replay and foreground-span streaming.
-- Coverage: upstream v18.17.0 packs compact transcript runs and tracks separator ownership through `historyEnd`.
-- Required action: capture accepted row boundaries after compact separators and preserve separator-only offers.
-- Proof: upstream `packages/tui/test/transcript-compact-packing.test.ts` and native compact-run tests.
-- Coverage: upstream v18.18.6 commits streaming rows through `headEmittedEnd` commit offers, unconditionally since v19.1.0.
-- Required action: capture those streaming-head rows as accepted tape parts in both offer composition and frame recomposition.
-- Coverage: upstream v18.18.6 moves rows with DL/IL instead of repainting on terminals without synchronized output.
-- Required action: keep that absolute-row path off cursor-relative multiplexer frames and preserved resize tails.
-- Owner: upstream `packages/tui/src/tui.ts#emitPlanFrame` gates `#movedRowsSequence`.
-- Proof: preserved-suffix contraction in `packages/tui/test/resize-multiplexer-anchor.test.ts`.
-- Proof: upstream `packages/tui/test/unsynchronized-row-moves.test.ts`.
-- Coverage: upstream v18.18.8 reuses live-tail entry wrappers across each frame's readers (#18705).
-- Required action: keep accepted-tape state beside that cache in `TranscriptContainer`.
-- Coverage: upstream v18.20.1 clips replayed history above finished blocks through `TranscriptContainer#retiresThrough`.
-- Required action: skip emergency layout for a clipped walk while retaining finalized-Assistant tail visibility otherwise.
-- Proof: clipped-head and draining-backlog cases in `packages/tui/test/transcript-container.test.ts`.
-
 ### `MOMP-TMUX-PAGEUP` — Native tmux history access
 
 - Disposition: `MOMP-EIGEN`.
-- Contract: PageUp on a focused empty editor opens tmux copy mode one page up.
-- Contract: drafts, pending images, overlays, non-tmux sessions, and failed tmux commands retain existing handling.
-- Owner: `src/modes/controllers/input-controller.ts` owns the empty-editor PageUp bridge.
-- Implementation constraint: use upstream `hasTerminalMultiplexerSession("tmux")` to detect explicit session ownership.
-- Required action: retain only the empty-editor tmux bridge at the current upstream input-controller seam.
+- Contract: PageUp on a focused empty composer opens tmux copy mode one page up.
+- Contract: drafts (even whitespace), pending images, overlays, non-tmux sessions, and failed tmux commands retain existing handling.
+- Owner: `src/modes/controllers/input-controller.ts#onComposerKey` owns the empty-composer PageUp bridge.
+- Implementation constraint: use upstream `packages/tui/src/driver/mux/detect.ts#hasMultiplexerSession` to detect explicit session ownership.
+- Implementation constraint: composer app bindings run only while the composer has focus, so overlays keep PageUp.
+- Required action: retain only the empty-composer tmux bridge at the current upstream input-controller seam.
 - Reason: current upstream has no tmux copy-mode bridge; this fork-specific capability remains required.
 - Proof: PageUp cases in `test/input-controller-keybindings.test.ts`.
-- Proof: the real tmux PageUp case in `test/tmux-scrollback-exactness.test.ts`.
+- Verification gap: the real-tmux PageUp case targeted the removed Composer API; verify copy mode in the installed TUI.
 
 ### `MOMP-PACKAGE-IDENTITY` — Side-by-side fork identity and update safety
 
@@ -1069,7 +947,8 @@ It also rejects `AGENTS.md` index rows whose IDs or dispositions differ from thi
 - Reason: a shared daemon keeps one `ps` board and one shared-browser claim, while separate directories would race the shared Chrome profile.
 - Coverage: daemon builds compare the shared Utils `VERSION` plus a file-mtime stamp, so the MOMP suffix never orders builds and the newest install wins without ping-pong.
 - Proof: an isolated `OMP_DAEMON_DIR` daemon spawned by the source candidate served installed `omp ps --json` and source `ps --json` from one PID.
-- Owner: `packages/tui/src/prompt/welcome.ts#WelcomeComponent` brands copyable startup-tip invocations using `APP_DISPLAY_NAME` passed through the startup and interactive Composer owners.
+- Owner: `src/ui/welcome/tips.ts#welcomeTip` brands copyable startup-tip invocations with `APP_DISPLAY_NAME`.
+- Owner: `src/modes/interactive/update-notice.tsx#UpdateNotice` renders the identity owner's update source label and action.
 - Owner: `src/extensibility/plugins/legacy-pi-compat.ts` owns installed-package self-import compatibility.
 - Coverage: upstream `loadLegacyPiModule` loads custom tools.
 - Coverage: upstream v18.12.5 owns custom-registry manifest fallback for empty Artifactory `dist-tags`.
@@ -1088,7 +967,7 @@ It also rejects `AGENTS.md` index rows whose IDs or dispositions differ from thi
 - Proof: `test/extension-loader-self-import.test.ts`.
 - Proof: late-profile recovery commands in `test/main-session-resolution-error.test.ts` and actual packed missing-session invocations.
 - Proof: published-identity and profile behavior in `test/utils/resume-command.test.ts`.
-- Proof: terminal and native startup-tip identity in `packages/tui/test/welcome.test.ts` and the actual installed startup surface.
+- Proof: inline-invocation branding with prose left unchanged in `test/ui/welcome/tips-branding.test.ts` and the actual installed startup surface.
 - Proof: actual candidate CLI help, usage errors, and resume recovery hints.
 - Proof: source and packed missing-VHS diagnostics name `omp` and `momp`, respectively.
 - Proof: publish and smoke gates owned by `project-momp-upgrader`.
@@ -1101,27 +980,14 @@ It also rejects `AGENTS.md` index rows whose IDs or dispositions differ from thi
 - Contract: workspace `symbols` (`file: "*"`) without `query` searches the `symbol` name, ignoring its `#N` suffix.
 - Reason: a 30-day session audit (2026-11-20) found 18 workspace symbol searches rejected for a missing `query`.
 - Owner: `src/lsp/tool.ts#LspTool.execute` owns the workspace-symbol query fallback.
-- Contract: typescript-language-server starts on the tsserver of the package behind the resolved `tsc`.
-  This applies when `node_modules/typescript` ships no `lib/tsserver.js`; a usable workspace TypeScript keeps precedence.
-- Reason: alias layouts (`typescript` → `@typescript/typescript6`, `.bin/tsc` → `@typescript/old`) crashed it at initialize.
-  Five local projects used that layout on 2026-11-20.
-- Owner: `src/lsp/config.ts#selectTypescriptServer` sets `initOptions.tsserver.fallbackPath`.
-- Contract: a server without `$/progress` within 2 s of its first opened document or a folder add ends its project-load wait then.
-- Implementation constraint: the window never starts at `initialized`, because warmed-up `tsc --lsp` and clangd begin loading only after `didOpen` (upstream review on PR #20204).
-- Reason: pyright, ty, ruff, and typescript-language-server never report progress and waited for the 15 s fallback.
-  First edits then delivered diagnostics late, and first `lsp diagnostics` calls timed out.
-- Owner: `src/lsp/client.ts#settleProjectLoadWithoutProgress`.
 - Coverage: upstream v19.0.0 filters file-scoped symbol queries through `formatMatchingDocumentSymbols`, so MOMP removed its filter helpers and test.
+- Coverage: upstream v19.2.1 ships the tsserver fallback (`src/lsp/config.ts#selectTypescriptServer`, PR #20202) and the first-open silent-load window (`src/lsp/client.ts#settleProjectLoadWithoutProgress`, PR #20204); MOMP dropped both closures.
 - Owner: the project-settings `lsp.md` override owns guidance for file-rename previews, omitted text-edit details, and name-only symbol lookup.
 - Coverage: upstream v18.11.3 owns configurable LSP call and diagnostic-wait budgets.
 - Required action: render the selected profile prompt with its current timeout variables at the dynamic description owner.
-- Coverage: upstream `main` merged PR #20202 (ISSUE-035, merge `1404e5a60f`) and PR #20204 (ISSUE-037, merge `ccbb881a78`) with the tsserver-fallback and first-open silent-load contracts; no release contains them yet.
-- Required action: retain the rename-preview, workspace-symbol, tsserver-fallback, and silent-load deltas with their prompt and proof.
-  At the first upgrade whose base contains both merges, drop the tsserver-fallback and silent-load closures and their contract lines.
-  Retain each until current upstream satisfies it.
+- Required action: retain the rename-preview and workspace-symbol deltas with their prompt and proof until current upstream satisfies each.
 - Proof: rename-preview cases in `test/tools/lsp-regressions.test.ts`.
 - Proof: the workspace-symbol `symbol` fallback case in `test/tools/lsp-regressions.test.ts`.
-- Proof: the alias-layout tsserver case and the silent-server project-load case in `test/tools/lsp-regressions.test.ts`.
 - Implementation constraint: `lsp-regressions.test.ts` points the agent dir at its empty test home.
   The resolver caches `~/.omp/agent` at import, so an operator `.lsp.json` otherwise leaked into the release proof.
 
@@ -1133,50 +999,40 @@ It also rejects `AGENTS.md` index rows whose IDs or dispositions differ from thi
 - Contract: pending groups, unavailable counters, image-only results, and historic results without metadata omit the total.
 - Contract: Read totals stay visible regardless of `display.showTokenUsage` because they describe tool payload.
 - Contract: single-row, inline-preview, and full Read result titles place the total after the path.
-- Contract: `cfg://` and `proc://` Read cards retain exact-token labels in ANSI and native headers.
 - Owner: `packages/agent/src/tokenizer.ts` owns exact native-count availability.
-- Owner: `src/session/agent-session.ts` owns final Read-result measurement and persisted metadata.
-- Owner: `packages/tui/src/chat/read-tool-group.ts` owns aggregation and compact display.
-- Owner: `packages/tui/src/tools/read-token.ts` owns exact suffix formatting.
-- Owner: `packages/tui/src/tools/read.ts` and `packages/tui/src/tools/fetch.ts` own full-result display.
-- Owner: `packages/tui/src/tools/cfg-render.ts` and `proc-render.ts` own their scheme-specific Read cards.
+- Owner: `src/session/agent-session.ts` owns final Read-result measurement in `ReadToolDetails.readTextTokens`.
+- Owner: `src/ui/transcript/read-group.tsx#readTokensLabel` owns aggregation; `src/ui/styles/transcript/read-group.ts` draws it.
+- Owner: `src/tools/read-token.ts` owns metadata validation and label formatting.
+- Owner: `src/ui/tools/read.tsx#readHead` and `src/ui/styles/tools/read.ts` own full-result display.
+- Coverage: upstream v19.2.1 moves `cfg://` and `proc://` reads to scheme presenters without a Read title; those cards carry no token label.
 - Required action: retain exact-only measurement and every compact and full Read rendering path at the named owners.
 - Proof: exact-count availability cases in `packages/agent/test/tokenizer.test.ts`.
 - Proof: post-TTSR measurement in `test/agent-session-message-pipeline.test.ts`.
-- Proof: aggregation and preview cases in `test/read-tool-group.test.ts`.
-- Proof: merged-selector previews retain their aggregate total in `test/read-tool-group.test.ts`.
-- Proof: per-call labels in both native preview headers in `test/read-tool-group.test.ts`.
-- Proof: full-result and `cfg://`/`proc://` ANSI and native headers in `packages/tui/test/read-render.test.ts`.
+- Proof: single-row, aggregate, delimited, unmeasured, and merged-preview cases in `test/read-tool-group.test.ts`.
 
 ### `MOMP-TEXT-COLOR` — Opt-in response foreground colors
 
 - Disposition: `UPSTREAM-INTEGRIERT`.
 - Contract: `tui.textColors` is a boolean setting, disabled by default, exposed in Appearance settings.
-- Contract: enabling it renders inline `<span style="color:#RRGGBB">text</span>` foreground colors.
+- Contract: enabling it renders inline `<span style="color:#RRGGBB">text</span>` foreground colors in terminal Markdown.
 - Contract: nested spans inherit or override foreground color; closing spans restore their parent.
-- Contract: logical scopes end at inline-block boundaries; emitted color runs close during streaming.
+- Contract: logical scopes end at inline-run boundaries, so an unclosed span never colors later blocks.
 - Contract: foreground tags preserve hard-line-break whitespace trimming without joining adjacent words.
-- Contract: streaming preserves foreground scopes without changing ordinary Markdown rendering when no color span is interpreted.
-- Implementation constraint: interpreted foreground spans disable the current row-splice optimization because it is scope-unaware.
-- Contract: disabled rendering, inline code, hex swatches, block HTML, and compact inline rendering remain unchanged.
-- Contract: foreground colors remain correct when native Markdown rendering is available.
-- Implementation constraint: the current native path uses rendered rows while foreground colors are enabled.
+- Contract: disabled rendering, inline code, hex swatches, and block HTML remain unchanged.
 - Contract: Main UI sessions expose `textColors` to templates from the effective setting.
 - Contract: headless and Child sessions never advertise terminal color guidance.
 - Contract: live setting changes rebuild the Main prompt and Markdown presentation through existing owners.
-- Owner: upstream `packages/tui/src/components/markdown.ts#Markdown` owns scopes, styling, and streaming.
-- Owner: upstream `packages/tui/src/theme/tui-adapters.ts` owns the configured Markdown theme snapshot.
-- Owner: `packages/tui/src/chat/assistant-message.ts#AssistantMessageComponent.describe` selects colored rows.
+- Owner: upstream `packages/tui/src/text/markdown/inline.ts#renderInline` owns span scopes and restoration.
+- Owner: upstream `packages/tui/src/text/markdown/look.ts#setMarkdownLook` carries the host setting; `render.ts#withHostLook` applies it.
 - Owner: MOMP adds `src/modes/settings.ts#cfgTuiTextColors` at the upstream settings owner.
-- Owner: upstream `src/modes/interactive-mode.ts` owns initial and live rendering configuration.
+- Owner: upstream `src/modes/interactive-mode.ts#syncTranscriptDisplaySettings` owns initial and live rendering configuration.
 - Owner: `src/system-prompt.ts` and `src/sdk.ts` own render inputs and session-scoped prompt rebuilds.
 - Owner: project-settings `SYSTEM.template.md` owns guidance inside `{{#if textColors}}`.
-- Reason: upstream strips span attributes and has no opt-in foreground-span or model-guidance contract.
-- Reason: upstream v18.5.1 consumes line-start trimming per token, so zero-width foreground tags must pass it on.
-- Coverage: upstream v18.9.0 exempts headings and links from default prose color; retain that context and MOMP span scopes together.
+- Reason: upstream treats `<span>` as zero-width structure and has no opt-in foreground-span or model-guidance contract.
+- Coverage: upstream v19.2.1 replaces the component Markdown renderer with Tern's `packages/tui/src/text/markdown/` renderer; MOMP re-implemented span scopes in its inline renderer.
+- Verification gap: native (TSP) hosts render Markdown themselves and do not yet draw span colors.
 - Required action: retain the minimal setting, renderer, and conditional-template closure at existing owners.
-- Proof: span scope, wrap/reset, line-break trimming, and disabled rendering in `packages/tui/test/markdown.test.ts`.
-- Proof: native Assistant streaming and finalization in `packages/tui/test/native/transcript-native.test.ts`.
+- Proof: span scope, restoration, line-break trimming, and disabled rendering in `packages/tui/test/markdown/text-colors.test.ts`.
 - Proof: live Main UI and headless prompt cases in `test/system-prompt-templates.test.ts`.
 - Proof: render both deployed template branches and interact with the actual TUI.
 

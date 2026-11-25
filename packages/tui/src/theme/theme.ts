@@ -8,6 +8,7 @@ import type { Theme } from "./contract";
 import {
 	BACKGROUND_KEYS,
 	type ColorValue,
+	DEFAULT_CACHE_MISS_COLOR,
 	FOREGROUND_KEYS,
 	OPTIONAL_KEYS,
 	type SymbolPreset,
@@ -169,6 +170,7 @@ export class ResolvedTheme implements Theme {
 			colors.mdExtensionLink = mixHex(intended(colors.text), intended(colors.mdLink), EXTENSION_LINK_TINT);
 		}
 		colors.thinkingMax ??= colors.thinkingXhigh ?? "";
+		colors.cacheMiss ??= DEFAULT_CACHE_MISS_COLOR;
 
 		this.name = json.name;
 		this.json = json;

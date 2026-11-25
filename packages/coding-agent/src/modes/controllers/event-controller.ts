@@ -37,7 +37,7 @@ import {
 	settleWithJobFrame,
 	toolRenderName,
 } from "../../session/transcript/tool-execution";
-import { textContent } from "../../session/transcript/transcript-entry";
+import { userDisplayText } from "../../session/transcript/transcript-entry";
 import {
 	assistantHasVisibleContent,
 	assistantUsageIsBilled,
@@ -1476,7 +1476,10 @@ export class EventController {
 			const matchedLocalSubmission = this.ctx.locallySubmittedUserSignatures.delete(signature);
 			const replacesOptimistic =
 				this.ctx.optimisticUserMessageSignature !== undefined && !wasOptimistic && !matchedLocalSubmission;
-			if (wasOptimistic) {
+			if (wasOptimistic && event.message.commandInvocation) {
+				// The optimistic row drew the bare draft; the canonical message carries the command provenance.
+				this.ctx.replaceOptimisticUserMessage(event.message);
+			} else if (wasOptimistic) {
 				this.ctx.clearOptimisticUserMessage();
 			} else if (replacesOptimistic) {
 				this.ctx.replaceOptimisticUserMessage(event.message);

@@ -23,6 +23,7 @@ import {
 	formatTruncationMetaNotice,
 	stripOutputNotice,
 } from "../../tools/output-meta-format";
+import { formatReadTokenLabel, readTokenCount } from "../../tools/read-token";
 import { shortenPath } from "../../utils/render-utils";
 import type { ToolActivity, ToolHead, ToolPresenter, ToolResult, ToolView, ToolViewState } from "./contract";
 import { resultText } from "./default";
@@ -87,6 +88,8 @@ export interface ReadTerm {
 	readonly error?: string;
 	readonly summarySpans?: number;
 	readonly conflicts?: number;
+	/** Exact Read-token label after the path. */
+	readonly tokens?: string;
 	readonly language?: string;
 	/** The text the cell shows. */
 	readonly content?: string;
@@ -141,6 +144,8 @@ function readHead(rawPath: string, args: ReadArgs | undefined, details?: ReadToo
 	const summary = (details as { summary?: { elidedSpans: number } } | undefined)?.summary;
 	if (summary) meta.push(`summary: ${summary.elidedSpans} elided span${summary.elidedSpans === 1 ? "" : "s"}`);
 	const conflicts = (details as { conflictCount?: number } | undefined)?.conflictCount ?? 0;
+	const tokens = readTokenCount(details);
+	if (tokens !== undefined) meta.push(formatReadTokenLabel(tokens));
 	const href = fileHref(readLinkPath(details));
 	return {
 		title: "Read",
@@ -380,6 +385,7 @@ function readResult(result: ToolResult<ReadToolDetails>, state: ToolViewState, a
 	const markdown = isMarkdown(details, args);
 	const summary = (details as { summary?: { elidedSpans: number } } | undefined)?.summary;
 	const conflicts = (details as { conflictCount?: number } | undefined)?.conflictCount ?? 0;
+	const readTokens = readTokenCount(details);
 	return {
 		head,
 		inline: true,
@@ -406,6 +412,7 @@ function readResult(result: ToolResult<ReadToolDetails>, state: ToolViewState, a
 			...(suffix ? { correctedFrom: shortenPath(suffix.from) } : {}),
 			...(summary ? { summarySpans: summary.elidedSpans } : {}),
 			...(conflicts > 0 ? { conflicts } : {}),
+			...(readTokens !== undefined ? { tokens: formatReadTokenLabel(readTokens) } : {}),
 			content,
 			...(details?.displayContent ? { startLine: details.displayContent.startLine } : {}),
 			...(details?.displayContent?.lineNumbers ? { lineNumbers: details.displayContent.lineNumbers } : {}),

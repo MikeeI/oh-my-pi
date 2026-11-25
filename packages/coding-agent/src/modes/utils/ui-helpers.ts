@@ -58,6 +58,7 @@ import type {
 	AssistantView,
 	CompactionQueuedMessage,
 	InteractiveModeContext,
+	NewVersionNotificationOptions,
 	PendingTool,
 	RenderInitialMessagesOptions,
 	RenderSessionContextOptions,
@@ -1043,8 +1044,8 @@ export class UiHelpers {
 		);
 	}
 
-	showNewVersionNotification(newVersion: string): void {
-		this.ctx.present(() => jsx(UpdateNotice, { version: newVersion }));
+	showNewVersionNotification(newVersion: string, options: NewVersionNotificationOptions = {}): void {
+		this.ctx.present(() => jsx(UpdateNotice, { version: newVersion, ...options }));
 	}
 
 	/** Feed the queued-message band: the session's steering and follow-ups, plus the compaction queue. */

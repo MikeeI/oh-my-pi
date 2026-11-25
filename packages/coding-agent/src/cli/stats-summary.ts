@@ -1,5 +1,5 @@
 import type { AgentType, AggregatedStats, SummaryStats } from "@oh-my-pi/omp-stats/shared-types";
-import { replaceTabs } from "@oh-my-pi/pi-tui";
+import { replaceTabs } from "../utils/text-width";
 import { formatDuration, formatNumber, formatPercent, sanitizeText } from "@oh-my-pi/pi-utils";
 
 const STATS_SUMMARY_RANGES = ["24h", "7d", "30d"] as const;

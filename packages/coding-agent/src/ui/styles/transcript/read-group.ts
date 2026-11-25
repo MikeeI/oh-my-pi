@@ -47,7 +47,7 @@ function headPath(cx: PaintContext, row: ReadTermRow): string {
 	const theme = cx.theme;
 	let out = row.path ? link(cx, row, theme.fg("accent", row.path)) : theme.fg("toolOutput", "…");
 	if (row.selectors) out += theme.fg("accent", row.selectors);
-	return out + notes(cx, row);
+	return out + notes(cx, row) + (row.tokens ? theme.fg("dim", ` · ${row.tokens}`) : "");
 }
 
 /** A tree row's path: dim directory, the name in the file color (a URL whole), muted selectors. */
@@ -135,9 +135,12 @@ function paintReadGroup(node: UiNode, cx: PaintContext): Block {
 			rows.push(...wrap(`${pad}${glyph(cx, single.status)} ${title(cx)} ${headPath(cx, single)}`.trimEnd(), width));
 			for (const usage of single.usage) rows.push(...wrap(theme.fg("dim", indent + usage), width));
 		}
+		// Previews of one file merged into one row get the aggregate above their per-call heads.
+		if (term.tokens) rows.push(...wrap(`${pad}${bullet} ${title(cx)}${theme.fg("dim", ` · ${term.tokens}`)}`, width));
 		return { rows: [...rows, ...previews] };
 	}
-	const rows = wrap(`${pad}${bullet} ${title(cx)}${theme.fg("dim", ` (${term.count})`)}`, width);
+	const total = term.tokens ? ` · ${term.tokens}` : "";
+	const rows = wrap(`${pad}${bullet} ${title(cx)}${theme.fg("dim", ` (${term.count})${total}`)}`, width);
 	const tree = term.tree ?? [];
 	const branch = theme.symbols.symbol("tree.branch");
 	const last = theme.symbols.symbol("tree.last");

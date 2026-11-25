@@ -23,6 +23,7 @@ import { formatDuration, formatNumber, isUrlLikePath, sanitizeText } from "@oh-m
 import type { TspCardStatus, TspSpan, TspText, TspTone } from "@oh-my-pi/pi-wire";
 import { splitUrlScheme } from "../../internal-urls/url-scheme";
 import type { ReadToolDetails } from "../../tools/details/read";
+import { formatReadTokenLabel, readTokenCount } from "../../tools/read-token";
 import { shortenPath } from "../../utils/render-utils";
 import { fileHref } from "../tools/file-common";
 import { ContentCode, firstSelectorLine, readLinkPath, splitTarget } from "../tools/read";
@@ -359,6 +360,26 @@ function usageByRow(rows: readonly SummaryRow[], usage: readonly ReadUsageRow[])
 	return out;
 }
 
+/**
+ * The exact Read-token label of `entries`: each executed call counts once however many rows it
+ * renders, and a pending or unmeasured call omits the whole total rather than under-reporting it.
+ */
+function readTokensLabel(entries: Iterable<ReadEntry>): string | undefined {
+	const seen = new Set<string>();
+	let total = 0;
+	for (const entry of entries) {
+		if (seen.has(entry.id)) continue;
+		seen.add(entry.id);
+		const tokens = entry.status === "pending" ? undefined : readTokenCount(entry.result?.details);
+		if (tokens === undefined) return undefined;
+		total += tokens;
+	}
+	return seen.size > 0 ? formatReadTokenLabel(total) : undefined;
+}
+
+/** The scheme whose compact reads keep their resolved body one expansion away. */
+const SKILL_SCHEME = "skill";
+
 // ---------------------------------------------------------------- the model
 
 /** Options of a read group. */
@@ -641,9 +662,13 @@ export class ReadGroup {
 		return this.#usage().get(id);
 	}
 
-	/** Whether a read shows its content. */
+	/**
+	 * Whether a read shows its content. An opened skill load shows its body even with previews off:
+	 * skill reads group compactly only because their full instructions stay one expansion away.
+	 */
 	previews(entry: ReadEntry): boolean {
-		return this.showContentPreview && entry.contentText !== undefined;
+		if (entry.contentText === undefined) return false;
+		return this.showContentPreview || (entry.expanded && splitUrlScheme(entry.path)?.scheme === SKILL_SCHEME);
 	}
 
 	/** The group's status: error, else running (cancelled once sealed) while a read is pending, else done. */
@@ -668,6 +693,8 @@ export interface ReadTermRow {
 	readonly selectors: string;
 	readonly correctedFrom?: string;
 	readonly conflicts?: number;
+	/** Exact Read-token label drawn after the path (single rows and preview heads only). */
+	readonly tokens?: string;
 	readonly usage: readonly string[];
 	/** Where the path links: the file read (at its first selected line), else a web URL. */
 	readonly link?: { readonly file?: string; readonly url?: string; readonly line?: number };
@@ -704,6 +731,8 @@ export type ReadGroupTerm = {
 	readonly single?: ReadTermRow;
 	/** Tree rows (several rows), previews left out. */
 	readonly tree?: readonly ReadTermRow[];
+	/** Exact Read-token total after `Read (N)`, or above previews merged into one row. */
+	readonly tokens?: string;
 	readonly previews?: readonly ReadTermPreview[];
 };
 
@@ -740,7 +769,7 @@ function termLink(row: SummaryRow): ReadTermRow["link"] {
 	return line === undefined ? { file } : { file, line };
 }
 
-function termRow(row: SummaryRow, usage: readonly ReadUsageRow[]): ReadTermRow {
+function termRow(row: SummaryRow, usage: readonly ReadUsageRow[], tokens?: string): ReadTermRow {
 	const corrected = rowCorrectedFrom(row);
 	const conflicts = rowConflicts(row);
 	const link = termLink(row);
@@ -749,6 +778,7 @@ function termRow(row: SummaryRow, usage: readonly ReadUsageRow[]): ReadTermRow {
 		...pathParts(row),
 		...(corrected ? { correctedFrom: shortenPath(corrected) } : {}),
 		...(conflicts ? { conflicts } : {}),
+		...(tokens ? { tokens } : {}),
 		usage: usage.map(usageLine),
 		...(link ? { link } : {}),
 	};
@@ -858,6 +888,7 @@ function GroupNode(props: GroupNodeProps): JSXNode {
 	const rows = group.rows(entries);
 	const status = group.status(entries);
 	const previews = entries.filter(entry => entry.status !== "error" && group.previews(entry));
+	const tokens = readTokensLabel(entries);
 	const body: JSXNode[] = [];
 	let collapsible = previews.length > 0;
 	let head: {
@@ -891,6 +922,7 @@ function GroupNode(props: GroupNodeProps): JSXNode {
 							],
 						}
 					: {}),
+				...(tokens ? { meta: [...(corrected ? [`corrected from ${shortenPath(corrected)}`] : []), tokens] } : {}),
 			};
 			if (rowStatus(row) === "error") {
 				const full = rowError(row);
@@ -911,7 +943,7 @@ function GroupNode(props: GroupNodeProps): JSXNode {
 			body.push(<UsageText usage={usage} nodeKey={`u${i}`} />);
 		});
 	} else {
-		head = { target: `${rows.length} files`, targetKind: "text" };
+		head = { target: `${rows.length} files`, targetKind: "text", ...(tokens ? { meta: [tokens] } : {}) };
 		const listed = group.rows(entries.filter(entry => !previews.includes(entry)));
 		const usage = group.usageFor(listed);
 		listed.forEach((row, index) => {
@@ -924,6 +956,8 @@ function GroupNode(props: GroupNodeProps): JSXNode {
 			const split = splitTarget(entry.path);
 			const sectionHead: TspSpan[] = [{ s: "path", t: shortenPath(split.path) || "…" }];
 			if (split.sel) sectionHead.push({ s: "muted", t: `:${split.sel}` });
+			const ownTokens = readTokensLabel([entry]);
+			if (ownTokens) sectionHead.push({ s: "dim", t: ` · ${ownTokens}` });
 			body.push(
 				<section
 					key={`p${entry.id}`}
@@ -1037,6 +1071,7 @@ function groupTerm(
 				],
 			},
 			[],
+			readTokensLabel([entry]),
 		);
 		const usage = group.usageOf(entry.id);
 		return {
@@ -1054,19 +1089,26 @@ function groupTerm(
 	if (rows.length === 1) {
 		const row = rows[0]!;
 		const rowPreviews = previews.filter((_, i) => row.targets.some(target => target.entry === previewed[i]));
-		const single = rowPreviews.length > 0 ? undefined : termRow(row, group.usageFor(rows).get(0) ?? []);
+		const single =
+			rowPreviews.length > 0
+				? undefined
+				: termRow(row, group.usageFor(rows).get(0) ?? [], readTokensLabel(row.targets.map(target => target.entry)));
+		const merged = !single && previewed.length > 1 ? readTokensLabel(entries) : undefined;
 		return {
 			look: "read-group",
 			count: 1,
 			...(single ? { single } : {}),
+			...(merged ? { tokens: merged } : {}),
 			previews: rowPreviews,
 		};
 	}
 	const listed = group.rows(entries.filter(entry => !group.previews(entry)));
 	const usage = group.usageFor(listed);
+	const tokens = readTokensLabel(entries);
 	return {
 		look: "read-group",
 		count: rows.length,
+		...(tokens ? { tokens } : {}),
 		tree: listed.map((row, index) => termRow(row, usage.get(index) ?? [])),
 		previews,
 	};
