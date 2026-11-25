@@ -472,6 +472,7 @@ It also rejects `AGENTS.md` index rows whose IDs or dispositions differ from thi
 - Coverage: upstream v19.0.0 exports `USER_AGENTS` to `src/web/scrapers/utils.ts`, which walks the same identity order.
 - Required action: capture upstream header walls only after the same-identity 429 retry.
 - Proof: `test/web-scraper-user-agent.test.ts`.
+- Proof: upstream `test/tools/fetch-user-agent-retry.test.ts`, keyed to identity position, with its 429 case pinning same-identity retry.
 - Source: https://developers.google.com/crawling/docs/crawlers-fetchers/google-common-crawlers
 - Source: Chrome Stable 156.0.8078.47, verified 2026-10-21: https://googlechromelabs.github.io/chrome-for-testing/last-known-good-versions.json
 - Source: curl 8.23.0, verified 2026-10-21: https://curl.se/download.html

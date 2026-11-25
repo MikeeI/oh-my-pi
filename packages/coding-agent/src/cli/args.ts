@@ -347,10 +347,10 @@ export function parseArgs(inputArgs: string[], extensionFlags?: Map<string, { ty
 				continue;
 			}
 			const next = args[i + 1];
-			if (next === undefined) {
-				if (!EXTENSION_SHADOWABLE_STRING_FLAGS.has(arg)) throw new Error(`${arg} requires a value`);
-			} else if (next === PROFILE_BOOTSTRAP_BOUNDARY_ARG) {
-				if (!EXTENSION_SHADOWABLE_STRING_FLAGS.has(arg)) throw new Error(`${arg} requires a value`);
+			// `--trusted-extension` keeps upstream's post-parse "non-empty, non-flag value" rejection.
+			const rejectsMissingValue = !EXTENSION_SHADOWABLE_STRING_FLAGS.has(arg) && arg !== "--trusted-extension";
+			if (next === undefined || next === PROFILE_BOOTSTRAP_BOUNDARY_ARG) {
+				if (rejectsMissingValue) throw new Error(`${arg} requires a value`);
 			} else {
 				const consumed = consumeBuiltInStringValue(arg, args, i + 1);
 				i = consumed.index;

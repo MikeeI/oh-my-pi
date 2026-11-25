@@ -57,7 +57,8 @@ describe("STRING_VALUE_FLAGS table is honored by args.ts parseArgs", () => {
 	}
 
 	for (const flag of STRING_VALUE_FLAGS) {
-		if (EXTENSION_SHADOWABLE_STRING_FLAGS.has(flag)) continue;
+		// `--trusted-extension` missing values are pinned by upstream test/cli-extension-path.test.ts.
+		if (EXTENSION_SHADOWABLE_STRING_FLAGS.has(flag) || flag === "--trusted-extension") continue;
 		it(`${flag} rejects a missing value`, () => {
 			// Goal validation is collected for CLI reporting rather than thrown by parseArgs.
 			if (flag === "--goal") {

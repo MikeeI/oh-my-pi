@@ -3,7 +3,10 @@ import * as path from "node:path";
 import { Settings } from "@oh-my-pi/pi-coding-agent/config/settings";
 import type { ToolSession } from "@oh-my-pi/pi-coding-agent/tools";
 import { ReadTool } from "@oh-my-pi/pi-coding-agent/tools/read";
-import { loadPage } from "@oh-my-pi/pi-coding-agent/web/scrapers/types";
+import { loadPage, USER_AGENTS } from "@oh-my-pi/pi-coding-agent/web/scrapers/types";
+
+// MOMP-READ-USER-AGENTS reorders identities; these cases key on position, not on upstream's curl-first order.
+const [FIRST_AGENT, SECOND_AGENT] = USER_AGENTS;
 
 function makeSession(): ToolSession {
 	const cwd = process.cwd();
@@ -30,11 +33,11 @@ describe("read URL refused for one user agent", () => {
 		servers.length = 0;
 	});
 
-	function serveRefusingCurl(refusal: () => Response): Bun.Server<undefined> {
+	function serveRefusingFirstAgent(refusal: () => Response): Bun.Server<undefined> {
 		const server = Bun.serve({
 			port: 0,
 			fetch: request =>
-				request.headers.get("user-agent")?.startsWith("curl/")
+				request.headers.get("user-agent") === FIRST_AGENT
 					? refusal()
 					: new Response(ARTICLE, { headers: { "content-type": "text/html" } }),
 		});
@@ -50,7 +53,7 @@ describe("read URL refused for one user agent", () => {
 	}
 
 	it("reads the page from the next user agent when a bare 403 page names no bot check", async () => {
-		const server = serveRefusingCurl(
+		const server = serveRefusingFirstAgent(
 			() =>
 				new Response("<html><head><title>403 Forbidden</title></head><body><h1>403 Forbidden</h1></body></html>", {
 					status: 403,
@@ -64,8 +67,8 @@ describe("read URL refused for one user agent", () => {
 		expect(text).toContain("Revenue grew in the quarter");
 	});
 
-	it("reads the page from the next user agent when curl receives a 200 challenge page", async () => {
-		const server = serveRefusingCurl(
+	it("reads the page from the next user agent when the first receives a 200 challenge page", async () => {
+		const server = serveRefusingFirstAgent(
 			() =>
 				new Response('<html><body><form><input name="js_challenge" value="1"/></form></body></html>', {
 					headers: { "content-type": "text/html" },
@@ -78,17 +81,17 @@ describe("read URL refused for one user agent", () => {
 		expect(text).toContain("Revenue grew in the quarter");
 	});
 
-	it("still tries the last user agent when the one after curl's challenge gets an error page", async () => {
+	it("still tries the last user agent when the one after the first's challenge gets an error page", async () => {
 		const server = Bun.serve({
 			port: 0,
 			fetch: request => {
 				const agent = request.headers.get("user-agent") ?? "";
-				if (agent.startsWith("curl/")) {
+				if (agent === FIRST_AGENT) {
 					return new Response('<html><body><input name="js_challenge"/></body></html>', {
 						headers: { "content-type": "text/html" },
 					});
 				}
-				if (agent.includes("TextBot")) return new Response("Not Found", { status: 404 });
+				if (agent === SECOND_AGENT) return new Response("Not Found", { status: 404 });
 				return new Response(ARTICLE, { headers: { "content-type": "text/html" } });
 			},
 		});
@@ -138,12 +141,12 @@ describe("read URL refused for one user agent", () => {
 			status: 403,
 		},
 	])(
-		"keeps curl's $blockedBy wall, never ok, when later user agents $later",
+		"keeps the first user agent's $blockedBy wall, never ok, when later user agents $later",
 		async ({ wall, refuse, stop, blockedBy, status }) => {
 			const server = Bun.serve({
 				port: 0,
 				fetch: request => {
-					if (request.headers.get("user-agent")?.startsWith("curl/")) return wall();
+					if (request.headers.get("user-agent") === FIRST_AGENT) return wall();
 					if (stop) server.stop(true);
 					return refuse();
 				},
@@ -160,17 +163,26 @@ describe("read URL refused for one user agent", () => {
 		},
 	);
 
-	it("reads the page from the next user agent before waiting out a 429's Retry-After", async () => {
-		const server = serveRefusingCurl(
-			() => new Response("Too Many Requests", { status: 429, headers: { "retry-after": "10" } }),
-		);
+	// MOMP-READ-USER-AGENTS: a throttle is not a refusal, so the same identity retries after Retry-After.
+	it("retries a 429 under the same user agent after its Retry-After", async () => {
+		const agents: (string | null)[] = [];
+		const server = Bun.serve({
+			port: 0,
+			fetch: request => {
+				agents.push(request.headers.get("user-agent"));
+				if (agents.length === 1) {
+					return new Response("Too Many Requests", { status: 429, headers: { "retry-after": "0" } });
+				}
+				return new Response(ARTICLE, { headers: { "content-type": "text/html" } });
+			},
+		});
+		servers.push(server);
 
-		const started = performance.now();
-		const { method, text } = await readText(server);
+		const result = await loadPage(`http://127.0.0.1:${server.port}/filing.htm`);
 
-		expect(method).not.toBe("failed");
-		expect(text).toContain("Revenue grew in the quarter");
-		expect(performance.now() - started).toBeLessThan(5_000);
+		expect(result.ok).toBe(true);
+		expect(result.content).toContain("Revenue grew in the quarter");
+		expect(agents).toEqual([FIRST_AGENT, FIRST_AGENT]);
 	});
 
 	it("sends a caller's own User-Agent once instead of repeating a refused request, whatever its spelling", async () => {
