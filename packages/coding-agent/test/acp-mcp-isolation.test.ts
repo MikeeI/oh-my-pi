@@ -343,7 +343,7 @@ describe("createAcpSessionFactory system prompts per workspace", () => {
 			const templatePath = `${workspaceB}/.omp/SYSTEM.template.md`;
 			await Bun.write(templatePath, "Workspace B {{cwd}}");
 			await Bun.write(`${workspaceB}/.omp/APPEND_SYSTEM.md`, "Workspace B append");
-			const fakeSession = {} as AgentSession;
+			const fakeSession = { addDisposer: mock(), setScopedModelsRefresher: mock() } as unknown as AgentSession;
 			const captured: CreateAgentSessionOptions[] = [];
 			const factory = createAcpSessionFactory({
 				baseOptions: {
@@ -386,7 +386,7 @@ describe("createAcpSessionFactory system prompts per workspace", () => {
 			const workspaceB = tempDir.join("workspace-b");
 			await Bun.write(`${workspaceB}/.omp/SYSTEM.template.md`, "Workspace B {{cwd}}");
 			await Bun.write(`${workspaceB}/.omp/APPEND_SYSTEM.md`, "Workspace B append");
-			const fakeSession = {} as AgentSession;
+			const fakeSession = { addDisposer: mock(), setScopedModelsRefresher: mock() } as unknown as AgentSession;
 			let captured: CreateAgentSessionOptions | undefined;
 			const factory = createAcpSessionFactory({
 				baseOptions: {
@@ -428,7 +428,7 @@ describe("createAcpSessionFactory system prompts per workspace", () => {
 			authStorage = await AuthStorage.create(tempDir.join("auth.db"));
 			const workspaceB = tempDir.join("workspace-b");
 			await Bun.write(`${workspaceB}/.omp/SYSTEM.template.md`, "{{#if}}");
-			const fakeSession = {} as AgentSession;
+			const fakeSession = { addDisposer: mock(), setScopedModelsRefresher: mock() } as unknown as AgentSession;
 			const factory = createAcpSessionFactory({
 				baseOptions: {
 					systemPrompt: () => ["Workspace A raw marker"],

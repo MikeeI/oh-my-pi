@@ -4,13 +4,10 @@ import type { RoutineProgress } from "@oh-my-pi/pi-coding-agent/extensibility/ro
 import { InputController } from "@oh-my-pi/pi-coding-agent/modes/controllers/input-controller";
 import type { InteractiveModeContext } from "@oh-my-pi/pi-coding-agent/modes/types";
 import { UiHelpers } from "@oh-my-pi/pi-coding-agent/modes/utils/ui-helpers";
+import type { AgentSession } from "@oh-my-pi/pi-coding-agent/session/agent-session";
+import { createInteractiveModeContext } from "./helpers/interactive-mode-context";
 
 function makeCtx() {
-	let text = "";
-	const addToHistory = vi.fn();
-	const setText = vi.fn((next: string) => {
-		text = next;
-	});
 	const runRoutineInvocation = vi.fn(
 		async (_text: string, _options: { onProgress?: (progress: RoutineProgress) => void | Promise<void> } = {}) =>
 			true,
@@ -18,114 +15,70 @@ function makeCtx() {
 	const prompt = vi.fn(
 		async (_text: string, _options?: { streamingBehavior?: "steer" | "followUp"; images?: ImageContent[] }) => true,
 	);
-	const updatePendingMessagesDisplay = vi.fn();
-	const requestRender = vi.fn();
-	const showStatus = vi.fn();
-	const showError = vi.fn();
-	const editor = {
-		onSubmit: undefined as undefined | ((input: string) => Promise<void>),
-		getText: () => text,
-		getExpandedText: () => text,
-		setText,
-		addToHistory,
-		imageLinks: undefined as (string | undefined)[] | undefined,
-		pendingImages: [] as ImageContent[],
-		pendingImageLinks: [] as (string | undefined)[],
-		clearDraft(historyText?: string) {
-			if (historyText !== undefined) addToHistory(historyText);
-			text = "";
-			this.imageLinks = undefined;
-			this.pendingImages = [];
-			this.pendingImageLinks = [];
-		},
-	};
-	const ctx = {
-		editor,
-		focusedAgentId: undefined,
-		collabGuest: undefined,
-		skillCommands: new Map(),
+	const ctx = createInteractiveModeContext({
 		session: {
-			isStreaming: false,
-			isCompacting: false,
-			isBashRunning: false,
-			isEvalRunning: false,
-			queuedMessageCount: 0,
-			extensionRunner: undefined,
-			runRoutineInvocation,
+			runRoutineInvocation: runRoutineInvocation as unknown as AgentSession["runRoutineInvocation"],
+			prompt: prompt as unknown as AgentSession["prompt"],
 			customCommands: [],
-			prompt,
 		},
-		get viewSession() {
-			return (this as typeof ctx).session;
-		},
-		showStatus,
-		showError,
-		updatePendingMessagesDisplay,
-		ui: { requestRender },
-		isBashMode: false,
-		isPythonMode: false,
-		loopModeEnabled: false,
-		goalModeEnabled: false,
-		compactionQueuedMessages: [],
+		skillCommands: new Map(),
 		fileSlashCommands: new Set<string>(),
 		routineSlashCommands: new Set<string>(["review-all"]),
-		locallySubmittedUserSignatures: new Set<string>(),
-		withLocalSubmission: async (_text: string, fn: () => unknown) => fn(),
-		sessionManager: { getSessionId: () => "session", getLeafId: () => null },
-	} as unknown as InteractiveModeContext;
+		withLocalSubmission: async (_text, fn) => fn(),
+		hasActiveBtw: () => false,
+		hasActiveOmfg: () => false,
+	});
 	const helpers = new UiHelpers(ctx);
 	ctx.queueCompactionMessage = helpers.queueCompactionMessage.bind(helpers);
 	ctx.isKnownSlashCommand = helpers.isKnownSlashCommand.bind(helpers);
+	const composer = ctx.composer;
+	const addToHistory = vi.spyOn(composer, "addToHistory");
+	const setImages = (images: ImageContent[], links: (string | undefined)[]) => {
+		composer.pendingImages.splice(0, composer.pendingImages.length, ...images);
+		composer.pendingImageLinks.splice(0, composer.pendingImageLinks.length, ...links);
+	};
 	return {
 		ctx,
-		editor,
+		composer,
+		setImages,
 		addToHistory,
-		setText,
 		runRoutineInvocation,
 		prompt,
-		updatePendingMessagesDisplay,
-		requestRender,
-		showStatus,
-		showError,
+		updatePendingMessagesDisplay: ctx.updatePendingMessagesDisplay,
+		showError: ctx.showError,
 	};
 }
 
 describe("InputController routine dispatch", () => {
 	it("submits routine invocations through the routine runner instead of raw prompt", async () => {
-		const { ctx, editor, addToHistory, runRoutineInvocation, prompt, updatePendingMessagesDisplay, requestRender } =
+		const { ctx, composer, setImages, addToHistory, runRoutineInvocation, prompt, updatePendingMessagesDisplay } =
 			makeCtx();
 		const image: ImageContent = { type: "image", mimeType: "image/png", data: "c3VjY2Vzcw==" };
-		editor.imageLinks = ["local://routine-success.png"];
-		editor.pendingImages = [image];
-		editor.pendingImageLinks = ["local://routine-success.png"];
+		setImages([image], ["local://routine-success.png"]);
 		const controller = new InputController(ctx);
 		controller.setupEditorSubmitHandler();
 
-		await editor.onSubmit?.("/review-all src/foo.ts");
+		await composer.onSubmit?.("/review-all src/foo.ts");
 
 		expect(runRoutineInvocation).toHaveBeenCalledWith("/review-all src/foo.ts", { onProgress: expect.any(Function) });
 		expect(prompt).not.toHaveBeenCalled();
 		expect(addToHistory).toHaveBeenCalledWith("/review-all src/foo.ts");
-		expect(editor.getText()).toBe("");
-		expect(editor.imageLinks).toBeUndefined();
-		expect(editor.pendingImages).toEqual([]);
-		expect(editor.pendingImageLinks).toEqual([]);
+		expect(composer.text()).toBe("");
+		expect(composer.pendingImages).toEqual([]);
+		expect(composer.pendingImageLinks).toEqual([]);
 		expect(updatePendingMessagesDisplay).toHaveBeenCalled();
-		expect(requestRender).toHaveBeenCalled();
 		const sessionState = ctx.session as unknown as { isStreaming: boolean };
 		sessionState.isStreaming = true;
-		await editor.onSubmit?.("next prompt");
+		await composer.onSubmit?.("next prompt");
 		expect(prompt).toHaveBeenCalledWith("next prompt", { streamingBehavior: "steer", images: undefined });
 	});
 
 	it("consumes submitted images but preserves a newer draft when a routine fails", async () => {
-		const { ctx, editor, runRoutineInvocation, prompt, showError } = makeCtx();
+		const { ctx, composer, setImages, runRoutineInvocation, prompt, showError } = makeCtx();
 		const controller = new InputController(ctx);
 		controller.setupEditorSubmitHandler();
 		const image: ImageContent = { type: "image", mimeType: "image/png", data: "ZmFpbHVyZQ==" };
-		editor.imageLinks = ["local://routine-error.png"];
-		editor.pendingImages = [image];
-		editor.pendingImageLinks = ["local://routine-error.png"];
+		setImages([image], ["local://routine-error.png"]);
 		const started = Promise.withResolvers<void>();
 		const release = Promise.withResolvers<void>();
 		runRoutineInvocation.mockImplementationOnce(async () => {
@@ -133,38 +86,37 @@ describe("InputController routine dispatch", () => {
 			await release.promise;
 			throw new Error("routine execution failed");
 		});
-		const submission = editor.onSubmit?.("/review-all src/foo.ts");
+		const submission = composer.onSubmit?.("/review-all src/foo.ts");
 		await started.promise;
-		expect(editor.pendingImages).toEqual([]);
+		expect(composer.pendingImages).toEqual([]);
 		const nextImage: ImageContent = { type: "image", mimeType: "image/png", data: "bmV4dA==" };
-		editor.setText("new draft");
-		editor.pendingImages = [nextImage];
-		editor.pendingImageLinks = ["local://new-draft.png"];
+		composer.setText("new draft");
+		setImages([nextImage], ["local://new-draft.png"]);
 		release.resolve();
 		await submission;
 
 		expect(showError).toHaveBeenCalledWith("routine execution failed");
-		expect(editor.getText()).toBe("new draft");
-		expect(editor.pendingImages).toEqual([nextImage]);
-		expect(editor.pendingImageLinks).toEqual(["local://new-draft.png"]);
+		expect(composer.text()).toBe("new draft");
+		expect(composer.pendingImages).toEqual([nextImage]);
+		expect(composer.pendingImageLinks).toEqual(["local://new-draft.png"]);
 
 		expect(prompt).not.toHaveBeenCalled();
 	});
 
 	it("queues routine submissions until compaction hands off", async () => {
-		const { ctx, editor, runRoutineInvocation, prompt } = makeCtx();
+		const { ctx, composer, setImages, runRoutineInvocation, prompt } = makeCtx();
 		const controller = new InputController(ctx);
 		controller.setupEditorSubmitHandler();
 		const image: ImageContent = { type: "image", mimeType: "image/png", data: "aW1hZ2U=" };
 		const sessionState = ctx.session as unknown as { isCompacting: boolean };
 		sessionState.isCompacting = true;
-		editor.pendingImages = [image];
+		setImages([image], [undefined]);
 		prompt.mockImplementationOnce(async submittedText => {
 			await runRoutineInvocation(submittedText, { onProgress: () => {} });
 			return true;
 		});
 
-		await editor.onSubmit?.("/review-all src/foo.ts [Image #1]");
+		await composer.onSubmit?.("/review-all src/foo.ts [Image #1]");
 
 		expect(runRoutineInvocation).not.toHaveBeenCalled();
 		expect(ctx.compactionQueuedMessages).toEqual([
@@ -183,9 +135,9 @@ describe("InputController routine dispatch", () => {
 	});
 
 	it("delegates follow-up routine invocations before raw follow-up prompt", async () => {
-		const { ctx, editor, addToHistory, runRoutineInvocation, prompt } = makeCtx();
+		const { ctx, composer, addToHistory, runRoutineInvocation, prompt } = makeCtx();
 		const controller = new InputController(ctx);
-		editor.setText("/review-all src/foo.ts");
+		composer.setText("/review-all src/foo.ts");
 
 		const started = Promise.withResolvers<void>();
 		const release = Promise.withResolvers<void>();
@@ -196,14 +148,14 @@ describe("InputController routine dispatch", () => {
 		});
 		const submission = controller.handleFollowUp();
 		await started.promise;
-		editor.setText("next follow-up draft");
+		composer.setText("next follow-up draft");
 		release.resolve();
 		await submission;
 
 		expect(runRoutineInvocation).toHaveBeenCalledWith("/review-all src/foo.ts", { onProgress: expect.any(Function) });
 		expect(prompt).not.toHaveBeenCalled();
 		expect(addToHistory).toHaveBeenCalledWith("/review-all src/foo.ts");
-		expect(editor.getText()).toBe("next follow-up draft");
+		expect(composer.text()).toBe("next follow-up draft");
 	});
 
 	it("recognizes colon-form routine invocations as known slash commands", () => {

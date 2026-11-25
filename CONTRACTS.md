@@ -686,6 +686,9 @@ It also rejects `AGENTS.md` index rows whose IDs or dispositions differ from thi
 - Coverage: upstream v18.20.0 groups `--help` tools through `src/tools/builtin-names.ts#BUILTIN_TOOL_HELP`, keyed by every built-in.
 - Required action: keep its default-on `conversation_search` entry so help groups match the top-level tool plan.
 - Proof: upstream `test/tools/builtin-defaults.test.ts` matches that help group to the default top-level tool plan.
+- Coverage: upstream v16.2.11 requires a `docs/tools/<name>.md` root doc for every built-in tool name.
+- Owner: `docs/tools/conversation-search.md` documents the tool for `omp://`.
+- Proof: upstream `test/internal-urls/docs-tool-coverage.test.ts` finds that doc.
 - Required action: preserve discovery failures through search coverage accounting.
 - Coverage: upstream v18.12.0 follows transcript symlinks, skips symlinked buckets, and deduplicates physical files.
 - Owner: upstream `src/session/session-listing.ts#scanBucketFiles` owns cross-bucket enumeration.
