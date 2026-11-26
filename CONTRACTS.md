@@ -239,6 +239,8 @@ It also rejects `AGENTS.md` index rows whose IDs or dispositions differ from thi
 - Contract: existing live or persisted Child prompt bytes are not rewritten by template edits.
 - Contract: changing the security-reviewer source invalidates a security plan's workflow fingerprint.
 - Owner: `src/prompts/user-prompt-source.ts` owns the shared strict Tool and Agent override file boundary.
+- Required action: detect dangling overrides with `readlink` after a missing `stat`, never `lstat`.
+- Reason: every absent override runs that probe during tool construction, and upstream `test/tools/path-literal-colon-selector.test.ts` stubs `fs.lstatSync` without its options.
 - Owner: `src/task/agents.ts` owns agent rendering and parsing; `src/task/discovery.ts` retains discovery precedence.
 - Owner: `src/task/index.ts` and `src/task/structured-subagent.ts` use the session profile for Task and Eval discovery.
 - Owner: upstream `src/task/index.ts#TaskTool.discoverAgents` passes the session's configuration directory to Task discovery.

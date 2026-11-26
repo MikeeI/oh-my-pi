@@ -1,5 +1,6 @@
 import * as fs from "node:fs";
 import * as path from "node:path";
+import { isEnoent } from "@oh-my-pi/pi-utils";
 
 export interface UserPromptSourceOptions {
 	agentDir: string;
@@ -22,7 +23,7 @@ export function resolveUserPromptSource(options: UserPromptSourceOptions): UserP
 	try {
 		stat = fs.statSync(overridePath, { throwIfNoEntry: false });
 		// A dangling symlink is configured, not absent; it must not silently select the fallback.
-		if (!stat && fs.lstatSync(overridePath, { throwIfNoEntry: false })) {
+		if (!stat && isSymlink(overridePath)) {
 			throw new Error(`Dangling prompt symlink: ${overridePath}`);
 		}
 	} catch (error) {
@@ -43,4 +44,19 @@ export function resolveUserPromptSource(options: UserPromptSourceOptions): UserP
 		throw new Error(`${label} must not be empty: ${overridePath}`);
 	}
 	return { source, filePath: overridePath };
+}
+
+/**
+ * Whether `target` itself is a symlink, for a path `stat` already reported missing.
+ * `readlink` instead of `lstat`: tool construction runs this on every absent override, and
+ * upstream suites globally stub `fs.lstatSync` (Windows NTFS-stream cases) without its options.
+ */
+function isSymlink(target: string): boolean {
+	try {
+		fs.readlinkSync(target);
+		return true;
+	} catch (error) {
+		if (isEnoent(error)) return false;
+		throw error;
+	}
 }
