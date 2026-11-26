@@ -6,7 +6,7 @@ Each linked `issues/ISSUE-NNN.md` is the complete authoritative record for one r
 This file owns `Next-Finding-ID` and projects current issue-file state.
 `Next-Action` is the 2–6 word `Next-Action/Summary` projection from the issue record.
 When a row disagrees with its issue file, correct the row from the issue file in the same task.
-ISSUE-020, ISSUE-023, and ISSUE-024 are paused at the user's request; their lifecycle states do not authorize investigation.
+ISSUE-020 is paused at the user's request; its lifecycle state does not authorize investigation.
 
 Next finding ID: ISSUE-040
 
@@ -23,10 +23,6 @@ Next finding ID: ISSUE-040
 | [ISSUE-016](issues/ISSUE-016.md) | RPC wait: every event wake rescans the complete turn history | Investigating | Not-Selected | Not-Selected | Medium | Benchmark RPC completion wait | Not published. |
 | [ISSUE-017](issues/ISSUE-017.md) | Session stats: aggregate messages through four full passes | Investigating | Not-Selected | Not-Selected | Low | Benchmark session stats scans | Not published. |
 | [ISSUE-020](issues/ISSUE-020.md) | Read: internal-first mixed batches do not split | Submitted | Pull-Request-Implementation | New-pull-request | High | Await explicit investigation resumption | https://github.com/can1357/oh-my-pi/pull/10578 |
-| [ISSUE-021](issues/ISSUE-021.md) | tmux width resize duplicates an unfinished live row | Investigating | Not-Selected | Not-Selected | High | Verify upstream width recurrence | Not published. |
-| [ISSUE-022](issues/ISSUE-022.md) | tmux height burst erases finalized transcript tail on Stop | Investigating | Not-Selected | Not-Selected | High | Verify upstream height recurrence | Not published. |
-| [ISSUE-023](issues/ISSUE-023.md) | tmux: preserve resize leaves duplicate editor and status rows | Investigating | Not-Selected | Not-Selected | High | Await explicit investigation resumption | Not published. |
-| [ISSUE-024](issues/ISSUE-024.md) | tmux: stale paints detach the resize cursor anchor and overwrite accepted rows | Investigating | Not-Selected | Not-Selected | High | Await explicit investigation resumption | Not published. |
 | [ISSUE-025](issues/ISSUE-025.md) | Task lifecycle: finished subagents stay fully live with only a time bound | Investigating | Not-Selected | Not-Selected | High | Measure representative live Child cost | Not published. |
 | [ISSUE-028](issues/ISSUE-028.md) | Anthropic prompt cache: every new session re-writes the unanchored `<project-context>` block | Submitted | Research-and-Reporting | Existing-issue-comment | Medium | Await maintainer decision | https://github.com/can1357/oh-my-pi/issues/16883#issuecomment-6387558568 |
 | [ISSUE-029](issues/ISSUE-029.md) | Codex prompt cache: sibling affinity follows the session headers, so sharing `prompt_cache_key` has no effect | Submitted | Research-and-Reporting | Existing-issue-comment | Low | Await maintainer decision | https://github.com/can1357/oh-my-pi/issues/16884#issuecomment-6387558727 |
@@ -51,6 +47,10 @@ Next finding ID: ISSUE-040
 | [ISSUE-019](issues/archive/ISSUE-019.md) | GitHub errors omit structured and request context | Pull-Request-Implementation | New-pull-request | Medium | Merged | https://github.com/can1357/oh-my-pi/pull/10581 |
 | [ISSUE-026](issues/archive/ISSUE-026.md) | Output notices: middle-elided sink output names the wrong shown line ranges | Not-Selected | Not-Selected | Medium | Fixed-Elsewhere | Not published. |
 | [ISSUE-027](issues/archive/ISSUE-027.md) | Prompt discovery: user templates ignore `PI_CODING_AGENT_DIR` | Not-Selected | Not-Selected | Medium | Fixed-Elsewhere | Not published. |
+| [ISSUE-021](issues/archive/ISSUE-021.md) | tmux width resize duplicates an unfinished live row | Not-Selected | Not-Selected | High | Superseded | Not published. |
+| [ISSUE-022](issues/archive/ISSUE-022.md) | tmux height burst erases finalized transcript tail on Stop | Not-Selected | Not-Selected | High | Superseded | Not published. |
+| [ISSUE-023](issues/archive/ISSUE-023.md) | tmux: preserve resize leaves duplicate editor and status rows | Not-Selected | Not-Selected | High | Superseded | Not published. |
+| [ISSUE-024](issues/archive/ISSUE-024.md) | tmux: stale paints detach the resize cursor anchor and overwrite accepted rows | Not-Selected | Not-Selected | High | Superseded | Not published. |
 | [ISSUE-030](issues/archive/ISSUE-030.md) | Status line: Mistral Vibe login keys bill a subscription but render as metered spend | Research-and-Reporting | New-issue | Medium | Fixed-Elsewhere | https://github.com/can1357/oh-my-pi/issues/18374 |
 | [ISSUE-031](issues/archive/ISSUE-031.md) | Prompt cache: a role edit in one instance rewrites every live session's task tool description | Research-and-Reporting | New-issue | High | Fixed-Elsewhere | https://github.com/can1357/oh-my-pi/issues/18716 |
 | [ISSUE-033](issues/archive/ISSUE-033.md) | Anthropic prompt cache: a tool activated mid-session re-writes the system and message cache | Research-and-Reporting | New-issue | High | Fixed-Elsewhere | https://github.com/can1357/oh-my-pi/issues/19826 |

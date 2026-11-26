@@ -1,6 +1,6 @@
 # ISSUE-022 — tmux height burst erases finalized transcript tail on Stop
 
-State: Investigating
+State: Archived
 Authorized-Work: Not-Selected
 Publication-Target: Not-Selected
 External-Reference: Not published.
@@ -8,7 +8,7 @@ Contribution-Priority: High
 Root-Cause-Confidence: High
 Finding-Category: Correctness
 Created: 2026-09-29
-Updated: 2026-09-29
+Updated: 2026-11-26
 Source: `upstream/main@d1932a6ff85613dde1160b87a73ddcdc3beb01f6`
 
 ## Root-Cause
@@ -80,6 +80,13 @@ Expected: Accepted final rows remain reachable in native tmux history or the vis
 
 ## Next-Action
 
-Summary: Verify upstream height recurrence
-Action: Reproduce the exact preserve-mode height burst and Stop handoff on canonical upstream, then classify overlap with #13661.
-Done-When: Upstream runtime evidence separates ED0 loss from Stop cursor overwrite and establishes whether an external report is useful.
+Summary: —
+Action: None.
+Done-When: None.
+
+## Archive
+
+Archive-Reason: Superseded
+Detail: None.
+Evidence: Upstream v19.2.0 replaced the legacy renderer with Tern; `v19.2.1@b55cd1bb66` no longer contains `packages/tui/src/tui.ts`, which owned the preserve-mode height burst and Stop handoff. The user adopted Tern's resize policy and `MOMP-SCROLLBACK` was retired in `personal@dd3209658a`. A recurrence under Tern is a new finding with new evidence.
+Checked: 2026-11-26

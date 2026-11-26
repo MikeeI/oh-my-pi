@@ -1,6 +1,6 @@
 # ISSUE-021 — tmux width resize duplicates an unfinished live row
 
-State: Investigating
+State: Archived
 Authorized-Work: Not-Selected
 Publication-Target: Not-Selected
 External-Reference: Not published.
@@ -8,7 +8,7 @@ Contribution-Priority: High
 Root-Cause-Confidence: High
 Finding-Category: Correctness
 Created: 2026-09-29
-Updated: 2026-09-29
+Updated: 2026-11-26
 Source: `upstream/main@d1932a6ff85613dde1160b87a73ddcdc3beb01f6`
 
 ## Root-Cause
@@ -79,6 +79,13 @@ Expected: Each accepted transcript row occurs once across tmux history and the v
 
 ## Next-Action
 
-Summary: Verify upstream width recurrence
-Action: Reproduce the recorded width-CPR sequence against current canonical upstream and compare its first normal frame with the MOMP correction.
-Done-When: The upstream disposition and the exact external target, if useful, are supported by a real tmux capture without broadening the local fork fix.
+Summary: —
+Action: None.
+Done-When: None.
+
+## Archive
+
+Archive-Reason: Superseded
+Detail: None.
+Evidence: Upstream v19.2.0 replaced the legacy renderer with Tern; `v19.2.1@b55cd1bb66` no longer contains `packages/tui/src/tui.ts`, whose `#resolveResizeAnchor` and `#emitPlanFrame` owned this cause. The user adopted Tern's resize policy and `MOMP-SCROLLBACK` was retired in `personal@dd3209658a`. A recurrence under Tern is a new finding with new evidence.
+Checked: 2026-11-26

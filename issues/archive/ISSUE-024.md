@@ -1,6 +1,6 @@
 # ISSUE-024 — tmux: stale paints detach the resize cursor anchor and overwrite accepted rows
 
-State: Investigating
+State: Archived
 Authorized-Work: Not-Selected
 Publication-Target: Not-Selected
 External-Reference: Not published.
@@ -8,7 +8,7 @@ Contribution-Priority: High
 Root-Cause-Confidence: High
 Finding-Category: Correctness
 Created: 2026-09-30
-Updated: 2026-10-06
+Updated: 2026-11-26
 Source: `upstream/main@8ac1309bd8adaddc891eeb389c545345073875be`
 
 The Source field names the local canonical-upstream comparison snapshot, not a completed upstream runtime reproduction.
@@ -83,10 +83,10 @@ Expected: all accepted markers remain reachable once, and the newly painted edit
 
 ### Runnable diagnostic
 
-- [Driver](evidence/issue-023/followup-driver.ts): production components, input/write/paint observers, and explicit diagnostic interventions.
-- [Runner](evidence/issue-023/followup-runner.ts): finite tmux protocol, no-resize controls, stage captures, and cleanup.
-- [Exact command trace](evidence/issue-023/followup/commands-history-probe-history-cpr.json): commands, times, socket, and stage summaries for the key comparison.
-- [Buffer-boundary query trace](evidence/issue-023/followup/commands-history-cursor-observe.json): additional DSR queries around alternate-buffer entry and exit.
+- [Driver](../evidence/issue-023/followup-driver.ts): production components, input/write/paint observers, and explicit diagnostic interventions.
+- [Runner](../evidence/issue-023/followup-runner.ts): finite tmux protocol, no-resize controls, stage captures, and cleanup.
+- [Exact command trace](../evidence/issue-023/followup/commands-history-probe-history-cpr.json): commands, times, socket, and stage summaries for the key comparison.
+- [Buffer-boundary query trace](../evidence/issue-023/followup/commands-history-cursor-observe.json): additional DSR queries around alternate-buffer entry and exit.
 
 Run from the repository root with a fresh output directory:
 
@@ -102,8 +102,8 @@ Do not run `history-cpr` as corrected-runtime verification: it deliberately rewr
 
 ### Decisive server-side chronology
 
-The full [tmux server log](evidence/issue-023/verified-fix/tmux-baseline-server.log.gz) is retained losslessly.
-The [indexed chronology](evidence/issue-023/verified-fix/tmux-cursor-chronology.json) preserves the decisive original lines.
+The full [tmux server log](../evidence/issue-023/verified-fix/tmux-baseline-server.log.gz) is retained losslessly.
+The [indexed chronology](../evidence/issue-023/verified-fix/tmux-cursor-chronology.json) preserves the decisive original lines.
 
 1. [O] Line 118402, `1790723048.975201`: tmux changes its native grid to 79×39.
 2. [O] Line 118404: tmux moves the cursor from zero-based row 32 to 38, preserving global row 82.
@@ -116,11 +116,11 @@ The [indexed chronology](evidence/issue-023/verified-fix/tmux-cursor-chronology.
 [S] Its cursor relocation retains the global content coordinate when history is pulled back into the grid.
 Sources: https://github.com/tmux/tmux/blob/3.4/window.c and https://github.com/tmux/tmux/blob/3.4/screen.c
 
-The [ordered baseline](evidence/issue-023/baseline-ordered-77adac/) reproduces the failure with a corrected title barrier.
+The [ordered baseline](../evidence/issue-023/baseline-ordered-77adac/) reproduces the failure with a corrected title barrier.
 Frames and barrier titles now share `ProcessTerminal`'s output pump rather than racing direct stdout writes.
 This rules out the diagnostic title ordering as the cause of the accepted-row loss.
 
-The corrected [raw runtime trace](evidence/issue-023/verified-fix/history-probe-resize.jsonl) receives `CSI 39;18 R`.
+The corrected [raw runtime trace](../evidence/issue-023/verified-fix/history-probe-resize.jsonl) receives `CSI 39;18 R`.
 No CPR translation is active in that run.
 All 32 accepted markers remain exactly once in its subsequent full-grid/history snapshots.
 
@@ -128,14 +128,14 @@ All 32 accepted markers remain exactly once in its subsequent full-grid/history 
 
 Each snapshot retains `live`, `full`, `historySize`, extracted native `history`, and the actual TUI paint with logical draft and hardware cursor.
 
-- [Before resize](evidence/issue-023/followup/history-probe-resize-initial.json): all accepted content and one box.
-- [After shrink](evidence/issue-023/followup/history-probe-resize-shrunk.json): all accepted markers survive; history size is 50.
-- [After grow](evidence/issue-023/followup/history-probe-resize-settled.json): markers 29–31 disappear and two status strips remain.
-- [After another contraction](evidence/issue-023/followup/history-probe-resize-contract.json): three physical status strips, one requested strip.
-- [After later history append](evidence/issue-023/followup/history-probe-resize-scroll.json): missing accepted markers do not return.
-- [Unmodified raw events](evidence/issue-023/followup/history-probe-resize.jsonl): resize signals, raw CPR, delivered input, terminal writes, and completed paints.
-- [Extra cursor queries](evidence/issue-023/followup/history-cursor-observe-resize.jsonl): row 33 is already reported before the grow's alternate-buffer entry.
-- [Computed causal facts](evidence/issue-023/followup/causal-analysis.json): marker inventories, cursor replies, first CUP, and absence of ED0/ED3 in the damaging frame.
+- [Before resize](../evidence/issue-023/followup/history-probe-resize-initial.json): all accepted content and one box.
+- [After shrink](../evidence/issue-023/followup/history-probe-resize-shrunk.json): all accepted markers survive; history size is 50.
+- [After grow](../evidence/issue-023/followup/history-probe-resize-settled.json): markers 29–31 disappear and two status strips remain.
+- [After another contraction](../evidence/issue-023/followup/history-probe-resize-contract.json): three physical status strips, one requested strip.
+- [After later history append](../evidence/issue-023/followup/history-probe-resize-scroll.json): missing accepted markers do not return.
+- [Unmodified raw events](../evidence/issue-023/followup/history-probe-resize.jsonl): resize signals, raw CPR, delivered input, terminal writes, and completed paints.
+- [Extra cursor queries](../evidence/issue-023/followup/history-cursor-observe-resize.jsonl): row 33 is already reported before the grow's alternate-buffer entry.
+- [Computed causal facts](../evidence/issue-023/followup/causal-analysis.json): marker inventories, cursor replies, first CUP, and absence of ED0/ED3 in the damaging frame.
 
 ### Isolating counterfactual
 
@@ -147,7 +147,7 @@ The raw and delivered replies are separately logged; this is an explicit diagnos
 - [O] Later contraction still leaves two strips because the preservation flag and erasure suppression were not changed.
 - [O] Subsequent history append retains all accepted preface markers in the intervention but only 0–28 in the unmodified run.
 
-Evidence: [intervention raw events](evidence/issue-023/followup/history-cpr-resize.jsonl), [settled frame](evidence/issue-023/followup/history-cpr-resize-settled.json), [later contraction](evidence/issue-023/followup/history-cpr-resize-contract.json), and [later history](evidence/issue-023/followup/history-cpr-resize-scroll.json).
+Evidence: [intervention raw events](../evidence/issue-023/followup/history-cpr-resize.jsonl), [settled frame](../evidence/issue-023/followup/history-cpr-resize-settled.json), [later contraction](../evidence/issue-023/followup/history-cpr-resize-contract.json), and [later history](../evidence/issue-023/followup/history-cpr-resize-scroll.json).
 
 This separates two causal boundaries: correct anchoring prevents accepted-row overwrite, but it does not repair later mutable-row erasure.
 A cleanup-only fix cannot substitute for anchor recovery.
@@ -222,7 +222,7 @@ These lifecycle guards retain the existing `MOMP-SCROLLBACK` contract at its cur
 [O] The final focused gate comprises 89 passing tests, zero failures, and 1,306 assertions across nine files.
 [O] TUI and coding-agent type checks, scoped Oxlint fixes, and formatting completed successfully.
 
-Final source hash and gate accounting: [final-verification.json](evidence/issue-023/verified-fix/final-verification.json).
+Final source hash and gate accounting: [final-verification.json](../evidence/issue-023/verified-fix/final-verification.json).
 The earlier 54-snapshot core capture has a separately recorded source hash and predates the final fullscreen guards.
 The final real-tmux regression includes those guards.
 Real Termius/iOS client rendering remains unmeasured.
@@ -237,6 +237,13 @@ Release commits, artifact identity, and the permanent release-test gate are reco
 
 ## Next-Action
 
-Summary: Await explicit investigation resumption
-Action: Wait for an explicit user request to resume this finding; do not run diagnostics or require device follow-up while paused.
-Done-When: The user explicitly resumes this finding and selects one bounded continuation.
+Summary: —
+Action: None.
+Done-When: None.
+
+## Archive
+
+Archive-Reason: Superseded
+Detail: None.
+Evidence: Upstream v19.2.0 replaced the legacy renderer with Tern; `v19.2.1@b55cd1bb66` no longer contains `packages/tui/src/tui.ts`, which owned the resize cursor anchor and stale paints. The user adopted Tern's resize policy and `MOMP-SCROLLBACK` was retired in `personal@dd3209658a`. The pause no longer applies; a recurrence under Tern is a new finding with new evidence.
+Checked: 2026-11-26

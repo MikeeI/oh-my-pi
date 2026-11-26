@@ -1,6 +1,6 @@
 # ISSUE-023 — tmux: preserve resize leaves duplicate editor and status rows
 
-State: Investigating
+State: Archived
 Authorized-Work: Not-Selected
 Publication-Target: Not-Selected
 External-Reference: Not published.
@@ -8,7 +8,7 @@ Contribution-Priority: High
 Root-Cause-Confidence: High
 Finding-Category: UI
 Created: 2026-09-29
-Updated: 2026-10-06
+Updated: 2026-11-26
 Source: `upstream/main@8ac1309bd8adaddc891eeb389c545345073875be`
 
 The Source field identifies the local upstream comparison baseline, not an observed upstream failure.
@@ -29,7 +29,7 @@ Both demonstrated causes and their resize lifecycle corrections are deployed in 
 This record owns mutable-row erasure; [ISSUE-024](ISSUE-024.md) owns stale absolute paints before SIGWINCH.
 The original bounded-erasure proposal is retained below as historical design evidence, not current instructions.
 Do not restart generic tmux diagnosis or substitute transcript-only tests for the retained real-terminal proofs.
-The complete retained terminal evidence is repository-owned under [evidence/issue-023/](evidence/issue-023/).
+The complete retained terminal evidence is repository-owned under [evidence/issue-023/](../evidence/issue-023/).
 The diagnostic driver and execution protocol are included below, so neither `/tmp` nor the previous conversation is required to reconstruct the experiment.
 All three iPhone/Termius screenshots are archived, linked, and interpreted below.
 The follow-up includes actual terminal input during production Edit-preview updates, authoritative paint plans, and separate live-grid/native-history captures.
@@ -269,28 +269,28 @@ Use the named symbols when navigating a later source tree.
 
 ### Retained raw evidence
 
-The initial fourteen diagnostic capture files and all three user screenshots are preserved under [evidence/issue-023/](evidence/issue-023/).
-The separate [follow-up archive](evidence/issue-023/followup/) retains the new input, paint, history, and CPR experiments.
+The initial fourteen diagnostic capture files and all three user screenshots are preserved under [evidence/issue-023/](../evidence/issue-023/).
+The separate [follow-up archive](../evidence/issue-023/followup/) retains the new input, paint, history, and CPR experiments.
 The fourteen diagnostic files were copied from `/tmp/momp-resize-audit-K15Q5J/` and verified byte-identical with `diff -qr`.
 The repository copies, not the temporary directory, are the evidence owner.
 
-- [chrome-after.txt](evidence/issue-023/chrome-after.txt): complete 39-row failing capture with three editor/status boxes.
-- [chrome-control.txt](evidence/issue-023/chrome-control.txt): complete 39-row control capture with one box.
-- [chrome.jsonl](evidence/issue-023/chrome.jsonl): timestamped outgoing TUI writes for the exact double/triple-box reproduction.
-- [chrome-control.jsonl](evidence/issue-023/chrome-control.jsonl): outgoing writes for the no-resize control.
-- [composer-resize.jsonl](evidence/issue-023/composer-resize.jsonl): real multiline-editor contraction after 79×39 → 79×22 → 79×39.
-- [composer-control.jsonl](evidence/issue-023/composer-control.jsonl): corresponding contraction without resize.
-- [resized.jsonl](evidence/issue-023/resized.jsonl): raw TUI contraction and full-height-repaint persistence experiment.
-- [control.jsonl](evidence/issue-023/control.jsonl): raw TUI no-resize contraction control.
-- [cursor.jsonl](evidence/issue-023/cursor.jsonl): real-editor width-shrink experiment with a nonzero cursor column.
-- [overlay.jsonl](evidence/issue-023/overlay.jsonl): fullscreen-overlay 80×19 → 80×13 → 80×19 round trip.
-- [covered.jsonl](evidence/issue-023/covered.jsonl): fullscreen-overlay height grow from 80×19 to 80×25.
-- [transcript-writes.log](evidence/issue-023/transcript-writes.log): original Assistant fixture through 79×39 → 164×19 → 79×39 and finalization.
-- [continuation-writes.log](evidence/issue-023/continuation-writes.log): finalized transcript through a 164×19 → 164×13 → 164×19 burst and a subsequent Assistant block.
-- [keyboard-writes.log](evidence/issue-023/keyboard-writes.log): analogous 79×39 → 79×22 → 79×39 burst and continuation.
-- [user-typing-during-edit.jpg](evidence/issue-023/user-typing-during-edit.jpg): the user's original device screenshot showing repeated draft text during an Edit preview.
-- [user-editor-overlap-235236.png](evidence/issue-023/user-editor-overlap-235236.png): the second device screenshot showing apparently empty editor chrome, overlapping border fragments, and transcript/TODO content below the visible editor/status region.
-- [user-tool-preview-overlap-235440.png](evidence/issue-023/user-tool-preview-overlap-235440.png): the third device screenshot showing Edit-preview text and stacked border/background fragments below an apparently empty input/status region while newer Assistant text is visible above.
+- [chrome-after.txt](../evidence/issue-023/chrome-after.txt): complete 39-row failing capture with three editor/status boxes.
+- [chrome-control.txt](../evidence/issue-023/chrome-control.txt): complete 39-row control capture with one box.
+- [chrome.jsonl](../evidence/issue-023/chrome.jsonl): timestamped outgoing TUI writes for the exact double/triple-box reproduction.
+- [chrome-control.jsonl](../evidence/issue-023/chrome-control.jsonl): outgoing writes for the no-resize control.
+- [composer-resize.jsonl](../evidence/issue-023/composer-resize.jsonl): real multiline-editor contraction after 79×39 → 79×22 → 79×39.
+- [composer-control.jsonl](../evidence/issue-023/composer-control.jsonl): corresponding contraction without resize.
+- [resized.jsonl](../evidence/issue-023/resized.jsonl): raw TUI contraction and full-height-repaint persistence experiment.
+- [control.jsonl](../evidence/issue-023/control.jsonl): raw TUI no-resize contraction control.
+- [cursor.jsonl](../evidence/issue-023/cursor.jsonl): real-editor width-shrink experiment with a nonzero cursor column.
+- [overlay.jsonl](../evidence/issue-023/overlay.jsonl): fullscreen-overlay 80×19 → 80×13 → 80×19 round trip.
+- [covered.jsonl](../evidence/issue-023/covered.jsonl): fullscreen-overlay height grow from 80×19 to 80×25.
+- [transcript-writes.log](../evidence/issue-023/transcript-writes.log): original Assistant fixture through 79×39 → 164×19 → 79×39 and finalization.
+- [continuation-writes.log](../evidence/issue-023/continuation-writes.log): finalized transcript through a 164×19 → 164×13 → 164×19 burst and a subsequent Assistant block.
+- [keyboard-writes.log](../evidence/issue-023/keyboard-writes.log): analogous 79×39 → 79×22 → 79×39 burst and continuation.
+- [user-typing-during-edit.jpg](../evidence/issue-023/user-typing-during-edit.jpg): the user's original device screenshot showing repeated draft text during an Edit preview.
+- [user-editor-overlap-235236.png](../evidence/issue-023/user-editor-overlap-235236.png): the second device screenshot showing apparently empty editor chrome, overlapping border fragments, and transcript/TODO content below the visible editor/status region.
+- [user-tool-preview-overlap-235440.png](../evidence/issue-023/user-tool-preview-overlap-235440.png): the third device screenshot showing Edit-preview text and stacked border/background fragments below an apparently empty input/status region while newer Assistant text is visible above.
 
 JSONL records contain `t` as epoch milliseconds, `width`, `height`, and escaped outgoing `data`.
 The three `.log` files are raw terminal-write streams produced by `PI_TUI_WRITE_LOG`, not JSONL.
@@ -404,14 +404,14 @@ No user's live pane was resized, cleared, or stopped.
 
 #### Reproduction owners and retained protocol
 
-- [followup-driver.ts](evidence/issue-023/followup-driver.ts) owns production Composer, CustomEditor, TranscriptContainer, Edit ToolExecutionComponent, and AssistantMessageComponent construction.
-- [followup-runner.ts](evidence/issue-023/followup-runner.ts) owns finite waits, fresh no-resize controls, isolated tmux sockets, snapshots, and server cleanup.
-- [Initial command trace](evidence/issue-023/followup/commands.json) preserves the `tool`, `typing`, and `raw-scroll` run.
-- [Ordinary large-result trace](evidence/issue-023/followup/commands-finalize.json) preserves the `finalize` counterprobe.
-- [Short-result and accepted-history trace](evidence/issue-023/followup/commands-finalize-short-history-tool.json) preserves `finalize-short` and `history-tool`.
-- [CPR isolation trace](evidence/issue-023/followup/commands-history-probe-history-cpr.json) preserves the unchanged-input and CPR-only intervention runs.
-- [Buffer-boundary cursor trace](evidence/issue-023/followup/commands-history-cursor-observe.json) distinguishes cursor detachment from alternate-buffer restoration.
-- [Computed causal facts](evidence/issue-023/followup/causal-analysis.json) records exact draft checks, physical/planned status counts, marker inventories, raw/delivered CPR, and first damaging CUP.
+- [followup-driver.ts](../evidence/issue-023/followup-driver.ts) owns production Composer, CustomEditor, TranscriptContainer, Edit ToolExecutionComponent, and AssistantMessageComponent construction.
+- [followup-runner.ts](../evidence/issue-023/followup-runner.ts) owns finite waits, fresh no-resize controls, isolated tmux sockets, snapshots, and server cleanup.
+- [Initial command trace](../evidence/issue-023/followup/commands.json) preserves the `tool`, `typing`, and `raw-scroll` run.
+- [Ordinary large-result trace](../evidence/issue-023/followup/commands-finalize.json) preserves the `finalize` counterprobe.
+- [Short-result and accepted-history trace](../evidence/issue-023/followup/commands-finalize-short-history-tool.json) preserves `finalize-short` and `history-tool`.
+- [CPR isolation trace](../evidence/issue-023/followup/commands-history-probe-history-cpr.json) preserves the unchanged-input and CPR-only intervention runs.
+- [Buffer-boundary cursor trace](../evidence/issue-023/followup/commands-history-cursor-observe.json) distinguishes cursor detachment from alternate-buffer restoration.
+- [Computed causal facts](../evidence/issue-023/followup/causal-analysis.json) records exact draft checks, physical/planned status counts, marker inventories, raw/delivered CPR, and first damaging CUP.
 
 Each `<scenario>-<control|resize>.jsonl` logs outgoing writes and completed paints.
 The later `history-probe`, `history-cpr`, and `history-cursor-observe` runs additionally log raw terminal input, resize signals, and delivered CPR.
@@ -436,7 +436,7 @@ The later safety additions change output selection and collision rejection, not 
 6. [O] `finalize-short-resize-contract`: an ordinary unexpanded eight-line Edit completes with unchanged diff contents; its viewport shrinks from 13 to 12 rows and leaves a duplicate bottom border on row 13.
 7. [O] Every corresponding no-resize control removes its superseded rows correctly.
 
-Evidence: [contracted tool](evidence/issue-023/followup/tool-resize-contract.json), [new Assistant above old preview](evidence/issue-023/followup/tool-resize-assistant.json), [typed draft](evidence/issue-023/followup/typing-resize-typed.json), [cleared draft](evidence/issue-023/followup/typing-resize-cleared.json), and [ordinary completion border](evidence/issue-023/followup/finalize-short-resize-contract.json).
+Evidence: [contracted tool](../evidence/issue-023/followup/tool-resize-contract.json), [new Assistant above old preview](../evidence/issue-023/followup/tool-resize-assistant.json), [typed draft](../evidence/issue-023/followup/typing-resize-typed.json), [cleared draft](../evidence/issue-023/followup/typing-resize-cleared.json), and [ordinary completion border](../evidence/issue-023/followup/finalize-short-resize-contract.json).
 Their matching controls are retained under the same names with `control` replacing `resize`.
 
 The completed short Edit needs neither an artificial diff reduction nor manual expansion to expose a stale border.
@@ -551,7 +551,7 @@ Contribution fit: correct the fork regression first; no upstream publication tar
 
 [O] The original failures were reproduced on `personal@77adac703fc417e0692d0f1e2946ece747d83421` before editing runtime code.
 That source already includes upstream 18.4.4; this is not a fix tested only against the earlier release.
-The [fresh baseline archive](evidence/issue-023/baseline-77adac/) retains the repeated tool, typing, history, and finalization failures.
+The [fresh baseline archive](../evidence/issue-023/baseline-77adac/) retains the repeated tool, typing, history, and finalization failures.
 
 [S] The sole production implementation owner is `packages/tui/src/tui.ts`.
 The change remains part of `MOMP-SCROLLBACK`, disposition `UPSTREAM-INTEGRIERT`.
@@ -587,9 +587,9 @@ Matching final dimensions after a net-zero burst did not mean the parked-offset 
 The final writer requires an established mutable-window snapshot before using relative cursor movement.
 Both reproductions now pass, alongside the existing width, tail-preservation, and Stop contracts.
 
-- [Stale fullscreen CPR failure](evidence/issue-023/verified-fix/fullscreen-before.txt).
-- [Intermediate candidate's real-tmux failure](evidence/issue-023/verified-fix/fullscreen-intermediate-before.txt).
-- [Final source identity and gate accounting](evidence/issue-023/verified-fix/final-verification.json).
+- [Stale fullscreen CPR failure](../evidence/issue-023/verified-fix/fullscreen-before.txt).
+- [Intermediate candidate's real-tmux failure](../evidence/issue-023/verified-fix/fullscreen-intermediate-before.txt).
+- [Final source identity and gate accounting](../evidence/issue-023/verified-fix/final-verification.json).
 
 The intermediate candidate failure is not claimed as an independently reproduced upstream defect.
 The original fullscreen experiment below remains a historical non-failure; the new cases exercise different boundaries.
@@ -597,7 +597,7 @@ The original fullscreen experiment below remains a historical non-failure; the n
 ### Retained successful core captures
 
 [O] Five diagnostic scenarios and their no-resize controls produced 54 retained snapshots across ten isolated panes.
-The [core manifest](evidence/issue-023/verified-fix/verification.json) records their source hash and computed assertions.
+The [core manifest](../evidence/issue-023/verified-fix/verification.json) records their source hash and computed assertions.
 These captures precede the final fullscreen hardening; the final permanent regression includes that hardening.
 [O] Physical status counts match the current paint plan without obsolete preview or draft copies.
 [O] The actual typed draft remains exact; clearing it removes both input markers from the full pane history and grid.
@@ -862,7 +862,7 @@ The original same-top sketch was insufficient by itself; the final regression al
 [O] TUI and coding-agent type checks plus scoped Oxlint and formatting complete successfully.
 
 The three new Composer cases passed first; the remaining 86 tests then passed without repeating those cases.
-The [final manifest](evidence/issue-023/verified-fix/final-verification.json) records their combined accounting and runtime hash.
+The [final manifest](../evidence/issue-023/verified-fix/final-verification.json) records their combined accounting and runtime hash.
 A repeatable full invocation is:
 
 ```bash
@@ -1024,6 +1024,13 @@ Baseline captures remain immutable; successful core captures and final implement
 
 ## Next-Action
 
-Summary: Await explicit investigation resumption
-Action: Wait for an explicit user request to resume this finding; do not run diagnostics or require device follow-up while paused.
-Done-When: The user explicitly resumes this finding and selects one bounded continuation.
+Summary: —
+Action: None.
+Done-When: None.
+
+## Archive
+
+Archive-Reason: Superseded
+Detail: None.
+Evidence: Upstream v19.2.0 replaced the legacy renderer with Tern; `v19.2.1@b55cd1bb66` no longer contains `packages/tui/src/tui.ts`, `terminal.ts`, `prompt/composer.ts`, or `status-line/component.ts`, which owned the duplicated editor and status rows. The user adopted Tern's resize policy and `MOMP-SCROLLBACK` was retired in `personal@dd3209658a`. The pause no longer applies; a recurrence under Tern is a new finding with new evidence.
+Checked: 2026-11-26
