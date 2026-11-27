@@ -8,7 +8,7 @@ This file owns `Next-Finding-ID` and projects current issue-file state.
 When a row disagrees with its issue file, correct the row from the issue file in the same task.
 ISSUE-020 is paused at the user's request; its lifecycle state does not authorize investigation.
 
-Next finding ID: ISSUE-040
+Next finding ID: ISSUE-041
 
 ## Open-Findings
 
@@ -29,6 +29,7 @@ Next finding ID: ISSUE-040
 | [ISSUE-032](issues/ISSUE-032.md) | Usage: Mistral Vibe Code budget is not reported | Submitted | Pull-Request-Implementation | New-pull-request | Medium | Await maintainer review | https://github.com/can1357/oh-my-pi/pull/18723 |
 | [ISSUE-034](issues/ISSUE-034.md) | Compaction: the grace-cap pass aborts a running remote speculation and re-sends it | Submitted | Pull-Request-Implementation | New-pull-request | High | Await maintainer review | https://github.com/can1357/oh-my-pi/pull/20201 |
 | [ISSUE-038](issues/ISSUE-038.md) | Startup: a cold built-in account default starts on another provider when no local discovery provider is enabled | Investigating | Not-Selected | Not-Selected | Medium | Select contribution path | Not published. |
+| [ISSUE-040](issues/ISSUE-040.md) | TUI: a running tool card taller than its viewport allocation collapses to a 2-row stub over blank rows | Investigating | Not-Selected | Not-Selected | Medium | Verify PR 20642 head | Not published. |
 
 ## Archived-Findings
 
