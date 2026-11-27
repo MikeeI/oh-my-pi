@@ -81,6 +81,23 @@ fn exit_status_and_exit_trap() {
 	assert_eq!(out, "1\n");
 }
 
+/// A nested shell runs its EXIT trap when its script runs out, not only on
+/// `exit`; a sourced file's end and a subshell's own end must not fire the
+/// shell's trap early, and an explicit `exit` must not run it twice.
+#[test]
+fn exit_trap_runs_when_the_script_ends() {
+	let (out, ..) = run("bash -c 'trap \"echo bye\" EXIT; echo body'; echo $?");
+	assert_eq!(out, "body\nbye\n0\n");
+	let (out, ..) = run("bash -c 'trap \"echo bye\" EXIT; echo body; exit 3'; echo $?");
+	assert_eq!(out, "body\nbye\n3\n");
+	let fs = MemFs::new();
+	fs.add_file("/t.sh", b"trap 'echo T' EXIT\necho body\n", 0o644);
+	fs.add_file("/lib.sh", b"echo lib\n", 0o644);
+	fs.add_file("/s.sh", b". /lib.sh\ntrap 'echo S' EXIT\n( : )\necho end\n", 0o644);
+	let out = run_script(FakeHost::new().with_fs(fs), b"bash /t.sh; bash /s.sh", &[], Fault::None);
+	assert_eq!(String::from_utf8_lossy(&out.stdout), "body\nT\nlib\nend\nS\n");
+}
+
 /// Invocation flags: set flags, inherited `SHELLOPTS`, `sh` is posix mode.
 #[test]
 fn options_from_flags_environment_and_name() {
