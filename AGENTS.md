@@ -115,6 +115,7 @@ Paths starting with `src/` or `scripts/` are relative to `packages/coding-agent/
 | `MOMP-LSP` | `UPSTREAM-INTEGRIERT` | Rename-preview and workspace-symbol LSP extensions | `src/lsp/utils.ts`, `src/lsp/tool.ts` |
 | `MOMP-READ-TOKEN-COUNT` | `UPSTREAM-INTEGRIERT` | Exact Read token totals | `packages/agent/src/tokenizer.ts`, `src/session/agent-session.ts`, `src/tools/details/read.ts`, `src/tools/read-token.ts`, `src/ui/transcript/read-group.tsx`, `src/ui/styles/transcript/read-group.ts`, `src/ui/tools/read.tsx`, `src/ui/styles/tools/read.ts` |
 | `MOMP-TEXT-COLOR` | `UPSTREAM-INTEGRIERT` | Opt-in response foreground colors | `packages/tui/src/text/markdown/inline.ts`, `packages/tui/src/text/markdown/look.ts`, `packages/tui/src/text/markdown/render.ts`, `src/modes/settings.ts`, `src/modes/interactive-mode.ts`, `src/system-prompt.ts`, `src/sdk.ts` |
+| `MOMP-TOOL-ALLOCATION` | `UPSTREAM-INTEGRIERT` | Tall tool cards fill their viewport allocation | `src/ui/styles/tools/block.ts`, `src/ui/styles/tools/default.ts`, `src/ui/styles/tools/bash.ts`, `src/ui/styles/tools/mcp.ts`, `src/ui/styles/tools/find.ts`, `src/ui/styles/tools/glob.ts`, `src/ui/styles/tools/grep.ts`, `src/ui/styles/tools/tool-command.ts`, `packages/tui/src/term/paint.ts`, `packages/tui/src/driver/images/anchor.ts` |
 
 ### Upstream Cutover and Delta Lifecycle
 

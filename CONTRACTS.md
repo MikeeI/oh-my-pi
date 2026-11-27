@@ -1042,6 +1042,26 @@ It also rejects `AGENTS.md` index rows whose IDs or dispositions differ from thi
 - Proof: live Main UI and headless prompt cases in `test/system-prompt-templates.test.ts`.
 - Proof: render both deployed template branches and interact with the actual TUI.
 
+### `MOMP-TOOL-ALLOCATION` — Tall tool cards fill their viewport allocation
+
+- Disposition: `UPSTREAM-INTEGRIERT`.
+- Contract: a transcript tool card taller than a viewport allocation of 3 or more rows paints exactly that many rows.
+- Contract: those rows are the card's heading rows over its newest rows, so a running Task or Eval card never shows a stub above blank rows.
+- Contract: the heading is the look's `Block.heading`, else the rows through its first non-blank row.
+- Contract: an anchored image is kept whole or dropped, rows that draw nothing spend no room, and hits are clipped to kept rows.
+- Contract: 1-row and 2-row allocations keep upstream's status line and `╭─`/`╰` frame-edge stub.
+- Owner: upstream `src/ui/styles/tools/block.ts#paintAllocated` owns the allocation decision; MOMP adds `#headAndTail` there.
+- Owner: `packages/tui/src/term/paint.ts#Block.heading` carries heading rows; `src/ui/styles/tools/` default, bash, mcp, find, glob, grep, and tool-command looks report them.
+- Owner: `packages/tui/src/driver/images/anchor.ts#anchoredRise` measures an anchored image's reserved rows.
+- Implementation constraint: the `hasGraphics` import and `ANCHOR` pattern in `anchor.ts` match upstream `1b8799b5bf`, which the v19.2.1 base lacks.
+- Reason: upstream v19.2.1 and `upstream/main@b8b13c3eb3` paint a 2-row stub for any too-small allocation; the rest becomes blank pin rows and the card flips per row of growth (ISSUE-040).
+- Coverage: the delta is open upstream PR #20642 at `6d18ffc0db` without its changelog entry.
+- Required action: once a selected base contains #20642 or an equivalent fix, classify `UPSTREAM-GEDECKT` and remove this closure, including the `anchor.ts` prerequisite upstream then owns.
+- Required action: until then keep the closure equal to the PR head; refresh it from a newer PR head instead of diverging.
+- Proof: `test/tools/tool-block-allocation.test.ts`.
+- Proof: `bun issues/evidence/issue-040/repro-allocation.ts` paints 3–14 row allocations at full height and shows no blank rows between card and dock.
+- Verification gap: headless frames do not prove Termius/iOS rendering; confirm on the installed TUI inside tmux.
+
 ### Experiments and non-contract artifacts
 
 Changelogs, formatting-only commits, test migrations, proposals, and experiments do not justify runtime retention.

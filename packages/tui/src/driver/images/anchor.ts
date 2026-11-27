@@ -8,9 +8,13 @@
  * row, draws, and restores the cursor. The other rows are reserved: empty
  * but not blank (a reset), so nothing treats them as trimmable padding.
  */
+import { hasGraphics } from "../output/ansi";
 
 /** A reserved image row. */
 export const RESERVED_ROW = "\x1b[0m";
+
+/** The cursor move up to an image's first row, at the start of its sequence. */
+const ANCHOR = /\x1b7\x1b\[(\d+)A/;
 
 /** `rows` rows drawing `sequence` from the first one. A single row is the bare sequence. */
 export function anchoredRows(sequence: string, rows: number): string[] {
@@ -18,6 +22,17 @@ export function anchoredRows(sequence: string, rows: number): string[] {
 	const out: string[] = Array.from({ length: height - 1 }, () => RESERVED_ROW);
 	out.push(height === 1 ? sequence : `\x1b7\x1b[${height - 1}A${sequence}\x1b8`);
 	return out;
+}
+
+/**
+ * Rows an anchored image's draw row moves up over (its reserved rows, see
+ * {@link anchoredRows}), however the rows were decorated (tinted, indented);
+ * 0 for any other row. Row trimmers keep those rows with it, or drop them all.
+ */
+export function anchoredRise(row: string): number {
+	if (!hasGraphics(row)) return 0;
+	const up = ANCHOR.exec(row);
+	return up ? Number(up[1]) : 0;
 }
 
 /** `rows` reserved rows (an image whose pixels are not ready yet). */
