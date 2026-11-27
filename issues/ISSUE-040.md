@@ -25,7 +25,7 @@ Trigger [S]: The card's natural height plus one row per other active block excee
 Reach [O]: Task card, 14-row screen, 3-row dock, one other active block: 7 body rows show whole and 8 collapse to the stub plus 8 blank rows.
 Impact [O]: Without hysteresis, one row of growth or shrink flips between the full card and the stub, which the user sees as jumping.
 Impact [O]: User report on `momp/19.2.1-mikeei-1` over Termius/tmux on iOS: `• Todo`, `╭─ Task · running`, `╰`, then about 10 blank rows above the dock.
-Impact [A]: Eval cards show the same stub labelled `Eval`; this rests on the shared `paintAllocated` route and was not reproduced with the eval look.
+Impact [O]: Eval cards hit the same route; with #20642 applied, a running eval cell keeps its `╭─── 🐍 ⣾ running <title>` edge over its newest rows (see Evidence).
 Impact [S]: No transcript loss; the settled block is written whole to history.
 Frequency [A]: Highest on small mobile panes (keyboard, landscape, tmux status bar); not measured.
 
@@ -40,6 +40,10 @@ Frequency [A]: Highest on small mobile panes (keyboard, landscape, tmux status b
 - [O] [repro-allocation.ts](evidence/issue-040/repro-allocation.ts) output on 2026-11-27: `paint h=14 -> 2 rows`, `h=13 -> 2`, `h=9 -> 2`, `h=2 -> 2`, `h=1 -> 1` for a 15-row card.
 - [O] The same script's backend frames: body rows 7 → full card, 8 and 9 → `⣽ Todo 0s`, `╭─ Task 0s`, `╰`, 8 blank rows, dock; 9 → 7 → 9 flips between the two.
 - [O] An in-memory candidate painter (compact head plus newest rows for heights > 2) filled the allocation without blank rows on the same scenario; not a recorded patch.
+- [O] #20642 head `6d18ffc0db` applied to `personal` as `MOMP-TOOL-ALLOCATION` (2026-11-27): the same script paints `h=14 -> 14`, `h=13 -> 13`, `h=9 -> 9`, `h=2 -> 2`, `h=1 -> 1`; frames for body rows 8 and 9 show the heading over the newest rows and no blank rows before the dock.
+- [O] Eval variant (`ToolBlock` with a 12-line running cell and 40 output lines): `h=9` and `h=4` keep the cell's titled edge, newest output rows, closing edge, and agent row.
+- [O] Eval output phase without `details.cells` keeps its first non-blank row (`… (31 earlier lines …)`); that look draws no title at full height either, so nothing is lost.
+- [O] `bun test packages/coding-agent/test/tools/tool-block-allocation.test.ts packages/tui/test/term/elastic-slots.test.tsx packages/coding-agent/test/subagent-hud-render.test.ts` → 93 pass, 0 fail; `check` in `packages/coding-agent` and `packages/tui` passes.
 
 ## Bug-Reproduction
 
@@ -60,32 +64,32 @@ Gaps: Discord not searched.
 - Archived ISSUE-021..024 — tmux resize integrity; different root cause.
 
 Contribution fit: #20642 owns the correction; a separate PR or issue would duplicate it.
-An Existing-pull-request-comment fits only if verification finds a case its head does not fix (for example the eval look, which sets no `heading`).
+An Existing-pull-request-comment fits only if verification finds a case its head does not fix; the Task and eval checks found none.
 
 ## Proposed-Change
 
 None beyond #20642.
-Verify its head against this finding's scenario and the eval look; contribute only evidence it lacks.
+MOMP carries its head without the changelog entry as `MOMP-TOOL-ALLOCATION` until a released base contains it.
 
 ## Scope-and-Constraints
 
 - Preserve: the 1-row and 2-row compact fallbacks, newest-first allocation, the bottom pin, and whole-block history on settle.
 - Exclude: dock-size reduction, `display.pinnedAgents` tuning, and allocation hysteresis; separate concerns.
-- MOMP: `momp/19.2.1-mikeei-1` is affected; carrying #20642 before merge would be a fork delta requiring an active contract under `AGENTS.md` Fork Delta Decision, not decided here.
+- MOMP: `MOMP-TOOL-ALLOCATION` in `CONTRACTS.md` owns the interim fork delta and its removal condition.
 
 ## Verification
 
-- `bun issues/evidence/issue-040/repro-allocation.ts` against the #20642 head: every allocation of 3 to 14 rows paints exactly that many rows, and frames for body rows 8 and 9 show no blank rows between the card and the dock.
-- The same check with an eval card (`omp.tool.eval`, look `eval`) taller than its allocation.
+- `bun test packages/coding-agent/test/tools/tool-block-allocation.test.ts` → pass.
+- `bun issues/evidence/issue-040/repro-allocation.ts`: every allocation of 3 to 14 rows paints exactly that many rows; frames for body rows 8 and 9 show no blank rows between card and dock.
+- Installed TUI inside tmux on Termius/iOS: a long-running Task or Eval no longer shows the stub over blank rows.
 
 ## Publication-Blockers
 
 - Authorized-Work and Publication-Target are not selected.
 - No verified case that #20642's head leaves unfixed; without one, there is nothing to publish.
-- Eval-look coverage by #20642 is assumed, not checked.
 
 ## Next-Action
 
-Summary: Verify PR 20642 head
-Action: Run the ISSUE-040 reproduction and an eval-look variant against #20642 head `6d18ffc0db` in a detached worktree.
-Done-When: Results for both scenarios are recorded in Evidence, and Next-Action either awaits #20642's merge or names an uncovered case.
+Summary: Await PR 20642 merge
+Action: Check #20642 at each MOMP upgrade; when a selected base contains it, remove `MOMP-TOOL-ALLOCATION` and archive this record as Fixed-Elsewhere.
+Done-When: A released upstream base contains #20642's fix and the fork closure is removed.
