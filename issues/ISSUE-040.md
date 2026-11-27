@@ -1,9 +1,9 @@
 # ISSUE-040 — TUI: a running tool card taller than its viewport allocation collapses to a 2-row stub over blank rows
 
-State: Investigating
-Authorized-Work: Not-Selected
-Publication-Target: Not-Selected
-External-Reference: Not published.
+State: Submitted
+Authorized-Work: Research-and-Reporting
+Publication-Target: Existing-pull-request-comment
+External-Reference: https://github.com/can1357/oh-my-pi/pull/20642#issuecomment-7222573267
 Contribution-Priority: Medium
 Root-Cause-Confidence: High
 Finding-Category: UI
@@ -85,8 +85,37 @@ MOMP carries its head without the changelog entry as `MOMP-TOOL-ALLOCATION` unti
 
 ## Publication-Blockers
 
-- Authorized-Work and Publication-Target are not selected.
-- No verified case that #20642's head leaves unfixed; without one, there is nothing to publish.
+None.
+
+## Publication-Draft
+
+Target: https://github.com/can1357/oh-my-pi/pull/20642 (PR conversation comment; head `6d18ffc0db`).
+Basis: `CONTRIBUTING.md` routes problems an open PR already fixes to that PR; the comment adds eval-look and installed-build evidence its test and body lack.
+
+````markdown
+Hi, thanks for working on this.
+
+I hit the same stub on 19.2.1 (Task and Eval cards in a small tmux pane) and checked this PR's head `6d18ffc0db` against it. Sharing the results in case they help review:
+
+- Headless repro on `v19.2.1` (`TermBackend` with a frame-recording driver, 60x14 screen, 3-row dock, one other active block): a running card one row taller than its allocation paints `╭─ Task` / `╰`, and the viewport pin fills the rest of the allocation with blank rows. One row less restores the full card, so a card that grows row by row flips between the two on every update.
+- With this PR's diff applied (changelog entry excluded), the same card paints exactly its allocation (`h=14 → 14`, `h=9 → 9`, `h=2 → 2`), with no blank rows before the dock.
+- Eval cards, which `tool-block-allocation.test.ts` does not cover: a running cell with 40 output lines and an `agent()` status row keeps its `╭─── 🐍 running <title>` edge, newest output rows, closing edge, and agent row at 9 and at 4 rows. The output phase without `details.cells` falls back to its first non-blank row, which matches its full-height look (that look has no title row).
+- An installed build in a 70x18 tmux pane, streaming a 45-line eval cell: the card kept its titled edge over its newest rows throughout.
+
+On `v19.2.1` the diff also needs the `ANCHOR` pattern and `hasGraphics` import in `packages/tui/src/driver/images/anchor.ts` from 1b8799b5bf; on current `main` it applies as is.
+
+No changes requested from my side.
+
+### Disclosure
+
+Investigated thoroughly with Claude Opus 5.5 (medium reasoning effort), using [Oh My Pi](https://github.com/can1357/oh-my-pi) as the agent framework.
+
+This report is not generic or unreviewed AI-generated output. Its claims were checked against the cited evidence, and it includes the relevant detail intended to help maintainers resolve the issue.
+
+If reports like this are not useful to the project, please let me know and I will refrain from submitting similar ones. My intent is to help without wasting maintainer time or energy or discouraging their work.
+
+Thank you for your work.
+````
 
 ## Next-Action
 

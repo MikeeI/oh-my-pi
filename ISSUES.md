@@ -29,7 +29,7 @@ Next finding ID: ISSUE-041
 | [ISSUE-032](issues/ISSUE-032.md) | Usage: Mistral Vibe Code budget is not reported | Submitted | Pull-Request-Implementation | New-pull-request | Medium | Await maintainer review | https://github.com/can1357/oh-my-pi/pull/18723 |
 | [ISSUE-034](issues/ISSUE-034.md) | Compaction: the grace-cap pass aborts a running remote speculation and re-sends it | Submitted | Pull-Request-Implementation | New-pull-request | High | Await maintainer review | https://github.com/can1357/oh-my-pi/pull/20201 |
 | [ISSUE-038](issues/ISSUE-038.md) | Startup: a cold built-in account default starts on another provider when no local discovery provider is enabled | Investigating | Not-Selected | Not-Selected | Medium | Select contribution path | Not published. |
-| [ISSUE-040](issues/ISSUE-040.md) | TUI: a running tool card taller than its viewport allocation collapses to a 2-row stub over blank rows | Investigating | Not-Selected | Not-Selected | Medium | Await PR 20642 merge | Not published. |
+| [ISSUE-040](issues/ISSUE-040.md) | TUI: a running tool card taller than its viewport allocation collapses to a 2-row stub over blank rows | Submitted | Research-and-Reporting | Existing-pull-request-comment | Medium | Await PR 20642 merge | https://github.com/can1357/oh-my-pi/pull/20642#issuecomment-7222573267 |
 
 ## Archived-Findings
 
